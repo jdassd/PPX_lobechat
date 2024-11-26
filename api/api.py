@@ -19,3 +19,18 @@ class API(System, Storage):
     def setWindow(self, window):
         '''获取窗口实例'''
         System._window = window
+    #     # 注入JavaScript以监听快捷键
+    #     js = """
+    #             document.addEventListener('keydown', function(event) {
+    #                 if (event.ctrlKey && event.shiftKey && event.key === 'H') {
+    #                     window.pywebview.api.trigger_hotkey();
+    #                 }
+    #             });
+    #             """
+    #     window.evaluate_js(js)
+    #
+    # def trigger_hotkey(self):
+    #     self.on_hotkey_pressed()
+    #
+    # def on_hotkey_pressed(self):
+    #     print("快捷键被触发!")

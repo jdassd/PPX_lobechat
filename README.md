@@ -1,3 +1,17 @@
+## 介绍
+
+本项目是为了将 lobechat 打包到各个平台，原本使用的是 Tauri 2.1.1 打包，但是因为不熟悉 Rust 语言的原因，所以改用了 Python 的方式进行打包。
+
+借用开源项目 PPX ，可以很方便的将 Vue 嵌入各个平台，虽然在某些打包方式上略有遗憾，比如 Mac M芯片 打包的安装包，只能安装在 M芯片的 Mac 上面，但是依旧可以完成许多内容，没有必要在事事的开始就追求完美，走一步算一步先用起来才是好的方案。
+
+### 问题与解决
+当有人帮忙把遇到的问题与解决方案明确详细的告知时，会让进度明显的加快，你，我的朋友，你应该也需要充分利用你的时间，所以我们应该让整个过程都加快，所以我会毫无保留的写下问题与我的解决方式，供你参考。
+1. 对于 pnpm 的问题，首先需要将 pnpm 换源：
+`pnpm config set registry https://registry.npmmirror.com `
+2. 对于 安装时报错 有时候是因为 vs 组件的问题，到这里 https://visualstudio.microsoft.com/visual-cpp-build-tools/ 下载C++生成工具，一定要完整安装，并且卸载以前有问题的版本，就可以解决问题。
+
+# 以下为原始内容
+
 ## 前言
 
 [**PPX**](https://blog.pangao.vip/docs-ppx/)（曾用名 vue-pywebview-pyinstaller）。第一个 **P** 表示 **P**ython ，当然，也可以表示 **P**angao（潘高，也就是我本人）。第二个 **P** 表示 **P**ywebview ，也可以表示 **P**yinstaller 。第三个 **X** 表示无限可能，指视图层可以使用 Vue、React、Angular、HTML 中的任意一种。
