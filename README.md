@@ -10,6 +10,24 @@
 `pnpm config set registry https://registry.npmmirror.com `
 2. 对于 安装时报错 有时候是因为 vs 组件的问题，到这里 https://visualstudio.microsoft.com/visual-cpp-build-tools/ 下载C++生成工具，一定要完整安装，并且卸载以前有问题的版本，就可以解决问题。
 
+3. 运行项目时提示 "ModuleNotFoundError: No module named 'keyboard'" 错误：
+   - 这是因为需要在项目自带的虚拟环境中安装 keyboard 包，而不是在全局环境或其他虚拟环境中安装
+   - 解决方法：
+     ```bash
+     # Windows系统
+     .\pyapp\pyenv\pyenv\Scripts\activate  # 激活项目自带的虚拟环境
+     pip install keyboard                  # 安装 keyboard 包
+     deactivate                           # 退出虚拟环境
+     
+     # macOS/Linux系统
+     ./pyapp/pyenv/bin/pip install keyboard
+     ```
+
+4. 全局快捷键在不同操作系统上的支持：
+   - Windows/Linux: 使用 Alt + Shift + Q 切换窗口显示/隐藏
+   - macOS: 使用 Option(Alt) + Shift + Q 切换窗口显示/隐藏
+   - 注意：在 macOS 上可能需要授予应用辅助功能权限才能使用全局快捷键
+
 # 以下为原始内容
 
 ## 前言
@@ -558,6 +576,12 @@ m=备注迁移信息 pnpm run alembic
 - 在 Windows 系统下，请不要使用中文路径，否则可能会出现 cannot call null pointer pointer from cdata 'int(_)(void _, int)' 等错误信息。mac 系统无此问题。
 
 ## 历史版本
+
+#### V5.2.2
+
+- 新增全局快捷键功能（Alt+Shift+Q）用于显示/隐藏窗口
+- 优化窗口显示逻辑，实现显示时临时置顶效果
+- 修复了浏览器缓存数据丢失的问题（设置 private_mode=False）
 
 #### V5.2.1
 

@@ -25,7 +25,7 @@ class Config:
     ##
     appName = 'LobeChat - Jdassd'  # 应用名称
     appNameEN = 'LobeChat - Jdassd'    # 应用名称-英文（用于生成缓存文件夹，必须是英文）
-    appVersion = "V1.0.0"  # 应用版本号
+    appVersion = "V5.2.2"  # 应用版本号
     appDeveloper = "Jdassd"  # 应用开发者
     appBlogs = "https://www.jdassd.top"  # 个人博客
     appPackage = 'top.jdassd'    # 应用包名，用于在本地电脑生成 vip.pangao.ppx 唯一文件夹
