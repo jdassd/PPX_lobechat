@@ -57,12 +57,14 @@ def toggle_window_visibility():
 def setup_global_hotkey():
     """设置全局快捷键"""
     system = platform.system()
-    if system == 'Darwin':  # macOS
-        # macOS 上使用 Option(Alt) + Shift + Q
-        keyboard.add_hotkey('alt+shift+q', toggle_window_visibility)
-    else:  # Windows 和 Linux
-        # Windows 和 Linux 上使用 Alt + Shift + Q
-        keyboard.add_hotkey('alt+shift+q', toggle_window_visibility)
+    
+    def handle_hotkey(e):
+        if ((system == 'Darwin' and keyboard.is_pressed('alt') and keyboard.is_pressed('shift') and keyboard.is_pressed('q')) or
+            (system != 'Darwin' and keyboard.is_pressed('alt') and keyboard.is_pressed('shift') and keyboard.is_pressed('q'))):
+            toggle_window_visibility()
+    
+    # 使用监听方式而不是热键绑定
+    keyboard.hook(handle_hotkey)
 
 def on_shown():
     # print('程序启动')
@@ -120,7 +122,8 @@ def WebViewApp(ifCef=False):
         width=initWidth, 
         height=initHeight, 
         min_size=(minWidth, minHeight),
-        on_top=False  # 默认不置顶，只在需要时通过 move_to_front() 置顶
+        on_top=False,  # 默认不置顶，只在需要时通过 move_to_front() 置顶
+        text_select=True  # 启用文本选择功能
     )
     
     # 存储窗口实例到全局变量
