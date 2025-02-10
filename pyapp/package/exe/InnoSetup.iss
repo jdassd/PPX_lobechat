@@ -1,20 +1,20 @@
 
-; 脚本由 Inno Setup 脚本向导 生成！
-; 有关创建 Inno Setup 脚本文件的详细资料请查阅帮助文档！
+; �ű��� Inno Setup �ű��� ���ɣ�
+; �йش��� Inno Setup �ű��ļ�����ϸ��������İ����ĵ���
 
-#define MyAppName "PPX"
-#define MyAppVersion "1.0.0"
-#define MyAppPublisher "PanGao"
-#define MyAppURL "http://blog.pangao.vip"
-#define MyAppExeName "PPX.exe"
-#define MyAppAssocName MyAppName + " 文件"
+#define MyAppName "LobeChat - Jdassd"
+#define MyAppVersion "5.2.3"
+#define MyAppPublisher "Jdassd"
+#define MyAppURL "https://www.jdassd.top"
+#define MyAppExeName "LobeChat - Jdassd.exe"
+#define MyAppAssocName MyAppName + " �ļ�"
 #define MyAppAssocExt ".myp"
 #define MyAppAssocKey StringChange(MyAppAssocName, " ", "") + MyAppAssocExt
 
 [Setup]
-; 注: AppId的值为单独标识该应用程序。
-; 不要为其他安装程序使用相同的AppId值。
-; (若要生成新的 GUID，可在菜单中点击 "工具|生成 GUID"。)
+; ע: AppId��ֵΪ������ʶ��Ӧ�ó���
+; ��ҪΪ������װ����ʹ����ͬ��AppIdֵ��
+; (��Ҫ�����µ� GUID�����ڲ˵��е�� "����|���� GUID"��)
 AppId={{F35003AB-441A-C0A6-4527-937E6A02F789}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
@@ -26,11 +26,11 @@ AppUpdatesURL={#MyAppURL}
 DefaultDirName={autopf}\{#MyAppName}
 ChangesAssociations=yes
 DisableProgramGroupPage=yes
-; 移除以下行，以在管理安装模式下运行（为所有用户安装）。
+; �Ƴ������У����ڹ���װģʽ�����У�Ϊ�����û���װ����
 PrivilegesRequired=lowest
-OutputDir=C:\pywebview\PPX\build
-OutputBaseFilename=PPX-V1.0.0_Windows
-SetupIconFile=C:\pywebview\PPX\pyapp\icon\logo.ico
+OutputDir=D:\bc\PPX\build
+OutputBaseFilename=LobeChat - Jdassd-V5.2.3_Windows
+SetupIconFile=D:\bc\PPX\pyapp\icon\logo.ico
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -42,8 +42,8 @@ Name: "chinesesimp"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "C:\pywebview\PPX\build\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-; 注意: 不要在任何共享系统文件上使用“Flags: ignoreversion”
+Source: "D:\bc\PPX\build\{#MyAppName}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+; ע��: ��Ҫ���κι���ϵͳ�ļ���ʹ�á�Flags: ignoreversion��
 
 [Registry]
 Root: HKA; Subkey: "Software\Classes\{#MyAppAssocExt}\OpenWithProgids"; ValueType: string; ValueName: "{#MyAppAssocKey}"; ValueData: ""; Flags: uninsdeletevalue

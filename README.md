@@ -589,6 +589,11 @@ m=备注迁移信息 pnpm run alembic
 - 优化窗口显示逻辑，实现显示时临时置顶效果
 - 修复了浏览器缓存数据丢失的问题（设置 private_mode=False）
 
+##### PanGao
+
+- pywebview 模块升级到 5.4
+- pyinstaller 模块升级到 6.12.0
+
 #### V5.2.1
 
 - pywebview 模块升级到 5.3.2

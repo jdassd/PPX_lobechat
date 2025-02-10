@@ -4,7 +4,7 @@
 Author: 潘高
 LastEditors: 潘高
 Date: 2022-03-21 16:54:23
-LastEditTime: 2024-10-23 20:05:08
+LastEditTime: 2025-02-10 14:03:02
 Description: 配置文件
 usage:
     from pyapp.config.config import Config
