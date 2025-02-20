@@ -1,7 +1,7 @@
 name: build
 on:
   push:
-    branches: [main]
+    branches: [lobechat_jdassd]
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -55,4 +55,4 @@ jobs:
         with:
           name: Setup_${{ runner.os }}
           retention-days: 1
-          path: build/*-*_*.*
+          path: build
