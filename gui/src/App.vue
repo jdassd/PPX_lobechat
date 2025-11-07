@@ -1,27 +1,42 @@
 <script setup>
-import HelloWorld from './components/HelloWorld.vue'
+import { computed, onMounted, watch } from 'vue'
+import { useToolkitStore } from '@/stores/toolkit'
+import AppHeader from '@/components/shell/AppHeader.vue'
+import SideNav from '@/components/shell/SideNav.vue'
+import InsightPanel from '@/components/shell/InsightPanel.vue'
+import ToolGrid from '@/components/tools/ToolGrid.vue'
+
+const store = useToolkitStore()
+const themeClass = computed(() => `theme-${store.theme}`)
+
+const applyTheme = (theme) => {
+  if (typeof document === 'undefined') {
+    return
+  }
+  const root = document.documentElement
+  root.setAttribute('data-theme', theme)
+}
+
+onMounted(async () => {
+  await store.bootstrap()
+  applyTheme(store.theme)
+})
+
+watch(
+  () => store.theme,
+  (theme) => applyTheme(theme)
+)
 </script>
 
-
 <template>
-  <div class="center-col h100 w100 scroll">
-    <div class="logo-box">
-      <img alt="pywebview logo" src="./assets/pywebview.png" />
-      <img class="ml50 mr50" alt="pyinstaller logo" src="./assets/pyinstaller.png" />
-      <img alt="Vue logo" src="./assets/vue.png" />
+  <div class="app-shell" :class="themeClass">
+    <AppHeader />
+    <div class="app-shell__body">
+      <SideNav />
+      <main class="app-shell__main">
+        <ToolGrid />
+      </main>
+      <InsightPanel />
     </div>
-    <HelloWorld class="m30" msg="PPX (Pywebview + PyInstaller + Vue3)" />
   </div>
 </template>
-
-<style>
-.scroll {
-  overflow: scroll;
-  background-color: #F7F7F7;
-  height: 100vh;
-}
-
-.logo-box span {
-  width: 74px;
-}
-</style>

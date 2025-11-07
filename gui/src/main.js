@@ -1,7 +1,10 @@
 import { createApp } from 'vue'
+import { createPinia } from 'pinia'
 import App from './App.vue'
 
 const app = createApp(App)
+const pinia = createPinia()
+app.use(pinia)
 
 // 组件库 ElementPlus
 import ElementPlus from 'element-plus'
