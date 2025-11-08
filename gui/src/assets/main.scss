@@ -16,11 +16,6 @@ body,
     font-size: 14px;
     overflow: hidden;
     position: relative;
-    -ms-overflow-style: none;// Chorme 隐藏滚动条
-    // IE/Edge 隐藏滚动条
-    ::-webkit-scrollbar {
-        display: none;
-    }
 }
 
 :root {
@@ -340,15 +335,34 @@ body,
 
 /* 应用壳体 */
 .app-shell {
+    height: 100vh;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
     background: radial-gradient(circle at top, #f5f7ff, #ecf0f3);
     color: var(--el-text-color-primary);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(64, 158, 255, 0.4) transparent;
+
+    &::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: transparent;
+        border-radius: 999px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background-color: rgba(64, 158, 255, 0.35);
+        border-radius: 999px;
+    }
 }
 
 .app-shell__body {
     flex: 1;
+    min-height: 0;
     display: grid;
     grid-template-columns: 220px 1fr 280px;
     gap: 16px;
