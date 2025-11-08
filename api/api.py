@@ -11,10 +11,9 @@ usage: 在Javascript中调用window.pywebview.api.<methodname>(<parameters>)
 
 from api.storage import Storage
 from api.system import System
-from api.toolkit import Toolkit
 
 
-class API(System, Storage, Toolkit):
+class API(System, Storage):
     '''业务层API，供前端JS调用'''
 
     def setWindow(self, window):
