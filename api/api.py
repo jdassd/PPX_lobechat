@@ -13,9 +13,10 @@ from api.storage import Storage
 from api.system import System
 from api.pdf import PDF
 from api.excel import Excel
+from api.seal import Seal
 
 
-class API(System, Storage, PDF, Excel):
+class API(System, Storage, PDF, Excel, Seal):
     '''业务层API，供前端JS调用'''
 
     def setWindow(self, window):

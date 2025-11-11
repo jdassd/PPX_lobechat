@@ -4,6 +4,7 @@ import { Document, Files, Stamp, Setting } from '@element-plus/icons-vue'
 import BtnUpdate from './components/BtnUpdate.vue'
 import PdfTool from './components/pdf/PdfTool.vue'
 import ExcelTool from './components/excel/ExcelTool.vue'
+import SealTool from './components/seal/SealTool.vue'
 
 const heroStats = [
   { label: '固定窗口', value: '1200 × 720 px', desc: '桌面端统一画布，防止布局跳动' },
@@ -49,8 +50,8 @@ const featureCards = [
     desc: '内置模板快速生成电子印章',
     icon: markRaw(Stamp),
     tags: ['模板管理', '透明导出'],
-    action: '稍后开放',
-    disabled: true,
+    action: '立即体验',
+    disabled: false,
     points: [
       '提供常见圆章、椭圆章等基础模板',
       '可自定义文字、字号、弧度与描边',
@@ -90,6 +91,7 @@ const checklist = [
 
 const pdfToolVisible = ref(false)
 const excelToolVisible = ref(false)
+const sealToolVisible = ref(false)
 
 const onFeatureAction = (feature) => {
   if (feature.disabled) {
@@ -101,6 +103,10 @@ const onFeatureAction = (feature) => {
   }
   if (feature.id === 'pdf') {
     pdfToolVisible.value = true
+    return
+  }
+  if (feature.id === 'seal') {
+    sealToolVisible.value = true
   }
 }
 
@@ -196,6 +202,7 @@ const onFeatureAction = (feature) => {
   </div>
   <PdfTool v-model="pdfToolVisible" />
   <ExcelTool v-model="excelToolVisible" />
+  <SealTool v-model="sealToolVisible" />
 </template>
 
 <style scoped>
