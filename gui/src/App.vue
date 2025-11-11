@@ -1,7 +1,8 @@
 <script setup>
-import { markRaw } from 'vue'
+import { markRaw, ref } from 'vue'
 import { Document, Files, Stamp, Setting } from '@element-plus/icons-vue'
 import BtnUpdate from './components/BtnUpdate.vue'
+import PdfTool from './components/pdf/PdfTool.vue'
 
 const heroStats = [
   { label: '固定窗口', value: '1200 × 720 px', desc: '桌面端统一画布，防止布局跳动' },
@@ -16,7 +17,8 @@ const featureCards = [
     desc: '针对固定结构的电子表格批处理',
     icon: markRaw(Document),
     tags: ['数据标准化', '图表导出'],
-    action: '稍后开启',
+    action: '稍后开放',
+    disabled: true,
     points: [
       '第一行支持自定义字段定义，允许通过分隔符快速匹配',
       '从第二行开始逐行清洗，可插入自定义逻辑',
@@ -31,7 +33,8 @@ const featureCards = [
     desc: '转换、合并与切割一体化',
     icon: markRaw(Files),
     tags: ['高清转换', '批量任务'],
-    action: '稍后开启',
+    action: '立即体验',
+    disabled: false,
     points: [
       'PDF 转高清图片，保留矢量细节',
       '一键生成仿真扫描件效果',
@@ -45,7 +48,8 @@ const featureCards = [
     desc: '内置模板快速生成电子印章',
     icon: markRaw(Stamp),
     tags: ['模板管理', '透明导出'],
-    action: '稍后开启',
+    action: '稍后开放',
+    disabled: true,
     points: [
       '提供常见圆章、椭圆章等基础模板',
       '可自定义文字、字号、弧度与描边',
@@ -55,10 +59,11 @@ const featureCards = [
   {
     id: 'roadmap',
     title: '功能预告',
-    desc: '第 6 类工具正在设计中',
+    desc: '共 6 类工具正在设计中',
     icon: markRaw(Setting),
     tags: ['需求收集中'],
     action: '提交想法',
+    disabled: true,
     points: [
       '更多 Office/PDF 自动化脚本接入',
       '结合 TinyDB/SQLite 打造轻量数据管道',
@@ -81,6 +86,18 @@ const checklist = [
     detail: '运行 pnpm run start 联调前后端，发版前执行 pnpm -C gui run build 及 pnpm run pre:<platform>。'
   }
 ]
+
+const pdfToolVisible = ref(false)
+
+const onFeatureAction = (feature) => {
+  if (feature.disabled) {
+    return
+  }
+  if (feature.id === 'pdf') {
+    pdfToolVisible.value = true
+  }
+}
+
 </script>
 
 <template>
@@ -140,7 +157,13 @@ const checklist = [
                 <div class="tags">
                   <el-tag v-for="tag in feature.tags" :key="tag" size="small" effect="plain">{{ tag }}</el-tag>
                 </div>
-                <el-button size="small" type="primary" plain :disabled="feature.id !== 'roadmap'">
+                <el-button
+                  size="small"
+                  type="primary"
+                  plain
+                  :disabled="feature.disabled"
+                  @click="onFeatureAction(feature)"
+                >
                   {{ feature.action }}
                 </el-button>
               </div>
@@ -165,6 +188,7 @@ const checklist = [
       </main>
     </div>
   </div>
+  <PdfTool v-model="pdfToolVisible" />
 </template>
 
 <style scoped>
