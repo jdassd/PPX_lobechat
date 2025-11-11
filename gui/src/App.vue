@@ -3,6 +3,7 @@ import { markRaw, ref } from 'vue'
 import { Document, Files, Stamp, Setting } from '@element-plus/icons-vue'
 import BtnUpdate from './components/BtnUpdate.vue'
 import PdfTool from './components/pdf/PdfTool.vue'
+import ExcelTool from './components/excel/ExcelTool.vue'
 
 const heroStats = [
   { label: '固定窗口', value: '1200 × 720 px', desc: '桌面端统一画布，防止布局跳动' },
@@ -17,8 +18,8 @@ const featureCards = [
     desc: '针对固定结构的电子表格批处理',
     icon: markRaw(Document),
     tags: ['数据标准化', '图表导出'],
-    action: '稍后开放',
-    disabled: true,
+    action: '立即体验',
+    disabled: false,
     points: [
       '第一行支持自定义字段定义，允许通过分隔符快速匹配',
       '从第二行开始逐行清洗，可插入自定义逻辑',
@@ -66,7 +67,7 @@ const featureCards = [
     disabled: true,
     points: [
       '更多 Office/PDF 自动化脚本接入',
-      '结合 TinyDB/SQLite 打造轻量数据管道',
+      '结合 TinyDB/SQLite 打造轻量数据管理',
       '计划加入任务编排与批处理命令面板'
     ]
   }
@@ -88,9 +89,14 @@ const checklist = [
 ]
 
 const pdfToolVisible = ref(false)
+const excelToolVisible = ref(false)
 
 const onFeatureAction = (feature) => {
   if (feature.disabled) {
+    return
+  }
+  if (feature.id === 'excel') {
+    excelToolVisible.value = true
     return
   }
   if (feature.id === 'pdf') {
@@ -189,6 +195,7 @@ const onFeatureAction = (feature) => {
     </div>
   </div>
   <PdfTool v-model="pdfToolVisible" />
+  <ExcelTool v-model="excelToolVisible" />
 </template>
 
 <style scoped>
