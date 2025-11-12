@@ -1,9 +1,9 @@
 {
-  "name": "ppx",
+  "name": "tools",
   "private": true,
-  "version": "5.3.0",
-  "description": "PPX是一款基于pywebview和PyInstaller框架，构建macOS、Windows和Linux平台客户端的应用框架。本框架的视图层支持Vue、React、Angular、HTML中的任意一种，业务层采用本地Python+调用远程API。",
-  "author": "潘高 <pangao1990@qq.com>",
+  "version": "1.0.0",
+  "description": "多功能工具箱的目标是采用简洁美观现代的界面，提供常用的一些工具，一次付费，终身使用，无广告，包更新",
+  "author": "jdassd <jdassd@163.com>",
   "scripts": {
     "initComments": "清空缓存，配置环境",
     "init": "pnpm run clean && pnpm install && pnpm run initInstall",

@@ -23,14 +23,14 @@ class Config:
     ##
     # 程序基础配置信息
     ##
-    appName = 'PPX'  # 应用名称
-    appNameEN = 'ppx'    # 应用名称-英文（用于生成缓存文件夹，必须是英文）
-    appVersion = "V5.3.3"  # 应用版本号
-    appDeveloper = "PanGao"  # 应用开发者
-    appBlogs = "https://blog.pangao.vip"  # 个人博客
-    appPackage = 'vip.pangao'    # 应用包名，用于在本地电脑生成 vip.pangao.ppx 唯一文件夹
-    appUpdateUrl = 'https://api.github.com/repos/pangao1990/ppx/releases/latest'    # 获取程序更新信息 https://api.github.com/repos/pangao1990/ppx/releases/latest
-    appISSID = 'F35003AB-441A-C0A6-4527-937E6A02F789'    # Inno Setup 打包唯一编号。在执行 pnpm run init 之前，请设置为空，程序会自动生成唯一编号，生成后请勿修改！！！
+    appName = '多功能工具箱'  # 应用名称
+    appNameEN = 'tools'    # 应用名称-英文（用于生成缓存文件夹，必须是英文）
+    appVersion = "V1.0.0"  # 应用版本号
+    appDeveloper = "Jdassd"  # 应用开发者
+    appBlogs = "https://baidu.com"  # 个人博客
+    appPackage = 'ppx.jdassd'    # 应用包名，用于在本地电脑生成 vip.pangao.ppx 唯一文件夹
+    appUpdateUrl = 'https://api.github.com/repos/jdassd/PPX_lobechat/releases/latest'    # 获取程序更新信息 https://api.github.com/repos/pangao1990/ppx/releases/latest
+    appISSID = ''    # Inno Setup 打包唯一编号。在执行 pnpm run init 之前，请设置为空，程序会自动生成唯一编号，生成后请勿修改！！！
 
     ##
     # 系统配置信息（不需要修改，可以自动获取）
@@ -50,7 +50,7 @@ class Config:
     devEnv = True    # 是否为开发环境，不需要手动更改，在程序运行的时候自动判断
     ifCoverDB = False    # 是否覆盖电脑上存储的数据库，默认不覆盖。只有在变更数据库密码或者数据库改动非常大，不得已的情况下才建议覆盖数据库
     typeDB = 'json'    # 数据库类型，目前支持: json, sql
-    pwDB = b'XnDRG0k1Q7hz-FxOyIRlGnUlRS6kTaUq_6ZwJbirkwY='    # 数据库密码，typeDB=json时有效。若要重置密码，请在执行 pnpm run init 之前，设置为空，程序会自动生成密码，生成后请勿修改！！！
+    pwDB = b''    # 数据库密码，typeDB=json时有效。若要重置密码，请在执行 pnpm run init 之前，设置为空，程序会自动生成密码，生成后请勿修改！！！
 
     ##
     # 函数
