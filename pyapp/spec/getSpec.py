@@ -25,6 +25,7 @@ ifLinux = args.if_linux
 buildPath = 'build'    # 存放最终打包成app的相对路径
 console = False    # 是否展示终端
 appName = Config.appName    # 项目名称
+appCollectName = Config.appNameEN    # 打包输出文件夹名称
 version = Config.appVersion    # 版本号
 logoExt = 'icns' if ifMac else 'png' if ifLinux else 'ico'
 
@@ -104,7 +105,7 @@ coll = COLLECT(exe,
                 strip=False,
                 upx=True,
                 upx_exclude=[],
-                name=appName)
+                name='{appCollectName}')
 app = BUNDLE(coll,
             name=appName+'.app',
             icon=icoPath,
@@ -165,7 +166,7 @@ coll = COLLECT(exe,
             strip=False,
             upx=True,
             upx_exclude=[],
-            name=appName)
+            name='{appCollectName}')
 
 '''
 

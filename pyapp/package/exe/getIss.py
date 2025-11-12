@@ -14,7 +14,8 @@ pyappDir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 sys.path.append(pyappDir)
 from config.config import Config
 
-appName = Config.appName    # 应用名称
+appName = Config.appName    # 应用名称（展示用）
+appNameEN = Config.appNameEN    # 应用名称-英文（用于生成文件夹）
 appVersion = Config.appVersion  # 应用版本号
 appVersion = appVersion[1:]    # 去掉第一位V
 appDeveloper = Config.appDeveloper  # 应用开发者
@@ -33,6 +34,7 @@ def getIss():
 
 #define MyAppName "''' + appName + '''"
 #define MyAppVersion "''' + appVersion + '''"
+#define MyAppFolderName "''' + appNameEN + '''"
 #define MyAppPublisher "''' + appDeveloper + '''"
 #define MyAppURL "''' + appBlogs + '''"
 #define MyAppExeName "''' + appName + '''.exe"
@@ -71,7 +73,7 @@ Name: "chinesesimp"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "''' + buildDir + '''\{#MyAppName}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+Source: "''' + buildDir + '''\{#MyAppFolderName}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 ; 注意: 不要在任何共享系统文件上使用“Flags: ignoreversion”
 
 [Registry]
@@ -93,5 +95,5 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChang
 
 # 生成配置文件
 issDir = os.path.dirname(__file__)
-with open(os.path.join(issDir, 'InnoSetup.iss'), 'w+', encoding='gbk') as f:
+with open(os.path.join(issDir, 'InnoSetup.iss'), 'w+', encoding='utf-8-sig') as f:
     f.write(getIss())
