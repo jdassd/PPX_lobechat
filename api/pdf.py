@@ -8,6 +8,7 @@ Description: PDF 工具相关 API
 
 from datetime import datetime
 import random
+from io import BytesIO
 from pathlib import Path
 from typing import Dict, Iterable, List
 
@@ -314,3 +315,68 @@ class PDF():
             return {'code': 0, 'msg': f'已导出 {len(targets)} 页', 'output': str(dest)}
         except Exception as exc:
             return {'code': -1, 'msg': f'切割失败：{exc}'}
+
+    def pdf_compress(self, options: Dict = None):
+        '''通过图片栅格化压缩 PDF'''
+        try:
+            opts = self._validate_payload(options)
+            file_path = opts.get('filePath', '')
+            mode = str(opts.get('mode') or 'medium')
+            custom_dpi = int(opts.get('customDpi') or 200)
+            output_path = opts.get('outputPath') or self._compose_output_path(
+                opts.get('outputDir', ''), opts.get('outputName', '')
+            )
+
+            dpi_presets = {
+                'low': 280,      # 压缩率低：更高清
+                'medium': 200,   # 平衡
+                'high': 130      # 压缩率高：更小
+            }
+            quality_presets = {
+                'low': 92,
+                'medium': 88,
+                'high': 82,
+                'custom': 90
+            }
+
+            if mode == 'custom':
+                dpi = max(72, min(400, custom_dpi))
+            else:
+                dpi = dpi_presets.get(mode, dpi_presets['medium'])
+            jpg_quality = quality_presets.get(mode, quality_presets['medium'])
+
+            source = self._ensure_pdf_file(file_path)
+            dest = self._resolve_output_path(source, output_path, 'compressed')
+
+            zoom = dpi / 72
+            matrix = fitz.Matrix(zoom, zoom)
+
+            result_doc = fitz.open()
+            try:
+                with fitz.open(source) as doc:
+                    if doc.page_count == 0:
+                        raise ValueError('PDF 内无页面')
+                    for page_index in range(doc.page_count):
+                        page = doc.load_page(page_index)
+                        pix = page.get_pixmap(matrix=matrix, alpha=False)
+                        image = self._pil_from_pixmap(pix)
+                        buffer = BytesIO()
+                        image.save(buffer, format='JPEG', quality=jpg_quality)
+                        img_bytes = buffer.getvalue()
+                        new_page = result_doc.new_page(width=page.rect.width, height=page.rect.height)
+                        new_page.insert_image(new_page.rect, stream=img_bytes)
+
+                if result_doc.page_count == 0:
+                    raise ValueError('压缩失败：生成页面为空')
+                result_doc.save(str(dest))
+            finally:
+                result_doc.close()
+
+            return {
+                'code': 0,
+                'msg': f'压缩完成，DPI={dpi}',
+                'output': str(dest),
+                'dpi': dpi
+            }
+        except Exception as exc:
+            return {'code': -1, 'msg': f'压缩失败：{exc}'}

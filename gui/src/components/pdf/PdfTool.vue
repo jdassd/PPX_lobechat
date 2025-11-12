@@ -144,6 +144,72 @@
           </section>
         </el-tab-pane>
 
+        <el-tab-pane label="PDF 压缩" name="compress">
+          <section class="panel">
+            <header>
+              <h4>按需压缩 PDF</h4>
+            </header>
+            <el-form :model="state.compress" label-width="110px">
+              <el-form-item label="源 PDF">
+                <div class="field-row">
+                  <el-button @click="selectPdf('compress')">选择 PDF</el-button>
+                  <span v-if="state.compress.file" class="file-chip">{{ state.compress.file.filename }}</span>
+                  <el-tag v-else type="info" effect="plain">尚未选择</el-tag>
+                </div>
+              </el-form-item>
+              <el-form-item label="压缩率">
+                <div class="field-row field-wrap">
+                  <el-radio-group v-model="state.compress.mode">
+                    <el-radio-button label="low">低（高清）</el-radio-button>
+                    <el-radio-button label="medium">中（均衡）</el-radio-button>
+                    <el-radio-button label="high">高（小体积）</el-radio-button>
+                    <el-radio-button label="custom">自定义</el-radio-button>
+                  </el-radio-group>
+                  <el-tag type="info" effect="plain">当前 DPI：{{ compressCurrentDpi }} DPI</el-tag>
+                </div>
+              </el-form-item>
+              <el-form-item v-if="state.compress.mode === 'custom'" label="自定义 DPI">
+                <el-input-number v-model="state.compress.customDpi" :min="72" :max="400" />
+              </el-form-item>
+              <el-form-item label="输出目录">
+                <div class="field-row">
+                  <el-input v-model="state.compress.outputDir" placeholder="可选" readonly />
+                  <el-button @click="selectDir('compress')">选择目录</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item label="输出文件名">
+                <el-input v-model="state.compress.outputName" placeholder="例如：压缩结果.pdf" />
+              </el-form-item>
+              <el-form-item>
+                <el-button
+                  type="primary"
+                  :loading="state.loading"
+                  @click="runCompress"
+                >
+                  开始压缩
+                </el-button>
+              </el-form-item>
+            </el-form>
+            <p class="dpi-hint">
+              推荐：低≈280 DPI（高清打印）、中≈200 DPI（通用传输）、高≈130 DPI（快速分享）。DPI 越低文件越小，越高越清晰。
+            </p>
+            <div v-if="state.compress.output" class="result-block">
+              <p class="result-title">压缩后的 PDF</p>
+              <el-scrollbar max-height="120px">
+                <div class="result-list">
+                  <el-tag
+                    type="success"
+                    effect="light"
+                    @click="openPath(state.compress.output)"
+                  >
+                    {{ state.compress.output }}
+                  </el-tag>
+                </div>
+              </el-scrollbar>
+            </div>
+          </section>
+        </el-tab-pane>
+
         <el-tab-pane label="合并 PDF" name="merge">
           <section class="panel">
             <header>
@@ -383,6 +449,12 @@ const visibleProxy = computed({
 
 const activeTab = ref('image')
 
+const compressModeDpiMap = {
+  low: 280,
+  medium: 200,
+  high: 130
+}
+
 const state = reactive({
   loading: false,
   toImage: {
@@ -401,6 +473,14 @@ const state = reactive({
     texture: true,
     noise: 6,
     result: []
+  },
+  compress: {
+    file: null,
+    mode: 'medium',
+    customDpi: 200,
+    outputDir: '',
+    outputName: '压缩结果.pdf',
+    output: ''
   },
   merge: {
     files: [],
@@ -425,6 +505,13 @@ const state = reactive({
     output: ''
   },
   logs: []
+})
+
+const compressCurrentDpi = computed(() => {
+  if (state.compress.mode === 'custom') {
+    return state.compress.customDpi || 200
+  }
+  return compressModeDpiMap[state.compress.mode] || compressModeDpiMap.medium
 })
 
 const ensurePyReady = () => {
@@ -539,6 +626,34 @@ const runScanEffect = async () => {
   })
   if (res) {
     state.scan.result = res.files || []
+  }
+}
+
+const runCompress = async () => {
+  if (!state.compress.file) {
+    ElMessage.warning('请选择 PDF 文件')
+    return
+  }
+  if (state.compress.mode === 'custom') {
+    const dpi = Number(state.compress.customDpi)
+    if (!dpi) {
+      ElMessage.warning('请输入自定义 DPI')
+      return
+    }
+    if (dpi < 72 || dpi > 400) {
+      ElMessage.warning('自定义 DPI 需在 72 - 400 之间')
+      return
+    }
+  }
+  const res = await callApi('pdf_compress', {
+    filePath: state.compress.file.path,
+    mode: state.compress.mode,
+    customDpi: state.compress.customDpi,
+    outputDir: state.compress.outputDir,
+    outputName: state.compress.outputName
+  })
+  if (res) {
+    state.compress.output = res.output
   }
 }
 
@@ -679,6 +794,17 @@ const runCut = async () => {
   gap: 12px;
   flex: 1;
   align-items: center;
+}
+
+.field-wrap {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dpi-hint {
+  margin: 8px 0 0;
+  color: #7a8093;
+  font-size: 13px;
 }
 
 .file-chip {
