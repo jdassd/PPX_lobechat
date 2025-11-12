@@ -1,10 +1,59 @@
 import { fileURLToPath, URL } from 'node:url'
+import fs from 'node:fs'
+import path from 'node:path'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
+const guiDir = fileURLToPath(new URL('.', import.meta.url))
+const portFilePath = path.resolve(guiDir, '../.ppx-dev-port')
+
+const devPortReporter = () => ({
+  name: 'ppx-dev-port-reporter',
+  apply: 'serve',
+  configureServer(server) {
+    const writePort = () => {
+      const address = server?.httpServer?.address()
+      if (address && typeof address === 'object' && address.port) {
+        const payload = {
+          port: address.port,
+          pid: process.pid,
+          time: Date.now()
+        }
+        try {
+          fs.writeFileSync(portFilePath, JSON.stringify(payload), 'utf-8')
+        } catch (error) {
+          console.warn('[ppx] 写入 dev port 失败:', error.message)
+        }
+      }
+    }
+
+    const cleanup = () => {
+      try {
+        if (fs.existsSync(portFilePath)) {
+          fs.unlinkSync(portFilePath)
+        }
+      } catch (error) {
+        console.warn('[ppx] 清理 dev port 文件失败:', error.message)
+      }
+    }
+
+    server?.httpServer?.once('listening', writePort)
+    server?.httpServer?.once('close', cleanup)
+    process.once('exit', cleanup)
+    process.once('SIGINT', () => {
+      cleanup()
+      process.exit(0)
+    })
+    process.once('SIGTERM', () => {
+      cleanup()
+      process.exit(0)
+    })
+  }
+})
+
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue(), devPortReporter()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))

@@ -10,8 +10,12 @@ usage: 运行前，请确保本机已经搭建Python3开发环境，且已经安
 '''
 
 import argparse
+import json
 import mimetypes
 import os
+import socket
+import time
+from contextlib import closing
 
 import webview
 
@@ -42,6 +46,75 @@ def on_closing():
     pass
 
 
+def _probe_port(host: str, port: int) -> bool:
+    '''简单探测某个端口是否可连接'''
+    try:
+        with closing(socket.create_connection((host, port), timeout=0.6)):
+            return True
+    except OSError:
+        return False
+
+
+def _dev_port_file():
+    return os.path.join(Config.codeDir, '.ppx-dev-port')
+
+
+def _read_dev_port_hint():
+    path = _dev_port_file()
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path, 'r', encoding='utf-8') as handler:
+            data = json.load(handler)
+        port = int(data.get('port'))
+        timestamp = float(data.get('time', 0)) / 1000.0
+        if port <= 0:
+            return None
+        if time.time() - timestamp > 120:
+            return None
+        return port
+    except Exception:
+        return None
+
+
+def _wait_dev_port_hint(timeout: float = 12.0):
+    deadline = time.time() + max(0.5, timeout)
+    while time.time() < deadline:
+        hint = _read_dev_port_hint()
+        if hint:
+            return hint
+        time.sleep(0.3)
+    return None
+
+
+def _resolve_dev_server(base_port: int, timeout: float = 25.0, span: int = 16):
+    '''探测实际启动的 Vite 端口（支持端口被占用后自动递增）'''
+    hosts = ['127.0.0.1', 'localhost']
+    hint_port = _wait_dev_port_hint(min(timeout * 0.4, 10))
+    if hint_port:
+        for host in hosts:
+            if _probe_port(host, hint_port):
+                Config.devPort = str(hint_port)
+                resolved = f'http://{host}:{hint_port}/'
+                print(f'[DevServer] 根据端口文件命中 {resolved}')
+                return resolved
+    if hint_port:
+        print(f'[DevServer] 端口文件 {hint_port} 无法连接，尝试扫描')
+    ports = [base_port + offset for offset in range(max(1, span))]
+    deadline = time.time() + max(1.0, timeout)
+    while time.time() < deadline:
+        for port in ports:
+            for host in hosts:
+                if _probe_port(host, port):
+                    Config.devPort = str(port)
+                    resolved = f'http://{host}:{port}/'
+                    print(f'[DevServer] 已检测到 Vite 端口 {port}，将使用 {resolved}')
+                    return resolved
+        time.sleep(0.5)
+    print(f'[DevServer] 未检测到动态端口，回落至 http://localhost:{base_port}/')
+    return f'http://localhost:{base_port}/'
+
+
 def WebViewApp(ifDev=False, ifCef=False):
 
     # 是否为开发环境
@@ -50,8 +123,12 @@ def WebViewApp(ifDev=False, ifCef=False):
     # 视图层页面URL
     if Config.devEnv:
         # 开发环境
-        MAIN_DIR = f'http://localhost:{Config.devPort}/'
-        template = os.path.join(MAIN_DIR, "")    # 设置页面，指向远程
+        try:
+            base_port = int(Config.devPort)
+        except (TypeError, ValueError):
+            base_port = 5173
+        MAIN_DIR = _resolve_dev_server(base_port)
+        template = MAIN_DIR    # 设置页面，指向远程
     else:
         # 生产环境
         MAIN_DIR = os.path.join(".", "web")
