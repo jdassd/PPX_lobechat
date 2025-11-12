@@ -18,6 +18,7 @@ sys.path.append(pyappDir)
 from config.config import Config
 
 appName = Config.appName    # 应用名称
+appDistName = Config.appNameEN    # PyInstaller 输出的可执行文件名称
 appVersion = Config.appVersion  # 应用版本号
 appVersion = appVersion[1:]    # 去掉第一位V
 appDeveloper = Config.appDeveloper  # 应用开发者
@@ -84,12 +85,12 @@ with open(os.path.join(scriptDir, 'postinst'), 'w+', encoding='utf-8') as f:
 
 buildDir = os.path.join(rootDir, 'build')
 
-os.system(f'mkdir -p {buildDir}/bin && mv {buildDir}/{appName} {buildDir}/bin/{appName}')
+os.system(f'mkdir -p {buildDir}/bin && mv {buildDir}/{appDistName} {buildDir}/bin/{appDistName}')
 os.system(f'mkdir -p {buildDir}/{appName}/DEBIAN')
 os.system(f'mkdir -p {buildDir}/{appName}/opt/{appName}/bin')
 os.system(f'mkdir -p {buildDir}/{appName}/usr/share/applications')
 os.system(f'mkdir -p {buildDir}/{appName}/usr/share/icons/hicolor/128x128/apps')
-os.system(f'cp {buildDir}/bin/{appName} {buildDir}/{appName}/opt/{appName}/bin/{appName}')
+os.system(f'cp {buildDir}/bin/{appDistName} {buildDir}/{appName}/opt/{appName}/bin/{appName}')
 os.system(f'cp {scriptDir}/control {buildDir}/{appName}/DEBIAN/control')
 os.system(f'cp {scriptDir}/postinst {buildDir}/{appName}/DEBIAN/postinst && chmod 755 {buildDir}/{appName}/DEBIAN/postinst')
 os.system(f'cp {scriptDir}/{appName}.desktop {buildDir}/{appName}/usr/share/applications/{appName}.desktop')
@@ -98,6 +99,6 @@ os.system(f'cp {logoPath} {buildDir}/{appName}/usr/share/icons/hicolor/128x128/a
 os.system(f'cd {buildDir}')
 os.system(f'cd {buildDir} && dpkg-deb --build {appName}')
 
-os.system(f'rm -fr {buildDir}/{appName} && mv {buildDir}/bin/{appName} {buildDir}/{appName} && rm -fr {buildDir}/bin')
+os.system(f'rm -fr {buildDir}/{appName} && mv {buildDir}/bin/{appDistName} {buildDir}/{appDistName} && rm -fr {buildDir}/bin')
 
 os.system(f'mv {buildDir}/{appName}.deb {buildDir}/{appName}-V{appVersion}_Linux.deb')

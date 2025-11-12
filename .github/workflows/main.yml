@@ -5,6 +5,8 @@ on:
     tags:
       - "v*"
       - "V*"
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -65,15 +67,44 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: 下载全部构建产物
         uses: actions/download-artifact@v4
         with:
           path: packages
 
+      - name: 收集产物列表
+        id: artifacts
+        run: |
+          FILE_LIST=$(find packages -type f -print)
+          if [ -z "$FILE_LIST" ]; then
+            echo "未找到可上传的文件" >&2
+            exit 1
+          fi
+          echo "$FILE_LIST"
+          printf "files<<EOF\n%s\nEOF\n" "$FILE_LIST" >> $GITHUB_OUTPUT
+
+      - name: 解析标签信息
+        id: tag_meta
+        run: |
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          git tag -l --format='%(contents)' "$TAG_NAME" > release_notes.md
+          if [ ! -s release_notes.md ]; then
+            git log -1 --pretty=%B > release_notes.md
+          fi
+          echo "body_path=release_notes.md" >> $GITHUB_OUTPUT
+
       - name: 发布到 GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
-          files: packages/**/*.*
-          generate_release_notes: true
+          files: ${{ steps.artifacts.outputs.files }}
+          body_path: ${{ steps.tag_meta.outputs.body_path }}
+          tag_name: ${{ steps.tag_meta.outputs.tag_name }}
+          generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.PPX_GITHUB_TOKEN }}
