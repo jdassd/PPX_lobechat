@@ -7,11 +7,7 @@ import ExcelTool from './components/excel/ExcelTool.vue'
 import SealTool from './components/seal/SealTool.vue'
 import ProcessManager from './components/system/ProcessManager.vue'
 
-const heroStats = [
-  { label: '固定窗口', value: '1200 × 720 px', desc: '桌面端统一画布，防止布局跳动' },
-  { label: '工具覆盖', value: 'Excel / PDF / 公章', desc: '核心场景优先实现，持续扩充' },
-  { label: '运行模式', value: '本地 Python', desc: '调用 pywebview API，数据不出本机' }
-]
+const heroStats = []
 
 const featureCards = [
   {
@@ -92,15 +88,11 @@ const featureCards = [
 const checklist = [
   {
     title: '检查更新',
-    detail: '基于 BtnUpdate 组件，统一触发 system_checkNewVersion，后续将开放静默更新模式。'
+    detail: '检查更新请点击上方小地球图标的方式进行更新，下载后的文件在用户的下载文件夹中，请打开安装即可完成更新操作。如果下载失败，请检查网络代理情况'
   },
   {
-    title: '安全配置',
-    detail: '配置存放于 pyapp/config 与 TinyDB keystore，通过 system_* API 读写以保持跨平台权限。'
-  },
-  {
-    title: '测试建议',
-    detail: '运行 pnpm run start 联调前后端，发版前执行 pnpm -C gui run build 及 pnpm run pre:<platform>。'
+    title: '通知公告',
+    detail: '该软件一次付费后永久更新，不再收费，没有广告，如需反馈软件使用问题，请发送名称为：“工具软件问题反馈”的邮件到邮箱：dassdj@yandex.com'
   }
 ]
 
@@ -139,13 +131,11 @@ const onFeatureAction = (feature) => {
       <header class="hero">
         <div class="hero-copy">
           <p class="hero-eyebrow">PPX 桌面工具箱</p>
-          <h1>一个窗口搞定 Excel、PDF 与印章工作</h1>
+          <h1>Excel、PDF、印章、线程等小工具</h1>
           <p class="hero-desc">
-            基于 Vue 3 + Element Plus 打造的统一入口，底层通过 PyWebView 调用本地 Python 服务，确保数据不离开本机。
-            当前阶段优先交付首页视觉与模块导航，功能入口将在后续迭代陆续放开。
+            数据安全不离开本机，无广告，界面简洁美观
           </p>
           <div class="hero-actions">
-            <el-button size="large" type="primary" disabled>立即使用（即将开放）</el-button>
             <div class="update-entry">
               <BtnUpdate />
               <span>检测更新</span>
@@ -207,8 +197,7 @@ const onFeatureAction = (feature) => {
         <section class="checklist">
           <div class="section-head">
             <div>
-              <p class="section-eyebrow">研发提示</p>
-              <h2>上线前需要确认的事项</h2>
+              <p class="section-eyebrow">使用提示与软件介绍</p>
             </div>
           </div>
           <div class="checklist-cards">
@@ -232,18 +221,19 @@ const onFeatureAction = (feature) => {
   width: 100%;
   height: 100%;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
   background: radial-gradient(circle at top, #f4f6fb 0%, #e4e9f2 55%, #d7deea 100%);
-  padding: 30px 0;
+  padding: 0;
 }
 
 .toolbox-window {
-  width: 1200px;
-  height: 720px;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
   background: #ffffff;
-  border-radius: 24px;
-  box-shadow: 0 25px 60px rgba(15, 36, 71, 0.15);
+  border-radius: 0;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -251,10 +241,14 @@ const onFeatureAction = (feature) => {
 
 .hero {
   display: flex;
-  padding: 40px;
+  padding: 24px 32px;
   gap: 24px;
   background: linear-gradient(135deg, #111c44 0%, #2c4674 70%);
   color: #ffffff;
+  flex-shrink: 0;
+  min-height: auto;
+  max-height: 140px;
+  overflow: hidden;
 }
 
 .hero-copy {
@@ -296,16 +290,11 @@ const onFeatureAction = (feature) => {
 }
 
 .hero-note {
-  margin-top: 18px;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.7);
+  display: none;
 }
 
 .hero-panel {
-  width: 360px;
-  display: grid;
-  grid-template-columns: repeat(1, 1fr);
-  gap: 14px;
+  display: none;
 }
 
 .stat-card {
@@ -335,9 +324,10 @@ const onFeatureAction = (feature) => {
 
 .content {
   flex: 1;
-  padding: 32px 40px;
+  padding: 20px 24px;
   overflow: auto;
   background: #f6f8fb;
+  min-height: 0;
 }
 
 .section-head {
@@ -466,14 +456,222 @@ h2 {
   font-size: 13px;
 }
 
-@media (max-width: 1280px) {
-  .app-shell {
-    padding: 16px;
+@media (max-width: 1440px) {
+  .hero {
+    padding: 20px 28px;
+    max-height: 160px;
   }
 
-  .toolbox-window {
-    transform: scale(0.95);
-    transform-origin: center;
+  .content {
+    padding: 16px 20px;
+  }
+
+  .feature-grid {
+    gap: 14px;
+  }
+
+  .hero-panel {
+    width: 300px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .hero {
+    flex-direction: column;
+    padding: 16px 20px;
+    max-height: none;
+    gap: 16px;
+  }
+
+  .hero-copy h1 {
+    font-size: 24px;
+  }
+
+  .hero-desc {
+    font-size: 13px;
+    margin: 12px 0 16px;
+  }
+
+  .hero-panel {
+    width: 100%;
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .content {
+    padding: 14px 16px;
+  }
+
+  .feature-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .checklist-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .hero-copy h1 {
+    font-size: 20px;
+  }
+
+  .hero-actions {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .hero-panel {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  h2 {
+    font-size: 20px;
+  }
+
+  .section-head {
+    margin-bottom: 14px;
+  }
+
+  .checklist-cards {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .hero {
+    padding: 12px 14px;
+  }
+
+  .hero-copy h1 {
+    font-size: 18px;
+    line-height: 1.2;
+  }
+
+  .hero-eyebrow {
+    font-size: 11px;
+  }
+
+  .hero-desc {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .hero-panel {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .stat-card {
+    padding: 12px 14px;
+  }
+
+  .stat-value {
+    font-size: 18px;
+  }
+
+  .content {
+    padding: 12px;
+  }
+
+  h2 {
+    font-size: 18px;
+  }
+
+  .section-head {
+    margin-bottom: 12px;
+  }
+
+  .feature-card {
+    min-height: auto;
+  }
+
+  .feature-icon {
+    width: 36px;
+    height: 36px;
+    padding: 8px;
+  }
+
+  .feature-title h3 {
+    font-size: 16px;
+  }
+
+  .feature-list li {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero {
+    padding: 8px 12px;
+  }
+
+  .hero-copy h1 {
+    font-size: 16px;
+  }
+
+  .hero-desc {
+    display: none;
+  }
+
+  .hero-actions {
+    gap: 8px;
+  }
+
+  .hero-note {
+    font-size: 11px;
+  }
+
+  .hero-panel {
+    display: none;
+  }
+
+  .content {
+    padding: 8px;
+  }
+
+  h2 {
+    font-size: 16px;
+  }
+
+  .section-head {
+    margin-bottom: 10px;
+  }
+
+  .section-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .feature-title h3 {
+    font-size: 14px;
+  }
+
+  .feature-list {
+    gap: 6px;
+    margin: 0 0 12px;
+  }
+
+  .feature-list li {
+    font-size: 11px;
+    gap: 6px;
+  }
+
+  .dot {
+    width: 5px;
+    height: 5px;
+    margin-top: 5px;
+  }
+
+  .check-card h3 {
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+
+  .check-card p {
+    font-size: 12px;
   }
 }
 </style>

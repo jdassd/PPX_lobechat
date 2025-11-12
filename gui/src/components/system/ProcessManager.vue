@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const props = defineProps({
@@ -14,6 +14,37 @@ const emit = defineEmits(['update:modelValue'])
 const visible = computed({
   get: () => props.modelValue,
   set: (value) => emit('update:modelValue', value)
+})
+
+const windowSize = reactive({ width: 0, height: 0 })
+
+const dialogWidth = computed(() => {
+  if (windowSize.width < 480) return '95%'
+  if (windowSize.width < 768) return '90%'
+  if (windowSize.width < 1024) return '85%'
+  if (windowSize.width < 1200) return '800px'
+  return '960px'
+})
+
+const tableHeight = computed(() => {
+  if (windowSize.height < 600) return 250
+  if (windowSize.height < 768) return 300
+  if (windowSize.height < 1000) return 350
+  return 420
+})
+
+const handleResize = () => {
+  windowSize.width = window.innerWidth
+  windowSize.height = window.innerHeight
+}
+
+onMounted(() => {
+  handleResize()
+  window.addEventListener('resize', handleResize)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
 })
 
 const filters = reactive({
@@ -175,7 +206,7 @@ const summaryText = computed(() => {
   <el-dialog
     v-model="visible"
     class="process-manager"
-    width="960px"
+    :width="dialogWidth"
     :close-on-click-modal="false"
     destroy-on-close
   >
@@ -216,7 +247,7 @@ const summaryText = computed(() => {
     <el-table
       :data="processRows"
       row-key="pid"
-      height="420"
+      :height="tableHeight"
       border
       v-loading="loading"
       size="small"
@@ -276,10 +307,12 @@ const summaryText = computed(() => {
   gap: 12px;
   align-items: center;
   margin-bottom: 12px;
+  flex-wrap: wrap;
 }
 
 .keyword-input {
   flex: 1;
+  min-width: 150px;
 }
 
 .port-input {
@@ -307,5 +340,43 @@ const summaryText = computed(() => {
   margin-top: 12px;
   font-size: 13px;
   color: #5a6074;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* 超小屏幕 */
+@media (max-width: 600px) {
+  .toolbar {
+    flex-direction: column;
+  }
+
+  .keyword-input,
+  .port-input,
+  .limit-select {
+    width: 100%;
+  }
+
+  :deep(.el-button) {
+    width: 100%;
+  }
+
+  :deep(.el-table-column--selection .el-table__cell) {
+    padding: 8px 2px;
+  }
+}
+
+/* 小屏幕 */
+@media (max-width: 768px) {
+  .port-input {
+    width: 100px;
+  }
+
+  .limit-select {
+    width: 120px;
+  }
+
+  :deep(.el-table) {
+    font-size: 12px;
+  }
 }
 </style>

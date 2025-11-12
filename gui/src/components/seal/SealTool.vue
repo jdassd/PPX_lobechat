@@ -1,7 +1,7 @@
 <template>
   <el-drawer
     v-model="visibleProxy"
-    size="70%"
+    size="80%"
     append-to-body
     custom-class="seal-tool-drawer"
   >
@@ -355,8 +355,8 @@ const resetDefaults = () => {
 <style scoped>
 .seal-tool {
   display: grid;
-  grid-template-columns: 1.3fr 0.7fr;
-  gap: 24px;
+  grid-template-columns: 1.4fr 0.6fr;
+  gap: 20px;
 }
 
 .drawer-head {
@@ -496,9 +496,179 @@ const resetDefaults = () => {
   margin-top: 40px;
 }
 
-@media (max-width: 1280px) {
+@media (max-width: 1440px) {
+  .seal-tool {
+    gap: 16px;
+  }
+
+  .panel {
+    padding: 16px;
+  }
+
+  .preview-stage {
+    min-height: 280px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .seal-tool {
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: 14px;
+  }
+
+  .drawer-head h3 {
+    font-size: 20px;
+  }
+
+  .panel {
+    padding: 14px;
+  }
+
+  .param-grid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+  }
+
+  .preview-stage {
+    min-height: 240px;
+  }
+
+  .preview-box {
+    max-width: 280px;
+    max-height: 280px;
+  }
+}
+
+@media (max-width: 1024px) {
   .seal-tool {
     grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .panel {
+    padding: 12px;
+  }
+
+  .field-row {
+    gap: 10px;
+  }
+
+  .param-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+
+  .typography-grid {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  }
+
+  .actions {
+    margin-top: 14px;
+    gap: 10px;
+  }
+}
+
+@media (max-width: 768px) {
+  .drawer-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .drawer-head h3 {
+    font-size: 18px;
+  }
+
+  .seal-tool {
+    gap: 12px;
+  }
+
+  .panel {
+    padding: 10px;
+    border-radius: 12px;
+  }
+
+  .param-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .typography-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .preview-stage {
+    min-height: 200px;
+    padding: 12px;
+  }
+
+  .preview-box {
+    max-width: 220px;
+    max-height: 220px;
+  }
+
+  .actions {
+    flex-wrap: wrap;
+    margin-top: 12px;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .drawer-head h3 {
+    font-size: 16px;
+  }
+
+  .drawer-head .eyebrow {
+    font-size: 11px;
+  }
+
+  .panel {
+    padding: 8px;
+    border-radius: 10px;
+  }
+
+  .config-panel header,
+  .preview-panel header {
+    margin-bottom: 10px;
+  }
+
+  .config-panel header h4,
+  .preview-panel header h4 {
+    font-size: 14px;
+  }
+
+  .field-row {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .param-card {
+    padding: 10px;
+    border-radius: 10px;
+  }
+
+  .param-grid {
+    gap: 8px;
+  }
+
+  .typography-grid {
+    gap: 10px;
+  }
+
+  .preview-stage {
+    min-height: 160px;
+    padding: 8px;
+  }
+
+  .preview-box {
+    max-width: 180px;
+    max-height: 180px;
+  }
+
+  .actions {
+    margin-top: 10px;
+    gap: 6px;
   }
 }
 </style>

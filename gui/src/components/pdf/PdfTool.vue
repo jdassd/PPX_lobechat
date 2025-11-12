@@ -1,7 +1,7 @@
 <template>
   <el-drawer
     v-model="visibleProxy"
-    size="70%"
+    size="80%"
     append-to-body
     custom-class="pdf-tool-drawer"
   >
