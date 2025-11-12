@@ -1,7 +1,7 @@
 name: build
 on:
   push:
-    branches: [pc_tools]
+    branches: [pc_tools2]
 jobs:
   build:
     runs-on: ${{ matrix.os }}
