@@ -1,10 +1,11 @@
 <script setup>
 import { markRaw, ref } from 'vue'
-import { Document, Files, Stamp, Setting } from '@element-plus/icons-vue'
+import { Document, Files, Monitor, Setting, Stamp } from '@element-plus/icons-vue'
 import BtnUpdate from './components/BtnUpdate.vue'
 import PdfTool from './components/pdf/PdfTool.vue'
 import ExcelTool from './components/excel/ExcelTool.vue'
 import SealTool from './components/seal/SealTool.vue'
+import ProcessManager from './components/system/ProcessManager.vue'
 
 const heroStats = [
   { label: '固定窗口', value: '1200 × 720 px', desc: '桌面端统一画布，防止布局跳动' },
@@ -59,6 +60,20 @@ const featureCards = [
     ]
   },
   {
+    id: 'process',
+    title: '进程管理',
+    desc: '定位占用端口的进程并一键结束',
+    icon: markRaw(Monitor),
+    tags: ['端口排查', '强制结束'],
+    action: '打开面板',
+    disabled: false,
+    points: [
+      '按进程名或命令模糊搜索',
+      '支持根据端口筛查冲突来源',
+      '内置强制结束能力，排除僵尸进程'
+    ]
+  },
+  {
     id: 'roadmap',
     title: '功能预告',
     desc: '共 6 类工具正在设计中',
@@ -92,6 +107,7 @@ const checklist = [
 const pdfToolVisible = ref(false)
 const excelToolVisible = ref(false)
 const sealToolVisible = ref(false)
+const processToolVisible = ref(false)
 
 const onFeatureAction = (feature) => {
   if (feature.disabled) {
@@ -107,6 +123,11 @@ const onFeatureAction = (feature) => {
   }
   if (feature.id === 'seal') {
     sealToolVisible.value = true
+    return
+  }
+  if (feature.id === 'process') {
+    processToolVisible.value = true
+    return
   }
 }
 
@@ -203,6 +224,7 @@ const onFeatureAction = (feature) => {
   <PdfTool v-model="pdfToolVisible" />
   <ExcelTool v-model="excelToolVisible" />
   <SealTool v-model="sealToolVisible" />
+  <ProcessManager v-model="processToolVisible" />
 </template>
 
 <style scoped>
