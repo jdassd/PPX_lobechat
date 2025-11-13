@@ -1,15 +1,76 @@
 <script setup>
 import { markRaw, ref } from 'vue'
-import { Document, Files, Monitor, Setting, Stamp } from '@element-plus/icons-vue'
+import { Document, Files, Monitor, Setting, Stamp, PictureFilled, Edit, VideoPlay, FolderOpened } from '@element-plus/icons-vue'
 import BtnUpdate from './components/BtnUpdate.vue'
 import PdfTool from './components/pdf/PdfTool.vue'
 import ExcelTool from './components/excel/ExcelTool.vue'
 import SealTool from './components/seal/SealTool.vue'
 import ProcessManager from './components/system/ProcessManager.vue'
+import ImageTool from './components/image/ImageTool.vue'
+import TextTool from './components/text/TextTool.vue'
+import VideoTool from './components/video/VideoTool.vue'
+import FileTool from './components/file/FileTool.vue'
 
 const heroStats = []
 
 const featureCards = [
+  {
+    id: 'image',
+    title: '图片处理',
+    desc: '格式转换 / 缩放 / 压缩',
+    icon: markRaw(PictureFilled),
+    tags: ['批量操作', '高清输出'],
+    action: '打开面板',
+    disabled: false,
+    points: [
+      '支持 PNG / JPG / TIFF / WEBP 互转，保持高画质',
+      '按百分比或像素缩放，支持锁定比例与输出目录',
+      '体积压缩支持质量或目标大小模式，适配分享需求'
+    ]
+  },
+  {
+    id: 'text',
+    title: '文本工具',
+    desc: '编码、JSON、大小写、哈希',
+    icon: markRaw(Edit),
+    tags: ['Base64', 'JSONPath'],
+    action: '打开面板',
+    disabled: false,
+    points: [
+      'Base64 / URL / HTML / UTF-8↔GBK 一次搞定',
+      'JSON 美化、压缩、校验与路径查询',
+      '大小写与命名风格互转，支持 camel / snake',
+      '内置 MD5 / SHA 系列哈希，可选文本或文件'
+    ]
+  },
+  {
+    id: 'video',
+    title: '视频处理',
+    desc: '格式转换 / 压缩 / 截取',
+    icon: markRaw(VideoPlay),
+    tags: ['FFmpeg', '多格式'],
+    action: '打开面板',
+    disabled: false,
+    points: [
+      'MP4、MOV、AVI、MKV 等互转，提供质感预设',
+      '三种压缩模式：预设、码率、目标大小',
+      '按时间轴快速截取片段，默认无损复制流'
+    ]
+  },
+  {
+    id: 'file',
+    title: '文件管理',
+    desc: '搜索 / 目录分析 / 压缩解压',
+    icon: markRaw(FolderOpened),
+    tags: ['ZIP/7Z', '统计面板'],
+    action: '打开面板',
+    disabled: false,
+    points: [
+      '按关键字、扩展名、大小范围搜索目录',
+      '统计空间占用、热门扩展名及最大文件',
+      'ZIP / 7Z 压缩与解压并行，支持密码'
+    ]
+  },
   {
     id: 'excel',
     title: 'Excel 工具',
@@ -100,6 +161,10 @@ const pdfToolVisible = ref(false)
 const excelToolVisible = ref(false)
 const sealToolVisible = ref(false)
 const processToolVisible = ref(false)
+const imageToolVisible = ref(false)
+const textToolVisible = ref(false)
+const videoToolVisible = ref(false)
+const fileToolVisible = ref(false)
 
 const onFeatureAction = (feature) => {
   if (feature.disabled) {
@@ -121,6 +186,22 @@ const onFeatureAction = (feature) => {
     processToolVisible.value = true
     return
   }
+  if (feature.id === 'image') {
+    imageToolVisible.value = true
+    return
+  }
+  if (feature.id === 'text') {
+    textToolVisible.value = true
+    return
+  }
+  if (feature.id === 'video') {
+    videoToolVisible.value = true
+    return
+  }
+  if (feature.id === 'file') {
+    fileToolVisible.value = true
+    return
+  }
 }
 
 </script>
@@ -131,7 +212,7 @@ const onFeatureAction = (feature) => {
       <header class="hero">
         <div class="hero-copy">
           <p class="hero-eyebrow">PPX 桌面工具箱</p>
-          <h1>Excel、PDF、印章、线程等小工具</h1>
+          <h1>Excel、PDF、图片、文本、视频、文件多工具</h1>
           <p class="hero-desc">
             数据安全不离开本机，无广告，界面简洁美观
           </p>
@@ -210,6 +291,10 @@ const onFeatureAction = (feature) => {
       </main>
     </div>
   </div>
+  <ImageTool v-model="imageToolVisible" />
+  <TextTool v-model="textToolVisible" />
+  <VideoTool v-model="videoToolVisible" />
+  <FileTool v-model="fileToolVisible" />
   <PdfTool v-model="pdfToolVisible" />
   <ExcelTool v-model="excelToolVisible" />
   <SealTool v-model="sealToolVisible" />

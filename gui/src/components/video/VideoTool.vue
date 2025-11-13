@@ -1,0 +1,393 @@
+<script setup>
+import { computed, reactive } from 'vue'
+import { ElMessage } from 'element-plus'
+
+const props = defineProps({
+  modelValue: {
+    type: Boolean,
+    default: false
+  }
+})
+
+const emit = defineEmits(['update:modelValue'])
+
+const visibleProxy = computed({
+  get: () => props.modelValue,
+  set: (value) => emit('update:modelValue', value)
+})
+
+const videoFilter = ['视频文件 (*.mp4;*.mov;*.avi;*.mkv;*.webm)']
+
+const state = reactive({
+  loading: false,
+  activeTab: 'convert',
+  convert: {
+    file: null,
+    targetFormat: 'mp4',
+    qualityPreset: 'medium',
+    preset: 'medium',
+    videoCodec: 'libx264',
+    audioCodec: 'aac',
+    outputDir: '',
+    result: ''
+  },
+  compress: {
+    file: null,
+    mode: 'preset',
+    bitrate: '1500k',
+    targetSizeMB: 20,
+    preset: 'balanced',
+    ffPreset: 'medium',
+    outputDir: '',
+    result: ''
+  },
+  cut: {
+    file: null,
+    start: '00:00:00',
+    end: '',
+    outputDir: '',
+    result: ''
+  }
+})
+
+const ensurePyReady = () => {
+  if (!window.pywebview?.api) {
+    ElMessage.warning('该功能需在桌面客户端中使用')
+    return false
+  }
+  return true
+}
+
+const selectVideo = async (target) => {
+  if (!ensurePyReady()) return
+  const result = await window.pywebview.api.system_pyCreateFileDialog(videoFilter)
+  if (result?.length) {
+    state[target].file = result[0]
+  }
+}
+
+const selectDir = async (target) => {
+  if (!ensurePyReady()) return
+  const current = state[target].outputDir
+  const dir = await window.pywebview.api.system_pySelectDirDialog(current)
+  if (dir) {
+    state[target].outputDir = dir
+  }
+}
+
+const ensureFile = (target) => {
+  if (!state[target].file) {
+    ElMessage.warning('请先选择视频文件')
+    return false
+  }
+  return true
+}
+
+const runConvert = async () => {
+  if (!ensurePyReady() || !ensureFile('convert')) return
+  state.loading = true
+  try {
+    const res = await window.pywebview.api.video_format_convert({
+      filePath: state.convert.file.path,
+      targetFormat: state.convert.targetFormat,
+      qualityPreset: state.convert.qualityPreset,
+      preset: state.convert.preset,
+      videoCodec: state.convert.videoCodec,
+      audioCodec: state.convert.audioCodec,
+      outputDir: state.convert.outputDir
+    })
+    if (res?.code === 0) {
+      state.convert.result = res.file || ''
+      ElMessage.success(res.msg || '转换完成')
+    } else {
+      ElMessage.error(res?.msg || '转换失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '转换失败')
+  } finally {
+    state.loading = false
+  }
+}
+
+const runCompress = async () => {
+  if (!ensurePyReady() || !ensureFile('compress')) return
+  state.loading = true
+  try {
+    const res = await window.pywebview.api.video_compress({
+      filePath: state.compress.file.path,
+      mode: state.compress.mode,
+      bitrate: state.compress.bitrate,
+      targetSizeMB: state.compress.targetSizeMB,
+      preset: state.compress.preset,
+      ffPreset: state.compress.ffPreset,
+      outputDir: state.compress.outputDir
+    })
+    if (res?.code === 0) {
+      state.compress.result = res.file || ''
+      ElMessage.success(res.msg || '压缩完成')
+    } else {
+      ElMessage.error(res?.msg || '压缩失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '压缩失败')
+  } finally {
+    state.loading = false
+  }
+}
+
+const runCut = async () => {
+  if (!ensurePyReady() || !ensureFile('cut')) return
+  state.loading = true
+  try {
+    const res = await window.pywebview.api.video_cut({
+      filePath: state.cut.file.path,
+      start: state.cut.start,
+      end: state.cut.end,
+      outputDir: state.cut.outputDir
+    })
+    if (res?.code === 0) {
+      state.cut.result = res.file || ''
+      ElMessage.success(res.msg || '截取完成')
+    } else {
+      ElMessage.error(res?.msg || '截取失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '截取失败')
+  } finally {
+    state.loading = false
+  }
+}
+
+const openFile = (file) => {
+  if (!ensurePyReady() || !file) return
+  window.pywebview.api.system_pyOpenFile(file)
+}
+</script>
+
+<template>
+  <el-drawer
+    v-model="visibleProxy"
+    size="70%"
+    append-to-body
+    custom-class="video-tool-drawer"
+  >
+    <template #header>
+      <div class="drawer-head">
+        <div>
+          <p class="eyebrow">VIDEO STUDIO</p>
+          <h3>视频处理工具</h3>
+          <p class="sub">格式转换、压缩与截取</p>
+        </div>
+        <el-tag type="success">Phase 1</el-tag>
+      </div>
+    </template>
+    <div class="video-tool">
+      <el-tabs v-model="state.activeTab">
+        <el-tab-pane label="格式转换" name="convert">
+          <section class="panel">
+            <header>
+              <h4>转换目标格式</h4>
+              <p>选择常见容器与编码预设</p>
+            </header>
+            <el-form :model="state.convert" label-width="120px">
+              <el-form-item label="源视频">
+                <div class="field-row">
+                  <el-input :model-value="state.convert.file?.path || ''" placeholder="尚未选择" readonly />
+                  <el-button @click="selectVideo('convert')">选择</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item label="目标格式">
+                <el-select v-model="state.convert.targetFormat" style="width: 200px">
+                  <el-option label="MP4" value="mp4" />
+                  <el-option label="MOV" value="mov" />
+                  <el-option label="AVI" value="avi" />
+                  <el-option label="MKV" value="mkv" />
+                  <el-option label="WebM" value="webm" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="质量预设">
+                <el-radio-group v-model="state.convert.qualityPreset">
+                  <el-radio-button label="high">高清</el-radio-button>
+                  <el-radio-button label="medium">均衡</el-radio-button>
+                  <el-radio-button label="low">体积优先</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item label="输出目录">
+                <div class="field-row">
+                  <el-input v-model="state.convert.outputDir" placeholder="自动创建" readonly />
+                  <el-button @click="selectDir('convert')">目录</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="state.loading" @click="runConvert">开始转换</el-button>
+              </el-form-item>
+            </el-form>
+            <el-alert
+              v-if="state.convert.result"
+              type="success"
+              :closable="false"
+              show-icon
+            >
+              <template #title>
+                已生成：<a class="link" @click.prevent="openFile(state.convert.result)">{{ state.convert.result }}</a>
+              </template>
+            </el-alert>
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane label="视频压缩" name="compress">
+          <section class="panel">
+            <header>
+              <h4>压缩模式</h4>
+              <p>按码率、目标大小或预设压缩</p>
+            </header>
+            <el-form :model="state.compress" label-width="120px">
+              <el-form-item label="源视频">
+                <div class="field-row">
+                  <el-input :model-value="state.compress.file?.path || ''" placeholder="尚未选择" readonly />
+                  <el-button @click="selectVideo('compress')">选择</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item label="模式">
+                <el-radio-group v-model="state.compress.mode">
+                  <el-radio-button label="preset">预设</el-radio-button>
+                  <el-radio-button label="bitrate">码率</el-radio-button>
+                  <el-radio-button label="size">目标大小</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item v-if="state.compress.mode === 'bitrate'" label="码率">
+                <el-input v-model="state.compress.bitrate" placeholder="例如 1500k" />
+              </el-form-item>
+              <el-form-item v-else-if="state.compress.mode === 'size'" label="目标大小 (MB)">
+                <el-input-number v-model="state.compress.targetSizeMB" :min="5" :max="5000" />
+              </el-form-item>
+              <template v-else>
+                <el-form-item label="预设">
+                  <el-select v-model="state.compress.preset" style="width: 200px">
+                    <el-option label="高清优先" value="high" />
+                    <el-option label="均衡" value="balanced" />
+                    <el-option label="体积最小" value="small" />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="FFmpeg Preset">
+                  <el-select v-model="state.compress.ffPreset" style="width: 200px">
+                    <el-option label="ultrafast" value="ultrafast" />
+                    <el-option label="superfast" value="superfast" />
+                    <el-option label="fast" value="fast" />
+                    <el-option label="medium" value="medium" />
+                    <el-option label="slow" value="slow" />
+                  </el-select>
+                </el-form-item>
+              </template>
+              <el-form-item label="输出目录">
+                <div class="field-row">
+                  <el-input v-model="state.compress.outputDir" placeholder="自动创建" readonly />
+                  <el-button @click="selectDir('compress')">目录</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="state.loading" @click="runCompress">开始压缩</el-button>
+              </el-form-item>
+            </el-form>
+            <el-alert
+              v-if="state.compress.result"
+              type="success"
+              :closable="false"
+              show-icon
+            >
+              <template #title>
+                已输出：<a class="link" @click.prevent="openFile(state.compress.result)">{{ state.compress.result }}</a>
+              </template>
+            </el-alert>
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane label="视频截取" name="cut">
+          <section class="panel">
+            <header>
+              <h4>截取片段</h4>
+              <p>按起止时间截取，无需重新编码</p>
+            </header>
+            <el-form :model="state.cut" label-width="120px">
+              <el-form-item label="源视频">
+                <div class="field-row">
+                  <el-input :model-value="state.cut.file?.path || ''" placeholder="尚未选择" readonly />
+                  <el-button @click="selectVideo('cut')">选择</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item label="开始时间">
+                <el-input v-model="state.cut.start" placeholder="00:00:00" />
+              </el-form-item>
+              <el-form-item label="结束时间">
+                <el-input v-model="state.cut.end" placeholder="可选，00:00:00" />
+              </el-form-item>
+              <el-form-item label="输出目录">
+                <div class="field-row">
+                  <el-input v-model="state.cut.outputDir" placeholder="自动创建" readonly />
+                  <el-button @click="selectDir('cut')">目录</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="state.loading" @click="runCut">截取</el-button>
+              </el-form-item>
+            </el-form>
+            <el-alert
+              v-if="state.cut.result"
+              type="success"
+              :closable="false"
+              show-icon
+            >
+              <template #title>
+                输出文件：<a class="link" @click.prevent="openFile(state.cut.result)">{{ state.cut.result }}</a>
+              </template>
+            </el-alert>
+          </section>
+        </el-tab-pane>
+      </el-tabs>
+    </div>
+  </el-drawer>
+</template>
+
+<style scoped>
+.drawer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 12px;
+  color: #8d93a8;
+  letter-spacing: 2px;
+}
+
+.panel {
+  background: #fff;
+  border: 1px solid #e9edf5;
+  border-radius: 18px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.panel header h4 {
+  margin: 0;
+}
+
+.panel header p {
+  margin: 6px 0 0;
+  color: #7a829d;
+  font-size: 13px;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.link {
+  color: #2f73ff;
+  cursor: pointer;
+}
+</style>

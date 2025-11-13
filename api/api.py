@@ -14,9 +14,13 @@ from api.system import System
 from api.pdf import PDF
 from api.excel import Excel
 from api.seal import Seal
+from api.image import ImageTool
+from api.text import TextTool
+from api.video import VideoTool
+from api.file import FileTool
 
 
-class API(System, Storage, PDF, Excel, Seal):
+class API(System, Storage, PDF, Excel, Seal, ImageTool, TextTool, VideoTool, FileTool):
     '''业务层API，供前端JS调用'''
 
     def setWindow(self, window):
