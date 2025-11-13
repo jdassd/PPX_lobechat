@@ -155,7 +155,17 @@ const checklist = [
   },
   {
     title: '通知公告',
-    detail: '该软件一次付费后永久更新，不再收费，没有广告，如需反馈软件使用问题，请发送名称为：“工具软件问题反馈”的邮件到邮箱：dassdj@yandex.com'
+    detail: '该软件一次付费后永久更新，不再收费，没有广告，如需反馈软件使用问题，请发送名称为："工具软件问题反馈"的邮件到邮箱：dassdj@yandex.com'
+  },
+  {
+    title: '视频功能无法使用',
+    parts: [
+      '该软件部分功能需要安装配置FFMPEG后才可使用，请参照教程手动配置FFMPEG，windows用户：',
+      {
+        text: '请点击此处访问教程',
+        url: 'https://blog.csdn.net/weixin_43914278/article/details/131722929'
+      }
+    ]
   }
 ]
 
@@ -286,7 +296,13 @@ const onFeatureAction = (feature) => {
           <div class="checklist-cards">
             <el-card v-for="item in checklist" :key="item.title" class="check-card" shadow="hover">
               <h3>{{ item.title }}</h3>
-              <p>{{ item.detail }}</p>
+              <p v-if="item.detail">{{ item.detail }}</p>
+              <p v-else class="detail-with-link">
+                <template v-for="(part, idx) in item.parts" :key="idx">
+                  <span v-if="typeof part === 'string'">{{ part }}</span>
+                  <a v-else :href="part.url" target="_blank" rel="noopener noreferrer" class="link-text">{{ part.text }}</a>
+                </template>
+              </p>
             </el-card>
           </div>
         </section>
@@ -541,6 +557,26 @@ h2 {
   color: #5a6070;
   line-height: 1.5;
   font-size: 13px;
+}
+
+.detail-with-link {
+  margin: 0;
+  color: #5a6070;
+  line-height: 1.5;
+  font-size: 13px;
+}
+
+.link-text {
+  color: #4058d7;
+  text-decoration: none;
+  cursor: pointer;
+  font-weight: 500;
+  transition: color 0.3s ease;
+}
+
+.link-text:hover {
+  color: #2e3fb3;
+  text-decoration: underline;
 }
 
 @media (max-width: 1440px) {
