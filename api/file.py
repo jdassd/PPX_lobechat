@@ -5,6 +5,8 @@
 """
 from __future__ import annotations
 
+import difflib
+import filecmp
 import hashlib
 import os
 import re
@@ -130,6 +132,24 @@ class FileTool:
             new_stem = re.sub(pattern, repl, stem)
             return f'{new_stem}{suffix}'
         return f'{stem}_{index}{suffix}'
+
+    def _sanitize_category_name(self, label: str) -> str:
+        safe = re.sub(r'[<>:"/\\\\|?*]+', '_', (label or '').strip())
+        safe = safe.strip('_') or '未分类'
+        return safe[:80]
+
+    def _read_text_file(self, path: Path, preferred: str | None) -> Tuple[str, str]:
+        encodings = []
+        if preferred:
+            encodings.append(preferred)
+        encodings.extend(['utf-8', 'utf-8-sig', 'gbk', 'latin-1'])
+        for encoding in encodings:
+            try:
+                with path.open('r', encoding=encoding) as handler:
+                    return handler.read(), encoding
+            except UnicodeDecodeError:
+                continue
+        raise ValueError(f'无法按常见编码读取 {path.name}')
 
     def file_search(self, options: Dict | None = None):
         """文件搜索"""
@@ -428,3 +448,237 @@ class FileTool:
             )
         except Exception as exc:
             return api_error(f'文件去重失败：{exc}')
+
+    # -------------------- P2 功能 --------------------
+
+    def file_auto_classify(self, options: Dict | None = None):
+        """按类型/大小/日期分类整理"""
+        try:
+            opts = self._validate(options)
+            directory = ensure_directory(opts.get('directory') or opts.get('sourceDir'), auto_create=False)
+            target_dir_opt = opts.get('targetDir')
+            if target_dir_opt:
+                target_dir = ensure_directory(target_dir_opt, auto_create=True)
+            else:
+                target_dir = directory / '_classified'
+                target_dir.mkdir(parents=True, exist_ok=True)
+            mode = str(opts.get('mode', 'type')).lower()
+            if mode not in {'type', 'size', 'date'}:
+                mode = 'type'
+            operation = str(opts.get('operation', 'copy')).lower()
+            if operation not in {'copy', 'move'}:
+                operation = 'copy'
+            conflict_policy = str(opts.get('conflictPolicy', 'rename')).lower()
+            recursive = bool(opts.get('recursive', True))
+            dry_run = bool(opts.get('dryRun', False))
+            filters = self._parse_common_filters(opts)
+            filters['recursive'] = recursive
+            files = self._collect_filtered_files(directory, filters, ensure_non_empty=False)
+            if not files:
+                raise ValueError('未匹配到任何文件')
+
+            type_map = []
+            for entry in opts.get('typeMap') or []:
+                label = entry.get('label') or entry.get('name')
+                extensions = entry.get('extensions') or entry.get('exts') or []
+                normalized = [ext.lower().lstrip('.') for ext in extensions if ext]
+                if label and normalized:
+                    type_map.append((label, normalized))
+            if not type_map:
+                type_map = [
+                    ('图片', ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'tiff']),
+                    ('视频', ['mp4', 'mov', 'avi', 'mkv', 'webm']),
+                    ('音频', ['mp3', 'wav', 'flac', 'aac', 'ogg']),
+                    ('文档', ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt']),
+                    ('压缩包', ['zip', '7z', 'rar', 'gz']),
+                ]
+
+            raw_buckets = opts.get('sizeBuckets') or []
+            if not raw_buckets:
+                raw_buckets = [
+                    {'label': '≤1MB', 'maxMB': 1},
+                    {'label': '1-10MB', 'minMB': 1, 'maxMB': 10},
+                    {'label': '10-100MB', 'minMB': 10, 'maxMB': 100},
+                    {'label': '≥100MB', 'minMB': 100},
+                ]
+            size_buckets = []
+            for bucket in raw_buckets:
+                label = bucket.get('label') or '未分组'
+                min_bytes = bucket.get('minBytes')
+                max_bytes = bucket.get('maxBytes')
+                if min_bytes is None and bucket.get('minMB') is not None:
+                    min_bytes = float(bucket['minMB']) * 1024 * 1024
+                if max_bytes is None and bucket.get('maxMB') is not None:
+                    max_bytes = float(bucket['maxMB']) * 1024 * 1024
+                min_b = int(min_bytes) if min_bytes is not None else None
+                max_b = int(max_bytes) if max_bytes is not None else None
+                size_buckets.append({'label': label, 'min': min_b, 'max': max_b})
+
+            date_format = opts.get('dateFormat') or '%Y-%m'
+            date_field = str(opts.get('dateField', 'modified')).lower()
+            fallback_label = opts.get('fallbackLabel') or '未分类'
+
+            target_root = target_dir.resolve()
+            directory_root = directory.resolve()
+            summary = {
+                'mode': mode,
+                'operation': operation,
+                'matched': len(files),
+            }
+            operations = []
+            categories = Counter()
+            total_size = 0
+
+            def resolve_category(path: Path, stat) -> str:
+                if mode == 'size':
+                    size = stat.st_size
+                    for bucket in size_buckets:
+                        min_b = bucket['min']
+                        max_b = bucket['max']
+                        if (min_b is None or size >= min_b) and (max_b is None or size < max_b):
+                            return bucket['label']
+                    return fallback_label
+                if mode == 'date':
+                    if date_field == 'created':
+                        timestamp = getattr(stat, 'st_ctime', stat.st_mtime)
+                    elif date_field == 'accessed':
+                        timestamp = getattr(stat, 'st_atime', stat.st_mtime)
+                    else:
+                        timestamp = stat.st_mtime
+                    dt = datetime.fromtimestamp(timestamp)
+                    try:
+                        return dt.strftime(date_format)
+                    except Exception:
+                        return dt.strftime('%Y-%m')
+                ext = path.suffix.lower().lstrip('.')
+                for label, exts in type_map:
+                    if ext in exts:
+                        return label
+                return ext.upper() or fallback_label
+
+            def resolve_conflict(dest: Path) -> Path:
+                if not dest.exists():
+                    return dest
+                if conflict_policy == 'overwrite':
+                    if not dry_run:
+                        dest.unlink()
+                    return dest
+                index = 1
+                while True:
+                    candidate = dest.with_name(f'{dest.stem}_{index}{dest.suffix}')
+                    if not candidate.exists():
+                        return candidate
+                    index += 1
+
+            for path in files:
+                stat = path.stat()
+                resolved_path = path.resolve()
+                if operation == 'move' and target_root != directory_root and target_root in resolved_path.parents:
+                    continue
+                label = resolve_category(path, stat)
+                safe_label = self._sanitize_category_name(label)
+                dest_dir = target_dir / safe_label
+                dest = dest_dir / path.name
+                dest = resolve_conflict(dest)
+                if dest == path:
+                    continue
+                operations.append({'from': str(path), 'to': str(dest), 'category': safe_label})
+                categories[safe_label] += 1
+                total_size += stat.st_size
+                if dry_run:
+                    continue
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                if operation == 'copy':
+                    shutil.copy2(path, dest)
+                else:
+                    shutil.move(str(path), str(dest))
+
+            summary['processed'] = len(operations)
+            summary['totalBytes'] = total_size
+            summary['totalSize'] = format_bytes(total_size)
+
+            payload = {
+                'summary': summary,
+                'categories': [{'label': label, 'count': count} for label, count in categories.most_common()],
+                'operations': operations[: min(len(operations), 80)],
+                'outputDir': str(target_dir),
+                'dryRun': dry_run,
+            }
+            message = '分类预览' if dry_run else '文件分类完成'
+            return api_success(message, **payload)
+        except Exception as exc:
+            return api_error(f'文件分类失败：{exc}')
+
+    def file_compare(self, options: Dict | None = None):
+        """比较两个文件差异"""
+        try:
+            opts = self._validate(options)
+            left = ensure_file_path(opts.get('fileA') or opts.get('left') or opts.get('leftFile'))
+            right = ensure_file_path(opts.get('fileB') or opts.get('right') or opts.get('rightFile'))
+            stat_left = left.stat()
+            stat_right = right.stat()
+            mode = str(opts.get('mode', 'auto')).lower()
+            encoding = opts.get('encoding')
+            ignore_case = bool(opts.get('ignoreCase', False))
+            context_lines = max(0, int(opts.get('contextLines') or 3))
+            max_diff_lines = max(10, int(opts.get('maxDiffLines') or 400))
+            max_preview_bytes = int(opts.get('maxPreviewBytes') or 2 * 1024 * 1024)
+
+            as_text = mode == 'text'
+            if mode == 'auto':
+                as_text = stat_left.st_size <= max_preview_bytes and stat_right.st_size <= max_preview_bytes
+
+            diff_lines: List[str] = []
+            encoding_used = {'left': '', 'right': ''}
+            equal = False
+
+            if as_text:
+                try:
+                    left_text, enc_left = self._read_text_file(left, encoding)
+                    right_text, enc_right = self._read_text_file(right, encoding)
+                    encoding_used = {'left': enc_left, 'right': enc_right}
+                    cmp_left = left_text.lower() if ignore_case else left_text
+                    cmp_right = right_text.lower() if ignore_case else right_text
+                    equal = cmp_left == cmp_right
+                    if not equal:
+                        diff_iter = difflib.unified_diff(
+                            left_text.splitlines(),
+                            right_text.splitlines(),
+                            fromfile=left.name,
+                            tofile=right.name,
+                            n=context_lines,
+                        )
+                        for idx, line in enumerate(diff_iter):
+                            if idx >= max_diff_lines:
+                                diff_lines.append('...diff truncated...')
+                                break
+                            diff_lines.append(line)
+                except ValueError:
+                    as_text = False
+
+            hash_left = self._hash_file(left)
+            hash_right = self._hash_file(right)
+            if not as_text:
+                equal = hash_left == hash_right
+
+            payload = {
+                'equal': equal,
+                'mode': 'text' if as_text else 'binary',
+                'size': {
+                    'left': stat_left.st_size,
+                    'right': stat_right.st_size,
+                    'leftText': format_bytes(stat_left.st_size),
+                    'rightText': format_bytes(stat_right.st_size),
+                },
+                'hash': {
+                    'left': hash_left,
+                    'right': hash_right,
+                },
+            }
+            if as_text:
+                payload['diff'] = diff_lines
+                payload['encoding'] = encoding_used
+
+            return api_success('文件对比完成', **payload)
+        except Exception as exc:
+            return api_error(f'文件对比失败：{exc}')

@@ -90,6 +90,29 @@ const state = reactive({
     mode: 'content',
     result: [],
     summary: null
+  },
+  classify: {
+    directory: '',
+    targetDir: '',
+    mode: 'type',
+    operation: 'copy',
+    recursive: true,
+    conflictPolicy: 'rename',
+    result: [],
+    summary: null,
+    categories: []
+  },
+  compare: {
+    fileA: null,
+    fileB: null,
+    mode: 'auto',
+    encoding: 'utf-8',
+    ignoreCase: false,
+    result: '',
+    diffText: '',
+    size: null,
+    hash: null,
+    encodingInfo: null
   }
 })
 
@@ -115,6 +138,30 @@ const selectDir = async (target) => {
     if (state[target].directory !== undefined) state[target].directory = dir
     if (state[target].outputDir !== undefined) state[target].outputDir = dir
     if (state[target].targetDir !== undefined) state[target].targetDir = dir
+  }
+}
+
+const selectClassifySource = async () => {
+  if (!ensurePyReady()) return
+  const dir = await window.pywebview.api.system_pySelectDirDialog(state.classify.directory)
+  if (dir) {
+    state.classify.directory = dir
+  }
+}
+
+const selectClassifyTarget = async () => {
+  if (!ensurePyReady()) return
+  const dir = await window.pywebview.api.system_pySelectDirDialog(state.classify.targetDir || state.classify.directory)
+  if (dir) {
+    state.classify.targetDir = dir
+  }
+}
+
+const selectCompareFile = async (target) => {
+  if (!ensurePyReady()) return
+  const files = await window.pywebview.api.system_pyCreateFileDialog(['全部文件 (*.*)'])
+  if (files?.length) {
+    state.compare[target] = files[0]
   }
 }
 
@@ -436,6 +483,72 @@ const runDedup = async () => {
     state.loading = false
   }
 }
+
+const runClassify = async () => {
+  if (!ensurePyReady()) return
+  if (!state.classify.directory) {
+    ElMessage.warning('请选择源目录')
+    return
+  }
+  state.loading = true
+  try {
+    const res = await window.pywebview.api.file_auto_classify({
+      directory: state.classify.directory,
+      targetDir: state.classify.targetDir,
+      mode: state.classify.mode,
+      operation: state.classify.operation,
+      recursive: state.classify.recursive,
+      conflictPolicy: state.classify.conflictPolicy
+    })
+    if (res?.code === 0) {
+      state.classify.summary = res.summary
+      state.classify.result = res.operations || []
+      state.classify.categories = res.categories || []
+      if (res.outputDir) {
+        state.classify.targetDir = res.outputDir
+      }
+      ElMessage.success(res.msg || '分类完成')
+    } else {
+      ElMessage.error(res?.msg || '分类失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '分类失败')
+  } finally {
+    state.loading = false
+  }
+}
+
+const runCompare = async () => {
+  if (!ensurePyReady()) return
+  if (!state.compare.fileA || !state.compare.fileB) {
+    ElMessage.warning('请先选择两个文件')
+    return
+  }
+  state.loading = true
+  try {
+    const res = await window.pywebview.api.file_compare({
+      fileA: state.compare.fileA.path,
+      fileB: state.compare.fileB.path,
+      mode: state.compare.mode,
+      encoding: state.compare.encoding,
+      ignoreCase: state.compare.ignoreCase
+    })
+    if (res?.code === 0) {
+      state.compare.result = res.equal ? '两个文件内容一致' : '检测到差异'
+      state.compare.diffText = (res.diff || []).join('\n')
+      state.compare.hash = res.hash || null
+      state.compare.size = res.size || null
+      state.compare.encodingInfo = res.encoding || null
+      ElMessage.success(res.msg || '对比完成')
+    } else {
+      ElMessage.error(res?.msg || '对比失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '对比失败')
+  } finally {
+    state.loading = false
+  }
+}
 </script>
 
 <template>
@@ -510,6 +623,92 @@ const runDedup = async () => {
                 </el-button>
               </template>
             </ResultTable>
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane label="自动分类" name="classify">
+          <section class="panel">
+            <header>
+              <h4>按类型 / 大小 / 日期整理</h4>
+              <p>将目录中的文件批量复制/移动到分类子目录</p>
+            </header>
+            <el-form :model="state.classify" label-width="130px" class="form-gap">
+              <el-form-item label="源目录">
+                <div class="field-row">
+                  <el-input v-model="state.classify.directory" placeholder="选择待整理目录" readonly />
+                  <el-button @click="selectClassifySource">选择</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item label="目标目录">
+                <div class="field-row">
+                  <el-input
+                    v-model="state.classify.targetDir"
+                    placeholder="留空则在源目录创建 _classified"
+                    readonly
+                  />
+                  <el-button @click="selectClassifyTarget">选择</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item label="分类模式">
+                <el-radio-group v-model="state.classify.mode">
+                  <el-radio-button label="type">按文件类型</el-radio-button>
+                  <el-radio-button label="size">按大小区间</el-radio-button>
+                  <el-radio-button label="date">按日期（年月）</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item label="操作方式">
+                <el-radio-group v-model="state.classify.operation">
+                  <el-radio-button label="copy">复制</el-radio-button>
+                  <el-radio-button label="move">移动</el-radio-button>
+                </el-radio-group>
+                <el-checkbox v-model="state.classify.recursive" style="margin-left: 12px">
+                  包含子目录
+                </el-checkbox>
+              </el-form-item>
+              <el-form-item label="冲突策略">
+                <el-select v-model="state.classify.conflictPolicy" style="width: 200px">
+                  <el-option label="重命名" value="rename" />
+                  <el-option label="覆盖" value="overwrite" />
+                </el-select>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="state.loading" @click="runClassify">执行分类</el-button>
+              </el-form-item>
+            </el-form>
+            <div v-if="state.classify.summary" class="stats-panel">
+              <el-descriptions :column="3" border size="small">
+                <el-descriptions-item label="匹配文件">
+                  {{ state.classify.summary.matched }}
+                </el-descriptions-item>
+                <el-descriptions-item label="已处理">
+                  {{ state.classify.summary.processed }}
+                </el-descriptions-item>
+                <el-descriptions-item label="总大小">
+                  {{ state.classify.summary.totalSize }}
+                </el-descriptions-item>
+              </el-descriptions>
+            </div>
+            <el-table
+              v-if="state.classify.categories.length"
+              :data="state.classify.categories"
+              border
+              size="small"
+              style="margin-top: 16px"
+            >
+              <el-table-column prop="label" label="分类" />
+              <el-table-column prop="count" label="数量" width="140" />
+            </el-table>
+            <el-table
+              v-if="state.classify.result.length"
+              :data="state.classify.result.slice(0, 60)"
+              border
+              size="small"
+              style="margin-top: 16px"
+            >
+              <el-table-column prop="category" label="分类" width="140" />
+              <el-table-column prop="from" label="源文件" show-overflow-tooltip />
+              <el-table-column prop="to" label="目标地址" show-overflow-tooltip />
+            </el-table>
           </section>
         </el-tab-pane>
 
@@ -819,6 +1018,79 @@ const runDedup = async () => {
                 </div>
               </div>
             </div>
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane label="文件对比" name="compare">
+          <section class="panel">
+            <header>
+              <h4>文本 / 二进制对比</h4>
+              <p>快速确认两个文件是否一致，并给出差异 diff</p>
+            </header>
+            <el-form :model="state.compare" label-width="120px" class="form-gap">
+              <el-form-item label="文件 A">
+                <div class="field-row">
+                  <el-input :model-value="state.compare.fileA?.path || ''" placeholder="尚未选择" readonly />
+                  <el-button @click="selectCompareFile('fileA')">选择</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item label="文件 B">
+                <div class="field-row">
+                  <el-input :model-value="state.compare.fileB?.path || ''" placeholder="尚未选择" readonly />
+                  <el-button @click="selectCompareFile('fileB')">选择</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item label="模式">
+                <el-radio-group v-model="state.compare.mode">
+                  <el-radio-button label="auto">自动</el-radio-button>
+                  <el-radio-button label="text">文本</el-radio-button>
+                  <el-radio-button label="binary">二进制</el-radio-button>
+                </el-radio-group>
+                <el-checkbox v-model="state.compare.ignoreCase" style="margin-left: 12px">忽略大小写</el-checkbox>
+              </el-form-item>
+              <el-form-item v-if="state.compare.mode !== 'binary'" label="首选编码">
+                <el-input v-model="state.compare.encoding" placeholder="默认 UTF-8" style="width: 220px" />
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="state.loading" @click="runCompare">执行对比</el-button>
+              </el-form-item>
+            </el-form>
+            <el-alert
+              v-if="state.compare.result"
+              :type="state.compare.diffText ? 'warning' : 'success'"
+              :closable="false"
+              show-icon
+            >
+              <template #title>{{ state.compare.result }}</template>
+            </el-alert>
+            <el-descriptions
+              v-if="state.compare.hash || state.compare.size"
+              :column="2"
+              border
+              size="small"
+              style="margin-top: 12px"
+            >
+              <el-descriptions-item label="文件 A 大小">
+                {{ state.compare.size?.leftText || state.compare.size?.left || '-' }}
+              </el-descriptions-item>
+              <el-descriptions-item label="文件 B 大小">
+                {{ state.compare.size?.rightText || state.compare.size?.right || '-' }}
+              </el-descriptions-item>
+              <el-descriptions-item label="文件 A 哈希">
+                {{ state.compare.hash?.left || '-' }}
+              </el-descriptions-item>
+              <el-descriptions-item label="文件 B 哈希">
+                {{ state.compare.hash?.right || '-' }}
+              </el-descriptions-item>
+            </el-descriptions>
+            <el-input
+              v-if="state.compare.diffText"
+              v-model="state.compare.diffText"
+              type="textarea"
+              :rows="12"
+              readonly
+              style="margin-top: 16px"
+            />
           </section>
         </el-tab-pane>
 

@@ -97,6 +97,38 @@ const state = reactive({
     outputDir: '',
     generatedDir: '',
     result: ''
+  },
+  concat: {
+    files: [],
+    direction: 'horizontal',
+    columns: 2,
+    spacing: 24,
+    align: 'center',
+    background: '#ffffff',
+    outputFormat: 'png',
+    quality: 90,
+    outputDir: '',
+    result: ''
+  },
+  rename: {
+    files: [],
+    mode: 'sequence',
+    prefix: 'img_',
+    suffix: '',
+    pattern: '{name}_{index}',
+    digits: 4,
+    startIndex: 1,
+    keepExtension: true,
+    copyMode: false,
+    outputDir: '',
+    dryRun: true,
+    operations: [],
+    skipped: []
+  },
+  exif: {
+    file: null,
+    data: [],
+    gps: {}
   }
 })
 
@@ -147,6 +179,14 @@ const selectDir = async (target) => {
 
 const ensureFilesReady = (target) => {
   if (!state[target].files.length) {
+    ElMessage.warning('请先选择文件')
+    return false
+  }
+  return true
+}
+
+const ensureSingleFile = (target) => {
+  if (!state[target].file) {
     ElMessage.warning('请先选择文件')
     return false
   }
@@ -230,6 +270,91 @@ const runCompress = async () => {
     }
   } catch (error) {
     ElMessage.error(error?.message || '压缩失败')
+  } finally {
+    state.loading = false
+  }
+}
+
+const runConcat = async () => {
+  if (!ensurePyReady() || !ensureFilesReady('concat')) return
+  state.loading = true
+  try {
+    const res = await window.pywebview.api.image_concat({
+      files: pickPaths(state.concat.files),
+      direction: state.concat.direction,
+      columns: state.concat.columns,
+      spacing: state.concat.spacing,
+      align: state.concat.align,
+      background: state.concat.background,
+      outputFormat: state.concat.outputFormat,
+      quality: state.concat.quality,
+      outputDir: state.concat.outputDir
+    })
+    if (res?.code === 0) {
+      state.concat.result = res.file || ''
+      state.concat.outputDir = res.outputDir || state.concat.outputDir
+      ElMessage.success(res.msg || '拼接完成')
+    } else {
+      ElMessage.error(res?.msg || '拼接失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '拼接失败')
+  } finally {
+    state.loading = false
+  }
+}
+
+const runRename = async () => {
+  if (!ensurePyReady() || !ensureFilesReady('rename')) return
+  state.loading = true
+  try {
+    const res = await window.pywebview.api.image_batch_rename({
+      files: pickPaths(state.rename.files),
+      mode: state.rename.mode,
+      prefix: state.rename.prefix,
+      suffix: state.rename.suffix,
+      pattern: state.rename.pattern,
+      digits: state.rename.digits,
+      startIndex: state.rename.startIndex,
+      keepExtension: state.rename.keepExtension,
+      copyMode: state.rename.copyMode,
+      outputDir: state.rename.outputDir,
+      dryRun: state.rename.dryRun
+    })
+    if (res?.code === 0 || res?.success) {
+      state.rename.operations = res.operations || []
+      state.rename.skipped = res.skipped || []
+      if (res.outputDir) {
+        state.rename.outputDir = res.outputDir
+      }
+      state.rename.dryRun = !!res.dryRun
+      ElMessage.success(res.msg || (state.rename.dryRun ? '预览生成' : '重命名完成'))
+    } else {
+      ElMessage.error(res?.msg || '重命名失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '重命名失败')
+  } finally {
+    state.loading = false
+  }
+}
+
+const runExif = async () => {
+  if (!ensurePyReady() || !ensureSingleFile('exif')) return
+  state.loading = true
+  try {
+    const res = await window.pywebview.api.image_get_exif({
+      file: state.exif.file.path
+    })
+    if (res?.code === 0 || res?.success) {
+      state.exif.data = res.exif || []
+      state.exif.gps = res.gps || {}
+      ElMessage.success(res.msg || '读取完成')
+    } else {
+      ElMessage.error(res?.msg || '读取失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '读取失败')
   } finally {
     state.loading = false
   }
@@ -833,6 +958,189 @@ const removeFile = (target, file) => {
             </el-alert>
           </section>
         </el-tab-pane>
+        <el-tab-pane label="高级批量" name="advanced">
+          <section class="panel advanced-grid">
+            <div class="advanced-card">
+              <header>
+                <h4>图片拼接</h4>
+                <p>批量横向 / 纵向 / 网格拼接，支持自定义背景与间距</p>
+              </header>
+              <el-form :model="state.concat" label-width="110px">
+                <el-form-item label="待处理">
+                  <div class="field-row">
+                    <el-button @click="selectImages('concat')">添加图片</el-button>
+                    <el-tag v-if="state.concat.files.length" type="info" effect="plain">
+                      已选 {{ state.concat.files.length }} 个文件
+                    </el-tag>
+                    <el-tag v-else type="warning" effect="plain">尚未选择</el-tag>
+                  </div>
+                </el-form-item>
+                <el-form-item label="排列方式">
+                  <el-radio-group v-model="state.concat.direction">
+                    <el-radio-button label="horizontal">横向</el-radio-button>
+                    <el-radio-button label="vertical">纵向</el-radio-button>
+                    <el-radio-button label="grid">网格</el-radio-button>
+                  </el-radio-group>
+                </el-form-item>
+                <el-form-item v-if="state.concat.direction === 'grid'" label="列数">
+                  <el-input-number v-model="state.concat.columns" :min="1" :max="6" />
+                </el-form-item>
+                <el-form-item label="对齐 / 间距">
+                  <div class="field-row field-row--wrap">
+                    <el-select v-model="state.concat.align" style="width: 140px">
+                      <el-option label="顶部" value="top" />
+                      <el-option label="居中" value="center" />
+                      <el-option label="底部" value="bottom" />
+                    </el-select>
+                    <el-input-number v-model="state.concat.spacing" :min="0" :max="200" />
+                  </div>
+                </el-form-item>
+                <el-form-item label="背景颜色">
+                  <el-color-picker v-model="state.concat.background" />
+                </el-form-item>
+                <el-form-item label="输出格式">
+                  <div class="field-row">
+                    <el-select v-model="state.concat.outputFormat" style="width: 120px">
+                      <el-option label="PNG" value="png" />
+                      <el-option label="JPG" value="jpg" />
+                      <el-option label="WEBP" value="webp" />
+                    </el-select>
+                    <el-input-number v-model="state.concat.quality" :min="30" :max="100" />
+                  </div>
+                </el-form-item>
+                <el-form-item label="输出目录">
+                  <div class="field-row">
+                    <el-input v-model="state.concat.outputDir" placeholder="留空自动创建" readonly />
+                    <el-button @click="selectDir('concat')">选择目录</el-button>
+                  </div>
+                </el-form-item>
+                <el-form-item>
+                  <el-button type="primary" :loading="state.loading" @click="runConcat">
+                    执行拼接
+                  </el-button>
+                </el-form-item>
+              </el-form>
+              <div v-if="state.concat.result" class="result-block">
+                <p class="result-title">输出文件</p>
+                <el-tag type="info" effect="plain" @click="openPath(state.concat.result)">
+                  {{ state.concat.result }}
+                </el-tag>
+              </div>
+            </div>
+            <div class="advanced-card">
+              <header>
+                <h4>批量重命名</h4>
+                <p>支持序号 / 时间戳 / 自定义模板，可预览再执行</p>
+              </header>
+              <el-form :model="state.rename" label-width="110px">
+                <el-form-item label="待处理">
+                  <div class="field-row">
+                    <el-button @click="selectImages('rename')">添加图片</el-button>
+                    <el-tag v-if="state.rename.files.length" effect="plain" type="info">
+                      已选 {{ state.rename.files.length }} 个
+                    </el-tag>
+                    <el-tag v-else effect="plain" type="warning">尚未选择</el-tag>
+                  </div>
+                </el-form-item>
+                <el-form-item label="模式">
+                  <el-radio-group v-model="state.rename.mode" size="small">
+                    <el-radio-button label="sequence">序号</el-radio-button>
+                    <el-radio-button label="timestamp">时间戳</el-radio-button>
+                    <el-radio-button label="custom">自定义</el-radio-button>
+                  </el-radio-group>
+                </el-form-item>
+                <el-form-item v-if="state.rename.mode === 'custom'" label="模板">
+                  <el-input
+                    v-model="state.rename.pattern"
+                    placeholder="可使用 {name} {index} {timestamp}"
+                  />
+                </el-form-item>
+                <el-form-item v-else label="前后缀">
+                  <div class="field-row field-row--wrap">
+                    <el-input v-model="state.rename.prefix" placeholder="前缀" />
+                    <el-input v-model="state.rename.suffix" placeholder="后缀" />
+                  </div>
+                </el-form-item>
+                <el-form-item label="序号配置">
+                  <div class="field-row field-row--wrap">
+                    <el-input-number v-model="state.rename.startIndex" :min="1" />
+                    <el-input-number v-model="state.rename.digits" :min="2" :max="6" />
+                  </div>
+                </el-form-item>
+                <el-form-item label="选项">
+                  <div class="toggle-row">
+                    <el-checkbox v-model="state.rename.keepExtension">保留原扩展名</el-checkbox>
+                    <el-checkbox v-model="state.rename.copyMode">复制到新目录</el-checkbox>
+                    <el-checkbox v-model="state.rename.dryRun">仅预览</el-checkbox>
+                  </div>
+                </el-form-item>
+                <el-form-item label="输出目录">
+                  <div class="field-row">
+                    <el-input v-model="state.rename.outputDir" placeholder="可选" readonly />
+                    <el-button @click="selectDir('rename')">选择目录</el-button>
+                  </div>
+                </el-form-item>
+                <el-form-item>
+                  <el-button type="primary" :loading="state.loading" @click="runRename">
+                    {{ state.rename.dryRun ? '生成预览' : '开始重命名' }}
+                  </el-button>
+                </el-form-item>
+              </el-form>
+              <div v-if="state.rename.operations.length" class="result-block">
+                <p class="result-title">
+                  {{ state.rename.dryRun ? '预览结果' : '重命名记录' }}（仅展示前 8 条）
+                </p>
+                <el-table :data="state.rename.operations.slice(0, 8)" size="small" border>
+                  <el-table-column prop="from" label="原文件" show-overflow-tooltip />
+                  <el-table-column prop="to" label="新文件" show-overflow-tooltip />
+                </el-table>
+              </div>
+            </div>
+          </section>
+          <section class="panel">
+            <header>
+              <h4>EXIF 信息查看</h4>
+              <p>读取拍摄时间、相机型号、GPS 信息等元数据</p>
+            </header>
+            <el-form :model="state.exif" label-width="110px">
+              <el-form-item label="图片文件">
+                <div class="field-row">
+                  <el-button @click="selectSingleImage('exif')">选择图片</el-button>
+                  <el-tag v-if="state.exif.file" effect="plain" type="info">
+                    {{ state.exif.file.filename }}
+                  </el-tag>
+                  <el-tag v-else effect="plain" type="warning">尚未选择</el-tag>
+                </div>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="state.loading" @click="runExif">
+                  读取 EXIF
+                </el-button>
+              </el-form-item>
+            </el-form>
+            <el-table
+              v-if="state.exif.data.length"
+              :data="state.exif.data"
+              border
+              height="240"
+              size="small"
+            >
+              <el-table-column prop="tag" label="属性" width="200" />
+              <el-table-column prop="value" label="内容" show-overflow-tooltip />
+            </el-table>
+            <el-descriptions
+              v-if="Object.keys(state.exif.gps).length"
+              title="GPS 信息"
+              size="small"
+              border
+              :column="2"
+            >
+              <el-descriptions-item v-for="(value, key) in state.exif.gps" :key="key" :label="key">
+                {{ value }}
+              </el-descriptions-item>
+            </el-descriptions>
+          </section>
+        </el-tab-pane>
       </el-tabs>
     </div>
   </el-drawer>
@@ -897,5 +1205,29 @@ const removeFile = (target, file) => {
 .link {
   color: #2f73ff;
   cursor: pointer;
+}
+
+.toggle-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 20px;
+}
+
+.advanced-card {
+  border: 1px solid #e8ebf5;
+  border-radius: 16px;
+  padding: 16px;
+  background: #f9fbff;
+}
+
+:global(:root[data-theme='dark']) .advanced-card {
+  background: #1f2030;
+  border-color: #2d3045;
 }
 </style>

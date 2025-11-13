@@ -67,6 +67,14 @@ const state = reactive({
   info: {
     file: null,
     data: null
+  },
+  concat: {
+    files: [],
+    reencode: false,
+    targetFormat: 'mp4',
+    preset: 'medium',
+    outputDir: '',
+    result: ''
   }
 })
 
@@ -84,6 +92,26 @@ const selectVideo = async (target) => {
   if (result?.length) {
     state[target].file = result[0]
   }
+}
+
+const selectConcatFiles = async () => {
+  if (!ensurePyReady()) return
+  const files = await window.pywebview.api.system_pyCreateFileDialog(videoFilter)
+  if (files?.length) {
+    state.concat.files.push(...files)
+  }
+}
+
+const removeConcatFile = (index) => {
+  state.concat.files.splice(index, 1)
+}
+
+const moveConcatFile = (index, direction) => {
+  const target = index + direction
+  if (target < 0 || target >= state.concat.files.length) return
+  const temp = state.concat.files[index]
+  state.concat.files[index] = state.concat.files[target]
+  state.concat.files[target] = temp
 }
 
 const selectDir = async (target) => {
@@ -173,6 +201,34 @@ const runCut = async () => {
     }
   } catch (error) {
     ElMessage.error(error?.message || '截取失败')
+  } finally {
+    state.loading = false
+  }
+}
+
+const runConcat = async () => {
+  if (!ensurePyReady()) return
+  if (!state.concat.files.length) {
+    ElMessage.warning('请至少选择两个视频')
+    return
+  }
+  state.loading = true
+  try {
+    const res = await window.pywebview.api.video_concat({
+      files: state.concat.files.map((file) => file.path || file),
+      reencode: state.concat.reencode,
+      targetFormat: state.concat.targetFormat,
+      preset: state.concat.preset,
+      outputDir: state.concat.outputDir
+    })
+    if (res?.code === 0) {
+      state.concat.result = res.file || ''
+      ElMessage.success(res.msg || '合成完成')
+    } else {
+      ElMessage.error(res?.msg || '合成失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '合成失败')
   } finally {
     state.loading = false
   }
@@ -549,6 +605,94 @@ const openFramesDir = () => {
             >
               打开输出目录
             </el-button>
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane label="视频合成" name="concat">
+          <section class="panel">
+            <header>
+              <h4>多视频拼接</h4>
+              <p>支持直接无损合并或重新编码输出，保持自定义排序</p>
+            </header>
+            <div class="field-row">
+              <el-button @click="selectConcatFiles">添加视频文件</el-button>
+              <el-button text type="danger" :disabled="!state.concat.files.length" @click="state.concat.files = []">
+                清空
+              </el-button>
+            </div>
+            <el-table
+              v-if="state.concat.files.length"
+              :data="state.concat.files"
+              border
+              size="small"
+              style="margin: 16px 0"
+            >
+              <el-table-column type="index" width="50" label="#" />
+              <el-table-column label="文件名" prop="filename" show-overflow-tooltip />
+              <el-table-column label="路径" show-overflow-tooltip>
+                <template #default="scope">
+                  {{ scope.row.path }}
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="160">
+                <template #default="scope">
+                  <el-button text size="small" @click="moveConcatFile(scope.$index, -1)">上移</el-button>
+                  <el-button text size="small" @click="moveConcatFile(scope.$index, 1)">下移</el-button>
+                  <el-button text size="small" type="danger" @click="removeConcatFile(scope.$index)">移除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+            <el-alert v-else type="info" :closable="false" show-icon>
+              <template #title>请选择至少两个视频文件</template>
+            </el-alert>
+            <el-form :model="state.concat" label-width="140px" class="form-block">
+              <el-form-item label="输出格式">
+                <div class="field-row">
+                  <el-select v-model="state.concat.targetFormat" style="width: 160px">
+                    <el-option label="MP4" value="mp4" />
+                    <el-option label="MOV" value="mov" />
+                    <el-option label="MKV" value="mkv" />
+                  </el-select>
+                  <el-switch
+                    v-model="state.concat.reencode"
+                    active-text="重新编码（兼容不同参数）"
+                  />
+                </div>
+              </el-form-item>
+              <el-form-item v-if="state.concat.reencode" label="编码预设">
+                <el-select v-model="state.concat.preset" style="width: 200px">
+                  <el-option label="更好画质" value="slow" />
+                  <el-option label="平衡" value="medium" />
+                  <el-option label="更快" value="fast" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="输出目录">
+                <div class="field-row">
+                  <el-input v-model="state.concat.outputDir" placeholder="留空自动创建" readonly />
+                  <el-button @click="selectDir('concat')">目录</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item>
+                <el-button
+                  type="primary"
+                  :loading="state.loading"
+                  :disabled="state.concat.files.length < 2"
+                  @click="runConcat"
+                >
+                  开始合成
+                </el-button>
+              </el-form-item>
+            </el-form>
+            <el-alert
+              v-if="state.concat.result"
+              type="success"
+              :closable="false"
+              show-icon
+            >
+              <template #title>
+                已输出：<a class="link" @click.prevent="openFile(state.concat.result)">{{ state.concat.result }}</a>
+              </template>
+            </el-alert>
           </section>
         </el-tab-pane>
 

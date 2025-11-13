@@ -395,6 +395,248 @@
             </div>
           </section>
         </el-tab-pane>
+
+        <el-tab-pane label="页面重排" name="reorder">
+          <section class="panel">
+            <header>
+              <h4>重新调整页码顺序</h4>
+              <p>输入新的页码序列，可自动补全剩余页码</p>
+            </header>
+            <el-form :model="state.reorder" label-width="120px">
+              <el-form-item label="源 PDF">
+                <div class="field-row">
+                  <el-button @click="selectPdf('reorder')">选择 PDF</el-button>
+                  <span v-if="state.reorder.file" class="file-chip">{{ state.reorder.file.filename }}</span>
+                  <el-tag v-else type="info" effect="plain">尚未选择</el-tag>
+                </div>
+              </el-form-item>
+              <el-form-item label="页码顺序">
+                <el-input
+                  v-model="state.reorder.orderText"
+                  placeholder="示例：3,1,2（表示新顺序）"
+                />
+              </el-form-item>
+              <el-form-item>
+                <el-checkbox v-model="state.reorder.appendRemaining">自动追加剩余页码</el-checkbox>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="state.loading" @click="runReorder">执行重排</el-button>
+              </el-form-item>
+            </el-form>
+            <div v-if="state.reorder.output" class="result-block">
+              <p class="result-title">输出文件</p>
+              <el-tag type="success" effect="plain" @click="openPath(state.reorder.output)">
+                {{ state.reorder.output }}
+              </el-tag>
+            </div>
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane label="提取文本" name="text">
+          <section class="panel">
+            <header>
+              <h4>导出 PDF 文本内容</h4>
+              <p>支持纯文本、Markdown、HTML、Blocks 等模式</p>
+            </header>
+            <el-form :model="state.extractText" label-width="120px">
+              <el-form-item label="源 PDF">
+                <div class="field-row">
+                  <el-button @click="selectPdf('extractText')">选择 PDF</el-button>
+                  <span v-if="state.extractText.file" class="file-chip">{{ state.extractText.file.filename }}</span>
+                  <el-tag v-else type="info" effect="plain">尚未选择</el-tag>
+                </div>
+              </el-form-item>
+              <el-form-item label="模式">
+                <el-radio-group v-model="state.extractText.mode">
+                  <el-radio-button label="plain">纯文本</el-radio-button>
+                  <el-radio-button label="markdown">Markdown</el-radio-button>
+                  <el-radio-button label="html">HTML</el-radio-button>
+                  <el-radio-button label="blocks">Blocks</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item label="页码区间">
+                <div class="field-row">
+                  <el-input-number v-model="state.extractText.startPage" :min="1" />
+                  <span class="range-sep">至</span>
+                  <el-input-number v-model="state.extractText.endPage" :min="1" />
+                </div>
+              </el-form-item>
+              <el-form-item label="自定义页码">
+                <el-input
+                  v-model="state.extractText.pageSpec"
+                  placeholder="可选，例如：1-3,5"
+                />
+              </el-form-item>
+              <el-form-item label="输出目录">
+                <div class="field-row">
+                  <el-input v-model="state.extractText.outputDir" placeholder="保存提取文本" readonly />
+                  <el-button @click="selectDir('extractText')">选择目录</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item>
+                <el-checkbox v-model="state.extractText.saveFile">保存为 .txt</el-checkbox>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="state.loading" @click="runExtractText">开始提取</el-button>
+              </el-form-item>
+            </el-form>
+            <div v-if="state.extractText.preview" class="result-block">
+              <p class="result-title">文本预览</p>
+              <el-input
+                v-model="state.extractText.preview"
+                type="textarea"
+                :rows="8"
+                readonly
+              />
+            </div>
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane label="提取图片" name="images">
+          <section class="panel">
+            <header>
+              <h4>导出 PDF 内嵌图片</h4>
+              <p>可指定页码范围与输出格式，自动保存到目录</p>
+            </header>
+            <el-form :model="state.extractImages" label-width="120px">
+              <el-form-item label="源 PDF">
+                <div class="field-row">
+                  <el-button @click="selectPdf('extractImages')">选择 PDF</el-button>
+                  <span v-if="state.extractImages.file" class="file-chip">{{ state.extractImages.file.filename }}</span>
+                  <el-tag v-else type="info" effect="plain">尚未选择</el-tag>
+                </div>
+              </el-form-item>
+              <el-form-item label="页码区间">
+                <div class="field-row">
+                  <el-input-number v-model="state.extractImages.startPage" :min="1" />
+                  <span class="range-sep">至</span>
+                  <el-input-number v-model="state.extractImages.endPage" :min="1" />
+                </div>
+              </el-form-item>
+              <el-form-item label="自定义页码">
+                <el-input v-model="state.extractImages.pageSpec" placeholder="可选：1-3,5" />
+              </el-form-item>
+              <el-form-item label="图片格式">
+                <el-select v-model="state.extractImages.format" style="width: 160px">
+                  <el-option label="PNG" value="png" />
+                  <el-option label="JPG" value="jpg" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="输出目录">
+                <div class="field-row">
+                  <el-input v-model="state.extractImages.outputDir" placeholder="自动创建" readonly />
+                  <el-button @click="selectDir('extractImages')">选择目录</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="state.loading" @click="runExtractImages">
+                  开始提取
+                </el-button>
+              </el-form-item>
+            </el-form>
+            <div v-if="state.extractImages.result.length" class="result-block">
+              <p class="result-title">输出图片（部分）</p>
+              <el-scrollbar max-height="160px">
+                <div class="result-list">
+                  <el-tag
+                    v-for="file in state.extractImages.result"
+                    :key="file"
+                    type="info"
+                    effect="plain"
+                    @click="openPath(file)"
+                  >
+                    {{ file }}
+                  </el-tag>
+                </div>
+              </el-scrollbar>
+            </div>
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane label="图片转 PDF" name="imagePdf">
+          <section class="panel">
+            <header>
+              <h4>将图片集合导出为 PDF</h4>
+              <p>支持 1/2/4 图布局，自定义纸张与边距</p>
+            </header>
+            <div class="field-row">
+              <el-button @click="addImagePdfFiles">添加图片</el-button>
+              <el-button text type="danger" :disabled="!state.imagePdf.files.length" @click="clearImagePdf">
+                清空
+              </el-button>
+            </div>
+            <el-table
+              v-if="state.imagePdf.files.length"
+              :data="state.imagePdf.files"
+              border
+              size="small"
+              style="margin: 12px 0"
+            >
+              <el-table-column type="index" width="50" label="#" />
+              <el-table-column prop="filename" label="文件名" />
+              <el-table-column label="操作" width="160">
+                <template #default="scope">
+                  <el-button link type="primary" @click="moveImagePdfFile(scope.$index, -1)" :disabled="scope.$index === 0">上移</el-button>
+                  <el-button link type="primary" @click="moveImagePdfFile(scope.$index, 1)" :disabled="scope.$index === state.imagePdf.files.length - 1">下移</el-button>
+                  <el-button link type="danger" @click="removeImagePdfFile(scope.$index)">移除</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+            <el-form :model="state.imagePdf" label-width="140px" class="form-gap">
+              <el-form-item label="纸张尺寸">
+                <el-select v-model="state.imagePdf.pageSize" style="width: 200px">
+                  <el-option label="A4" value="a4" />
+                  <el-option label="A5" value="a5" />
+                  <el-option label="Letter" value="letter" />
+                  <el-option label="自定义" value="custom" />
+                </el-select>
+              </el-form-item>
+              <div v-if="state.imagePdf.pageSize === 'custom'" class="field-row">
+                <el-form-item label="宽 (px)">
+                  <el-input-number v-model="state.imagePdf.customWidth" :min="600" :max="6000" />
+                </el-form-item>
+                <el-form-item label="高 (px)">
+                  <el-input-number v-model="state.imagePdf.customHeight" :min="600" :max="6000" />
+                </el-form-item>
+              </div>
+              <el-form-item label="每页布局">
+                <el-radio-group v-model="state.imagePdf.perPage">
+                  <el-radio-button :label="1">1 / 页</el-radio-button>
+                  <el-radio-button :label="2">2 / 页</el-radio-button>
+                  <el-radio-button :label="4">4 / 页</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item label="边距 (px)">
+                <el-input-number v-model="state.imagePdf.margin" :min="10" :max="200" />
+              </el-form-item>
+              <el-form-item label="输出目录">
+                <div class="field-row">
+                  <el-input v-model="state.imagePdf.outputDir" placeholder="留空自动创建" readonly />
+                  <el-button @click="selectDir('imagePdf')">选择目录</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item label="输出文件名">
+                <el-input v-model="state.imagePdf.outputName" placeholder="如：图片合集.pdf" />
+              </el-form-item>
+              <el-form-item>
+                <el-button
+                  type="primary"
+                  :loading="state.loading"
+                  :disabled="!state.imagePdf.files.length"
+                  @click="runImagesToPdf"
+                >
+                  生成 PDF
+                </el-button>
+              </el-form-item>
+            </el-form>
+            <div v-if="state.imagePdf.output" class="result-block">
+              <p class="result-title">输出文件</p>
+              <el-tag type="info" effect="plain" @click="openPath(state.imagePdf.output)">
+                {{ state.imagePdf.output }}
+              </el-tag>
+            </div>
+          </section>
+        </el-tab-pane>
       </el-tabs>
 
       <section class="log-panel">
@@ -455,6 +697,8 @@ const compressModeDpiMap = {
   high: 130
 }
 
+const imageFilter = ['图片 (*.png;*.jpg;*.jpeg;*.webp;*.bmp)']
+
 const state = reactive({
   loading: false,
   toImage: {
@@ -502,6 +746,43 @@ const state = reactive({
     startPage: 1,
     endPage: 1,
     pageSpec: '',
+    output: ''
+  },
+  reorder: {
+    file: null,
+    orderText: '',
+    appendRemaining: true,
+    output: ''
+  },
+  extractText: {
+    file: null,
+    mode: 'plain',
+    startPage: 1,
+    endPage: 1,
+    pageSpec: '',
+    outputDir: '',
+    saveFile: false,
+    preview: '',
+    segments: []
+  },
+  extractImages: {
+    file: null,
+    startPage: 1,
+    endPage: 1,
+    pageSpec: '',
+    format: 'png',
+    outputDir: '',
+    result: []
+  },
+  imagePdf: {
+    files: [],
+    pageSize: 'a4',
+    customWidth: 2480,
+    customHeight: 3508,
+    perPage: 1,
+    margin: 40,
+    outputDir: '',
+    outputName: '图片合集.pdf',
     output: ''
   },
   logs: []
@@ -724,6 +1005,116 @@ const runCut = async () => {
   })
   if (res) {
     state.cut.output = res.output
+  }
+}
+
+const runReorder = async () => {
+  if (!state.reorder.file) {
+    ElMessage.warning('请选择 PDF 文件')
+    return
+  }
+  const order = state.reorder.orderText
+    .split(',')
+    .map((item) => Number(item.trim()))
+    .filter((num) => Number.isInteger(num) && num > 0)
+  if (!order.length) {
+    ElMessage.warning('请填写新的页码顺序，例如：3,1,2')
+    return
+  }
+  const res = await callApi('pdf_reorder_pages', {
+    filePath: state.reorder.file.path,
+    order,
+    appendRemaining: state.reorder.appendRemaining
+  })
+  if (res) {
+    state.reorder.output = res.output
+  }
+}
+
+const runExtractText = async () => {
+  if (!state.extractText.file) {
+    ElMessage.warning('请选择 PDF 文件')
+    return
+  }
+  const res = await callApi('pdf_extract_text', {
+    filePath: state.extractText.file.path,
+    pageSpec: state.extractText.pageSpec,
+    startPage: state.extractText.startPage,
+    endPage: state.extractText.endPage,
+    textMode: state.extractText.mode,
+    saveFile: state.extractText.saveFile,
+    outputDir: state.extractText.outputDir
+  })
+  if (res) {
+    state.extractText.preview = res.preview || ''
+    state.extractText.segments = res.segments || []
+    if (res.output) {
+      state.extractText.outputDir = res.output.split(/[\\/]/).slice(0, -1).join('/') || state.extractText.outputDir
+    }
+  }
+}
+
+const runExtractImages = async () => {
+  if (!state.extractImages.file) {
+    ElMessage.warning('请选择 PDF 文件')
+    return
+  }
+  const res = await callApi('pdf_extract_images', {
+    filePath: state.extractImages.file.path,
+    pageSpec: state.extractImages.pageSpec,
+    startPage: state.extractImages.startPage,
+    endPage: state.extractImages.endPage,
+    format: state.extractImages.format,
+    outputDir: state.extractImages.outputDir
+  })
+  if (res) {
+    state.extractImages.result = res.files || []
+    state.extractImages.outputDir = res.outputDir || state.extractImages.outputDir
+  }
+}
+
+const addImagePdfFiles = async () => {
+  if (!ensurePyReady()) return
+  const files = await window.pywebview.api.system_pyCreateFileDialog(imageFilter)
+  if (files?.length) {
+    state.imagePdf.files.push(...files)
+  }
+}
+
+const removeImagePdfFile = (index) => {
+  state.imagePdf.files.splice(index, 1)
+}
+
+const moveImagePdfFile = (index, offset) => {
+  const target = index + offset
+  if (target < 0 || target >= state.imagePdf.files.length) return
+  const list = state.imagePdf.files
+  const current = list[index]
+  list.splice(index, 1)
+  list.splice(target, 0, current)
+}
+
+const clearImagePdf = () => {
+  state.imagePdf.files.splice(0, state.imagePdf.files.length)
+}
+
+const runImagesToPdf = async () => {
+  if (!state.imagePdf.files.length) {
+    ElMessage.warning('请先选择图片')
+    return
+  }
+  const res = await callApi('pdf_images_to_pdf', {
+    images: state.imagePdf.files.map((item) => item.path),
+    pageSize: state.imagePdf.pageSize,
+    customWidth: state.imagePdf.customWidth,
+    customHeight: state.imagePdf.customHeight,
+    perPage: state.imagePdf.perPage,
+    margin: state.imagePdf.margin,
+    outputDir: state.imagePdf.outputDir,
+    outputName: state.imagePdf.outputName
+  })
+  if (res) {
+    state.imagePdf.output = res.output
   }
 }
 </script>

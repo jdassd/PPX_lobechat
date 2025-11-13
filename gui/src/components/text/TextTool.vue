@@ -18,6 +18,8 @@ const visibleProxy = computed({
   set: (value) => emit('update:modelValue', value)
 })
 
+let replaceRuleSeed = 1
+
 const state = reactive({
   loading: false,
   activeTab: 'codec',
@@ -74,6 +76,29 @@ const state = reactive({
     unit: 's',
     timezone: 'Asia/Shanghai',
     result: ''
+  },
+  replace: {
+    content: '',
+    rules: [
+      {
+        id: replaceRuleSeed,
+        search: '',
+        replace: '',
+        regex: false,
+        caseSensitive: true,
+        enabled: true,
+        limit: 0
+      }
+    ],
+    result: '',
+    report: []
+  },
+  unicode: {
+    mode: 'escape',
+    content: '',
+    codePoints: '',
+    result: '',
+    preview: []
   },
   hash: {
     sourceType: 'text',
@@ -266,6 +291,77 @@ const runTimestamp = async () => {
     }
   } catch (error) {
     ElMessage.error(error?.message || '转换失败')
+  } finally {
+    state.loading = false
+  }
+}
+
+const addReplaceRule = () => {
+  replaceRuleSeed += 1
+  state.replace.rules.push({
+    id: replaceRuleSeed,
+    search: '',
+    replace: '',
+    regex: false,
+    caseSensitive: true,
+    enabled: true,
+    limit: 0
+  })
+}
+
+const removeReplaceRule = (index) => {
+  state.replace.rules.splice(index, 1)
+  if (!state.replace.rules.length) {
+    addReplaceRule()
+  }
+}
+
+const runReplace = async () => {
+  if (!ensurePyReady()) return
+  const rules = state.replace.rules.filter((rule) => rule.enabled && rule.search?.trim())
+  if (!rules.length) {
+    ElMessage.warning('请至少启用一条规则')
+    return
+  }
+  state.loading = true
+  try {
+    const res = await window.pywebview.api.text_batch_replace({
+      content: state.replace.content,
+      rules
+    })
+    if (res?.code === 0 || res?.success) {
+      state.replace.result = res.result || ''
+      state.replace.report = res.report || []
+      ElMessage.success(res.msg || '处理完成')
+    } else {
+      ElMessage.error(res?.msg || '处理失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '处理失败')
+  } finally {
+    state.loading = false
+  }
+}
+
+const runUnicode = async () => {
+  if (!ensurePyReady()) return
+  state.loading = true
+  try {
+    const res = await window.pywebview.api.text_unicode_convert({
+      mode: state.unicode.mode,
+      content: state.unicode.content,
+      codePoints: state.unicode.codePoints,
+      uppercase: true
+    })
+    if (res?.code === 0 || res?.success) {
+      state.unicode.result = res.result || ''
+      state.unicode.preview = res.codepoints || res.preview || []
+      ElMessage.success(res.msg || '处理完成')
+    } else {
+      ElMessage.error(res?.msg || '处理失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '处理失败')
   } finally {
     state.loading = false
   }
@@ -631,6 +727,63 @@ const openFile = (path) => {
           </section>
         </el-tab-pane>
 
+        <el-tab-pane label="批量替换" name="replace">
+          <section class="panel">
+            <header>
+              <h4>批量替换规则</h4>
+              <p>支持文本/正则模式、区分大小写、替换次数限制，附执行报告</p>
+            </header>
+            <div class="rule-toolbar">
+              <span>替换规则</span>
+              <el-button size="small" type="primary" text @click="addReplaceRule">新增规则</el-button>
+            </div>
+            <div class="rule-list">
+              <div v-for="(rule, index) in state.replace.rules" :key="rule.id" class="rule-row">
+                <div class="rule-row-line">
+                  <el-checkbox v-model="rule.enabled">启用</el-checkbox>
+                  <el-checkbox v-model="rule.regex">正则</el-checkbox>
+                  <el-checkbox v-model="rule.caseSensitive" :disabled="rule.regex">区分大小写</el-checkbox>
+                  <el-input-number
+                    v-model="rule.limit"
+                    :min="0"
+                    :max="999"
+                    :step="1"
+                    size="small"
+                    style="width: 120px"
+                  />
+                  <el-button size="small" text type="danger" @click="removeReplaceRule(index)">移除</el-button>
+                </div>
+                <el-input v-model="rule.search" placeholder="查找内容（支持正则）" />
+                <el-input v-model="rule.replace" placeholder="替换为（可留空）" />
+              </div>
+            </div>
+            <div class="text-grid">
+              <el-input
+                v-model="state.replace.content"
+                type="textarea"
+                :rows="8"
+                placeholder="输入原始文本"
+              />
+              <div class="text-grid-actions">
+                <el-button type="primary" :loading="state.loading" @click="runReplace">执行</el-button>
+              </div>
+              <PreviewPanel title="输出" :content="state.replace.result" />
+            </div>
+            <el-table
+              v-if="state.replace.report.length"
+              :data="state.replace.report"
+              border
+              size="small"
+              style="margin-top: 16px"
+            >
+              <el-table-column type="index" width="60" label="#" />
+              <el-table-column prop="search" label="查找" show-overflow-tooltip />
+              <el-table-column prop="replacement" label="替换为" show-overflow-tooltip />
+              <el-table-column prop="count" label="影响条数" width="120" />
+            </el-table>
+          </section>
+        </el-tab-pane>
+
         <el-tab-pane label="时间戳转换" name="timestamp">
           <section class="panel">
             <header>
@@ -664,6 +817,56 @@ const openFile = (path) => {
               </el-form-item>
             </el-form>
             <PreviewPanel v-if="state.timestamp.result" title="结果 JSON" :content="state.timestamp.result" />
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane label="Unicode 工具" name="unicode">
+          <section class="panel">
+            <header>
+              <h4>Unicode 编码 / 解码</h4>
+              <p>在文本与 \\uXXXX、编码点间快速转换，支持批量列表</p>
+            </header>
+            <el-form :model="state.unicode" label-width="120px" class="form-gap">
+              <el-form-item label="模式">
+                <el-radio-group v-model="state.unicode.mode">
+                  <el-radio-button label="escape">文本 → \\u</el-radio-button>
+                  <el-radio-button label="unescape">\\u → 文本</el-radio-button>
+                  <el-radio-button label="codepoint">输出编码点</el-radio-button>
+                  <el-radio-button label="from_codepoint">编码点 → 文本</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item v-if="state.unicode.mode === 'from_codepoint'" label="编码点列表">
+                <el-input
+                  v-model="state.unicode.codePoints"
+                  type="textarea"
+                  :rows="4"
+                  placeholder="示例：0041 0042 或 U+1F600,U+1F64C"
+                />
+              </el-form-item>
+            </el-form>
+            <div class="text-grid">
+              <el-input
+                v-model="state.unicode.content"
+                type="textarea"
+                :rows="8"
+                placeholder="输入文本或编码点"
+              />
+              <div class="text-grid-actions">
+                <el-button type="primary" :loading="state.loading" @click="runUnicode">执行</el-button>
+              </div>
+              <PreviewPanel title="输出" :content="state.unicode.result" />
+            </div>
+            <el-table
+              v-if="state.unicode.preview?.length"
+              :data="state.unicode.preview"
+              border
+              size="small"
+              style="margin-top: 16px"
+            >
+              <el-table-column prop="char" label="字符" width="120" />
+              <el-table-column prop="code" label="Unicode" />
+              <el-table-column prop="decimal" label="十进制" width="120" />
+            </el-table>
           </section>
         </el-tab-pane>
 
@@ -775,5 +978,35 @@ const openFile = (path) => {
 
 .link {
   color: #2f73ff;
+}
+
+.rule-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 12px 0;
+}
+
+.rule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.rule-row {
+  border: 1px dashed #d8deee;
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rule-row-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
 }
 </style>

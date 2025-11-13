@@ -16,6 +16,7 @@ from api.utils import (
     api_error,
     api_success,
     ensure_file_path,
+    ensure_files_payload,
     parse_timespan,
     normalize_suffix,
 )
@@ -268,3 +269,54 @@ class VideoTool:
             return api_success('视频信息获取完成', info=info, raw=payload)
         except Exception as exc:
             return api_error(f'读取视频信息失败：{exc}')
+
+    # -------------------- P2 功能 --------------------
+
+    def video_concat(self, options: Dict | None = None):
+        """多视频合成"""
+        try:
+            opts = self._validate(options)
+            raw_files = opts.get('files') or opts.get('fileList')
+            if not raw_files:
+                raise ValueError('请至少选择 2 个视频文件')
+            files = ensure_files_payload({'files': raw_files})
+            if len(files) < 2:
+                raise ValueError('至少需要两个视频文件')
+            ffmpeg = self._require_ffmpeg()
+            reencode = bool(opts.get('reencode', False))
+            base = files[0]
+            target_format = str(opts.get('targetFormat') or base.suffix or '.mp4').lstrip('.')
+            dest = self._prepare_output(base, opts, 'concat', target_format)
+            manifest = dest.with_suffix('.concat.txt')
+            try:
+                with manifest.open('w', encoding='utf-8') as handler:
+                    for path in files:
+                        normalized = str(path).replace('\\', '/').replace("'", r"'\''")
+                        handler.write(f"file '{normalized}'\n")
+                args = [
+                    ffmpeg,
+                    '-y',
+                    '-f', 'concat',
+                    '-safe', '0',
+                    '-i', str(manifest),
+                ]
+                if reencode:
+                    vcodec = opts.get('videoCodec') or 'libx264'
+                    acodec = opts.get('audioCodec') or 'aac'
+                    crf = opts.get('crf')
+                    try:
+                        crf_value = int(crf) if crf is not None else 22
+                    except (TypeError, ValueError):
+                        crf_value = 22
+                    preset = opts.get('preset', 'medium')
+                    args += ['-c:v', vcodec, '-preset', preset, '-crf', str(crf_value), '-c:a', acodec]
+                else:
+                    args += ['-c', 'copy']
+                args.append(str(dest))
+                self._run(args)
+            finally:
+                if manifest.exists():
+                    manifest.unlink()
+            return api_success('视频合成完成', file=str(dest))
+        except Exception as exc:
+            return api_error(f'视频合成失败：{exc}')

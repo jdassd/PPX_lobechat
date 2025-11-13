@@ -401,3 +401,94 @@ class TextTool:
             return api_success('哈希计算完成', result=hasher.hexdigest())
         except Exception as exc:
             return api_error(f'哈希计算失败：{exc}')
+
+    def text_batch_replace(self, options: Dict | None = None):
+        """批量替换"""
+        try:
+            opts = self._validate(options)
+            content = opts.get('content', '') or ''
+            rules = opts.get('rules') or []
+            if not isinstance(rules, list) or not rules:
+                raise ValueError('请至少添加一条规则')
+            result = content
+            report = []
+            total_replaced = 0
+            for idx, rule in enumerate(rules, start=1):
+                if not rule or not rule.get('enabled', True):
+                    continue
+                search = rule.get('search') or rule.get('pattern') or ''
+                if not search:
+                    continue
+                replacement = rule.get('replace') or rule.get('value') or ''
+                limit = rule.get('limit')
+                try:
+                    limit = int(limit)
+                except (TypeError, ValueError):
+                    limit = 0
+                use_regex = bool(rule.get('regex'))
+                case_sensitive = bool(rule.get('caseSensitive', True))
+                flags = rule.get('flags')
+                if use_regex:
+                    pattern = self._compile_regex(search, flags)
+                    if limit and limit > 0:
+                        result, replaced = pattern.subn(replacement, result, count=limit)
+                    else:
+                        result, replaced = pattern.subn(replacement, result)
+                else:
+                    flag = 0 if case_sensitive else re.IGNORECASE
+                    pattern = re.compile(re.escape(search), flag)
+                    repl = replacement
+                    if limit and limit > 0:
+                        result, replaced = pattern.subn(lambda _: repl, result, count=limit)
+                    else:
+                        result, replaced = pattern.subn(lambda _: repl, result)
+                total_replaced += replaced
+                report.append({
+                    'index': idx,
+                    'search': search,
+                    'replacement': replacement,
+                    'count': replaced,
+                })
+            return api_success('批量替换完成', result=result, replaced=total_replaced, report=report)
+        except Exception as exc:
+            return api_error(f'批量替换失败：{exc}')
+
+    def text_unicode_convert(self, options: Dict | None = None):
+        """Unicode 转义处理"""
+        try:
+            opts = self._validate(options)
+            content = opts.get('content', '') or ''
+            mode = str(opts.get('mode', 'escape')).lower()
+            if mode in {'escape', 'encode'}:
+                escaped = content.encode('unicode_escape').decode('ascii')
+                if opts.get('uppercase'):
+                    escaped = re.sub(r'\\u[0-9a-fA-F]{4}', lambda match: match.group(0).upper(), escaped)
+                    escaped = re.sub(r'\\U[0-9a-fA-F]{8}', lambda match: match.group(0).upper(), escaped)
+                return api_success('已转换为 Unicode 转义', result=escaped)
+            if mode in {'unescape', 'decode'}:
+                decoded = content.encode('utf-8').decode('unicode_escape')
+                return api_success('已还原字符', result=decoded)
+            if mode in {'codepoint', 'codepoints'}:
+                table = [
+                    {'char': ch, 'code': f'U+{ord(ch):04X}', 'decimal': ord(ch)}
+                    for ch in content
+                ]
+                return api_success('编码点列表', codepoints=table, count=len(table))
+            if mode in {'from_codepoint', 'from_codepoints'}:
+                raw_codes = opts.get('codePoints') or content
+                if not raw_codes:
+                    raise ValueError('请输入编码点')
+                chars = []
+                for chunk in re.split(r'[\s,;]+', str(raw_codes).strip()):
+                    if not chunk:
+                        continue
+                    normalized = chunk.upper().lstrip('U+').lstrip('0X')
+                    try:
+                        code_int = int(normalized, 16)
+                    except ValueError:
+                        raise ValueError(f'非法编码点：{chunk}')
+                    chars.append(chr(code_int))
+                return api_success('编码点转换完成', result=''.join(chars), count=len(chars))
+            raise ValueError('未知的转换模式')
+        except Exception as exc:
+            return api_error(f'Unicode 处理失败：{exc}')

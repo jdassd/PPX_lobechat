@@ -281,6 +281,117 @@ class Excel():
         except Exception as exc:
             return {'code': -1, 'msg': f'合并失败：{exc}'}
 
+    def excel_column_profile(self, options: Dict = None):
+        '''列统计分析'''
+        try:
+            opts = self._validate_payload(options)
+            source = self._ensure_excel_file(opts.get('filePath', ''))
+            sheet_name = opts.get('sheetName')
+            delimiter = opts.get('delimiter') or '|'
+            schema_text = opts.get('schemaText', '')
+            header, data_rows, active_sheet = self._load_sheet(source, sheet_name)
+            schema = self._normalize_schema(schema_text, delimiter, header)
+            target_columns = opts.get('columns') or schema
+            columns = [col for col in target_columns if col in schema]
+            if not columns:
+                columns = schema
+            records = self._rows_to_dicts(schema, data_rows, active_sheet)
+            total_rows = len(records)
+            profiles = []
+            for column in columns:
+                values = [str(row.get(column, '') or '').strip() for row in records]
+                blanks = sum(1 for value in values if not value)
+                non_blank = [value for value in values if value]
+                unique_count = len(set(non_blank))
+                numeric_values = []
+                for value in non_blank:
+                    try:
+                        numeric_values.append(float(value.replace(',', '')))
+                    except Exception:
+                        continue
+                is_numeric = len(numeric_values) >= max(1, int(0.6 * len(non_blank))) if non_blank else False
+                counter = Counter(non_blank)
+                top_values = [
+                    {'value': key, 'count': count, 'ratio': round(count / total_rows, 4)}
+                    for key, count in counter.most_common(5)
+                ]
+                numeric_summary = {}
+                if numeric_values:
+                    numeric_summary = {
+                        'min': min(numeric_values),
+                        'max': max(numeric_values),
+                        'avg': round(sum(numeric_values) / len(numeric_values), 4)
+                    }
+                profiles.append({
+                    'field': column,
+                    'type': 'number' if is_numeric else 'text',
+                    'unique': unique_count,
+                    'blanks': blanks,
+                    'blankRatio': round(blanks / total_rows, 4) if total_rows else 0,
+                    'topValues': top_values,
+                    'numeric': numeric_summary,
+                    'samples': non_blank[:5]
+                })
+            return {
+                'code': 0,
+                'msg': '列分析完成',
+                'summary': {
+                    'sheet': active_sheet,
+                    'totalRows': total_rows,
+                    'columns': len(columns)
+                },
+                'profiles': profiles
+            }
+        except Exception as exc:
+            return {'code': -1, 'msg': f'分析失败：{exc}'}
+
+    def excel_split_by_column(self, options: Dict = None):
+        '''按列拆分为多个工作簿'''
+        try:
+            opts = self._validate_payload(options)
+            source = self._ensure_excel_file(opts.get('filePath', ''))
+            column = opts.get('column') or opts.get('groupBy')
+            if not column:
+                raise ValueError('请选择需要拆分的列')
+            sheet_name = opts.get('sheetName')
+            delimiter = opts.get('delimiter') or '|'
+            schema_text = opts.get('schemaText', '')
+            header, data_rows, active_sheet = self._load_sheet(source, sheet_name)
+            schema = self._normalize_schema(schema_text, delimiter, header)
+            if column not in schema:
+                raise ValueError(f'列不存在：{column}')
+            records = self._rows_to_dicts(schema, data_rows, active_sheet)
+            limit = int(opts.get('limit') or 0)
+            min_rows = int(opts.get('minRows') or 1)
+            empty_label = opts.get('emptyLabel') or '未分类'
+            output_dir = self._ensure_output_dir(source, opts.get('outputDir', ''), 'split')
+            groups: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+            for row in records:
+                key = str(row.get(column) or '').strip() or empty_label
+                groups[key].append(row)
+            sorted_groups = sorted(groups.items(), key=lambda item: len(item[1]), reverse=True)
+            if limit > 0:
+                sorted_groups = sorted_groups[:limit]
+            exports = []
+            for label, rows in sorted_groups:
+                if len(rows) < min_rows:
+                    continue
+                safe_label = ''.join(ch if ch.isalnum() else '_' for ch in label) or 'group'
+                dest = output_dir / f'{column}_{safe_label}.xlsx'
+                self._write_rows(schema, rows, dest)
+                exports.append({'label': label, 'rows': len(rows), 'file': str(dest)})
+            if not exports:
+                raise ValueError('没有满足条件的分组可导出')
+            return {
+                'code': 0,
+                'msg': f'已导出 {len(exports)} 个分组',
+                'groups': [{'label': item['label'], 'rows': item['rows']} for item in exports],
+                'files': [item['file'] for item in exports],
+                'outputDir': str(output_dir)
+            }
+        except Exception as exc:
+            return {'code': -1, 'msg': f'拆分失败：{exc}'}
+
     # -------- internal helpers --------
 
     def _list_sheets(self, file_path: Path) -> List[str]:

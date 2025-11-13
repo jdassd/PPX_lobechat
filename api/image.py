@@ -6,10 +6,14 @@
 from __future__ import annotations
 
 import io
+import math
+import shutil
+import time
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple
 
-from PIL import Image, ImageColor, ImageDraw, ImageEnhance, ImageFont, ImageOps
+from PIL import Image, ImageColor, ImageDraw, ImageEnhance, ImageFont, ImageOps, ExifTags
 
 from api.utils import (
     ensure_files_payload,
@@ -18,6 +22,7 @@ from api.utils import (
     api_error,
     format_bytes,
     parse_percentage,
+    clamp_int,
 )
 
 
@@ -140,6 +145,24 @@ class ImageTool:
             return max(1, int(part_a)), max(1, int(part_b))
         except (ValueError, TypeError):
             return 1, 1
+
+    def _align_offset(self, container: int, item: int, align: str) -> int:
+        mode = (align or 'center').lower()
+        if mode in {'start', 'top', 'left'}:
+            return 0
+        if mode in {'end', 'bottom', 'right'}:
+            return max(0, container - item)
+        return max(0, (container - item) // 2)
+
+    def _stringify_exif_value(self, value):
+        if isinstance(value, bytes):
+            try:
+                return value.decode('utf-8', errors='ignore').strip('\x00')
+            except Exception:
+                return value.hex()
+        if isinstance(value, (list, tuple)):
+            return ', '.join(self._stringify_exif_value(item) for item in value)
+        return str(value)
 
     # -------------------- P0 功能 --------------------
 
@@ -423,3 +446,196 @@ class ImageTool:
             return api_success('PDF 导出完成', file=str(dest), outputDir=str(output_dir), pages=len(pages))
         except Exception as exc:
             return api_error(f'导出 PDF 失败：{exc}')
+
+    # -------------------- P2 功能 --------------------
+
+    def image_concat(self, options: Dict | None = None):
+        """图片拼接"""
+        try:
+            opts = self._validate(options)
+            files = ensure_files_payload(opts)
+            layout = str(opts.get('direction', 'horizontal')).lower()
+            if layout not in {'horizontal', 'vertical', 'grid'}:
+                layout = 'horizontal'
+            spacing = max(0, int(opts.get('spacing') or 0))
+            align = str(opts.get('align', 'center')).lower()
+            fmt = str(opts.get('outputFormat') or 'png').lower().lstrip('.')
+            if fmt not in self._valid_formats:
+                fmt = 'png'
+            quality = None
+            if opts.get('quality') is not None:
+                try:
+                    quality = int(opts.get('quality'))
+                except (TypeError, ValueError):
+                    quality = None
+            bg_color = (*self._parse_color(opts.get('background') or '#ffffff'), 255)
+            output_dir = self._prepare_output_dir(files, opts.get('outputDir'), 'image_concat')
+            images: List[Image.Image] = []
+            widths: List[int] = []
+            heights: List[int] = []
+            try:
+                for path in files:
+                    img = Image.open(path).convert('RGBA')
+                    images.append(img)
+                    widths.append(img.width)
+                    heights.append(img.height)
+                if layout == 'vertical':
+                    canvas_width = max(widths)
+                    canvas_height = sum(heights) + spacing * max(0, len(images) - 1)
+                    canvas = Image.new('RGBA', (canvas_width, canvas_height), bg_color)
+                    offset_y = 0
+                    for img in images:
+                        offset_x = self._align_offset(canvas_width, img.width, align)
+                        canvas.paste(img, (offset_x, offset_y), img)
+                        offset_y += img.height + spacing
+                elif layout == 'grid':
+                    columns = max(1, int(opts.get('columns') or 2))
+                    max_width = max(widths)
+                    max_height = max(heights)
+                    rows = math.ceil(len(images) / columns)
+                    canvas_width = columns * max_width + spacing * max(0, columns - 1)
+                    canvas_height = rows * max_height + spacing * max(0, rows - 1)
+                    canvas = Image.new('RGBA', (canvas_width, canvas_height), bg_color)
+                    for idx, img in enumerate(images):
+                        row = idx // columns
+                        col = idx % columns
+                        cell_x = col * (max_width + spacing)
+                        cell_y = row * (max_height + spacing)
+                        offset_x = cell_x + self._align_offset(max_width, img.width, 'center')
+                        offset_y = cell_y + self._align_offset(max_height, img.height, 'center')
+                        canvas.paste(img, (offset_x, offset_y), img)
+                else:
+                    canvas_width = sum(widths) + spacing * max(0, len(images) - 1)
+                    canvas_height = max(heights)
+                    canvas = Image.new('RGBA', (canvas_width, canvas_height), bg_color)
+                    offset_x = 0
+                    for img in images:
+                        offset_y = self._align_offset(canvas_height, img.height, align)
+                        canvas.paste(img, (offset_x, offset_y), img)
+                        offset_x += img.width + spacing
+            finally:
+                for img in images:
+                    img.close()
+            dest_name = opts.get('outputName') or f'{files[0].stem}_concat.{fmt}'
+            if not dest_name.lower().endswith(f'.{fmt}'):
+                dest_name = f'{dest_name}.{fmt}'
+            dest = output_dir / dest_name
+            self._save_image(canvas, dest, fmt, quality)
+            return api_success('图片拼接完成', file=str(dest), outputDir=str(output_dir))
+        except Exception as exc:
+            return api_error(f'拼接失败：{exc}')
+
+    def image_batch_rename(self, options: Dict | None = None):
+        """图片批量重命名/复制"""
+        try:
+            opts = self._validate(options)
+            files = ensure_files_payload(opts)
+            mode = str(opts.get('mode', 'sequence')).lower()
+            digits = max(1, int(opts.get('digits') or len(str(len(files) + 1))))
+            start_index = int(opts.get('startIndex') or 1)
+            prefix = opts.get('prefix') or 'img_'
+            suffix = opts.get('suffix') or ''
+            timestamp_fmt = opts.get('timestampFormat') or '%Y%m%d_%H%M%S'
+            pattern = opts.get('pattern') or '{name}_{index}'
+            keep_extension = bool(opts.get('keepExtension', True))
+            override_ext = opts.get('extension')
+            if override_ext:
+                override_ext = override_ext if override_ext.startswith('.') else f'.{override_ext}'
+            dry_run = bool(opts.get('dryRun', True))
+            copy_mode = bool(opts.get('copyMode', False))
+            conflict_policy = str(opts.get('conflictPolicy', 'skip')).lower()
+            output_dir = opts.get('outputDir')
+            target_dir = None
+            if output_dir:
+                target_dir = Path(output_dir)
+                target_dir.mkdir(parents=True, exist_ok=True)
+            if copy_mode and target_dir is None:
+                target_dir = self._prepare_output_dir(files, None, 'image_rename')
+            operations: List[Dict[str, str]] = []
+            skipped: List[str] = []
+            timestamp_cache = datetime.now().strftime(timestamp_fmt)
+
+            def build_name(path: Path, number: int) -> str:
+                digits_str = str(number).zfill(digits)
+                if mode == 'timestamp':
+                    base = f'{prefix}{timestamp_cache}_{digits_str}{suffix}'
+                elif mode == 'custom':
+                    context = {
+                        'index': digits_str,
+                        'number': digits_str,
+                        'name': path.stem,
+                        'original': path.stem,
+                        'timestamp': int(time.time()),
+                        'datetime': timestamp_cache,
+                    }
+                    try:
+                        base = pattern.format(**context)
+                    except Exception:
+                        base = f'{prefix}{digits_str}{suffix}'
+                else:
+                    base = f'{prefix}{digits_str}{suffix}'
+                if keep_extension or not override_ext:
+                    ext = path.suffix or '.png'
+                else:
+                    ext = override_ext
+                return base + ext
+
+            for offset, path in enumerate(files):
+                index = start_index + offset
+                new_name = build_name(path, index)
+                if target_dir:
+                    dest = target_dir / new_name
+                else:
+                    dest = path.with_name(new_name)
+                if dest.exists() and dest != path:
+                    if conflict_policy == 'overwrite' and not dry_run:
+                        dest.unlink()
+                    else:
+                        skipped.append(str(path))
+                        continue
+                operations.append({'from': str(path), 'to': str(dest)})
+                if dry_run:
+                    continue
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                if copy_mode:
+                    shutil.copy2(path, dest)
+                else:
+                    path.rename(dest)
+            message = '重命名预览' if dry_run else '批量重命名完成'
+            payload = {
+                'operations': operations,
+                'skipped': skipped,
+                'dryRun': dry_run,
+            }
+            if target_dir:
+                payload['outputDir'] = str(target_dir)
+            return api_success(message, **payload)
+        except Exception as exc:
+            return api_error(f'批量重命名失败：{exc}')
+
+    def image_get_exif(self, options: Dict | None = None):
+        """获取 EXIF 信息"""
+        try:
+            opts = self._validate(options)
+            file_path = self._ensure_single_file(opts)
+            with Image.open(file_path) as image:
+                exif = image.getexif()
+                if not exif:
+                    return api_success('未检测到 EXIF 信息', exif=[], gps={}, file=str(file_path))
+                readable = []
+                gps_info = {}
+                for tag_id, value in exif.items():
+                    tag_name = ExifTags.TAGS.get(tag_id, f'Tag {tag_id}')
+                    if tag_name == 'GPSInfo' and isinstance(value, dict):
+                        gps_info = {
+                            ExifTags.GPSTAGS.get(key, str(key)): self._stringify_exif_value(val)
+                            for key, val in value.items()
+                        }
+                        continue
+                    readable.append({
+                        'tag': tag_name,
+                        'value': self._stringify_exif_value(value),
+                    })
+            return api_success('EXIF 读取完成', file=str(file_path), exif=readable, gps=gps_info)
+        except Exception as exc:
+            return api_error(f'读取 EXIF 失败：{exc}')
