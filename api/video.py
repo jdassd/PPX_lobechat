@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import time
 from pathlib import Path
 from typing import Dict
 
@@ -80,6 +81,18 @@ class VideoTool:
         if extension:
             filename = normalize_suffix(filename, extension)
         return dest_dir / filename
+
+    def _prepare_sequence_dir(self, source: Path, options: Dict, suffix: str) -> Path:
+        output_dir = options.get('outputDir')
+        if output_dir:
+            base_dir = Path(output_dir)
+            base_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            base_dir = source.parent / suffix
+            base_dir.mkdir(parents=True, exist_ok=True)
+        target = base_dir / f'{source.stem}_{int(time.time())}'
+        target.mkdir(parents=True, exist_ok=True)
+        return target
 
     # -------------------- P0 功能 --------------------
 
@@ -170,3 +183,88 @@ class VideoTool:
             return api_success('截取完成', file=str(dest))
         except Exception as exc:
             return api_error(f'截取失败：{exc}')
+
+    def video_extract_audio(self, options: Dict | None = None):
+        """提取音频"""
+        try:
+            opts = self._validate(options)
+            source = ensure_file_path(opts.get('filePath'))
+            ffmpeg = self._require_ffmpeg()
+            audio_format = str(opts.get('audioFormat', 'mp3')).lower()
+            quality = str(opts.get('quality', 'medium')).lower()
+            bitrate_map = {'high': '320k', 'medium': '192k', 'low': '128k'}
+            codec_args = {
+                'mp3': ['-c:a', 'libmp3lame'],
+                'aac': ['-c:a', 'aac'],
+                'wav': ['-c:a', 'pcm_s16le'],
+                'flac': ['-c:a', 'flac'],
+            }
+            dest = self._prepare_output(source, opts, 'audio', audio_format)
+            args = [ffmpeg, '-y', '-i', str(source), '-vn']
+            args += codec_args.get(audio_format, ['-c:a', 'aac'])
+            if audio_format not in {'wav'}:
+                args += ['-b:a', bitrate_map.get(quality, '192k')]
+            args.append(str(dest))
+            self._run(args)
+            return api_success('音频提取完成', file=str(dest))
+        except Exception as exc:
+            return api_error(f'音频提取失败：{exc}')
+
+    def video_extract_frames(self, options: Dict | None = None):
+        """提取帧图"""
+        try:
+            opts = self._validate(options)
+            source = ensure_file_path(opts.get('filePath'))
+            ffmpeg = self._require_ffmpeg()
+            mode = str(opts.get('mode', 'time')).lower()
+            interval = max(1, int(opts.get('interval') or 5))
+            image_format = str(opts.get('imageFormat', 'png')).lower()
+            dest_dir = self._prepare_sequence_dir(source, opts, 'frames')
+            pattern = dest_dir / f'{source.stem}_%04d.{image_format}'
+            args = [ffmpeg, '-y', '-i', str(source)]
+            if mode == 'frame':
+                args += ['-vf', f"select='not(mod(n\\,{interval}))'", '-vsync', 'vfr']
+            else:
+                fps_expr = f'1/{interval}' if interval else '1'
+                args += ['-vf', f'fps={fps_expr}']
+            args.append(str(pattern))
+            self._run(args)
+            files = sorted(dest_dir.glob(f'{source.stem}_*.{image_format}'))
+            preview = [str(path) for path in files[:10]]
+            return api_success('帧图提取完成', outputDir=str(dest_dir), files=preview, count=len(files))
+        except Exception as exc:
+            return api_error(f'帧图提取失败：{exc}')
+
+    def video_get_info(self, options: Dict | None = None):
+        """获取视频信息"""
+        try:
+            opts = self._validate(options)
+            source = ensure_file_path(opts.get('filePath'))
+            ffprobe = self._require_ffprobe()
+            cmd = [
+                ffprobe,
+                '-v', 'error',
+                '-print_format', 'json',
+                '-show_format',
+                '-show_streams',
+                str(source),
+            ]
+            process = subprocess.run(cmd, capture_output=True, text=True)
+            if process.returncode != 0:
+                raise RuntimeError(process.stderr.strip() or '无法解析视频信息')
+            payload = json.loads(process.stdout or '{}')
+            video_stream = next((stream for stream in payload.get('streams', []) if stream.get('codec_type') == 'video'), {})
+            audio_stream = next((stream for stream in payload.get('streams', []) if stream.get('codec_type') == 'audio'), {})
+            info = {
+                'duration': float(payload.get('format', {}).get('duration') or 0),
+                'bitrate': payload.get('format', {}).get('bit_rate'),
+                'size': payload.get('format', {}).get('size'),
+                'videoCodec': video_stream.get('codec_name'),
+                'audioCodec': audio_stream.get('codec_name'),
+                'width': video_stream.get('width'),
+                'height': video_stream.get('height'),
+                'fps': video_stream.get('avg_frame_rate'),
+            }
+            return api_success('视频信息获取完成', info=info, raw=payload)
+        except Exception as exc:
+            return api_error(f'读取视频信息失败：{exc}')

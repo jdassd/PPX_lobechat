@@ -52,6 +52,51 @@ const state = reactive({
     outputDir: '',
     generatedDir: '',
     result: []
+  },
+  watermark: {
+    files: [],
+    watermarkType: 'text',
+    text: '',
+    fontSize: 32,
+    color: '#ffffff',
+    opacity: 60,
+    position: 'bottom-right',
+    watermarkImage: null,
+    scalePercent: 30,
+    outputDir: '',
+    generatedDir: '',
+    result: []
+  },
+  crop: {
+    file: null,
+    mode: 'custom',
+    x: 0,
+    y: 0,
+    width: 800,
+    height: 600,
+    ratio: '16:9',
+    outputDir: '',
+    generatedDir: '',
+    result: ''
+  },
+  rotate: {
+    files: [],
+    operation: 'rotate90',
+    outputDir: '',
+    generatedDir: '',
+    result: []
+  },
+  pdf: {
+    files: [],
+    pageSize: 'a4',
+    customWidth: 2480,
+    customHeight: 3508,
+    perPage: 1,
+    margin: 40,
+    outputName: '',
+    outputDir: '',
+    generatedDir: '',
+    result: ''
   }
 })
 
@@ -66,8 +111,29 @@ const ensurePyReady = () => {
 const selectImages = async (target) => {
   if (!ensurePyReady()) return
   const files = await window.pywebview.api.system_pyCreateFileDialog(imageFilter)
-  if (!files || !files.length) return
-  state[target].files = files
+  if (files?.length) {
+    state[target].files = files
+  }
+}
+
+const selectSingleImage = async (target, field = 'file') => {
+  if (!ensurePyReady()) return
+  const files = await window.pywebview.api.system_pyCreateFileDialog(imageFilter)
+  if (files?.length) {
+    state[target][field] = files[0]
+  }
+}
+
+const selectWatermarkImage = async () => {
+  if (!ensurePyReady()) return
+  const files = await window.pywebview.api.system_pyCreateFileDialog(imageFilter)
+  if (files?.length) {
+    state.watermark.watermarkImage = files[0]
+  }
+}
+
+const clearWatermarkImage = () => {
+  state.watermark.watermarkImage = null
 }
 
 const selectDir = async (target) => {
@@ -87,7 +153,7 @@ const ensureFilesReady = (target) => {
   return true
 }
 
-const pickPaths = (files) => files.map((item) => item.path || item)
+const pickPaths = (files = []) => files.map((item) => item?.path || item)
 
 const runFormatConvert = async () => {
   if (!ensurePyReady() || !ensureFilesReady('format')) return
@@ -169,6 +235,131 @@ const runCompress = async () => {
   }
 }
 
+const runWatermark = async () => {
+  if (!ensurePyReady() || !ensureFilesReady('watermark')) return
+  if (state.watermark.watermarkType === 'text' && !state.watermark.text.trim()) {
+    ElMessage.warning('请输入水印文字')
+    return
+  }
+  if (state.watermark.watermarkType === 'image' && !state.watermark.watermarkImage) {
+    ElMessage.warning('请选择水印图片')
+    return
+  }
+  state.loading = true
+  try {
+    const payload = {
+      files: pickPaths(state.watermark.files),
+      watermarkType: state.watermark.watermarkType,
+      text: state.watermark.text,
+      fontSize: state.watermark.fontSize,
+      color: state.watermark.color,
+      opacity: state.watermark.opacity,
+      position: state.watermark.position,
+      watermarkImage: state.watermark.watermarkImage?.path,
+      scalePercent: state.watermark.scalePercent,
+      outputDir: state.watermark.outputDir
+    }
+    const res = await window.pywebview.api.image_add_watermark(payload)
+    if (res?.code === 0) {
+      state.watermark.result = res.files || []
+      state.watermark.generatedDir = res.outputDir || state.watermark.outputDir
+      ElMessage.success(res.msg || '水印已添加')
+    } else {
+      ElMessage.error(res?.msg || '处理失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '处理失败')
+  } finally {
+    state.loading = false
+  }
+}
+
+const runCrop = async () => {
+  if (!ensurePyReady()) return
+  if (!state.crop.file) {
+    ElMessage.warning('请选择需要裁剪的图片')
+    return
+  }
+  state.loading = true
+  try {
+    const payload = {
+      file: state.crop.file.path || state.crop.file,
+      mode: state.crop.mode,
+      x: state.crop.x,
+      y: state.crop.y,
+      width: state.crop.width,
+      height: state.crop.height,
+      ratio: state.crop.ratio,
+      outputDir: state.crop.outputDir
+    }
+    const res = await window.pywebview.api.image_crop(payload)
+    if (res?.code === 0) {
+      state.crop.result = res.file || ''
+      state.crop.generatedDir = res.outputDir || state.crop.outputDir
+      ElMessage.success(res.msg || '裁剪完成')
+    } else {
+      ElMessage.error(res?.msg || '裁剪失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '裁剪失败')
+  } finally {
+    state.loading = false
+  }
+}
+
+const runRotate = async () => {
+  if (!ensurePyReady() || !ensureFilesReady('rotate')) return
+  state.loading = true
+  try {
+    const payload = {
+      files: pickPaths(state.rotate.files),
+      operation: state.rotate.operation,
+      outputDir: state.rotate.outputDir
+    }
+    const res = await window.pywebview.api.image_rotate_flip(payload)
+    if (res?.code === 0) {
+      state.rotate.result = res.files || []
+      state.rotate.generatedDir = res.outputDir || state.rotate.outputDir
+      ElMessage.success(res.msg || '处理完成')
+    } else {
+      ElMessage.error(res?.msg || '处理失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '处理失败')
+  } finally {
+    state.loading = false
+  }
+}
+
+const runImagePdf = async () => {
+  if (!ensurePyReady() || !ensureFilesReady('pdf')) return
+  state.loading = true
+  try {
+    const payload = {
+      files: pickPaths(state.pdf.files),
+      pageSize: state.pdf.pageSize,
+      customWidth: state.pdf.customWidth,
+      customHeight: state.pdf.customHeight,
+      perPage: state.pdf.perPage,
+      margin: state.pdf.margin,
+      outputName: state.pdf.outputName,
+      outputDir: state.pdf.outputDir
+    }
+    const res = await window.pywebview.api.image_to_pdf(payload)
+    if (res?.code === 0) {
+      state.pdf.result = res.file || ''
+      state.pdf.generatedDir = res.outputDir || state.pdf.outputDir
+      ElMessage.success(res.msg || 'PDF 已生成')
+    } else {
+      ElMessage.error(res?.msg || '转换失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '转换失败')
+  } finally {
+    state.loading = false
+  }
+}
+
 const openPath = (path) => {
   if (!ensurePyReady() || !path) return
   window.pywebview.api.system_pyOpenFile(path)
@@ -194,7 +385,7 @@ const removeFile = (target, file) => {
 <template>
   <el-drawer
     v-model="visibleProxy"
-    size="78%"
+    size="80%"
     append-to-body
     custom-class="image-tool-drawer"
   >
@@ -203,9 +394,9 @@ const removeFile = (target, file) => {
         <div>
           <p class="eyebrow">IMAGE TOOLKIT</p>
           <h3>图片处理工具</h3>
-          <p class="sub">格式转换、批量缩放与压缩一步到位</p>
+          <p class="sub">格式转换、缩放、压缩、水印及 PDF 合成</p>
         </div>
-        <el-tag type="success" size="large">Phase 1</el-tag>
+        <el-tag type="warning" size="large">Phase 2</el-tag>
       </div>
     </template>
     <div class="image-tool">
@@ -237,7 +428,7 @@ const removeFile = (target, file) => {
               </el-form-item>
               <el-form-item label="输出目录">
                 <div class="field-row">
-                  <el-input v-model="state.format.outputDir" placeholder="留空则自动创建" readonly />
+                  <el-input v-model="state.format.outputDir" placeholder="留空自动创建" readonly />
                   <el-button @click="selectDir('format')">选目录</el-button>
                 </div>
               </el-form-item>
@@ -374,6 +565,274 @@ const removeFile = (target, file) => {
             </ResultTable>
           </section>
         </el-tab-pane>
+
+        <el-tab-pane label="水印 / 批处理" name="watermark">
+          <section class="panel">
+            <header>
+              <h4>批量添加水印</h4>
+              <p>支持文字与图片水印，九宫格定位与透明度控制</p>
+            </header>
+            <FileSelector
+              label="待处理图片"
+              :files="state.watermark.files"
+              :removable="true"
+              @select="selectImages('watermark')"
+              @remove="(file) => removeFile('watermark', file)"
+            />
+            <el-form :model="state.watermark" label-width="110px" class="form-block">
+              <el-form-item label="水印类型">
+                <el-radio-group v-model="state.watermark.watermarkType">
+                  <el-radio-button label="text">文字</el-radio-button>
+                  <el-radio-button label="image">图片</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+              <template v-if="state.watermark.watermarkType === 'text'">
+                <el-form-item label="文字内容">
+                  <el-input
+                    v-model="state.watermark.text"
+                    placeholder="输入水印文字，可换行"
+                    type="textarea"
+                    :rows="3"
+                  />
+                </el-form-item>
+                <div class="watermark-config">
+                  <el-form-item label="字号">
+                    <el-input-number v-model="state.watermark.fontSize" :min="8" :max="200" />
+                  </el-form-item>
+                  <el-form-item label="颜色">
+                    <el-color-picker v-model="state.watermark.color" show-alpha />
+                  </el-form-item>
+                  <el-form-item label="透明度 (%)">
+                    <el-slider v-model="state.watermark.opacity" :min="5" :max="100" show-input />
+                  </el-form-item>
+                </div>
+              </template>
+              <template v-else>
+                <el-form-item label="水印图片">
+                  <div class="field-row">
+                    <el-input :model-value="state.watermark.watermarkImage?.path || ''" placeholder="点击选择图片" readonly />
+                    <el-button @click="selectWatermarkImage">选择</el-button>
+                    <el-button text type="danger" @click="clearWatermarkImage">清除</el-button>
+                  </div>
+                </el-form-item>
+                <el-form-item label="尺寸比例 (%)">
+                  <el-slider v-model="state.watermark.scalePercent" :min="5" :max="80" show-input />
+                </el-form-item>
+                <el-form-item label="透明度 (%)">
+                  <el-slider v-model="state.watermark.opacity" :min="5" :max="100" show-input />
+                </el-form-item>
+              </template>
+              <el-form-item label="位置">
+                <el-select v-model="state.watermark.position" style="width: 220px">
+                  <el-option label="左上角" value="top-left" />
+                  <el-option label="右上角" value="top-right" />
+                  <el-option label="居中" value="center" />
+                  <el-option label="左下角" value="bottom-left" />
+                  <el-option label="右下角" value="bottom-right" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="输出目录">
+                <div class="field-row">
+                  <el-input v-model="state.watermark.outputDir" placeholder="自动创建" readonly />
+                  <el-button @click="selectDir('watermark')">选目录</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="state.loading" @click="runWatermark">开始处理</el-button>
+              </el-form-item>
+            </el-form>
+            <ResultTable
+              v-if="state.watermark.result.length"
+              title="输出文件"
+              :items="state.watermark.result.map((path) => ({ path }))"
+              :columns="[{ label: '文件路径', prop: 'path' }]"
+            >
+              <template #actions>
+                <el-button text type="primary" @click="openDir('watermark')">打开目录</el-button>
+              </template>
+            </ResultTable>
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane label="裁剪工具" name="crop">
+          <section class="panel">
+            <header>
+              <h4>快速裁剪</h4>
+              <p>支持自定义坐标或按比例裁剪</p>
+            </header>
+            <el-form :model="state.crop" label-width="120px" class="form-block">
+              <el-form-item label="源图片">
+                <div class="field-row">
+                  <el-input :model-value="state.crop.file?.path || ''" placeholder="请选择图片" readonly />
+                  <el-button @click="selectSingleImage('crop')">选择</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item label="模式">
+                <el-radio-group v-model="state.crop.mode">
+                  <el-radio-button label="custom">自定义</el-radio-button>
+                  <el-radio-button label="ratio">按比例</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+              <template v-if="state.crop.mode === 'custom'">
+                <div class="field-row field-row--wrap">
+                  <el-form-item label="X">
+                    <el-input-number v-model="state.crop.x" :min="0" />
+                  </el-form-item>
+                  <el-form-item label="Y">
+                    <el-input-number v-model="state.crop.y" :min="0" />
+                  </el-form-item>
+                  <el-form-item label="宽度">
+                    <el-input-number v-model="state.crop.width" :min="10" />
+                  </el-form-item>
+                  <el-form-item label="高度">
+                    <el-input-number v-model="state.crop.height" :min="10" />
+                  </el-form-item>
+                </div>
+              </template>
+              <el-form-item v-else label="比例">
+                <el-select v-model="state.crop.ratio" style="width: 220px">
+                  <el-option label="1:1 (方形)" value="1:1" />
+                  <el-option label="4:3" value="4:3" />
+                  <el-option label="3:2" value="3:2" />
+                  <el-option label="16:9" value="16:9" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="输出目录">
+                <div class="field-row">
+                  <el-input v-model="state.crop.outputDir" placeholder="自动创建" readonly />
+                  <el-button @click="selectDir('crop')">选目录</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="state.loading" @click="runCrop">开始裁剪</el-button>
+              </el-form-item>
+            </el-form>
+            <el-alert
+              v-if="state.crop.result"
+              type="success"
+              :closable="false"
+              show-icon
+            >
+              <template #title>
+                已输出：
+                <a class="link" @click.prevent="openPath(state.crop.result)">{{ state.crop.result }}</a>
+              </template>
+            </el-alert>
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane label="旋转 / 翻转" name="rotate">
+          <section class="panel">
+            <header>
+              <h4>方向调整</h4>
+              <p>旋转 90/180/270°，或镜像 / 垂直翻转</p>
+            </header>
+            <FileSelector
+              label="图片列表"
+              :files="state.rotate.files"
+              :removable="true"
+              @select="selectImages('rotate')"
+              @remove="(file) => removeFile('rotate', file)"
+            />
+            <el-form :model="state.rotate" label-width="120px" class="form-block">
+              <el-form-item label="操作">
+                <el-select v-model="state.rotate.operation" style="width: 240px">
+                  <el-option label="旋转 90°" value="rotate90" />
+                  <el-option label="旋转 180°" value="rotate180" />
+                  <el-option label="旋转 270°" value="rotate270" />
+                  <el-option label="水平镜像" value="mirror" />
+                  <el-option label="垂直翻转" value="flip" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="输出目录">
+                <div class="field-row">
+                  <el-input v-model="state.rotate.outputDir" placeholder="自动创建" readonly />
+                  <el-button @click="selectDir('rotate')">选目录</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="state.loading" @click="runRotate">开始处理</el-button>
+              </el-form-item>
+            </el-form>
+            <ResultTable
+              v-if="state.rotate.result.length"
+              title="处理结果"
+              :items="state.rotate.result.map((path) => ({ path }))"
+              :columns="[{ label: '文件路径', prop: 'path' }]"
+            >
+              <template #actions>
+                <el-button text type="primary" @click="openDir('rotate')">打开目录</el-button>
+              </template>
+            </ResultTable>
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane label="图片转 PDF" name="pdf">
+          <section class="panel">
+            <header>
+              <h4>合成 PDF</h4>
+              <p>拖入多张图片，设置纸张与排版后输出 PDF</p>
+            </header>
+            <FileSelector
+              label="图片列表"
+              :files="state.pdf.files"
+              :removable="true"
+              @select="selectImages('pdf')"
+              @remove="(file) => removeFile('pdf', file)"
+            />
+            <el-form :model="state.pdf" label-width="120px" class="form-block">
+              <el-form-item label="页面尺寸">
+                <el-select v-model="state.pdf.pageSize" style="width: 220px">
+                  <el-option label="A4" value="a4" />
+                  <el-option label="A5" value="a5" />
+                  <el-option label="Letter" value="letter" />
+                  <el-option label="自定义" value="custom" />
+                </el-select>
+              </el-form-item>
+              <div v-if="state.pdf.pageSize === 'custom'" class="field-row">
+                <el-form-item label="宽 (px)">
+                  <el-input-number v-model="state.pdf.customWidth" :min="600" :max="6000" />
+                </el-form-item>
+                <el-form-item label="高 (px)">
+                  <el-input-number v-model="state.pdf.customHeight" :min="600" :max="6000" />
+                </el-form-item>
+              </div>
+              <el-form-item label="每页布局">
+                <el-radio-group v-model="state.pdf.perPage">
+                  <el-radio-button :label="1">1 / 页</el-radio-button>
+                  <el-radio-button :label="2">2 / 页</el-radio-button>
+                  <el-radio-button :label="4">4 / 页</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item label="边距 (px)">
+                <el-input-number v-model="state.pdf.margin" :min="10" :max="300" />
+              </el-form-item>
+              <el-form-item label="输出名称">
+                <el-input v-model="state.pdf.outputName" placeholder="可选，例如 merge.pdf" />
+              </el-form-item>
+              <el-form-item label="输出目录">
+                <div class="field-row">
+                  <el-input v-model="state.pdf.outputDir" placeholder="自动创建" readonly />
+                  <el-button @click="selectDir('pdf')">选目录</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="state.loading" @click="runImagePdf">生成 PDF</el-button>
+              </el-form-item>
+            </el-form>
+            <el-alert
+              v-if="state.pdf.result"
+              type="success"
+              :closable="false"
+              show-icon
+            >
+              <template #title>
+                已输出：
+                <a class="link" @click.prevent="openPath(state.pdf.result)">{{ state.pdf.result }}</a>
+              </template>
+            </el-alert>
+          </section>
+        </el-tab-pane>
       </el-tabs>
     </div>
   </el-drawer>
@@ -421,7 +880,22 @@ const removeFile = (target, file) => {
   gap: 12px;
 }
 
+.field-row--wrap {
+  flex-wrap: wrap;
+}
+
 .form-block {
   margin-top: 18px;
+}
+
+.watermark-config {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.link {
+  color: #2f73ff;
+  cursor: pointer;
 }
 </style>

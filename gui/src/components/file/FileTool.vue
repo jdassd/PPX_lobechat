@@ -47,8 +47,57 @@ const state = reactive({
     targetDir: '',
     password: '',
     files: []
+  },
+  copy: {
+    sourceDir: '',
+    targetDir: '',
+    keyword: '',
+    extensions: '',
+    recursive: true,
+    conflictPolicy: 'skip',
+    result: null
+  },
+  remove: {
+    directory: '',
+    keyword: '',
+    extensions: '',
+    recursive: true,
+    deletePolicy: 'recycle',
+    dryRun: true,
+    preview: [],
+    summary: null
+  },
+  rename: {
+    directory: '',
+    extensions: '',
+    recursive: false,
+    rule: 'sequence',
+    prefix: 'FILE_',
+    start: 1,
+    padding: 3,
+    search: '',
+    pattern: '',
+    replace: '',
+    conflictPolicy: 'skip',
+    dryRun: true,
+    result: [],
+    skipped: []
+  },
+  dedup: {
+    directory: '',
+    extensions: '',
+    recursive: true,
+    mode: 'content',
+    result: [],
+    summary: null
   }
 })
+
+const parseExtensions = (value) =>
+  value
+    .split(',')
+    .map((item) => item.trim().replace('.', ''))
+    .filter(Boolean)
 
 const ensurePyReady = () => {
   if (!window.pywebview?.api) {
@@ -213,6 +262,180 @@ const openPath = (path) => {
   if (!ensurePyReady() || !path) return
   window.pywebview.api.system_pyOpenFile(path)
 }
+
+const chooseDir = async (current = '') => {
+  if (!ensurePyReady()) return null
+  return window.pywebview.api.system_pySelectDirDialog(current)
+}
+
+const selectCopySource = async () => {
+  const dir = await chooseDir(state.copy.sourceDir)
+  if (dir) state.copy.sourceDir = dir
+}
+
+const selectCopyTarget = async () => {
+  const dir = await chooseDir(state.copy.targetDir)
+  if (dir) state.copy.targetDir = dir
+}
+
+const selectRemoveDir = async () => {
+  const dir = await chooseDir(state.remove.directory)
+  if (dir) state.remove.directory = dir
+}
+
+const selectRenameDir = async () => {
+  const dir = await chooseDir(state.rename.directory)
+  if (dir) state.rename.directory = dir
+}
+
+const selectDedupDir = async () => {
+  const dir = await chooseDir(state.dedup.directory)
+  if (dir) state.dedup.directory = dir
+}
+
+const runCopy = async () => {
+  if (!ensurePyReady()) return
+  if (!state.copy.sourceDir || !state.copy.targetDir) {
+    ElMessage.warning('请选择源目录和目标目录')
+    return
+  }
+  state.loading = true
+  try {
+    const res = await window.pywebview.api.file_batch_copy({
+      sourceDir: state.copy.sourceDir,
+      targetDir: state.copy.targetDir,
+      keyword: state.copy.keyword,
+      extensions: parseExtensions(state.copy.extensions || ''),
+      recursive: state.copy.recursive,
+      conflictPolicy: state.copy.conflictPolicy
+    })
+    if (res?.code === 0) {
+      state.copy.result = res
+      ElMessage.success(res.msg || '复制完成')
+    } else {
+      ElMessage.error(res?.msg || '复制失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '复制失败')
+  } finally {
+    state.loading = false
+  }
+}
+
+const runDelete = async () => {
+  if (!ensurePyReady()) return
+  if (!state.remove.directory) {
+    ElMessage.warning('请选择目录')
+    return
+  }
+  state.loading = true
+  try {
+    const res = await window.pywebview.api.file_batch_delete({
+      directory: state.remove.directory,
+      keyword: state.remove.keyword,
+      extensions: parseExtensions(state.remove.extensions || ''),
+      recursive: state.remove.recursive,
+      deletePolicy: state.remove.deletePolicy,
+      dryRun: state.remove.dryRun
+    })
+    if (res?.code === 0) {
+      state.remove.preview = res.preview || []
+      state.remove.summary = res
+      ElMessage.success(res.msg || (state.remove.dryRun ? '预览完成' : '删除完成'))
+    } else {
+      ElMessage.error(res?.msg || '删除失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '删除失败')
+  } finally {
+    state.loading = false
+  }
+}
+
+const buildRenameParams = () => {
+  if (state.rename.rule === 'sequence') {
+    return {
+      prefix: state.rename.prefix,
+      start: state.rename.start,
+      padding: state.rename.padding
+    }
+  }
+  if (state.rename.rule === 'timestamp') {
+    return {
+      start: state.rename.start,
+      padding: state.rename.padding
+    }
+  }
+  if (state.rename.rule === 'replace') {
+    return {
+      pattern: state.rename.search,
+      replace: state.rename.replace
+    }
+  }
+  return {
+    pattern: state.rename.pattern,
+    replace: state.rename.replace
+  }
+}
+
+const runRename = async () => {
+  if (!ensurePyReady()) return
+  if (!state.rename.directory) {
+    ElMessage.warning('请选择目录')
+    return
+  }
+  state.loading = true
+  try {
+    const res = await window.pywebview.api.file_batch_rename({
+      directory: state.rename.directory,
+      extensions: parseExtensions(state.rename.extensions || ''),
+      recursive: state.rename.recursive,
+      rule: state.rename.rule,
+      ruleParams: buildRenameParams(),
+      conflictPolicy: state.rename.conflictPolicy,
+      dryRun: state.rename.dryRun
+    })
+    if (res?.code === 0) {
+      state.rename.result = res.renamed || []
+      state.rename.skipped = res.skipped || []
+      ElMessage.success(res.msg || (state.rename.dryRun ? '预览完成' : '重命名完成'))
+    } else {
+      ElMessage.error(res?.msg || '重命名失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '重命名失败')
+  } finally {
+    state.loading = false
+  }
+}
+
+const runDedup = async () => {
+  if (!ensurePyReady()) return
+  if (!state.dedup.directory) {
+    ElMessage.warning('请选择目录')
+    return
+  }
+  state.loading = true
+  try {
+    const res = await window.pywebview.api.file_deduplicate({
+      directory: state.dedup.directory,
+      mode: state.dedup.mode,
+      extensions: parseExtensions(state.dedup.extensions || ''),
+      recursive: state.dedup.recursive
+    })
+    if (res?.code === 0) {
+      state.dedup.result = res.groups || []
+      state.dedup.summary = res
+      ElMessage.success(res.msg || '扫描完成')
+    } else {
+      ElMessage.error(res?.msg || '扫描失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '扫描失败')
+  } finally {
+    state.loading = false
+  }
+}
 </script>
 
 <template>
@@ -287,6 +510,263 @@ const openPath = (path) => {
                 </el-button>
               </template>
             </ResultTable>
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane label="批量复制" name="copy">
+          <section class="panel">
+            <header>
+              <h4>按规则复制文件</h4>
+              <p>按关键字 / 扩展名筛选，自动复制到目标目录</p>
+            </header>
+            <el-form :model="state.copy" label-width="120px">
+              <el-form-item label="源目录">
+                <div class="field-row">
+                  <el-input v-model="state.copy.sourceDir" placeholder="选择源目录" readonly />
+                  <el-button @click="selectCopySource">选择</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item label="目标目录">
+                <div class="field-row">
+                  <el-input v-model="state.copy.targetDir" placeholder="选择目标目录" readonly />
+                  <el-button @click="selectCopyTarget">选择</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item label="关键字">
+                <el-input v-model="state.copy.keyword" placeholder="可选" />
+              </el-form-item>
+              <el-form-item label="扩展名">
+                <el-input v-model="state.copy.extensions" placeholder="例如：pdf,jpg" />
+              </el-form-item>
+              <el-form-item label="选项">
+                <el-checkbox v-model="state.copy.recursive">包含子目录</el-checkbox>
+                <el-select v-model="state.copy.conflictPolicy" style="width: 200px">
+                  <el-option label="冲突跳过" value="skip" />
+                  <el-option label="覆盖同名文件" value="overwrite" />
+                </el-select>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="state.loading" @click="runCopy">开始复制</el-button>
+              </el-form-item>
+            </el-form>
+            <el-descriptions
+              v-if="state.copy.result"
+              :column="3"
+              border
+              size="small"
+            >
+              <el-descriptions-item label="已复制">{{ state.copy.result.copied }}</el-descriptions-item>
+              <el-descriptions-item label="跳过">{{ state.copy.result.skipped }}</el-descriptions-item>
+              <el-descriptions-item label="总大小">{{ state.copy.result.sizeText }}</el-descriptions-item>
+            </el-descriptions>
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane label="批量删除" name="delete">
+          <section class="panel">
+            <header>
+              <h4>按条件删除文件</h4>
+              <p>支持先预览，再执行永久删除或移动到回收站</p>
+            </header>
+            <el-form :model="state.remove" label-width="120px">
+              <el-form-item label="目录">
+                <div class="field-row">
+                  <el-input v-model="state.remove.directory" placeholder="选择目录" readonly />
+                  <el-button @click="selectRemoveDir">选择</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item label="关键字">
+                <el-input v-model="state.remove.keyword" placeholder="可选" />
+              </el-form-item>
+              <el-form-item label="扩展名">
+                <el-input v-model="state.remove.extensions" placeholder="如：log,tmp" />
+              </el-form-item>
+              <el-form-item label="选项">
+                <el-checkbox v-model="state.remove.recursive">包含子目录</el-checkbox>
+                <el-radio-group v-model="state.remove.deletePolicy">
+                  <el-radio-button label="recycle">移动到回收站</el-radio-button>
+                  <el-radio-button label="permanent">永久删除</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item label="预览模式">
+                <el-switch v-model="state.remove.dryRun" active-text="仅预览" inactive-text="直接删除" />
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="state.loading" @click="runDelete">
+                  {{ state.remove.dryRun ? '预览删除列表' : '立即删除' }}
+                </el-button>
+              </el-form-item>
+            </el-form>
+            <el-table
+              v-if="state.remove.preview.length"
+              :data="state.remove.preview"
+              border
+              size="small"
+              style="margin-top: 16px"
+            >
+              <el-table-column label="待删除文件">
+                <template #default="scope">
+                  <a class="link" @click.prevent="openPath(scope.row)">{{ scope.row }}</a>
+                </template>
+              </el-table-column>
+            </el-table>
+            <el-descriptions
+              v-if="state.remove.summary && !state.remove.dryRun"
+              :column="2"
+              border
+              size="small"
+              style="margin-top: 16px"
+            >
+              <el-descriptions-item label="删除数量">{{ state.remove.summary.deleted }}</el-descriptions-item>
+              <el-descriptions-item label="释放空间">{{ state.remove.summary.sizeText }}</el-descriptions-item>
+            </el-descriptions>
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane label="批量改名" name="rename">
+          <section class="panel">
+            <header>
+              <h4>重命名规则</h4>
+              <p>支持序号、时间戳、替换或正则表达式</p>
+            </header>
+            <el-form :model="state.rename" label-width="120px">
+              <el-form-item label="目录">
+                <div class="field-row">
+                  <el-input v-model="state.rename.directory" placeholder="选择目录" readonly />
+                  <el-button @click="selectRenameDir">选择</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item label="扩展名">
+                <el-input v-model="state.rename.extensions" placeholder="可选，如：jpg,png" />
+              </el-form-item>
+              <el-form-item label="选项">
+                <el-checkbox v-model="state.rename.recursive">包含子目录</el-checkbox>
+                <el-switch v-model="state.rename.dryRun" active-text="仅预览" inactive-text="立即改名" />
+              </el-form-item>
+              <el-form-item label="冲突策略">
+                <el-select v-model="state.rename.conflictPolicy" style="width: 200px">
+                  <el-option label="跳过已有文件" value="skip" />
+                  <el-option label="直接覆盖" value="overwrite" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="规则">
+                <el-radio-group v-model="state.rename.rule">
+                  <el-radio-button label="sequence">序号</el-radio-button>
+                  <el-radio-button label="timestamp">时间戳</el-radio-button>
+                  <el-radio-button label="replace">替换</el-radio-button>
+                  <el-radio-button label="regex">正则</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+              <div v-if="state.rename.rule === 'sequence'" class="field-row">
+                <el-form-item label="前缀">
+                  <el-input v-model="state.rename.prefix" placeholder="如 IMG_" />
+                </el-form-item>
+                <el-form-item label="起始值">
+                  <el-input-number v-model="state.rename.start" :min="1" />
+                </el-form-item>
+                <el-form-item label="位数">
+                  <el-input-number v-model="state.rename.padding" :min="1" :max="6" />
+                </el-form-item>
+              </div>
+              <div v-else-if="state.rename.rule === 'timestamp'" class="field-row">
+                <el-form-item label="起始值">
+                  <el-input-number v-model="state.rename.start" :min="1" />
+                </el-form-item>
+                <el-form-item label="位数">
+                  <el-input-number v-model="state.rename.padding" :min="1" :max="6" />
+                </el-form-item>
+              </div>
+              <div v-else class="field-row">
+                <el-form-item label="匹配">
+                  <el-input
+                    v-if="state.rename.rule === 'regex'"
+                    v-model="state.rename.pattern"
+                    placeholder="正则表达式"
+                  />
+                  <el-input
+                    v-else
+                    v-model="state.rename.search"
+                    placeholder="要替换的文本"
+                  />
+                </el-form-item>
+                <el-form-item label="替换为">
+                  <el-input v-model="state.rename.replace" placeholder="替换内容" />
+                </el-form-item>
+              </div>
+              <el-form-item>
+                <el-button type="primary" :loading="state.loading" @click="runRename">
+                  {{ state.rename.dryRun ? '预览结果' : '执行改名' }}
+                </el-button>
+              </el-form-item>
+            </el-form>
+            <el-table
+              v-if="state.rename.result.length"
+              :data="state.rename.result"
+              border
+              size="small"
+              style="margin-top: 12px"
+            >
+              <el-table-column label="原文件" prop="from" />
+              <el-table-column label="新文件" prop="to" />
+            </el-table>
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane label="文件去重" name="dedup">
+          <section class="panel">
+            <header>
+              <h4>重复文件检测</h4>
+              <p>按内容或文件名扫描重复项，展示可释放空间</p>
+            </header>
+            <el-form :model="state.dedup" label-width="120px">
+              <el-form-item label="目录">
+                <div class="field-row">
+                  <el-input v-model="state.dedup.directory" placeholder="选择目录" readonly />
+                  <el-button @click="selectDedupDir">选择</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item label="扩展名">
+                <el-input v-model="state.dedup.extensions" placeholder="可选，如：zip,iso" />
+              </el-form-item>
+              <el-form-item label="模式">
+                <el-radio-group v-model="state.dedup.mode">
+                  <el-radio-button label="content">按内容 (哈希)</el-radio-button>
+                  <el-radio-button label="name">按文件名</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item>
+                <el-checkbox v-model="state.dedup.recursive">包含子目录</el-checkbox>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="state.loading" @click="runDedup">开始扫描</el-button>
+              </el-form-item>
+            </el-form>
+            <el-descriptions
+              v-if="state.dedup.summary"
+              :column="2"
+              border
+              size="small"
+            >
+              <el-descriptions-item label="重复分组">{{ state.dedup.summary.totalGroups }}</el-descriptions-item>
+              <el-descriptions-item label="可释放空间">{{ state.dedup.summary.spaceSaved }}</el-descriptions-item>
+            </el-descriptions>
+            <el-table
+              v-if="state.dedup.result.length"
+              :data="state.dedup.result"
+              border
+              size="small"
+              style="margin-top: 12px"
+            >
+              <el-table-column label="重复文件">
+                <template #default="scope">
+                  <ul class="dedup-list">
+                    <li v-for="file in scope.row.files" :key="file">
+                      <a class="link" @click.prevent="openPath(file)">{{ file }}</a>
+                    </li>
+                  </ul>
+                </template>
+              </el-table-column>
+            </el-table>
           </section>
         </el-tab-pane>
 
@@ -527,5 +1007,15 @@ const openPath = (path) => {
 
 .link {
   color: #2f73ff;
+}
+
+.dedup-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+.dedup-list li {
+  margin-bottom: 4px;
 }
 </style>

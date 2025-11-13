@@ -17,7 +17,7 @@ const featureCards = [
   {
     id: 'image',
     title: '图片处理',
-    desc: '格式转换 / 缩放 / 压缩',
+    desc: '格式转换 / 缩放 / 压缩 / 水印',
     icon: markRaw(PictureFilled),
     tags: ['批量操作', '高清输出'],
     action: '打开面板',
@@ -25,49 +25,51 @@ const featureCards = [
     points: [
       '支持 PNG / JPG / TIFF / WEBP 互转，保持高画质',
       '按百分比或像素缩放，支持锁定比例与输出目录',
-      '体积压缩支持质量或目标大小模式，适配分享需求'
+      '体积压缩支持质量或目标大小模式，适配分享需求',
+      '新增文字 / 图片水印、裁剪、旋转与图片转 PDF'
     ]
   },
   {
     id: 'text',
     title: '文本工具',
-    desc: '编码、JSON、大小写、哈希',
+    desc: '编码、JSON、正则、CSV/JSON、去重',
     icon: markRaw(Edit),
-    tags: ['Base64', 'JSONPath'],
+    tags: ['Base64', 'JSONPath', '正则'],
     action: '打开面板',
     disabled: false,
     points: [
       'Base64 / URL / HTML / UTF-8↔GBK 一次搞定',
       'JSON 美化、压缩、校验与路径查询',
-      '大小写与命名风格互转，支持 camel / snake',
+      '新增正则工具、CSV↔JSON 转换、去重排序与时间戳互转',
       '内置 MD5 / SHA 系列哈希，可选文本或文件'
     ]
   },
   {
     id: 'video',
     title: '视频处理',
-    desc: '格式转换 / 压缩 / 截取',
+    desc: '格式转换 / 压缩 / 截取 / 音频 / 帧图',
     icon: markRaw(VideoPlay),
-    tags: ['FFmpeg', '多格式'],
+    tags: ['FFmpeg', '音频提取'],
     action: '打开面板',
     disabled: false,
     points: [
       'MP4、MOV、AVI、MKV 等互转，提供质感预设',
       '三种压缩模式：预设、码率、目标大小',
-      '按时间轴快速截取片段，默认无损复制流'
+      '按时间轴快速截取片段，默认无损复制流',
+      '一键提取 MP3/WAV、导出帧图，查看码率/分辨率等参数'
     ]
   },
   {
     id: 'file',
     title: '文件管理',
-    desc: '搜索 / 目录分析 / 压缩解压',
+    desc: '搜索 / 目录分析 / 复制 / 删除 / 改名 / 去重',
     icon: markRaw(FolderOpened),
-    tags: ['ZIP/7Z', '统计面板'],
+    tags: ['ZIP/7Z', '批量处理'],
     action: '打开面板',
     disabled: false,
     points: [
       '按关键字、扩展名、大小范围搜索目录',
-      '统计空间占用、热门扩展名及最大文件',
+      '新增批量复制、删除、重命名，与内容/名称去重扫描',
       'ZIP / 7Z 压缩与解压并行，支持密码'
     ]
   },

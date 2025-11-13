@@ -47,6 +47,26 @@ const state = reactive({
     end: '',
     outputDir: '',
     result: ''
+  },
+  audio: {
+    file: null,
+    audioFormat: 'mp3',
+    quality: 'medium',
+    outputDir: '',
+    result: ''
+  },
+  frames: {
+    file: null,
+    mode: 'time',
+    interval: 5,
+    imageFormat: 'png',
+    outputDir: '',
+    generatedDir: '',
+    result: []
+  },
+  info: {
+    file: null,
+    data: null
   }
 })
 
@@ -158,9 +178,84 @@ const runCut = async () => {
   }
 }
 
+const runAudio = async () => {
+  if (!ensurePyReady() || !ensureFile('audio')) return
+  state.loading = true
+  try {
+    const res = await window.pywebview.api.video_extract_audio({
+      filePath: state.audio.file.path,
+      audioFormat: state.audio.audioFormat,
+      quality: state.audio.quality,
+      outputDir: state.audio.outputDir
+    })
+    if (res?.code === 0) {
+      state.audio.result = res.file || ''
+      ElMessage.success(res.msg || '提取完成')
+    } else {
+      ElMessage.error(res?.msg || '提取失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '提取失败')
+  } finally {
+    state.loading = false
+  }
+}
+
+const runFrames = async () => {
+  if (!ensurePyReady() || !ensureFile('frames')) return
+  state.loading = true
+  try {
+    const res = await window.pywebview.api.video_extract_frames({
+      filePath: state.frames.file.path,
+      mode: state.frames.mode,
+      interval: state.frames.interval,
+      imageFormat: state.frames.imageFormat,
+      outputDir: state.frames.outputDir
+    })
+    if (res?.code === 0) {
+      state.frames.result = res.files || []
+      state.frames.generatedDir = res.outputDir || state.frames.outputDir
+      ElMessage.success(res.msg || '帧图已导出')
+    } else {
+      ElMessage.error(res?.msg || '导出失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '导出失败')
+  } finally {
+    state.loading = false
+  }
+}
+
+const runInfo = async () => {
+  if (!ensurePyReady() || !ensureFile('info')) return
+  state.loading = true
+  try {
+    const res = await window.pywebview.api.video_get_info({
+      filePath: state.info.file.path
+    })
+    if (res?.code === 0) {
+      state.info.data = res.info || null
+      ElMessage.success(res.msg || '信息已获取')
+    } else {
+      ElMessage.error(res?.msg || '获取失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '获取失败')
+  } finally {
+    state.loading = false
+  }
+}
+
 const openFile = (file) => {
   if (!ensurePyReady() || !file) return
   window.pywebview.api.system_pyOpenFile(file)
+}
+
+const openFramesDir = () => {
+  const dir = state.frames.generatedDir || state.frames.outputDir
+  if (dir) {
+    openFile(dir)
+  }
 }
 </script>
 
@@ -176,9 +271,9 @@ const openFile = (file) => {
         <div>
           <p class="eyebrow">VIDEO STUDIO</p>
           <h3>视频处理工具</h3>
-          <p class="sub">格式转换、压缩与截取</p>
+          <p class="sub">格式转换、压缩、截取、音频与帧图导出</p>
         </div>
-        <el-tag type="success">Phase 1</el-tag>
+        <el-tag type="warning">Phase 2</el-tag>
       </div>
     </template>
     <div class="video-tool">
@@ -341,6 +436,153 @@ const openFile = (file) => {
                 输出文件：<a class="link" @click.prevent="openFile(state.cut.result)">{{ state.cut.result }}</a>
               </template>
             </el-alert>
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane label="音频提取" name="audio">
+          <section class="panel">
+            <header>
+              <h4>视频 → 音频</h4>
+              <p>输出 MP3 / WAV / AAC / FLAC，支持质量预设</p>
+            </header>
+            <el-form :model="state.audio" label-width="120px">
+              <el-form-item label="源视频">
+                <div class="field-row">
+                  <el-input :model-value="state.audio.file?.path || ''" placeholder="尚未选择" readonly />
+                  <el-button @click="selectVideo('audio')">选择</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item label="音频格式">
+                <el-select v-model="state.audio.audioFormat" style="width: 200px">
+                  <el-option label="MP3" value="mp3" />
+                  <el-option label="WAV" value="wav" />
+                  <el-option label="AAC" value="aac" />
+                  <el-option label="FLAC" value="flac" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="质量">
+                <el-radio-group v-model="state.audio.quality">
+                  <el-radio-button label="high">高</el-radio-button>
+                  <el-radio-button label="medium">均衡</el-radio-button>
+                  <el-radio-button label="low">小体积</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item label="输出目录">
+                <div class="field-row">
+                  <el-input v-model="state.audio.outputDir" placeholder="自动创建" readonly />
+                  <el-button @click="selectDir('audio')">目录</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="state.loading" @click="runAudio">提取音频</el-button>
+              </el-form-item>
+            </el-form>
+            <el-alert
+              v-if="state.audio.result"
+              type="success"
+              :closable="false"
+              show-icon
+            >
+              <template #title>
+                已输出：<a class="link" @click.prevent="openFile(state.audio.result)">{{ state.audio.result }}</a>
+              </template>
+            </el-alert>
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane label="帧图导出" name="frames">
+          <section class="panel">
+            <header>
+              <h4>按时间 / 帧提取图片</h4>
+              <p>支持每 N 秒或每 N 帧保存，自动保存到目录</p>
+            </header>
+            <el-form :model="state.frames" label-width="120px">
+              <el-form-item label="源视频">
+                <div class="field-row">
+                  <el-input :model-value="state.frames.file?.path || ''" placeholder="尚未选择" readonly />
+                  <el-button @click="selectVideo('frames')">选择</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item label="模式">
+                <el-radio-group v-model="state.frames.mode">
+                  <el-radio-button label="time">每 N 秒</el-radio-button>
+                  <el-radio-button label="frame">每 N 帧</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item :label="state.frames.mode === 'time' ? '间隔 (秒)' : '间隔 (帧)'">
+                <el-input-number v-model="state.frames.interval" :min="1" :max="3600" />
+              </el-form-item>
+              <el-form-item label="图片格式">
+                <el-select v-model="state.frames.imageFormat" style="width: 200px">
+                  <el-option label="PNG" value="png" />
+                  <el-option label="JPG" value="jpg" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="输出目录">
+                <div class="field-row">
+                  <el-input v-model="state.frames.outputDir" placeholder="自动创建" readonly />
+                  <el-button @click="selectDir('frames')">目录</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="state.loading" @click="runFrames">开始导出</el-button>
+              </el-form-item>
+            </el-form>
+            <el-table
+              v-if="state.frames.result.length"
+              :data="state.frames.result"
+              border
+              size="small"
+              style="margin-top: 12px"
+            >
+              <el-table-column label="示例文件" align="left">
+                <template #default="scope">
+                  <a class="link" @click.prevent="openFile(scope.row)">{{ scope.row }}</a>
+                </template>
+              </el-table-column>
+            </el-table>
+            <el-button
+              v-if="state.frames.result.length"
+              type="primary"
+              link
+              @click="openFramesDir"
+            >
+              打开输出目录
+            </el-button>
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane label="视频信息" name="info">
+          <section class="panel">
+            <header>
+              <h4>快速查看参数</h4>
+              <p>显示时长、分辨率、码率、编码器等关键指标</p>
+            </header>
+            <el-form :model="state.info" label-width="120px">
+              <el-form-item label="视频文件">
+                <div class="field-row">
+                  <el-input :model-value="state.info.file?.path || ''" placeholder="尚未选择" readonly />
+                  <el-button @click="selectVideo('info')">选择</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="state.loading" @click="runInfo">获取信息</el-button>
+              </el-form-item>
+            </el-form>
+            <el-descriptions
+              v-if="state.info.data"
+              :column="3"
+              border
+              size="small"
+              style="margin-top: 16px"
+            >
+              <el-descriptions-item label="时长 (s)">{{ state.info.data.duration }}</el-descriptions-item>
+              <el-descriptions-item label="分辨率">{{ state.info.data.width }}×{{ state.info.data.height }}</el-descriptions-item>
+              <el-descriptions-item label="帧率">{{ state.info.data.fps }}</el-descriptions-item>
+              <el-descriptions-item label="视频编码">{{ state.info.data.videoCodec }}</el-descriptions-item>
+              <el-descriptions-item label="音频编码">{{ state.info.data.audioCodec }}</el-descriptions-item>
+              <el-descriptions-item label="码率 (bps)">{{ state.info.data.bitrate }}</el-descriptions-item>
+            </el-descriptions>
           </section>
         </el-tab-pane>
       </el-tabs>

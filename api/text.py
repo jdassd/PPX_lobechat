@@ -6,13 +6,21 @@
 from __future__ import annotations
 
 import base64
+import csv
 import hashlib
 import html
 import json
 import re
 import urllib.parse
+from collections import Counter, OrderedDict
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List
+
+try:  # pragma: no cover
+    from zoneinfo import ZoneInfo
+except ImportError:  # pragma: no cover
+    ZoneInfo = None  # type: ignore
 
 from api.utils import api_error, api_success, ensure_file_path
 
@@ -25,6 +33,14 @@ class TextTool:
         'sha1': hashlib.sha1,
         'sha256': hashlib.sha256,
         'sha512': hashlib.sha512,
+    }
+
+    _regex_flags = {
+        'ignorecase': re.IGNORECASE,
+        'multiline': re.MULTILINE,
+        'dotall': re.DOTALL,
+        'unicode': re.UNICODE,
+        'verbose': re.VERBOSE,
     }
 
     def _validate(self, options: Dict | None) -> Dict:
@@ -43,6 +59,72 @@ class TextTool:
                 continue
             words.extend(re.findall(r'[A-Za-z0-9]+', chunk))
         return [w.lower() for w in words if w]
+
+    def _compile_regex(self, pattern: str, flags: List[str] | str | None):
+        flag_value = 0
+        if isinstance(flags, str):
+            flags = [flags]
+        if isinstance(flags, list):
+            for flag in flags:
+                flag_value |= self._regex_flags.get(flag.lower(), 0)
+        return re.compile(pattern, flag_value)
+
+    def _resolve_timezone(self, label: str | None):
+        if not label:
+            return timezone.utc
+        if ZoneInfo:
+            try:
+                return ZoneInfo(label)
+            except Exception:
+                pass
+        match = re.match(r'UTC([+\-]?)(\d{1,2})(?::?(\d{2}))?', label.upper())
+        if match:
+            sign = -1 if match.group(1) == '-' else 1
+            hours = int(match.group(2))
+            minutes = int(match.group(3) or 0)
+            delta = timedelta(hours=hours, minutes=minutes)
+            return timezone(sign * delta)
+        return timezone.utc
+
+    def _parse_datetime(self, raw: str, tzinfo):
+        try:
+            dt = datetime.fromisoformat(raw)
+        except ValueError:
+            dt = None
+            patterns = [
+                '%Y-%m-%d %H:%M:%S',
+                '%Y/%m/%d %H:%M:%S',
+                '%Y-%m-%d %H:%M',
+                '%Y/%m/%d %H:%M',
+                '%Y-%m-%d',
+                '%Y/%m/%d',
+            ]
+            for fmt in patterns:
+                try:
+                    dt = datetime.strptime(raw, fmt)
+                    break
+                except ValueError:
+                    continue
+            if dt is None:
+                raise ValueError('无法解析日期时间格式')
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=tzinfo)
+        return dt
+
+    def _normalize_lines(self, content: str, trim: bool, keep_empty: bool) -> List[str]:
+        lines = content.splitlines()
+        normalized = []
+        for line in lines:
+            current = line.strip() if trim else line.rstrip('\r')
+            if not current and not keep_empty:
+                continue
+            normalized.append(current)
+        return normalized
+
+    def _resolve_file_arg(self, value):
+        if isinstance(value, dict):
+            return value.get('path')
+        return value
 
     def text_encode_decode(self, options: Dict | None = None):
         """编码/解码"""
@@ -121,6 +203,81 @@ class TextTool:
         except Exception as exc:
             return api_error(f'JSON 处理失败：{exc}')
 
+    def text_regex_match(self, options: Dict | None = None):
+        """正则搜索 / 替换 / 提取"""
+        try:
+            opts = self._validate(options)
+            pattern = opts.get('pattern')
+            if not pattern:
+                raise ValueError('请输入正则表达式')
+            content = opts.get('content', '') or ''
+            operation = str(opts.get('operation', 'search')).lower()
+            regex = self._compile_regex(pattern, opts.get('flags'))
+
+            if operation == 'replace':
+                replacement = opts.get('replacement', '')
+                result, count = regex.subn(replacement, content)
+                return api_success('替换完成', result=result, count=count)
+
+            matches = []
+            for match in regex.finditer(content):
+                matches.append({
+                    'match': match.group(0),
+                    'start': match.start(),
+                    'end': match.end(),
+                    'groups': list(match.groups()),
+                })
+            if operation == 'extract':
+                extracted = [item['match'] for item in matches]
+                return api_success('提取完成', matches=matches, extracted=extracted, count=len(matches))
+            return api_success('匹配完成', matches=matches, count=len(matches))
+        except Exception as exc:
+            return api_error(f'正则处理失败：{exc}')
+
+    def text_convert_csv_json(self, options: Dict | None = None):
+        """CSV 与 JSON 互转"""
+        try:
+            opts = self._validate(options)
+            direction = str(opts.get('direction', 'csv_to_json')).lower()
+            source_path = self._resolve_file_arg(opts.get('file') or opts.get('filePath') or opts.get('sourceFile'))
+            path = ensure_file_path(source_path)
+            delimiter = str(opts.get('delimiter') or ',')
+            output_dir = Path(opts.get('outputDir') or path.parent)
+            output_dir.mkdir(parents=True, exist_ok=True)
+            base_name = opts.get('outputName') or f'{path.stem}_converted'
+
+            if direction == 'csv_to_json':
+                with path.open('r', encoding=opts.get('encoding') or 'utf-8-sig', newline='') as handler:
+                    reader = csv.DictReader(handler, delimiter=delimiter)
+                    rows = list(reader)
+                dest = output_dir / f'{base_name}.json'
+                with dest.open('w', encoding='utf-8') as handler:
+                    json.dump(rows, handler, ensure_ascii=False, indent=2)
+                return api_success('已转换为 JSON', file=str(dest), count=len(rows))
+
+            with path.open('r', encoding=opts.get('encoding') or 'utf-8') as handler:
+                data = json.load(handler)
+            if isinstance(data, dict):
+                rows = [data]
+            elif isinstance(data, list):
+                rows = data
+            else:
+                raise ValueError('JSON 必须为对象或对象列表')
+            if not rows:
+                raise ValueError('JSON 内容为空')
+            if not isinstance(rows[0], dict):
+                raise ValueError('JSON 列表元素必须为对象')
+
+            fieldnames = sorted({key for row in rows for key in row.keys()})
+            dest = output_dir / f'{base_name}.csv'
+            with dest.open('w', encoding='utf-8-sig', newline='') as handler:
+                writer = csv.DictWriter(handler, fieldnames=fieldnames, delimiter=delimiter)
+                writer.writeheader()
+                writer.writerows(rows)
+            return api_success('已转换为 CSV', file=str(dest), columns=len(fieldnames), rows=len(rows))
+        except Exception as exc:
+            return api_error(f'CSV/JSON 转换失败：{exc}')
+
     def text_case_transform(self, options: Dict | None = None):
         """大小写转换"""
         try:
@@ -150,6 +307,78 @@ class TextTool:
         except Exception as exc:
             return api_error(f'转换失败：{exc}')
 
+    def text_deduplicate_sort(self, options: Dict | None = None):
+        """去重 / 排序 / 词频统计"""
+        try:
+            opts = self._validate(options)
+            content = opts.get('content', '') or ''
+            trim = bool(opts.get('trimWhitespace', True))
+            keep_empty = bool(opts.get('keepEmpty', False))
+            case_sensitive = bool(opts.get('caseSensitive', True))
+            lines = self._normalize_lines(content, trim, keep_empty)
+            operation = str(opts.get('operation', 'deduplicate')).lower()
+
+            seen = OrderedDict()
+            for line in lines:
+                key = line if case_sensitive else line.lower()
+                if key not in seen:
+                    seen[key] = line
+
+            result_lines = list(seen.values())
+            stats = {
+                'originalCount': len(content.splitlines()),
+                'effectiveCount': len(lines),
+                'uniqueCount': len(result_lines),
+                'removedCount': len(lines) - len(result_lines),
+            }
+
+            if operation == 'sort':
+                sort_method = str(opts.get('sortMethod', 'alpha')).lower()
+                descending = bool(opts.get('descending', False))
+                if sort_method == 'length':
+                    result_lines.sort(key=len, reverse=descending)
+                else:
+                    result_lines.sort(key=lambda item: item if case_sensitive else item.lower(), reverse=descending)
+            elif operation == 'frequency':
+                counter = Counter(line if case_sensitive else line.lower() for line in lines)
+                freq = [
+                    {'value': seen[key], 'count': count}
+                    for key, count in counter.most_common(100)
+                ]
+                return api_success('词频统计完成', frequency=freq, stats=stats)
+
+            return api_success('处理完成', result='\n'.join(result_lines), stats=stats)
+        except Exception as exc:
+            return api_error(f'文本处理失败：{exc}')
+
+    def text_timestamp_convert(self, options: Dict | None = None):
+        """时间戳与日期互转"""
+        try:
+            opts = self._validate(options)
+            direction = str(opts.get('direction', 'ts_to_date')).lower()
+            tz = self._resolve_timezone(opts.get('timezone'))
+            unit = str(opts.get('unit', 's')).lower()
+            if direction in {'ts_to_date', 'timestamp_to_datetime'}:
+                raw = opts.get('timestamp') or opts.get('value') or 0
+                timestamp = float(raw)
+                if unit in {'ms', 'millisecond', 'milliseconds'}:
+                    timestamp /= 1000.0
+                dt = datetime.fromtimestamp(timestamp, tz=timezone.utc).astimezone(tz)
+                return api_success('转换完成', datetime=dt.isoformat(), display=dt.strftime('%Y-%m-%d %H:%M:%S'), timestamp=int(timestamp), timestampMs=int(timestamp * 1000))
+            raw = opts.get('datetime') or opts.get('value') or ''
+            if not raw:
+                raise ValueError('请输入日期时间')
+            dt = self._parse_datetime(raw, tz)
+            timestamp = dt.astimezone(timezone.utc).timestamp()
+            result = {
+                'timestamp': int(timestamp),
+                'timestampMs': int(timestamp * 1000),
+                'datetime': dt.isoformat(),
+            }
+            return api_success('转换完成', **result)
+        except Exception as exc:
+            return api_error(f'时间转换失败：{exc}')
+
     def text_hash_calculate(self, options: Dict | None = None):
         """哈希计算"""
         try:
@@ -161,10 +390,7 @@ class TextTool:
             hasher = self._hash_algorithms[algorithm]()
             if source_type == 'file':
                 file_info = opts.get('file')
-                if isinstance(file_info, dict):
-                    file_path = file_info.get('path')
-                else:
-                    file_path = file_info
+                file_path = self._resolve_file_arg(file_info)
                 path = ensure_file_path(file_path)
                 with path.open('rb') as handler:
                     for chunk in iter(lambda: handler.read(8192), b''):
