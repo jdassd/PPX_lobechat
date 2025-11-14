@@ -57,15 +57,25 @@ class ImageTool:
         return base
 
     def _save_image(self, image: Image.Image, dest: Path, fmt: str, quality: int | None = None):
+        """Persist image with reasonable defaults and Pillow-compatible format names."""
         save_kwargs = {}
+        fmt = (fmt or 'png').lower()
         if fmt in {'jpg', 'jpeg'}:
+            # JPEG does not support alpha; always save as RGB
             image = image.convert('RGB')
             if quality:
                 save_kwargs['quality'] = max(30, min(quality, 100))
             save_kwargs.setdefault('optimize', True)
         if fmt == 'png':
             save_kwargs.setdefault('compress_level', 6)
-        image.save(dest, fmt.upper(), **save_kwargs)
+
+        # Pillow uses 'JPEG' internally; normalize common alias 'jpg'
+        if fmt in {'jpg', 'jpeg'}:
+            pil_format = 'JPEG'
+        else:
+            pil_format = fmt.upper()
+
+        image.save(dest, pil_format, **save_kwargs)
 
     def _resolve_font(self, size: int, font_path: str | None) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
         candidates = []
@@ -296,6 +306,34 @@ class ImageTool:
             return api_error(f'压缩失败：{exc}')
 
     # -------------------- Phase 2 功能 --------------------
+
+    def image_preview(self, options: Dict | None = None):
+        """ͼƬԤ�� - ���� data URL��֧�ֱ������� file:/// ��Դ"""
+        try:
+            opts = self._validate(options)
+            # ֧�� file / path �������ֶ�
+            file_path = ensure_file_path(opts.get('file') or opts.get('path'))
+            try:
+                max_size = int(opts.get('maxSize') or 1920)
+            except (TypeError, ValueError):
+                max_size = 1920
+            max_size = max(256, min(max_size, 8192))
+
+            with Image.open(file_path) as img:
+                img = img.convert('RGBA')
+                orig_w, orig_h = img.size
+                # ����ͼƬ���������ʱ�������Сһ�£������ڸ�ǰ�˵���غ�����
+                if max(orig_w, orig_h) > max_size:
+                    img.thumbnail((max_size, max_size), Image.LANCZOS)
+
+                buffer = io.BytesIO()
+                img.save(buffer, format='PNG')
+                encoded = base64.b64encode(buffer.getvalue()).decode('ascii')
+
+            preview = f'data:image/png;base64,{encoded}'
+            return api_success('ͼƬԤ�����ɹ�', preview=preview, width=orig_w, height=orig_h)
+        except Exception as exc:
+            return api_error(f'ͼƬԤ��ʧ�ܣ�{exc}')
 
     def image_add_watermark(self, options: Dict | None = None):
         """批量添加文字或图片水印，支持平铺与旋转"""

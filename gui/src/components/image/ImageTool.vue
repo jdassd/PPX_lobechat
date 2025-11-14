@@ -303,8 +303,14 @@ const onCropImageLoaded = (event) => {
   const img = event?.target
   if (!img) return
   const rect = img.getBoundingClientRect()
-  state.crop.imageWidth = img.naturalWidth || rect.width || img.width || 0
-  state.crop.imageHeight = img.naturalHeight || rect.height || img.height || 0
+
+  // ���ȶ�ȡԭʼͼƬ���ߴ磬���ɵ���� py ���ص�����Ϊ׼
+  if (!state.crop.imageWidth || !state.crop.imageHeight) {
+    state.crop.imageWidth = img.naturalWidth || rect.width || img.width || 0
+    state.crop.imageHeight = img.naturalHeight || rect.height || img.height || 0
+  }
+
+  // ��¼��ǰ DOM ��ʾ�ߴ磬��ͼƬ�ߴ渺һ�����ڿռ������
   state.crop.displayWidth = rect.width || img.clientWidth || img.width || 0
   state.crop.displayHeight = rect.height || img.clientHeight || img.height || 0
   if (!state.crop.imageWidth || !state.crop.imageHeight) return
@@ -426,6 +432,10 @@ const selectImages = async (target) => {
 }
 
 const selectSingleImage = async (target, field = 'file') => {
+  if (target === 'crop' && field === 'file') {
+    await selectCropImage()
+    return
+  }
   if (!ensurePyReady()) return
   const files = await window.pywebview.api.system_pyCreateFileDialog(imageFilter)
   if (files?.length) {
@@ -443,6 +453,41 @@ const selectSingleImage = async (target, field = 'file') => {
       state.crop.width = 0
       state.crop.height = 0
     }
+  }
+}
+
+const selectCropImage = async () => {
+  if (!ensurePyReady()) return
+  const files = await window.pywebview.api.system_pyCreateFileDialog(imageFilter)
+  if (!files?.length) return
+
+  const file = files[0]
+  state.crop.file = file
+
+  // �����ü�״̬�����ԴͼƬ����ͼƬԭʼ���ߴ磬�����õ� py �˷�����Ϊ׼
+  state.crop.previewUrl = ''
+  state.crop.imageWidth = 0
+  state.crop.imageHeight = 0
+  state.crop.displayWidth = 0
+  state.crop.displayHeight = 0
+  state.crop.x = 0
+  state.crop.y = 0
+  state.crop.width = 0
+  state.crop.height = 0
+
+  try {
+    const res = await window.pywebview.api.image_preview({
+      file: file.path || file.filename
+    })
+    if (res?.code === 0 && res.preview) {
+      state.crop.previewUrl = res.preview
+      state.crop.imageWidth = res.width || 0
+      state.crop.imageHeight = res.height || 0
+    } else {
+      ElMessage.error(res?.msg || 'ͼƬԤ��ʧ��')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || 'ͼƬԤ��ʧ��')
   }
 }
 

@@ -127,7 +127,7 @@ class Seal():
             value = min(maximum, value)
         return value
 
-    def _parse_color(self, color_value, alpha: int) -> Tuple[int, int, int, int]:
+    def _parse_seal_color(self, color_value, alpha: int) -> Tuple[int, int, int, int]:
         alpha = self._int_option({'alpha': alpha}, 'alpha', alpha, 0, 255)
         if isinstance(color_value, str):
             value = color_value.strip()
@@ -204,7 +204,7 @@ class Seal():
         config['bracket_offset_down'] = self._float_option(opts, 'bracketOffsetBottom', 0)
 
         alpha = self._int_option(opts, 'alpha', 220, 30, 255)
-        config['fill'] = self._parse_color(opts.get('color', '#d4252c'), alpha)
+        config['fill'] = self._parse_seal_color(opts.get('color', '#d4252c'), alpha)
 
         texture_path = str(opts.get('texturePath') or '').strip()
         if texture_path:
