@@ -51,9 +51,18 @@ pyappDir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 sys.path.append(pyappDir)
 
 from config.config import Config
+try:
+    # 统一从项目根目录 logo.png 生成 macOS 使用的 .icns 图标
+    from icon.generate_icons import generate_logo_icons
+except Exception:
+    generate_logo_icons = None
 
 appName = Config.appName    # 应用名称
 appVersion = Config.appVersion    # 应用版本号
+
+# 确保 dmg 使用的 logo.icns 由根目录 logo.png 自动生成
+if 'generate_logo_icons' in globals() and generate_logo_icons is not None:
+    generate_logo_icons()
 
 dmgName = f'{appName}-{appVersion}_macOS'
 
@@ -83,3 +92,4 @@ background = '""" + pyappDir + """/package/dmg/bg.png'
 jsonDir = os.path.dirname(__file__)
 with open(os.path.join(jsonDir, 'dmg.py'), 'w+', encoding='utf-8') as f:
     f.write(getJson())
+

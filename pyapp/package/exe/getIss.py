@@ -13,6 +13,11 @@ import os
 pyappDir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(pyappDir)
 from config.config import Config
+try:
+    # 统一从项目根目录 logo.png 生成 Windows 使用的 .ico 图标
+    from icon.generate_icons import generate_logo_icons
+except Exception:
+    generate_logo_icons = None
 
 appName = Config.appName    # 应用名称（展示用）
 appNameEN = Config.appNameEN    # 应用名称-英文（用于生成文件夹）
@@ -21,6 +26,11 @@ appVersion = appVersion[1:]    # 去掉第一位V
 appDeveloper = Config.appDeveloper  # 应用开发者
 appBlogs = Config.appBlogs  # 个人博客
 rootDir = os.path.dirname(pyappDir)
+
+# 确保 InnoSetup 使用的 logo.ico 由根目录 logo.png 自动生成
+if 'generate_logo_icons' in globals() and generate_logo_icons is not None:
+    generate_logo_icons()
+
 buildDir = os.path.join(rootDir, 'build')
 logoPath = os.path.join(rootDir, 'pyapp', 'icon', 'logo.ico')
 appISSID = Config.appISSID    # 安装包唯一GUID
@@ -97,3 +107,4 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChang
 issDir = os.path.dirname(__file__)
 with open(os.path.join(issDir, 'InnoSetup.iss'), 'w+', encoding='utf-8-sig') as f:
     f.write(getIss())
+

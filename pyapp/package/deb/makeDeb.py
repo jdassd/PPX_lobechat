@@ -5,8 +5,8 @@ Author: 潘高
 LastEditors: 潘高
 Date: 2024-09-09 21:06:15
 LastEditTime: 2024-09-09 23:37:41
-Description: 制作linux下的deb安装包
-usage: 运行前，请确保本机已经搭建Python3开发环境，且已经安装  模块。
+Description: 制作 linux 下的 deb 安装包
+usage: 运行前，请确保本机已经搭建 Python3 开发环境，且已经安装必要模块
 '''
 
 import os
@@ -16,15 +16,25 @@ scriptDir = os.path.dirname(os.path.abspath(__file__))
 pyappDir = os.path.dirname(os.path.dirname(scriptDir))
 sys.path.append(pyappDir)
 from config.config import Config
+try:
+    # Ensure icons (including Linux PNG) are generated from root logo.png.
+    from icon.generate_icons import generate_logo_icons
+except Exception:
+    generate_logo_icons = None
 
-appName = Config.appName    # 应用名称
-appDistName = Config.appNameEN    # PyInstaller 输出的可执行文件名称
-appVersion = Config.appVersion  # 应用版本号
-appVersion = appVersion[1:]    # 去掉第一位V
+appName = Config.appName  # 应用名称
+appDistName = Config.appNameEN  # PyInstaller 输出的可执行文件名称
+appVersion = Config.appVersion  # 应用版本号（例如 V5.3.0）
+appVersion = appVersion[1:]  # 去掉第一位 V
 appDeveloper = Config.appDeveloper  # 应用开发者
 appBlogs = Config.appBlogs  # 个人博客
 
 rootDir = os.path.dirname(pyappDir)
+
+# 先根据根目录 logo.png 生成 pyapp/icon/logo.png
+if 'generate_logo_icons' in globals() and generate_logo_icons is not None:
+    generate_logo_icons()
+
 logoPath = os.path.join(rootDir, 'pyapp', 'icon', 'logo.png')
 
 
@@ -60,21 +70,21 @@ with open(os.path.join(scriptDir, f'{appName}.desktop'), 'w+', encoding='utf-8')
     f.write(getDesktop)
 
 
-# 生成安装完成调用的postinst脚本
+# 生成安装完成调用的 postinst 脚本
 getPostinst = """
 # !/bin/bash
-#更新桌面图标数据库
+# 更新桌面图标数据库
 update-desktop-database /usr/share/applications || true
-#获取当前的用户名
+# 获取当前的用户名
 username=`getent passwd \`who\` | head -n 1 | cut -d : -f 1`
-#判断桌面文件夹是否存在
+# 判断桌面文件夹是否存在
 if [ -d "/home/${username}/Desktop" ]; then
 echo 'Desktop exist'
-#将你的桌面文件复制到桌面
+# 将桌面文件复制到桌面
 cp """ + f'/usr/share/applications/{appName}.desktop' + """ /home/${username}/Desktop
 else
-echo '桌面文件夹存在'
-#中文系统自动复制到中文桌面
+echo '桌面文件夹不存在'
+# 中文系统自动复制到中文桌面
 cp """ + f'/usr/share/applications/{appName}.desktop' + """ /home/${username}/桌面
 fi
 
@@ -102,3 +112,4 @@ os.system(f'cd {buildDir} && dpkg-deb --build {appName}')
 os.system(f'rm -fr {buildDir}/{appName} && mv {buildDir}/bin/{appDistName} {buildDir}/{appDistName} && rm -fr {buildDir}/bin')
 
 os.system(f'mv {buildDir}/{appName}.deb {buildDir}/{appName}-V{appVersion}_Linux.deb')
+
