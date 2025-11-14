@@ -464,7 +464,7 @@ const selectCropImage = async () => {
   const file = files[0]
   state.crop.file = file
 
-  // �����ü�״̬�����ԴͼƬ����ͼƬԭʼ���ߴ磬�����õ� py �˷�����Ϊ׼
+  // 重置裁剪状态
   state.crop.previewUrl = ''
   state.crop.imageWidth = 0
   state.crop.imageHeight = 0
@@ -484,10 +484,10 @@ const selectCropImage = async () => {
       state.crop.imageWidth = res.width || 0
       state.crop.imageHeight = res.height || 0
     } else {
-      ElMessage.error(res?.msg || 'ͼƬԤ��ʧ��')
+      ElMessage.error(res?.msg || '图片预览失败')
     }
   } catch (error) {
-    ElMessage.error(error?.message || 'ͼƬԤ��ʧ��')
+    ElMessage.error(error?.message || '图片预览失败')
   }
 }
 

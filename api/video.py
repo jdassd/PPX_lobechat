@@ -5,7 +5,9 @@
 """
 from __future__ import annotations
 
+import base64
 import json
+import mimetypes
 import shutil
 import subprocess
 import time
@@ -94,6 +96,35 @@ class VideoTool:
         target = base_dir / f'{source.stem}_{int(time.time())}'
         target.mkdir(parents=True, exist_ok=True)
         return target
+
+    def video_preview(self, options: Dict | None = None):
+        """视频预览：将小文件转为 data URL，避免前端直接访问 file:///"""
+        try:
+            opts = self._validate(options)
+            # 支持 filePath / file / path 三种字段名
+            file_opt = opts.get('filePath') or opts.get('file') or opts.get('path')
+            source = ensure_file_path(file_opt)
+
+            try:
+                max_bytes = int(opts.get('maxBytes') or 16 * 1024 * 1024)
+            except (TypeError, ValueError):
+                max_bytes = 16 * 1024 * 1024
+            max_bytes = max(1 * 1024 * 1024, min(max_bytes, 64 * 1024 * 1024))
+
+            file_size = source.stat().st_size
+            if file_size > max_bytes:
+                return api_error('视频文件过大，暂不支持内嵌预览，请通过系统默认的视频播放器查看。')
+
+            mime, _ = mimetypes.guess_type(source.name)
+            if not mime or not mime.startswith('video/'):
+                mime = 'video/mp4'
+
+            data = source.read_bytes()
+            encoded = base64.b64encode(data).decode('ascii')
+            url = f'data:{mime};base64,{encoded}'
+            return api_success('视频预览生成成功', preview=url, size=len(data))
+        except Exception as exc:
+            return api_error(f'视频预览失败：{exc}')
 
     # -------------------- P0 功能 --------------------
 

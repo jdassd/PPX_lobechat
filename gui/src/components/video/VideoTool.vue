@@ -271,6 +271,30 @@ watch(
   }
 )
 
+const loadVideoPreview = async (target) => {
+  if (!ensurePyReady()) return
+  const file = state[target]?.file
+  if (!file) return
+  const path = file.path || file.filename
+  if (!path) return
+  try {
+    const res = await window.pywebview.api.video_preview({
+      filePath: path
+    })
+    if (res?.code === 0 && res.preview) {
+      state[target].previewUrl = res.preview
+    } else {
+      state[target].previewUrl = ''
+      if (res?.msg) {
+        ElMessage.error(res.msg)
+      }
+    }
+  } catch (error) {
+    state[target].previewUrl = ''
+    ElMessage.error(error?.message || '视频预览失败')
+  }
+}
+
 const ensurePyReady = () => {
   if (!window.pywebview?.api) {
     ElMessage.warning('该功能需在桌面客户端中使用')
@@ -286,20 +310,22 @@ const selectVideo = async (target) => {
     const file = result[0]
     state[target].file = file
     if (target === 'cut') {
-      state.cut.previewUrl = toFileUrl(file.path || file.filename || '')
+      state.cut.previewUrl = ''
       state.cut.duration = 0
       state.cut.rangeStart = 0
       state.cut.rangeEnd = 0
       state.cut.start = '00:00:00'
       state.cut.end = ''
+      await loadVideoPreview('cut')
     }
     if (target === 'audio') {
-      state.audio.previewUrl = toFileUrl(file.path || file.filename || '')
+      state.audio.previewUrl = ''
       state.audio.duration = 0
       state.audio.rangeStart = 0
       state.audio.rangeEnd = 0
       state.audio.start = '00:00:00'
       state.audio.end = ''
+      await loadVideoPreview('audio')
     }
   }
 }
