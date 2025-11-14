@@ -11,6 +11,7 @@ import hashlib
 import os
 import re
 import shutil
+import subprocess
 import time
 import zipfile
 from collections import Counter
@@ -97,6 +98,65 @@ class FileTool:
             raise ValueError('未匹配到任何文件')
         return files
 
+    def _search_with_fd(self, directory: Path, filters: Dict, limit: int):
+        """尝试使用 fd/fdfind 进行快速文件名搜索，不满足条件或失败时返回 None."""
+        fd_path = shutil.which('fd') or shutil.which('fdfind')
+        if not fd_path:
+            return None
+        keyword = filters['keyword']
+        extensions = filters['extensions']
+        args = [
+            fd_path,
+            '--hidden',
+            '--follow',
+            '--type',
+            'f',
+            '--max-results',
+            str(limit),
+        ]
+        for ext in extensions:
+            args += ['--extension', ext]
+        pattern = keyword or ''
+        if not pattern:
+            # 使用空模式时 fd 需要一个通配符，这里使用 '.' 匹配全部文件
+            pattern = '.'
+        args.append(pattern)
+        args.append(str(directory))
+        try:
+            proc = subprocess.run(args, capture_output=True, text=True)
+        except Exception:
+            return None
+        # returncode 为 1 时表示无匹配结果，也视为正常
+        if proc.returncode not in (0, 1):
+            return None
+        matched = []
+        for line in proc.stdout.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            path = Path(line)
+            if not path.is_absolute():
+                path = directory / path
+            try:
+                if not path.is_file():
+                    continue
+                if not self._match_common_filters(path, filters):
+                    continue
+                stat = path.stat()
+            except OSError:
+                continue
+            matched.append({
+                'name': path.name,
+                'path': str(path),
+                'size': stat.st_size,
+                'sizeText': format_bytes(stat.st_size),
+                'modified': stat.st_mtime,
+                'ext': path.suffix.lower(),
+            })
+            if len(matched) >= limit:
+                break
+        return matched
+
     def _hash_file(self, path: Path, chunk_size: int = 1024 * 1024) -> str:
         hasher = hashlib.md5()
         with path.open('rb') as handler:
@@ -159,21 +219,24 @@ class FileTool:
             filters = self._parse_common_filters(opts)
             limit = clamp_int(opts.get('limit', 500), 50, 2000)
 
-            matched = []
-            for path in self._iter_files(directory, recursive=filters['recursive']):
-                if not self._match_common_filters(path, filters):
-                    continue
-                stat = path.stat()
-                matched.append({
-                    'name': path.name,
-                    'path': str(path),
-                    'size': stat.st_size,
-                    'sizeText': format_bytes(stat.st_size),
-                    'modified': stat.st_mtime,
-                    'ext': path.suffix.lower(),
-                })
-                if len(matched) >= limit:
-                    break
+            # 优先尝试使用 fd 这类开源文件搜索引擎，加速大目录检索
+            matched = self._search_with_fd(directory, filters, limit)
+            if matched is None:
+                matched = []
+                for path in self._iter_files(directory, recursive=filters['recursive']):
+                    if not self._match_common_filters(path, filters):
+                        continue
+                    stat = path.stat()
+                    matched.append({
+                        'name': path.name,
+                        'path': str(path),
+                        'size': stat.st_size,
+                        'sizeText': format_bytes(stat.st_size),
+                        'modified': stat.st_mtime,
+                        'ext': path.suffix.lower(),
+                    })
+                    if len(matched) >= limit:
+                        break
             return api_success('搜索完成', items=matched)
         except Exception as exc:
             return api_error(f'搜索失败：{exc}')
@@ -255,15 +318,37 @@ class FileTool:
             dest = output_dir / f'{filename}{suffix}'
 
             if fmt == 'zip':
-                compression = zipfile.ZIP_DEFLATED
-                with zipfile.ZipFile(dest, 'w', compression=compression, compresslevel=6) as handler:
-                    for path in items:
-                        if path.is_dir():
-                            for file_path in path.rglob('*'):
-                                if file_path.is_file():
-                                    handler.write(file_path, file_path.relative_to(path.parent))
-                        else:
-                            handler.write(path, arcname=path.name)
+                password = str(opts.get('password') or '').strip()
+                if password:
+                    # 使用 7-Zip 创建带密码的 ZIP（ZipCrypto），兼容常见解压工具
+                    seven_zip = shutil.which('7z') or shutil.which('7za') or shutil.which('7zz')
+                    if not seven_zip:
+                        raise EnvironmentError('未检测到 7-Zip，暂不支持 ZIP 密码压缩，请改用 7Z 格式或安装 7-Zip')
+                    common_root = os.path.commonpath([str(path.parent) for path in items])
+                    rel_paths = [os.path.relpath(str(path), common_root) for path in items]
+                    cmd = [
+                        seven_zip,
+                        'a',
+                        '-tzip',
+                        '-y',
+                        f'-p{password}',
+                        '-mem=ZipCrypto',
+                        str(dest),
+                    ] + rel_paths
+                    proc = subprocess.run(cmd, cwd=common_root, capture_output=True, text=True)
+                    if proc.returncode != 0:
+                        stderr = proc.stderr.strip() or '调用 7-Zip 创建带密码 ZIP 失败'
+                        raise RuntimeError(stderr)
+                else:
+                    compression = zipfile.ZIP_DEFLATED
+                    with zipfile.ZipFile(dest, 'w', compression=compression, compresslevel=6) as handler:
+                        for path in items:
+                            if path.is_dir():
+                                for file_path in path.rglob('*'):
+                                    if file_path.is_file():
+                                        handler.write(file_path, file_path.relative_to(path.parent))
+                            else:
+                                handler.write(path, arcname=path.name)
             else:
                 if py7zr is None:
                     raise ImportError('缺少 py7zr 依赖，请运行 pip install py7zr')

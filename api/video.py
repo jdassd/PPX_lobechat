@@ -105,21 +105,33 @@ class VideoTool:
             ffmpeg = self._require_ffmpeg()
             target_format = str(opts.get('targetFormat', 'mp4')).lstrip('.').lower() or 'mp4'
             quality_preset = str(opts.get('qualityPreset', 'medium')).lower()
-            crf_map = {'high': 18, 'medium': 22, 'low': 28}
-            crf = crf_map.get(quality_preset, 22)
-            vcodec = opts.get('videoCodec') or 'libx264'
-            acodec = opts.get('audioCodec') or 'aac'
             dest = self._prepare_output(source, opts, 'convert', target_format)
-            args = [
-                ffmpeg,
-                '-y',
-                '-i', str(source),
-                '-c:v', vcodec,
-                '-preset', opts.get('preset', 'medium'),
-                '-crf', str(crf),
-                '-c:a', acodec,
-                str(dest),
-            ]
+
+            # 原画模式：尽可能不重新编码，直接复制音视频流
+            if quality_preset in {'origin', 'original', 'source', 'copy'}:
+                args = [
+                    ffmpeg,
+                    '-y',
+                    '-i', str(source),
+                    '-c', 'copy',
+                    str(dest),
+                ]
+            else:
+                crf_map = {'high': 18, 'medium': 22, 'low': 28}
+                crf = crf_map.get(quality_preset, 22)
+                vcodec = opts.get('videoCodec') or 'libx264'
+                acodec = opts.get('audioCodec') or 'aac'
+                preset = str(opts.get('preset', 'medium') or 'medium')
+                args = [
+                    ffmpeg,
+                    '-y',
+                    '-i', str(source),
+                    '-c:v', vcodec,
+                    '-preset', preset,
+                    '-crf', str(crf),
+                    '-c:a', acodec,
+                    str(dest),
+                ]
             self._run(args)
             return api_success('格式转换完成', file=str(dest))
         except Exception as exc:
@@ -193,6 +205,10 @@ class VideoTool:
             ffmpeg = self._require_ffmpeg()
             audio_format = str(opts.get('audioFormat', 'mp3')).lower()
             quality = str(opts.get('quality', 'medium')).lower()
+            start_seconds, start_label = parse_timespan(opts.get('start') or 0)
+            end_seconds, end_label = parse_timespan(opts.get('end') or 0)
+            if end_seconds and end_seconds <= start_seconds:
+                raise ValueError('结束时间必须大于开始时间')
             bitrate_map = {'high': '320k', 'medium': '192k', 'low': '128k'}
             codec_args = {
                 'mp3': ['-c:a', 'libmp3lame'],
@@ -201,7 +217,11 @@ class VideoTool:
                 'flac': ['-c:a', 'flac'],
             }
             dest = self._prepare_output(source, opts, 'audio', audio_format)
-            args = [ffmpeg, '-y', '-i', str(source), '-vn']
+            args = [ffmpeg, '-y', '-ss', start_label, '-i', str(source), '-vn']
+            if end_seconds:
+                duration = end_seconds - start_seconds
+                _, duration_label = parse_timespan(duration)
+                args += ['-t', duration_label]
             args += codec_args.get(audio_format, ['-c:a', 'aac'])
             if audio_format not in {'wav'}:
                 args += ['-b:a', bitrate_map.get(quality, '192k')]

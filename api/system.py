@@ -178,7 +178,11 @@ class System():
             return ''
 
     def system_listProcesses(self, filters=None):
-        '''获取进程列表，可按名称和端口过滤'''
+        '''获取进程列表，可按名称和端口过滤
+
+        说明：为提升查询速度，默认仅在指定端口过滤时才收集端口信息，
+        普通名称搜索不会遍历每个进程的网络连接。
+        '''
         if psutil is None:
             return self._psutil_missing_response()
 
@@ -204,9 +208,10 @@ class System():
             sort_by = str(filters.get('sortBy', sort_by)).lower()
             sort_order = str(filters.get('sortOrder', sort_order)).lower()
         elif filters:
+            # 向后兼容字符串参数：按关键字过滤
             keyword = str(filters).strip().lower()
 
-        matched = list()
+        matched = []
         attrs = ['pid', 'name', 'username', 'status', 'cmdline', 'create_time', 'memory_percent']
         try:
             processes = psutil.process_iter(attrs=attrs)
@@ -224,9 +229,12 @@ class System():
                         merged = f"{name} {cmdline}".lower()
                         if keyword not in merged:
                             continue
-                    ports = self._collect_process_ports(proc)
-                    if port is not None and port not in ports:
-                        continue
+                    # 仅在需要按端口过滤时才收集端口信息，避免遍历大量连接影响性能
+                    ports = []
+                    if port is not None:
+                        ports = self._collect_process_ports(proc)
+                        if port not in ports:
+                            continue
                     cpu_percent = proc.cpu_percent(interval=None)
                     try:
                         mem_info = proc.memory_info()

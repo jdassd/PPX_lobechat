@@ -1,5 +1,5 @@
-<script setup>
-import { computed, reactive } from 'vue'
+﻿<script setup>
+import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 
 const props = defineProps({
@@ -17,6 +17,48 @@ const visibleProxy = computed({
 })
 
 const videoFilter = ['视频文件 (*.mp4;*.mov;*.avi;*.mkv;*.webm)']
+
+const toFileUrl = (path) => {
+  if (!path) return ''
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('file://')) {
+    return path
+  }
+  const normalized = path.replace(/\\/g, '/')
+  if (/^[a-zA-Z]:\//.test(normalized)) {
+    return `file:///${normalized}`
+  }
+  return normalized
+}
+
+const parseTimeToSeconds = (value) => {
+  if (!value && value !== 0) return 0
+  if (typeof value === 'number') {
+    return value >= 0 ? value : 0
+  }
+  const text = String(value).trim()
+  if (!text) return 0
+  const parts = text.split(':').map((item) => Number.parseFloat(item || '0'))
+  if (!parts.length || parts.some((n) => Number.isNaN(n) || n < 0)) {
+    return 0
+  }
+  let seconds = 0
+  if (parts.length === 1) {
+    seconds = parts[0]
+  } else if (parts.length === 2) {
+    seconds = parts[0] * 60 + parts[1]
+  } else {
+    seconds = parts[0] * 3600 + parts[1] * 60 + parts[2]
+  }
+  return seconds >= 0 ? seconds : 0
+}
+
+const secondsToTime = (value) => {
+  const total = Math.max(0, Math.floor(value || 0))
+  const h = String(Math.floor(total / 3600)).padStart(2, '0')
+  const m = String(Math.floor((total % 3600) / 60)).padStart(2, '0')
+  const s = String(total % 60).padStart(2, '0')
+  return `${h}:${m}:${s}`
+}
 
 const state = reactive({
   loading: false,
@@ -46,14 +88,24 @@ const state = reactive({
     start: '00:00:00',
     end: '',
     outputDir: '',
-    result: ''
+    result: '',
+    duration: 0,
+    rangeStart: 0,
+    rangeEnd: 0,
+    previewUrl: ''
   },
   audio: {
     file: null,
     audioFormat: 'mp3',
     quality: 'medium',
     outputDir: '',
-    result: ''
+    result: '',
+    start: '00:00:00',
+    end: '',
+    duration: 0,
+    rangeStart: 0,
+    rangeEnd: 0,
+    previewUrl: ''
   },
   frames: {
     file: null,
@@ -78,6 +130,147 @@ const state = reactive({
   }
 })
 
+const cutVideoRef = ref(null)
+const audioVideoRef = ref(null)
+
+const cutRange = computed({
+  get: () => {
+    const duration = state.cut.duration || 0
+    const start = Math.max(0, Math.min(state.cut.rangeStart || 0, duration))
+    const endRaw = state.cut.rangeEnd || duration
+    const end = Math.max(start, Math.min(endRaw, duration))
+    return [start, end]
+  },
+  set: (val) => {
+    if (!Array.isArray(val) || val.length < 2) return
+    const duration = state.cut.duration || 0
+    let [start, end] = val
+    start = Math.max(0, Math.min(start ?? 0, duration))
+    end = Math.max(start, Math.min(end ?? duration, duration))
+    state.cut.rangeStart = start
+    state.cut.rangeEnd = end
+    state.cut.start = secondsToTime(start)
+    if (!duration || Math.abs(end - duration) < 0.5) {
+      state.cut.end = ''
+    } else {
+      state.cut.end = secondsToTime(end)
+    }
+  }
+})
+
+const audioRange = computed({
+  get: () => {
+    const duration = state.audio.duration || 0
+    const start = Math.max(0, Math.min(state.audio.rangeStart || 0, duration))
+    const endRaw = state.audio.rangeEnd || duration
+    const end = Math.max(start, Math.min(endRaw, duration))
+    return [start, end]
+  },
+  set: (val) => {
+    if (!Array.isArray(val) || val.length < 2) return
+    const duration = state.audio.duration || 0
+    let [start, end] = val
+    start = Math.max(0, Math.min(start ?? 0, duration))
+    end = Math.max(start, Math.min(end ?? duration, duration))
+    state.audio.rangeStart = start
+    state.audio.rangeEnd = end
+    state.audio.start = secondsToTime(start)
+    if (!duration || Math.abs(end - duration) < 0.5) {
+      state.audio.end = ''
+    } else {
+      state.audio.end = secondsToTime(end)
+    }
+  }
+})
+
+const onCutLoadedMetadata = () => {
+  const video = cutVideoRef.value
+  if (!video) return
+  const duration = Number.isFinite(video.duration) ? video.duration : 0
+  state.cut.duration = duration
+  const start = parseTimeToSeconds(state.cut.start)
+  const endRaw = parseTimeToSeconds(state.cut.end)
+  const end = endRaw && endRaw > 0 ? endRaw : duration
+  state.cut.rangeStart = Math.max(0, Math.min(start, duration))
+  state.cut.rangeEnd = Math.max(state.cut.rangeStart, Math.min(end, duration))
+}
+
+const onAudioLoadedMetadata = () => {
+  const video = audioVideoRef.value
+  if (!video) return
+  const duration = Number.isFinite(video.duration) ? video.duration : 0
+  state.audio.duration = duration
+  const start = parseTimeToSeconds(state.audio.start)
+  const endRaw = parseTimeToSeconds(state.audio.end)
+  const end = endRaw && endRaw > 0 ? endRaw : duration
+  state.audio.rangeStart = Math.max(0, Math.min(start, duration))
+  state.audio.rangeEnd = Math.max(state.audio.rangeStart, Math.min(end, duration))
+}
+
+const onCutRangeChange = (val) => {
+  if (!cutVideoRef.value || !Array.isArray(val) || !val.length) return
+  cutVideoRef.value.currentTime = val[0] || 0
+}
+
+const onAudioRangeChange = (val) => {
+  if (!audioVideoRef.value || !Array.isArray(val) || !val.length) return
+  audioVideoRef.value.currentTime = val[0] || 0
+}
+
+watch(
+  () => state.cut.start,
+  (value) => {
+    const duration = state.cut.duration || 0
+    let start = parseTimeToSeconds(value)
+    if (duration && start > duration) start = duration
+    state.cut.rangeStart = start
+  }
+)
+
+watch(
+  () => state.cut.end,
+  (value) => {
+    const duration = state.cut.duration || 0
+    if (!value) {
+      state.cut.rangeEnd = duration
+      return
+    }
+    let end = parseTimeToSeconds(value)
+    if (duration) {
+      if (end < state.cut.rangeStart) end = state.cut.rangeStart
+      if (end > duration) end = duration
+    }
+    state.cut.rangeEnd = end
+  }
+)
+
+watch(
+  () => state.audio.start,
+  (value) => {
+    const duration = state.audio.duration || 0
+    let start = parseTimeToSeconds(value)
+    if (duration && start > duration) start = duration
+    state.audio.rangeStart = start
+  }
+)
+
+watch(
+  () => state.audio.end,
+  (value) => {
+    const duration = state.audio.duration || 0
+    if (!value) {
+      state.audio.rangeEnd = duration
+      return
+    }
+    let end = parseTimeToSeconds(value)
+    if (duration) {
+      if (end < state.audio.rangeStart) end = state.audio.rangeStart
+      if (end > duration) end = duration
+    }
+    state.audio.rangeEnd = end
+  }
+)
+
 const ensurePyReady = () => {
   if (!window.pywebview?.api) {
     ElMessage.warning('该功能需在桌面客户端中使用')
@@ -90,7 +283,24 @@ const selectVideo = async (target) => {
   if (!ensurePyReady()) return
   const result = await window.pywebview.api.system_pyCreateFileDialog(videoFilter)
   if (result?.length) {
-    state[target].file = result[0]
+    const file = result[0]
+    state[target].file = file
+    if (target === 'cut') {
+      state.cut.previewUrl = toFileUrl(file.path || file.filename || '')
+      state.cut.duration = 0
+      state.cut.rangeStart = 0
+      state.cut.rangeEnd = 0
+      state.cut.start = '00:00:00'
+      state.cut.end = ''
+    }
+    if (target === 'audio') {
+      state.audio.previewUrl = toFileUrl(file.path || file.filename || '')
+      state.audio.duration = 0
+      state.audio.rangeStart = 0
+      state.audio.rangeEnd = 0
+      state.audio.start = '00:00:00'
+      state.audio.end = ''
+    }
   }
 }
 
@@ -242,6 +452,8 @@ const runAudio = async () => {
       filePath: state.audio.file.path,
       audioFormat: state.audio.audioFormat,
       quality: state.audio.quality,
+      start: state.audio.start,
+      end: state.audio.end,
       outputDir: state.audio.outputDir
     })
     if (res?.code === 0) {
@@ -358,6 +570,7 @@ const openFramesDir = () => {
               </el-form-item>
               <el-form-item label="质量预设">
                 <el-radio-group v-model="state.convert.qualityPreset">
+                  <el-radio-button label="original">原画</el-radio-button>
                   <el-radio-button label="high">高清</el-radio-button>
                   <el-radio-button label="medium">均衡</el-radio-button>
                   <el-radio-button label="low">体积优先</el-radio-button>
@@ -420,13 +633,13 @@ const openFramesDir = () => {
                     <el-option label="体积最小" value="small" />
                   </el-select>
                 </el-form-item>
-                <el-form-item label="FFmpeg Preset">
+                <el-form-item label="FFmpeg 预设">
                   <el-select v-model="state.compress.ffPreset" style="width: 200px">
-                    <el-option label="ultrafast" value="ultrafast" />
-                    <el-option label="superfast" value="superfast" />
-                    <el-option label="fast" value="fast" />
-                    <el-option label="medium" value="medium" />
-                    <el-option label="slow" value="slow" />
+                    <el-option label="极快（调试用）" value="ultrafast" />
+                    <el-option label="很快（画质较低）" value="superfast" />
+                    <el-option label="快速（体积较小）" value="fast" />
+                    <el-option label="均衡（推荐）" value="medium" />
+                    <el-option label="更好画质（编码更慢）" value="slow" />
                   </el-select>
                 </el-form-item>
               </template>
@@ -459,6 +672,30 @@ const openFramesDir = () => {
               <h4>截取片段</h4>
               <p>按起止时间截取，无需重新编码</p>
             </header>
+            <div v-if="state.cut.file" class="video-preview-block">
+              <video
+                ref="cutVideoRef"
+                class="video-preview"
+                :src="state.cut.previewUrl"
+                controls
+                @loadedmetadata="onCutLoadedMetadata"
+              />
+              <el-slider
+                v-if="state.cut.duration"
+                v-model="cutRange"
+                :min="0"
+                :max="state.cut.duration"
+                :step="1"
+                range
+                class="video-range-slider"
+                @change="onCutRangeChange"
+              />
+              <div v-if="state.cut.duration" class="video-range-meta">
+                <span>开始：{{ state.cut.start || '00:00:00' }}</span>
+                <span>结束：{{ state.cut.end || '视频末尾' }}</span>
+                <span>总长：{{ secondsToTime(state.cut.duration) }}</span>
+              </div>
+            </div>
             <el-form :model="state.cut" label-width="120px">
               <el-form-item label="源视频">
                 <div class="field-row">
@@ -498,9 +735,33 @@ const openFramesDir = () => {
         <el-tab-pane label="音频提取" name="audio">
           <section class="panel">
             <header>
-              <h4>视频 → 音频</h4>
-              <p>输出 MP3 / WAV / AAC / FLAC，支持质量预设</p>
+              <h4>视频转音频</h4>
+              <p>输出 MP3 / WAV / AAC / FLAC，支持质量预设与时间截取</p>
             </header>
+            <div v-if="state.audio.file" class="video-preview-block">
+              <video
+                ref="audioVideoRef"
+                class="video-preview"
+                :src="state.audio.previewUrl"
+                controls
+                @loadedmetadata="onAudioLoadedMetadata"
+              />
+              <el-slider
+                v-if="state.audio.duration"
+                v-model="audioRange"
+                :min="0"
+                :max="state.audio.duration"
+                :step="1"
+                range
+                class="video-range-slider"
+                @change="onAudioRangeChange"
+              />
+              <div v-if="state.audio.duration" class="video-range-meta">
+                <span>开始：{{ state.audio.start || '00:00:00' }}</span>
+                <span>结束：{{ state.audio.end || '视频末尾' }}</span>
+                <span>总长：{{ secondsToTime(state.audio.duration) }}</span>
+              </div>
+            </div>
             <el-form :model="state.audio" label-width="120px">
               <el-form-item label="源视频">
                 <div class="field-row">
@@ -518,10 +779,16 @@ const openFramesDir = () => {
               </el-form-item>
               <el-form-item label="质量">
                 <el-radio-group v-model="state.audio.quality">
-                  <el-radio-button label="high">高</el-radio-button>
+                  <el-radio-button label="high">高质量</el-radio-button>
                   <el-radio-button label="medium">均衡</el-radio-button>
                   <el-radio-button label="low">小体积</el-radio-button>
                 </el-radio-group>
+              </el-form-item>
+              <el-form-item label="开始时间">
+                <el-input v-model="state.audio.start" placeholder="00:00:00" />
+              </el-form-item>
+              <el-form-item label="结束时间">
+                <el-input v-model="state.audio.end" placeholder="可选，00:00:00" />
               </el-form-item>
               <el-form-item label="输出目录">
                 <div class="field-row">
@@ -544,9 +811,7 @@ const openFramesDir = () => {
               </template>
             </el-alert>
           </section>
-        </el-tab-pane>
-
-        <el-tab-pane label="帧图导出" name="frames">
+        </el-tab-pane>        <el-tab-pane label="帧图导出" name="frames">
           <section class="panel">
             <header>
               <h4>按时间 / 帧提取图片</h4>
@@ -772,8 +1037,33 @@ const openFramesDir = () => {
   gap: 10px;
 }
 
+.video-preview-block {
+  margin-bottom: 16px;
+}
+
+.video-preview {
+  width: 100%;
+  max-height: 260px;
+  border-radius: 12px;
+  background: #000;
+}
+
+.video-range-slider {
+  margin-top: 10px;
+}
+
+.video-range-meta {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #7a829d;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .link {
   color: #2f73ff;
   cursor: pointer;
 }
 </style>
+

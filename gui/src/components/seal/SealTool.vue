@@ -16,7 +16,36 @@
       </div>
     </template>
     <div class="seal-tool">
-      <section class="panel config-panel">
+      <section v-if="state.locked" class="panel lock-panel">
+        <header>
+          <h4>敏感功能访问确认</h4>
+          <p>公章生成涉及企业及个人敏感信息，请输入访问密码后继续操作。</p>
+        </header>
+        <el-form label-width="110px">
+          <el-form-item label="访问密码">
+            <el-input
+              v-model="state.password"
+              type="password"
+              autocomplete="off"
+              placeholder="请输入访问密码"
+              show-password
+              @keyup.enter="unlockSeal"
+            />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" @click="unlockSeal">解锁公章生成</el-button>
+          </el-form-item>
+          <el-alert
+            v-if="state.passwordError"
+            type="error"
+            :closable="false"
+            show-icon
+          >
+            {{ state.passwordError }}
+          </el-alert>
+        </el-form>
+      </section>
+      <section v-else class="panel config-panel">
         <header>
           <h4>模板与文字</h4>
           <p>目前提供圆形企业公章模板，可自由调整内容与样式</p>
@@ -135,7 +164,7 @@
         </div>
       </section>
 
-      <section class="panel preview-panel">
+      <section v-if="!state.locked" class="panel preview-panel">
         <header>
           <h4>实时预览</h4>
           <p>所有参数调整后可立即查看透明 PNG 结果</p>
@@ -184,6 +213,7 @@ const visibleProxy = computed({
 })
 
 const predefinedColors = ['#d4252c', '#c11f26', '#cf1b2c', '#bb1f2c', '#a2192e']
+const SEAL_UNLOCK_PASSWORD = 'Jd_251114'
 
 const makeDefaultForm = () => ({
   topText: '某某科技有限公司',
@@ -219,7 +249,10 @@ const state = reactive({
   loading: false,
   outputDir: '',
   outputName: '企业公章.png',
-  resultPath: ''
+  resultPath: '',
+  locked: true,
+  password: '',
+  passwordError: ''
 })
 
 const canvasSize = computed(() => (state.form.outerRadius + state.form.edge) * 2)
@@ -227,7 +260,7 @@ const canvasSize = computed(() => (state.form.outerRadius + state.form.edge) * 2
 watch(
   () => props.modelValue,
   (visible) => {
-    if (visible && !state.preview) {
+    if (visible && !state.locked && !state.preview) {
       runPreview()
     }
   }
@@ -342,11 +375,31 @@ const openOutput = () => {
   window.pywebview.api.system_pyOpenFile(state.resultPath)
 }
 
+const unlockSeal = () => {
+  if (!state.password) {
+    state.passwordError = '请输入访问密码'
+    ElMessage.warning('请输入访问密码')
+    return
+  }
+  if (state.password === SEAL_UNLOCK_PASSWORD) {
+    state.locked = false
+    state.passwordError = ''
+    const needPreview = !state.preview && props.modelValue
+    state.password = ''
+    if (needPreview) {
+      runPreview()
+    }
+  } else {
+    state.passwordError = '密码错误，无法访问公章生成'
+    ElMessage.error('密码错误')
+  }
+}
+
 const resetDefaults = () => {
   Object.assign(state.form, makeDefaultForm())
   state.preview = ''
   state.resultPath = ''
-  if (props.modelValue) {
+  if (props.modelValue && !state.locked) {
     runPreview()
   }
 }

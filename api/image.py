@@ -1,10 +1,11 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 图片处理相关 API
 """
 from __future__ import annotations
 
+import base64
 import io
 import math
 import shutil
@@ -29,11 +30,14 @@ from api.utils import (
 class ImageTool:
     """图片相关功能"""
 
-    _valid_formats = {'png', 'jpg', 'jpeg', 'webp', 'bmp', 'tiff'}
+    _valid_formats = {'png', 'jpg', 'jpeg', 'webp', 'bmp', 'tiff', 'gif', 'svg'}
     _page_sizes = {
         'a4': (2480, 3508),   # 300 DPI
         'a5': (1748, 2480),
         'letter': (2550, 3300),
+        'a3': (3508, 4961),
+        'square': (3000, 3000),
+        'slide_16_9': (3508, 1973),
     }
 
     def _validate(self, options: Dict | None) -> Dict:
@@ -187,7 +191,21 @@ class ImageTool:
                 with Image.open(file_path) as image:
                     dest_name = f'{file_path.stem}.{fmt}' if keep_name else f'{file_path.stem}_{fmt}'
                     dest = output_dir / dest_name
-                    self._save_image(image, dest, fmt, quality)
+                    if fmt == 'svg':
+                        # 使用简单矢量包装：将位图嵌入 SVG 作为 base64 PNG，避免额外依赖
+                        rgb = image.convert('RGB')
+                        buffer = io.BytesIO()
+                        rgb.save(buffer, format='PNG')
+                        encoded = base64.b64encode(buffer.getvalue()).decode('ascii')
+                        svg = (
+                            f'<svg xmlns="http://www.w3.org/2000/svg" '
+                            f'width="{rgb.width}" height="{rgb.height}">'
+                            f'<image href="data:image/png;base64,{encoded}" '
+                            f'width="{rgb.width}" height="{rgb.height}"/></svg>'
+                        )
+                        dest.write_text(svg, encoding='utf-8')
+                    else:
+                        self._save_image(image, dest, fmt, quality)
                     rewritten.append(str(dest))
             return api_success(f'已转换 {len(rewritten)} 个文件', files=rewritten, outputDir=str(output_dir))
         except Exception as exc:
@@ -280,7 +298,7 @@ class ImageTool:
     # -------------------- Phase 2 功能 --------------------
 
     def image_add_watermark(self, options: Dict | None = None):
-        """批量添加文字或图片水印"""
+        """批量添加文字或图片水印，支持平铺与旋转"""
         try:
             opts = self._validate(options)
             files = ensure_files_payload(opts)
@@ -290,7 +308,21 @@ class ImageTool:
             opacity = max(5, min(int(opts.get('opacity') or 60), 100))
             font_size = max(8, int(opts.get('fontSize') or 32))
             color = self._parse_color(opts.get('color'))
-            results = []
+
+            # 平铺与旋转参数
+            tile = bool(opts.get('tile', False))
+            try:
+                tile_spacing = int(opts.get('tileSpacing') or 80)
+            except (TypeError, ValueError):
+                tile_spacing = 80
+            tile_spacing = max(0, min(tile_spacing, 2000))
+            try:
+                rotation = float(opts.get('rotation') or 0.0)
+            except (TypeError, ValueError):
+                rotation = 0.0
+            rotation = max(-180.0, min(rotation, 180.0))
+
+            results: List[str] = []
 
             wm_image_path = opts.get('watermarkImage')
             if isinstance(wm_image_path, dict):
@@ -300,6 +332,8 @@ class ImageTool:
             for file_path in files:
                 with Image.open(file_path).convert('RGBA') as base:
                     overlay = Image.new('RGBA', base.size, (255, 255, 255, 0))
+
+                    # 准备单个水印图层
                     if watermark_type == 'image':
                         if not watermark_image:
                             raise ValueError('请提供水印图片')
@@ -308,35 +342,70 @@ class ImageTool:
                             scale_percent = max(5.0, min(scale_percent, 100.0)) / 100.0
                             target_width = max(10, int(base.width * scale_percent))
                             target_height = max(10, int(target_width * wm.height / wm.width))
-                            wm_resized = wm.resize((target_width, target_height), Image.LANCZOS)
-                            alpha_layer = wm_resized.getchannel('A') if 'A' in wm_resized.getbands() else Image.new('L', wm_resized.size, 255)
+                            stamp = wm.resize((target_width, target_height), Image.LANCZOS)
+                            alpha_layer = stamp.getchannel('A') if 'A' in stamp.getbands() else Image.new('L', stamp.size, 255)
                             enhancer = ImageEnhance.Brightness(alpha_layer)
-                            wm_resized.putalpha(enhancer.enhance(opacity / 100.0))
-                            pos = self._resolve_position(base.size, wm_resized.size, position)
-                            overlay.paste(wm_resized, pos, mask=wm_resized)
+                            stamp.putalpha(enhancer.enhance(opacity / 100.0))
                     else:
-                        text = str(opts.get('text') or '').strip()
-                        if not text:
+                        text_value = str(opts.get('text') or '').strip()
+                        if not text_value:
                             raise ValueError('请输入文字水印内容')
                         font = self._resolve_font(font_size, opts.get('fontPath'))
-                        draw = ImageDraw.Draw(overlay)
-                        bbox = draw.multiline_textbbox((0, 0), text, font=font)
-                        mark_w = bbox[2] - bbox[0]
-                        mark_h = bbox[3] - bbox[1]
-                        pos = self._resolve_position(base.size, (mark_w, mark_h), position)
+                        # 先测量文本尺寸
+                        temp_img = Image.new('RGBA', (10, 10), (255, 255, 255, 0))
+                        temp_draw = ImageDraw.Draw(temp_img)
+                        bbox = temp_draw.multiline_textbbox((0, 0), text_value, font=font)
+                        mark_w = max(1, bbox[2] - bbox[0])
+                        mark_h = max(1, bbox[3] - bbox[1])
+                        # 在独立图层绘制文字
+                        stamp = Image.new('RGBA', (mark_w, mark_h), (255, 255, 255, 0))
+                        draw = ImageDraw.Draw(stamp)
                         draw.multiline_text(
-                            pos,
-                            text,
+                            (0, 0),
+                            text_value,
                             font=font,
                             fill=(*color, int(255 * (opacity / 100.0))),
                             align='left',
                         )
+
+                    # 旋转水印（如设置了角度）
+                    if rotation and abs(rotation) > 0.1:
+                        stamp = stamp.rotate(
+                            rotation,
+                            expand=True,
+                            resample=Image.BICUBIC,
+                            fillcolor=(0, 0, 0, 0),
+                        )
+
+                    stamp_w, stamp_h = stamp.size
+                    if stamp_w <= 0 or stamp_h <= 0:
+                        continue
+
+                    if tile:
+                        # 平铺模式：按间距覆盖整张图片
+                        step_x = max(1, stamp_w + tile_spacing)
+                        step_y = max(1, stamp_h + tile_spacing)
+                        offset_x = max(0, tile_spacing // 2)
+                        offset_y = max(0, tile_spacing // 2)
+                        y = offset_y
+                        while y < base.height:
+                            x = offset_x
+                            while x < base.width:
+                                overlay.paste(stamp, (int(x), int(y)), stamp)
+                                x += step_x
+                            y += step_y
+                    else:
+                        # 单个水印：沿用九宫格定位
+                        pos = self._resolve_position(base.size, stamp.size, position)
+                        overlay.paste(stamp, pos, stamp)
+
                     composed = Image.alpha_composite(base, overlay)
                     fmt = file_path.suffix.lstrip('.').lower() or 'png'
                     dest = output_dir / f'{file_path.stem}_wm.{fmt}'
                     self._save_image(composed, dest, fmt)
                     results.append(str(dest))
-            return api_success(f'已完成 {len(results)} 个文件水印', files=results, outputDir=str(output_dir))
+
+            return api_success(f'已完成{len(results)} 个文件水印', files=results, outputDir=str(output_dir))
         except Exception as exc:
             return api_error(f'水印处理失败：{exc}')
 
@@ -379,6 +448,9 @@ class ImageTool:
             opts = self._validate(options)
             files = ensure_files_payload(opts)
             operation = str(opts.get('operation', 'rotate90')).lower()
+            angle = float(opts.get('angle') or 0.0)
+            flip_horizontal = bool(opts.get('flipHorizontal'))
+            flip_vertical = bool(opts.get('flipVertical'))
             output_dir = self._prepare_output_dir(files, opts.get('outputDir'), 'image_rotate')
             results = []
             for file_path in files:
@@ -391,6 +463,14 @@ class ImageTool:
                         processed = ImageOps.mirror(image)
                     elif operation == 'flip':
                         processed = ImageOps.flip(image)
+                    elif operation == 'custom':
+                        processed = image
+                        if angle:
+                            processed = processed.rotate(angle, expand=True)
+                        if flip_horizontal:
+                            processed = ImageOps.mirror(processed)
+                        if flip_vertical:
+                            processed = ImageOps.flip(processed)
                     else:
                         processed = image.rotate(90, expand=True)
                     dest = output_dir / f'{file_path.stem}_{operation}{file_path.suffix}'
@@ -639,3 +719,5 @@ class ImageTool:
             return api_success('EXIF 读取完成', file=str(file_path), exif=readable, gps=gps_info)
         except Exception as exc:
             return api_error(f'读取 EXIF 失败：{exc}')
+
+

@@ -32,12 +32,31 @@
                 </div>
               </el-form-item>
               <el-form-item label="分辨率 (DPI)">
-                <el-input-number v-model="state.toImage.dpi" :min="96" :max="600" />
+                <div class="field-row field-wrap">
+                  <el-radio-group v-model="state.toImage.dpiPreset">
+                    <el-radio-button label="ultra">超清</el-radio-button>
+                    <el-radio-button label="high">高清</el-radio-button>
+                    <el-radio-button label="standard">标清</el-radio-button>
+                    <el-radio-button label="custom">自定义</el-radio-button>
+                  </el-radio-group>
+                  <el-input-number
+                    v-model="state.toImage.dpi"
+                    :min="96"
+                    :max="600"
+                    :step="10"
+                    :disabled="state.toImage.dpiPreset !== 'custom'"
+                  />
+                </div>
+                <p class="dpi-hint">
+                  DPI 越高，导出图片越清晰，文件体积也会更大。推荐：超清 400 DPI，高清 300 DPI，标清 200 DPI。
+                </p>
               </el-form-item>
               <el-form-item label="图片格式">
                 <el-select v-model="state.toImage.format" style="width: 160px">
                   <el-option label="PNG" value="png" />
                   <el-option label="JPG" value="jpg" />
+                  <el-option label="GIF" value="gif" />
+                  <el-option label="SVG" value="svg" />
                   <el-option label="TIFF" value="tiff" />
                   <el-option label="WEBP" value="webp" />
                 </el-select>
@@ -227,6 +246,15 @@
               border
             >
               <el-table-column type="index" label="#" width="50" />
+              <el-table-column label="页码选择" width="220">
+                <template #default="scope">
+                  <el-input
+                    v-model="scope.row.pageSpec"
+                    size="small"
+                    placeholder="如 1-3,5,8"
+                  />
+                </template>
+              </el-table-column>
               <el-table-column prop="filename" label="文件名" />
               <el-table-column label="操作" width="180">
                 <template #default="scope">
@@ -278,8 +306,8 @@
         <el-tab-pane label="拆分 PDF" name="split">
           <section class="panel">
             <header>
-              <h4>按固定页数进行拆分</h4>
-              <p>适合按章节或分页导出多个文件</p>
+              <h4>拆分模式一：按固定页数拆分</h4>
+              <p>每 N 页拆分成一个文件，适合按章节或分页导出多个 PDF</p>
             </header>
             <el-form :model="state.split" label-width="110px">
               <el-form-item label="源 PDF">
@@ -330,8 +358,8 @@
         <el-tab-pane label="页码切割" name="cut">
           <section class="panel">
             <header>
-              <h4>按页码区间或自定义集合导出</h4>
-              <p>快速摘取合同重点段落或指定页</p>
+              <h4>拆分模式二：按页码拆分 / 摘取</h4>
+              <p>通过页码区间或自定义页码列表摘取页面，生成一份新的 PDF 摘录</p>
             </header>
             <el-form :model="state.cut" label-width="110px">
               <el-form-item label="源 PDF">
@@ -357,8 +385,15 @@
               <el-form-item v-else label="页码列表">
                 <el-input
                   v-model="state.cut.pageSpec"
-                  placeholder="示例：1-3,5,8"
+                  placeholder="示例：1-3,5,8；支持用分号或换行分隔多个区间"
+                  type="textarea"
+                  :rows="3"
                 />
+              </el-form-item>
+              <el-form-item v-if="state.cut.mode === 'custom'">
+                <el-checkbox v-model="state.cut.multi">
+                  按多个区间分别导出多个 PDF 文件
+                </el-checkbox>
               </el-form-item>
               <el-form-item label="输出目录">
                 <div class="field-row">
@@ -379,16 +414,18 @@
                 </el-button>
               </el-form-item>
             </el-form>
-            <div v-if="state.cut.output" class="result-block">
+            <div v-if="state.cut.output || state.cut.outputs.length" class="result-block">
               <p class="result-title">生成文件</p>
               <el-scrollbar max-height="120px">
                 <div class="result-list">
                   <el-tag
+                    v-for="file in (state.cut.outputs.length ? state.cut.outputs : [state.cut.output])"
+                    :key="file"
                     type="success"
                     effect="light"
-                    @click="openPath(state.cut.output)"
+                    @click="openPath(file)"
                   >
-                    {{ state.cut.output }}
+                    {{ file }}
                   </el-tag>
                 </div>
               </el-scrollbar>
@@ -399,8 +436,8 @@
         <el-tab-pane label="页面重排" name="reorder">
           <section class="panel">
             <header>
-              <h4>重新调整页码顺序</h4>
-              <p>输入新的页码序列，可自动补全剩余页码</p>
+              <h4>拖动缩略图调整页面顺序</h4>
+              <p>先生成预览，再通过拖动页面缩略图重排顺序，无需手动填写页码</p>
             </header>
             <el-form :model="state.reorder" label-width="120px">
               <el-form-item label="源 PDF">
@@ -410,11 +447,43 @@
                   <el-tag v-else type="info" effect="plain">尚未选择</el-tag>
                 </div>
               </el-form-item>
-              <el-form-item label="页码顺序">
-                <el-input
-                  v-model="state.reorder.orderText"
-                  placeholder="示例：3,1,2（表示新顺序）"
-                />
+              <el-form-item label="页面预览">
+                <div class="reorder-preview">
+                  <div class="field-row">
+                    <el-button
+                      type="primary"
+                      plain
+                      :loading="state.reorder.loadingPreview"
+                      :disabled="!state.reorder.file"
+                      @click="loadReorderPreview"
+                    >
+                      生成预览
+                    </el-button>
+                    <span class="reorder-hint">生成后可在下方拖动页面缩略图调整顺序（当前预览最多前 80 页）</span>
+                  </div>
+                  <template v-if="state.reorder.pages && state.reorder.pages.length">
+                    <el-scrollbar max-height="260px">
+                      <div class="reorder-grid">
+                        <div
+                          v-for="(page, index) in state.reorder.pages"
+                          :key="page.page"
+                          class="reorder-page"
+                          draggable="true"
+                          @dragstart="onReorderDragStart(index, $event)"
+                          @dragover.prevent="onReorderDragOver(index, $event)"
+                          @drop.prevent="onReorderDrop(index, $event)"
+                        >
+                          <div class="reorder-thumb">
+                            <img :src="page.image" :alt="`第 ${page.page} 页`" />
+                          </div>
+                          <p class="reorder-page-label">第 {{ page.page }} 页</p>
+                        </div>
+                      </div>
+                    </el-scrollbar>
+                    <p class="reorder-hint">当前顺序即为重排后的顺序，执行前可多次调整。</p>
+                  </template>
+                  <p v-else class="reorder-empty-hint">请选择 PDF 后点击“生成预览”。</p>
+                </div>
               </el-form-item>
               <el-form-item>
                 <el-checkbox v-model="state.reorder.appendRemaining">自动追加剩余页码</el-checkbox>
@@ -477,7 +546,7 @@
                 <el-checkbox v-model="state.extractText.saveFile">保存为 .txt</el-checkbox>
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" :loading="state.loading" @click="runExtractText">开始提取</el-button>
+              <el-button type="primary" :loading="state.loading" @click="runExtractText">开始提取</el-button>
               </el-form-item>
             </el-form>
             <div v-if="state.extractText.preview" class="result-block">
@@ -488,6 +557,48 @@
                 :rows="8"
                 readonly
               />
+            </div>
+          </section>
+        </el-tab-pane>
+
+        <el-tab-pane label="PDF 转 Word" name="word">
+          <section class="panel">
+            <header>
+              <h4>转换为可编辑 Word 文档</h4>
+              <p>按页提取文本并生成 .docx，适合再次排版编辑</p>
+            </header>
+            <el-form :model="state.word" label-width="120px">
+              <el-form-item label="源 PDF">
+                <div class="field-row">
+                  <el-button @click="selectPdf('word')">选择 PDF</el-button>
+                  <span v-if="state.word.file" class="file-chip">{{ state.word.file.filename }}</span>
+                  <el-tag v-else type="info" effect="plain">尚未选择</el-tag>
+                </div>
+              </el-form-item>
+              <el-form-item label="文本模式">
+                <el-radio-group v-model="state.word.textMode">
+                  <el-radio-button label="plain">纯文本</el-radio-button>
+                  <el-radio-button label="markdown">Markdown</el-radio-button>
+                  <el-radio-button label="html">HTML</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item label="输出目录">
+                <div class="field-row">
+                  <el-input v-model="state.word.outputDir" placeholder="保存生成的 .docx" readonly />
+                  <el-button @click="selectDir('word')">选择目录</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="state.loading" @click="runPdfToWord">
+                  转换为 Word
+                </el-button>
+              </el-form-item>
+            </el-form>
+            <div v-if="state.word.output" class="result-block">
+              <p class="result-title">输出文件</p>
+              <el-tag type="success" effect="plain" @click="openPath(state.word.output)">
+                {{ state.word.output }}
+              </el-tag>
             </div>
           </section>
         </el-tab-pane>
@@ -559,6 +670,7 @@
               <h4>将图片集合导出为 PDF</h4>
               <p>支持 1/2/4 图布局，自定义纸张与边距</p>
             </header>
+            <p class="image-pdf-hint">与图片工具中的「图片转 PDF」功能等价，这里仅提供一个快捷入口。</p>
             <div class="field-row">
               <el-button @click="addImagePdfFiles">添加图片</el-button>
               <el-button text type="danger" :disabled="!state.imagePdf.files.length" @click="clearImagePdf">
@@ -672,7 +784,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+  import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 
 const props = defineProps({
@@ -697,6 +809,12 @@ const compressModeDpiMap = {
   high: 130
 }
 
+const toImageDpiPresetMap = {
+  ultra: 400,
+  high: 300,
+  standard: 200
+}
+
 const imageFilter = ['图片 (*.png;*.jpg;*.jpeg;*.webp;*.bmp)']
 
 const state = reactive({
@@ -704,7 +822,8 @@ const state = reactive({
   toImage: {
     file: null,
     outputDir: '',
-    dpi: 320,
+    dpiPreset: 'ultra',
+    dpi: 400,
     format: 'png',
     result: []
   },
@@ -746,13 +865,17 @@ const state = reactive({
     startPage: 1,
     endPage: 1,
     pageSpec: '',
-    output: ''
+    multi: false,
+    output: '',
+    outputs: []
   },
   reorder: {
     file: null,
     orderText: '',
     appendRemaining: true,
-    output: ''
+    output: '',
+    pages: [],
+    loadingPreview: false
   },
   extractText: {
     file: null,
@@ -764,6 +887,12 @@ const state = reactive({
     saveFile: false,
     preview: '',
     segments: []
+  },
+  word: {
+    file: null,
+    textMode: 'plain',
+    outputDir: '',
+    output: ''
   },
   extractImages: {
     file: null,
@@ -788,12 +917,38 @@ const state = reactive({
   logs: []
 })
 
+const reorderDragState = reactive({
+  fromIndex: -1
+})
+
 const compressCurrentDpi = computed(() => {
   if (state.compress.mode === 'custom') {
     return state.compress.customDpi || 200
   }
   return compressModeDpiMap[state.compress.mode] || compressModeDpiMap.medium
 })
+
+watch(
+  () => state.toImage.dpiPreset,
+  (preset) => {
+    if (preset === 'custom') return
+    const target = toImageDpiPresetMap[preset]
+    if (target) {
+      state.toImage.dpi = target
+    }
+  }
+)
+
+watch(
+  () => state.toImage.dpi,
+  (value) => {
+    if (state.toImage.dpiPreset === 'custom') return
+    const presetValue = toImageDpiPresetMap[state.toImage.dpiPreset]
+    if (presetValue && value !== presetValue) {
+      state.toImage.dpiPreset = 'custom'
+    }
+  }
+)
 
 const ensurePyReady = () => {
   if (!window.pywebview?.api) {
@@ -811,7 +966,11 @@ const selectPdf = async (key, multiple = false) => {
     const existing = new Set(state[key].files.map((item) => item.path))
     result.forEach((item) => {
       if (!existing.has(item.path)) {
-        state[key].files.push(item)
+        const entry = { ...item }
+        if (key === 'merge' && entry.pageSpec === undefined) {
+          entry.pageSpec = ''
+        }
+        state[key].files.push(entry)
       }
     })
   } else {
@@ -961,7 +1120,10 @@ const runMerge = async () => {
     return
   }
   const res = await callApi('pdf_merge', {
-    files: state.merge.files.map((item) => item.path),
+    files: state.merge.files.map((item) => ({
+      path: item.path,
+      pageSpec: item.pageSpec || ''
+    })),
     outputDir: state.merge.outputDir,
     outputName: state.merge.outputName
   })
@@ -994,7 +1156,7 @@ const runCut = async () => {
     ElMessage.warning('请输入页码集合')
     return
   }
-  const res = await callApi('pdf_cut', {
+  const payload = {
     filePath: state.cut.file.path,
     outputDir: state.cut.outputDir,
     outputName: state.cut.outputName,
@@ -1002,9 +1164,19 @@ const runCut = async () => {
     startPage: state.cut.startPage,
     endPage: state.cut.endPage,
     pageSpec: state.cut.pageSpec
-  })
+  }
+  const useMulti =
+    state.cut.mode === 'custom' && state.cut.multi && state.cut.pageSpec.trim().length > 0
+  const apiName = useMulti ? 'pdf_multi_cut' : 'pdf_cut'
+  const res = await callApi(apiName, payload)
   if (res) {
-    state.cut.output = res.output
+    if (res.files && Array.isArray(res.files) && res.files.length) {
+      state.cut.outputs = res.files
+      state.cut.output = res.files[0]
+    } else {
+      state.cut.outputs = []
+      state.cut.output = res.output
+    }
   }
 }
 
@@ -1013,12 +1185,17 @@ const runReorder = async () => {
     ElMessage.warning('请选择 PDF 文件')
     return
   }
-  const order = state.reorder.orderText
-    .split(',')
-    .map((item) => Number(item.trim()))
-    .filter((num) => Number.isInteger(num) && num > 0)
+  let order = []
+  if (state.reorder.pages && state.reorder.pages.length) {
+    order = state.reorder.pages.map((item) => item.page)
+  } else if (state.reorder.orderText) {
+    order = state.reorder.orderText
+      .split(',')
+      .map((item) => Number(item.trim()))
+      .filter((num) => Number.isInteger(num) && num > 0)
+  }
   if (!order.length) {
-    ElMessage.warning('请填写新的页码顺序，例如：3,1,2')
+    ElMessage.warning('请先生成预览并拖动调整页面顺序')
     return
   }
   const res = await callApi('pdf_reorder_pages', {
@@ -1029,6 +1206,80 @@ const runReorder = async () => {
   if (res) {
     state.reorder.output = res.output
   }
+}
+
+const syncReorderOrderText = () => {
+  if (!state.reorder.pages || !state.reorder.pages.length) {
+    state.reorder.orderText = ''
+    return
+  }
+  state.reorder.orderText = state.reorder.pages.map((item) => item.page).join(',')
+}
+
+const loadReorderPreview = async () => {
+  if (!state.reorder.file) {
+    ElMessage.warning('请选择 PDF 文件')
+    return
+  }
+  state.reorder.loadingPreview = true
+  try {
+  const res = await callApi('pdf_convert_to_images', {
+    filePath: state.reorder.file.path,
+    dpi: 120,
+    format: 'png',
+    maxPages: 80
+  })
+    if (res && Array.isArray(res.files)) {
+      state.reorder.pages = res.files.map((path, index) => ({
+        page: index + 1,
+        image: path
+      }))
+      syncReorderOrderText()
+    }
+  } finally {
+    state.reorder.loadingPreview = false
+  }
+}
+
+const onReorderDragStart = (index, event) => {
+  reorderDragState.fromIndex = index
+  if (event && event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', String(index))
+  }
+}
+
+const onReorderDragOver = (index, event) => {
+  if (event && event.preventDefault) {
+    event.preventDefault()
+  }
+  if (event && event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move'
+  }
+}
+
+const onReorderDrop = (index, event) => {
+  if (event && event.preventDefault) {
+    event.preventDefault()
+  }
+  let from = reorderDragState.fromIndex
+  if (from === -1 && event && event.dataTransfer) {
+    const raw = event.dataTransfer.getData('text/plain')
+    const parsed = Number.parseInt(raw, 10)
+    if (!Number.isNaN(parsed)) {
+      from = parsed
+    }
+  }
+  const list = state.reorder.pages
+  if (!list || !list.length) return
+  if (from < 0 || from >= list.length) return
+  if (index < 0 || index >= list.length) return
+  if (from === index) return
+
+  const [moved] = list.splice(from, 1)
+  list.splice(index, 0, moved)
+  reorderDragState.fromIndex = -1
+  syncReorderOrderText()
 }
 
 const runExtractText = async () => {
@@ -1050,6 +1301,24 @@ const runExtractText = async () => {
     state.extractText.segments = res.segments || []
     if (res.output) {
       state.extractText.outputDir = res.output.split(/[\\/]/).slice(0, -1).join('/') || state.extractText.outputDir
+    }
+  }
+}
+
+const runPdfToWord = async () => {
+  if (!state.word.file) {
+    ElMessage.warning('请选择 PDF 文件')
+    return
+  }
+  const res = await callApi('pdf_to_word', {
+    filePath: state.word.file.path,
+    textMode: state.word.textMode,
+    outputDir: state.word.outputDir
+  })
+  if (res) {
+    state.word.output = res.output || ''
+    if (res.outputDir) {
+      state.word.outputDir = res.outputDir
     }
   }
 }
@@ -1220,6 +1489,70 @@ const runImagesToPdf = async () => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.reorder-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reorder-hint,
+.reorder-empty-hint {
+  margin: 8px 0 0;
+  color: #9094a6;
+  font-size: 12px;
+}
+
+.reorder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.reorder-page {
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #e0e4f0;
+  padding: 8px;
+  cursor: grab;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.reorder-page:active {
+  cursor: grabbing;
+}
+
+.reorder-thumb {
+  width: 100%;
+  padding-top: 140px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #f3f4fb;
+}
+
+.reorder-thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.reorder-page-label {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #5f6475;
+}
+
+.image-pdf-hint {
+  margin: 4px 0 12px;
+  color: #9094a6;
+  font-size: 12px;
 }
 
 .merge-toolbar {

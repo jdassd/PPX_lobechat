@@ -1,5 +1,5 @@
-<script setup>
-import { computed, reactive } from 'vue'
+﻿<script setup>
+import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 
 import FileSelector from '../shared/FileSelector.vue'
@@ -40,6 +40,7 @@ const state = reactive({
     width: 1920,
     height: 1080,
     keepRatio: true,
+    photoPreset: '',
     outputDir: '',
     generatedDir: '',
     result: []
@@ -61,6 +62,9 @@ const state = reactive({
     color: '#ffffff',
     opacity: 60,
     position: 'bottom-right',
+    tile: false,
+    tileSpacing: 80,
+    rotation: 0,
     watermarkImage: null,
     scalePercent: 30,
     outputDir: '',
@@ -75,6 +79,11 @@ const state = reactive({
     width: 800,
     height: 600,
     ratio: '16:9',
+    previewUrl: '',
+    imageWidth: 0,
+    imageHeight: 0,
+    displayWidth: 0,
+    displayHeight: 0,
     outputDir: '',
     generatedDir: '',
     result: ''
@@ -82,6 +91,9 @@ const state = reactive({
   rotate: {
     files: [],
     operation: 'rotate90',
+    angle: 0,
+    flipHorizontal: false,
+    flipVertical: false,
     outputDir: '',
     generatedDir: '',
     result: []
@@ -132,6 +144,271 @@ const state = reactive({
   }
 })
 
+const photoSizeMap = {
+  '1inch': { width: 295, height: 413 },
+  '2inch': { width: 413, height: 579 },
+  small1: { width: 260, height: 378 },
+  big1: { width: 390, height: 567 }
+}
+
+const toFileUrl = (path) => {
+  if (!path) return ''
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('file://')) {
+    return path
+  }
+  const normalized = path.replace(/\\/g, '/')
+  if (/^[a-zA-Z]:\//.test(normalized)) {
+    return `file:///${normalized}`
+  }
+  return normalized
+}
+
+const cropPreviewRef = ref(null)
+
+const cropInteraction = reactive({
+  dragging: false,
+  startX: 0,
+  startY: 0,
+  // 用于记录是否通过“控制手柄”调整已有裁剪框
+  handle: ''
+})
+
+const hasCropImage = computed(
+  () => state.crop.imageWidth > 0 && state.crop.imageHeight > 0 && state.crop.displayWidth > 0 && state.crop.displayHeight > 0
+)
+
+const hasCropRect = computed(
+  () => hasCropImage.value && state.crop.width > 0 && state.crop.height > 0
+)
+
+const rotatePreviewUrl = computed(() => {
+  const first = state.rotate.files[0]
+  if (!first) return ''
+  const path = first.path || first
+  if (!path) return ''
+  return getFileUrl(path)
+})
+
+const rotatePreviewStyle = computed(() => {
+  const transforms = []
+  const op = state.rotate.operation
+  if (op === 'rotate90') {
+    transforms.push('rotate(90deg)')
+  } else if (op === 'rotate180') {
+    transforms.push('rotate(180deg)')
+  } else if (op === 'rotate270') {
+    transforms.push('rotate(270deg)')
+  } else if (op === 'mirror') {
+    transforms.push('scaleX(-1)')
+  } else if (op === 'flip') {
+    transforms.push('scaleY(-1)')
+  } else if (op === 'custom') {
+    if (state.rotate.angle) {
+      transforms.push(`rotate(${state.rotate.angle}deg)`)
+    }
+    if (state.rotate.flipHorizontal) {
+      transforms.push('scaleX(-1)')
+    }
+    if (state.rotate.flipVertical) {
+      transforms.push('scaleY(-1)')
+    }
+  }
+  if (!transforms.length) return {}
+  return {
+    transform: transforms.join(' '),
+    transformOrigin: '50% 50%',
+    transition: 'transform 0.2s ease-out'
+  }
+})
+
+const getCropDisplayRect = () => {
+  if (!hasCropRect.value) {
+    return null
+  }
+  const scaleX = state.crop.displayWidth / state.crop.imageWidth
+  const scaleY = state.crop.displayHeight / state.crop.imageHeight
+  const left = state.crop.x * scaleX
+  const top = state.crop.y * scaleY
+  const width = state.crop.width * scaleX
+  const height = state.crop.height * scaleY
+  return {
+    left,
+    top,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height
+  }
+}
+
+const cropRectStyle = computed(() => {
+  if (!hasCropRect.value) return {}
+  const scaleX = state.crop.displayWidth / state.crop.imageWidth
+  const scaleY = state.crop.displayHeight / state.crop.imageHeight
+  const left = state.crop.x * scaleX
+  const top = state.crop.y * scaleY
+  const width = state.crop.width * scaleX
+  const height = state.crop.height * scaleY
+  return {
+    left: `${left}px`,
+    top: `${top}px`,
+    width: `${width}px`,
+    height: `${height}px`
+  }
+})
+
+const updateCropRectByRatio = () => {
+  if (!hasCropImage.value) return
+  const ratioStr = state.crop.ratio || '1:1'
+  const [wStr, hStr] = ratioStr.split(':')
+  let ratioW = parseInt(wStr || '1', 10)
+  let ratioH = parseInt(hStr || '1', 10)
+  if (!Number.isFinite(ratioW) || ratioW <= 0) ratioW = 1
+  if (!Number.isFinite(ratioH) || ratioH <= 0) ratioH = 1
+
+  const baseW = state.crop.imageWidth
+  const baseH = state.crop.imageHeight
+  let targetW = baseW
+  let targetH = Math.round((targetW * ratioH) / ratioW)
+  if (targetH > baseH) {
+    targetH = baseH
+    targetW = Math.round((targetH * ratioW) / ratioH)
+  }
+  const x = Math.max(0, Math.round((baseW - targetW) / 2))
+  const y = Math.max(0, Math.round((baseH - targetH) / 2))
+  state.crop.x = x
+  state.crop.y = y
+  state.crop.width = targetW
+  state.crop.height = targetH
+}
+
+const updateCropRectFromDisplay = (startX, startY, currentX, currentY) => {
+  if (!hasCropImage.value) return
+  if (startX === currentX && startY === currentY) return
+  const minX = Math.max(0, Math.min(startX, currentX))
+  const minY = Math.max(0, Math.min(startY, currentY))
+  const maxX = Math.min(state.crop.displayWidth, Math.max(startX, currentX))
+  const maxY = Math.min(state.crop.displayHeight, Math.max(startY, currentY))
+  const widthDisplay = Math.max(1, maxX - minX)
+  const heightDisplay = Math.max(1, maxY - minY)
+  const scaleX = state.crop.imageWidth / state.crop.displayWidth
+  const scaleY = state.crop.imageHeight / state.crop.displayHeight
+  state.crop.x = Math.round(minX * scaleX)
+  state.crop.y = Math.round(minY * scaleY)
+  state.crop.width = Math.round(widthDisplay * scaleX)
+  state.crop.height = Math.round(heightDisplay * scaleY)
+}
+
+const onCropImageLoaded = (event) => {
+  const img = event?.target
+  if (!img) return
+  const rect = img.getBoundingClientRect()
+  state.crop.imageWidth = img.naturalWidth || rect.width || img.width || 0
+  state.crop.imageHeight = img.naturalHeight || rect.height || img.height || 0
+  state.crop.displayWidth = rect.width || img.clientWidth || img.width || 0
+  state.crop.displayHeight = rect.height || img.clientHeight || img.height || 0
+  if (!state.crop.imageWidth || !state.crop.imageHeight) return
+
+  if (state.crop.mode === 'ratio') {
+    updateCropRectByRatio()
+  } else if (!state.crop.width || !state.crop.height) {
+    state.crop.x = 0
+    state.crop.y = 0
+    state.crop.width = state.crop.imageWidth
+    state.crop.height = state.crop.imageHeight
+  }
+}
+
+const onCropMouseDown = (event) => {
+  if (event.button !== 0) return
+  if (!hasCropImage.value || !cropPreviewRef.value) return
+  const rect = cropPreviewRef.value.getBoundingClientRect()
+  const x = event.clientX - rect.left
+  const y = event.clientY - rect.top
+  cropInteraction.dragging = true
+  cropInteraction.startX = x
+  cropInteraction.startY = y
+  updateCropRectFromDisplay(x, y, x, y)
+}
+
+const onCropMouseMove = (event) => {
+  if (!cropInteraction.dragging || !hasCropImage.value || !cropPreviewRef.value) return
+  const rect = cropPreviewRef.value.getBoundingClientRect()
+  const x = event.clientX - rect.left
+  const y = event.clientY - rect.top
+  updateCropRectFromDisplay(cropInteraction.startX, cropInteraction.startY, x, y)
+}
+
+const onCropMouseUp = () => {
+  cropInteraction.dragging = false
+  cropInteraction.handle = ''
+}
+
+const onCropHandleMouseDown = (position, event) => {
+  if (event.button !== 0) return
+  if (!hasCropImage.value || !cropPreviewRef.value || !hasCropRect.value) return
+  const displayRect = getCropDisplayRect()
+  if (!displayRect) return
+  const hostRect = cropPreviewRef.value.getBoundingClientRect()
+  const pointerX = event.clientX - hostRect.left
+  const pointerY = event.clientY - hostRect.top
+
+  // 以裁剪框对角作为锚点，当前指针为另一角，从而重用 updateCropRectFromDisplay 的逻辑
+  let anchorX = displayRect.left
+  let anchorY = displayRect.top
+  if (position === 'nw') {
+    anchorX = displayRect.right
+    anchorY = displayRect.bottom
+  } else if (position === 'ne') {
+    anchorX = displayRect.left
+    anchorY = displayRect.bottom
+  } else if (position === 'sw') {
+    anchorX = displayRect.right
+    anchorY = displayRect.top
+  } else if (position === 'se') {
+    anchorX = displayRect.left
+    anchorY = displayRect.top
+  } else if (position === 'n') {
+    anchorX = displayRect.left
+    anchorY = displayRect.bottom
+  } else if (position === 's') {
+    anchorX = displayRect.left
+    anchorY = displayRect.top
+  } else if (position === 'w') {
+    anchorX = displayRect.right
+    anchorY = displayRect.top
+  } else if (position === 'e') {
+    anchorX = displayRect.left
+    anchorY = displayRect.top
+  }
+
+  cropInteraction.dragging = true
+  cropInteraction.startX = anchorX
+  cropInteraction.startY = anchorY
+  cropInteraction.handle = position
+  updateCropRectFromDisplay(anchorX, anchorY, pointerX, pointerY)
+}
+
+watch(
+  () => state.resize.photoPreset,
+  (preset) => {
+    const size = photoSizeMap[preset]
+    if (!size) return
+    state.resize.width = size.width
+    state.resize.height = size.height
+  }
+)
+
+watch(
+  () => [state.crop.mode, state.crop.ratio],
+  () => {
+    if (!hasCropImage.value) return
+    if (state.crop.mode === 'ratio') {
+      updateCropRectByRatio()
+    }
+  }
+)
+
 const ensurePyReady = () => {
   if (!window.pywebview?.api) {
     ElMessage.warning('该功能需在桌面客户端中使用')
@@ -152,7 +429,20 @@ const selectSingleImage = async (target, field = 'file') => {
   if (!ensurePyReady()) return
   const files = await window.pywebview.api.system_pyCreateFileDialog(imageFilter)
   if (files?.length) {
-    state[target][field] = files[0]
+    const file = files[0]
+    state[target][field] = file
+    if (target === 'crop' && field === 'file') {
+      state.crop.previewUrl = toFileUrl(file.path || file.filename || '')
+      // 重置预览参数，在图片加载完成时重新计算
+      state.crop.imageWidth = 0
+      state.crop.imageHeight = 0
+      state.crop.displayWidth = 0
+      state.crop.displayHeight = 0
+      state.crop.x = 0
+      state.crop.y = 0
+      state.crop.width = 0
+      state.crop.height = 0
+    }
   }
 }
 
@@ -380,6 +670,9 @@ const runWatermark = async () => {
       color: state.watermark.color,
       opacity: state.watermark.opacity,
       position: state.watermark.position,
+      tile: state.watermark.tile,
+      tileSpacing: state.watermark.tileSpacing,
+      rotation: state.watermark.rotation,
       watermarkImage: state.watermark.watermarkImage?.path,
       scalePercent: state.watermark.scalePercent,
       outputDir: state.watermark.outputDir
@@ -439,6 +732,9 @@ const runRotate = async () => {
     const payload = {
       files: pickPaths(state.rotate.files),
       operation: state.rotate.operation,
+      angle: state.rotate.angle,
+      flipHorizontal: state.rotate.flipHorizontal,
+      flipVertical: state.rotate.flipVertical,
       outputDir: state.rotate.outputDir
     }
     const res = await window.pywebview.api.image_rotate_flip(payload)
@@ -544,6 +840,8 @@ const removeFile = (target, file) => {
                 <el-select v-model="state.format.targetFormat" style="width: 200px">
                   <el-option label="PNG" value="png" />
                   <el-option label="JPG" value="jpg" />
+                  <el-option label="GIF" value="gif" />
+                  <el-option label="SVG" value="svg" />
                   <el-option label="WEBP" value="webp" />
                   <el-option label="TIFF" value="tiff" />
                 </el-select>
@@ -603,6 +901,18 @@ const removeFile = (target, file) => {
                 <el-slider v-model="state.resize.percent" :min="10" :max="300" show-input />
               </el-form-item>
               <template v-else>
+                <el-form-item label="证件照尺寸">
+                  <el-select
+                    v-model="state.resize.photoPreset"
+                    placeholder="可快速选择 1 寸 / 2 寸等常用尺寸"
+                    style="width: 260px"
+                  >
+                    <el-option label="1 寸（295×413）" value="1inch" />
+                    <el-option label="2 寸（413×579）" value="2inch" />
+                    <el-option label="小一寸（260×378）" value="small1" />
+                    <el-option label="大一寸（390×567）" value="big1" />
+                  </el-select>
+                </el-form-item>
                 <el-form-item label="目标尺寸">
                   <div class="field-row">
                     <el-input-number v-model="state.resize.width" :min="32" />
@@ -691,7 +1001,7 @@ const removeFile = (target, file) => {
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="水印 / 批处理" name="watermark">
+        <el-tab-pane label="批量水印" name="watermark">
           <section class="panel">
             <header>
               <h4>批量添加水印</h4>
@@ -747,7 +1057,32 @@ const removeFile = (target, file) => {
                   <el-slider v-model="state.watermark.opacity" :min="5" :max="100" show-input />
                 </el-form-item>
               </template>
-              <el-form-item label="位置">
+              <el-form-item label="平铺 / 间距">
+                <div class="field-row field-row--wrap">
+                  <el-switch
+                    v-model="state.watermark.tile"
+                    active-text="按间距平铺"
+                    inactive-text="单个水印"
+                  />
+                  <el-input-number
+                    v-model="state.watermark.tileSpacing"
+                    :min="20"
+                    :max="600"
+                    :step="10"
+                    :disabled="!state.watermark.tile"
+                  />
+                  <span>px</span>
+                </div>
+              </el-form-item>
+              <el-form-item label="旋转角度">
+                <el-slider
+                  v-model="state.watermark.rotation"
+                  :min="-90"
+                  :max="90"
+                  :step="1"
+                  show-input
+                />
+              </el-form-item>              <el-form-item label="位置">
                 <el-select v-model="state.watermark.position" style="width: 220px">
                   <el-option label="左上角" value="top-left" />
                   <el-option label="右上角" value="top-right" />
@@ -822,6 +1157,65 @@ const removeFile = (target, file) => {
                   <el-option label="16:9" value="16:9" />
                 </el-select>
               </el-form-item>
+              <el-form-item v-if="state.crop.file" label="预览裁剪">
+                <div class="crop-preview">
+                  <div
+                    ref="cropPreviewRef"
+                    class="crop-preview-inner"
+                    @mousedown.prevent="onCropMouseDown"
+                    @mousemove.prevent="onCropMouseMove"
+                    @mouseup.prevent="onCropMouseUp"
+                    @mouseleave="onCropMouseUp"
+                  >
+                    <img
+                      v-if="state.crop.previewUrl"
+                      :src="state.crop.previewUrl"
+                      alt="预览图片"
+                      class="crop-preview-image"
+                      @load="onCropImageLoaded"
+                    />
+                    <div
+                      v-if="hasCropRect"
+                      class="crop-preview-rect"
+                      :style="cropRectStyle"
+                    >
+                      <div
+                        class="crop-handle crop-handle-nw"
+                        @mousedown.stop.prevent="onCropHandleMouseDown('nw', $event)"
+                      />
+                      <div
+                        class="crop-handle crop-handle-ne"
+                        @mousedown.stop.prevent="onCropHandleMouseDown('ne', $event)"
+                      />
+                      <div
+                        class="crop-handle crop-handle-sw"
+                        @mousedown.stop.prevent="onCropHandleMouseDown('sw', $event)"
+                      />
+                      <div
+                        class="crop-handle crop-handle-se"
+                        @mousedown.stop.prevent="onCropHandleMouseDown('se', $event)"
+                      />
+                      <div
+                        class="crop-handle crop-handle-n"
+                        @mousedown.stop.prevent="onCropHandleMouseDown('n', $event)"
+                      />
+                      <div
+                        class="crop-handle crop-handle-s"
+                        @mousedown.stop.prevent="onCropHandleMouseDown('s', $event)"
+                      />
+                      <div
+                        class="crop-handle crop-handle-w"
+                        @mousedown.stop.prevent="onCropHandleMouseDown('w', $event)"
+                      />
+                      <div
+                        class="crop-handle crop-handle-e"
+                        @mousedown.stop.prevent="onCropHandleMouseDown('e', $event)"
+                      />
+                    </div>
+                  </div>
+                  <p class="crop-preview-hint">在图片上拖动绘制裁剪区域，坐标会自动填入上方字段</p>
+                </div>
+              </el-form-item>
               <el-form-item label="输出目录">
                 <div class="field-row">
                   <el-input v-model="state.crop.outputDir" placeholder="自动创建" readonly />
@@ -867,7 +1261,15 @@ const removeFile = (target, file) => {
                   <el-option label="旋转 270°" value="rotate270" />
                   <el-option label="水平镜像" value="mirror" />
                   <el-option label="垂直翻转" value="flip" />
+                  <el-option label="自定义角度 / 翻转" value="custom" />
                 </el-select>
+              </el-form-item>
+              <el-form-item v-if="state.rotate.operation === 'custom'" label="旋转角度">
+                <el-slider v-model="state.rotate.angle" :min="-180" :max="180" show-input />
+              </el-form-item>
+              <el-form-item v-if="state.rotate.operation === 'custom'" label="翻转">
+                <el-checkbox v-model="state.rotate.flipHorizontal">水平</el-checkbox>
+                <el-checkbox v-model="state.rotate.flipVertical">垂直</el-checkbox>
               </el-form-item>
               <el-form-item label="输出目录">
                 <div class="field-row">
@@ -1202,6 +1604,99 @@ const removeFile = (target, file) => {
   gap: 16px;
 }
 
+.crop-preview {
+  margin-top: 8px;
+}
+
+.crop-preview-inner {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #050713;
+}
+
+.crop-preview-image {
+  display: block;
+  max-width: 100%;
+}
+
+.crop-preview-rect {
+  position: absolute;
+  border: 2px solid #2f73ff;
+  box-shadow: 0 0 0 1px rgba(47, 115, 255, 0.35);
+  pointer-events: auto;
+}
+
+.crop-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  border: 1px solid #2f73ff;
+  box-shadow: 0 0 0 1px rgba(47, 115, 255, 0.3);
+}
+
+.crop-handle-nw {
+  top: -4px;
+  left: -4px;
+  cursor: nwse-resize;
+}
+
+.crop-handle-ne {
+  top: -4px;
+  right: -4px;
+  cursor: nesw-resize;
+}
+
+.crop-handle-sw {
+  bottom: -4px;
+  left: -4px;
+  cursor: nesw-resize;
+}
+
+.crop-handle-se {
+  bottom: -4px;
+  right: -4px;
+  cursor: nwse-resize;
+}
+
+.crop-handle-n {
+  top: -4px;
+  left: 50%;
+  margin-left: -4px;
+  cursor: ns-resize;
+}
+
+.crop-handle-s {
+  bottom: -4px;
+  left: 50%;
+  margin-left: -4px;
+  cursor: ns-resize;
+}
+
+.crop-handle-w {
+  left: -4px;
+  top: 50%;
+  margin-top: -4px;
+  cursor: ew-resize;
+}
+
+.crop-handle-e {
+  right: -4px;
+  top: 50%;
+  margin-top: -4px;
+  cursor: ew-resize;
+}
+
+.crop-preview-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #7a829d;
+}
+
 .link {
   color: #2f73ff;
   cursor: pointer;
@@ -1231,3 +1726,4 @@ const removeFile = (target, file) => {
   border-color: #2d3045;
 }
 </style>
+

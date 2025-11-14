@@ -223,7 +223,7 @@ const onFeatureAction = (feature) => {
     <div class="toolbox-window">
       <header class="hero">
         <div class="hero-copy">
-          <p class="hero-eyebrow">PPX 桌面工具箱</p>
+          <p class="hero-eyebrow">桌面工具箱</p>
           <h1>Excel、PDF、图片、文本、视频、文件多工具</h1>
           <p class="hero-desc">
             数据安全不离开本机，无广告，界面简洁美观
@@ -231,10 +231,10 @@ const onFeatureAction = (feature) => {
           <div class="hero-actions">
             <div class="update-entry">
               <BtnUpdate />
-              <span>检测更新</span>
+              <span style="font-size: 13px">👈检测更新</span>
             </div>
           </div>
-          <p class="hero-note">固定窗口尺寸 1200×720 px，所有页面都会在该画布内完整展示。</p>
+<!--          <p class="hero-note">固定窗口尺寸 1200×720 px，所有页面都会在该画布内完整展示。</p>-->
         </div>
         <div class="hero-panel">
           <div v-for="stat in heroStats" :key="stat.label" class="stat-card">
@@ -250,7 +250,7 @@ const onFeatureAction = (feature) => {
           <div class="section-head">
             <div>
               <p class="section-eyebrow">核心能力</p>
-              <h2>常用工具先行落位</h2>
+              <h2>常用工具</h2>
             </div>
             <el-tag type="success" effect="plain">首页预览</el-tag>
           </div>
@@ -346,11 +346,10 @@ const onFeatureAction = (feature) => {
   display: flex;
   padding: 24px 32px;
   gap: 24px;
-  background: linear-gradient(135deg, #111c44 0%, #2c4674 70%);
+  background: url("assets/backgroud2.png") center / cover no-repeat;
   color: #ffffff;
   flex-shrink: 0;
-  min-height: auto;
-  max-height: 140px;
+  height: 140px;
   overflow: hidden;
 }
 
@@ -359,11 +358,12 @@ const onFeatureAction = (feature) => {
 }
 
 .hero-eyebrow {
-  font-size: 12px;
+  font-size: 16px;
   text-transform: uppercase;
   letter-spacing: 0.2em;
   margin-bottom: 12px;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255, 255, 255, 1);
+  font-weight: bold;
 }
 
 .hero h1 {
@@ -670,10 +670,6 @@ h2 {
   .hero-copy h1 {
     font-size: 18px;
     line-height: 1.2;
-  }
-
-  .hero-eyebrow {
-    font-size: 11px;
   }
 
   .hero-desc {
