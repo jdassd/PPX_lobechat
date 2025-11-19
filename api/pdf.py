@@ -230,6 +230,75 @@ class PDF():
     def _chunk_list(self, items: List[Path], size: int) -> List[List[Path]]:
         return [list(items[idx: idx + size]) for idx in range(0, len(items), size)]
 
+    def _guess_page_title(self, page, page_no: int) -> str:
+        """
+        尝试根据字体大小 / 位置，推断当前页面的“标题”文本，用于自动生成目录。
+        规则尽量温和：优先取页面上方、字号较大的非空文本，失败时退回到首行文本。
+        """
+        best = None
+        try:
+            data = page.get_text('dict')
+        except Exception:
+            data = None
+
+        if isinstance(data, dict):
+            for block in data.get('blocks', []):
+                # type 0 为文本块，其余为图片等
+                if block.get('type', 0) != 0:
+                    continue
+                bbox = block.get('bbox') or [0, 0, 0, 0]
+                top = float(bbox[1]) if len(bbox) >= 2 else 0.0
+                for line in block.get('lines', []):
+                    for span in line.get('spans', []):
+                        text = (span.get('text') or '').strip()
+                        if not text:
+                            continue
+                        # 过滤明显无意义的内容：纯数字页码等
+                        if len(text) <= 1:
+                            continue
+                        if text.isdigit() and len(text) <= 4:
+                            continue
+                        # 简单过滤常见页码样式：Page 1 / 第 1 页
+                        normalized = ''.join(ch for ch in text if not ch.isspace())
+                        lower_norm = normalized.lower()
+                        if lower_norm.startswith('page') and lower_norm[4:].strip().isdigit():
+                            continue
+                        # 记录候选项：字号越大、位置越靠上优先
+                        try:
+                            size = float(span.get('size') or 0)
+                        except (TypeError, ValueError):
+                            size = 0.0
+                        if size <= 0:
+                            continue
+                        candidate = {'text': text, 'size': size, 'top': top}
+                        if best is None:
+                            best = candidate
+                        else:
+                            if size > best['size'] + 0.5:
+                                best = candidate
+                            elif abs(size - best['size']) <= 0.5 and top < best['top'] - 2:
+                                best = candidate
+
+        if best is not None:
+            return best['text'].strip()
+
+        # 兜底：使用首个有效的文本行作为标题
+        try:
+            raw = page.get_text('text') or ''
+            for line in raw.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                if len(line) <= 1:
+                    continue
+                if line.isdigit() and len(line) <= 4:
+                    continue
+                return line
+        except Exception:
+            pass
+
+        return ''
+
     def pdf_convert_to_images(self, options: Dict = None):
         '''PDF 转高清图片'''
         try:
@@ -835,5 +904,70 @@ class PDF():
             }
         except Exception as exc:
             return {'code': -1, 'msg': f'图片转 PDF 失败：{exc}'}
+
+    def pdf_generate_toc(self, options: Dict = None):
+        '''自动为 PDF 生成目录（书签）并输出一份带目录的新 PDF，同时返回目录预览文本'''
+        try:
+            opts = self._validate_payload(options)
+            source = self._ensure_pdf_file(opts.get('filePath', ''))
+            output_path = opts.get('outputPath') or self._compose_output_path(
+                opts.get('outputDir', ''), opts.get('outputName', '')
+            )
+
+            entries: List[Dict] = []
+            with fitz.open(source) as doc:
+                total = doc.page_count
+                if total == 0:
+                    raise ValueError('PDF 内无页面')
+
+                for index in range(total):
+                    page = doc.load_page(index)
+                    title = self._guess_page_title(page, index + 1)
+                    if title:
+                        entries.append({'page': index + 1, 'title': title})
+
+                # 若未能识别任何标题，则退化为“按页生成目录项”
+                if not entries:
+                    entries = [{'page': i + 1, 'title': f'第 {i + 1} 页'} for i in range(total)]
+
+                # 设置书签目录：一级目录，指向各页
+                toc = [[1, entry['title'], entry['page']] for entry in entries]
+                doc.set_toc(toc)
+
+                dest = self._resolve_output_path(source, output_path, 'toc')
+                doc.save(str(dest))
+
+            # 生成目录预览文本
+            lines: List[str] = []
+            for idx, entry in enumerate(entries, start=1):
+                title = str(entry.get('title') or '').strip()
+                if len(title) > 80:
+                    title = f'{title[:77]}...'
+                lines.append(f'{idx}. 第 {entry["page"]} 页：{title}')
+            toc_text = '\n'.join(lines)
+
+            # 可选：导出为独立 .txt 文件
+            text_output = ''
+            if opts.get('saveText'):
+                text_dir_opt = opts.get('textOutputDir') or opts.get('outputDir', '')
+                text_dir = self._ensure_output_dir(source, text_dir_opt, 'toc')
+                filename = opts.get('textOutputName') or f'{source.stem}_toc.txt'
+                if not filename.lower().endswith('.txt'):
+                    filename = f'{filename}.txt'
+                text_dest = text_dir / filename
+                text_dest.write_text(toc_text, encoding='utf-8')
+                text_output = str(text_dest)
+
+            return {
+                'code': 0,
+                'msg': '目录生成完成',
+                'output': str(dest),
+                'pages': len(entries),
+                'tocText': toc_text[:2000],
+                'entries': entries[: min(len(entries), 200)],
+                'textOutput': text_output
+            }
+        except Exception as exc:
+            return {'code': -1, 'msg': f'目录生成失败：{exc}'}
 
 

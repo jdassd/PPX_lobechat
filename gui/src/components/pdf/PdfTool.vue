@@ -561,6 +561,60 @@
           </section>
         </el-tab-pane>
 
+        <el-tab-pane label="生成目录" name="toc">
+          <section class="panel">
+            <header>
+              <h4>为 PDF 自动生成目录</h4>
+              <p>根据每页标题自动推断目录，并生成一份带目录的 PDF</p>
+            </header>
+            <el-form :model="state.toc" label-width="120px">
+              <el-form-item label="源 PDF">
+                <div class="field-row">
+                  <el-button @click="selectPdf('toc')">选择 PDF</el-button>
+                  <span v-if="state.toc.file" class="file-chip">{{ state.toc.file.filename }}</span>
+                  <el-tag v-else type="info" effect="plain">尚未选择</el-tag>
+                </div>
+              </el-form-item>
+              <el-form-item label="输出目录">
+                <div class="field-row">
+                  <el-input v-model="state.toc.outputDir" placeholder="保存带目录的 PDF" readonly />
+                  <el-button @click="selectDir('toc')">选择目录</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item label="输出文件名">
+                <el-input v-model="state.toc.outputName" placeholder="如：带目录版.pdf" />
+              </el-form-item>
+              <el-form-item>
+                <el-checkbox v-model="state.toc.saveText">同时导出目录为 .txt</el-checkbox>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="state.loading" @click="runGenerateToc">
+                  生成目录
+                </el-button>
+              </el-form-item>
+            </el-form>
+            <div v-if="state.toc.output" class="result-block">
+              <p class="result-title">输出文件</p>
+              <el-tag type="success" effect="plain" @click="openPath(state.toc.output)">
+                {{ state.toc.output }}
+              </el-tag>
+              <p v-if="state.toc.textOutput" class="result-title" style="margin-top: 8px">
+                目录文本已另存为：
+                <a class="link" @click.prevent="openPath(state.toc.textOutput)">{{ state.toc.textOutput }}</a>
+              </p>
+            </div>
+            <div v-if="state.toc.preview" class="result-block">
+              <p class="result-title">目录预览</p>
+              <el-input
+                v-model="state.toc.preview"
+                type="textarea"
+                :rows="8"
+                readonly
+              />
+            </div>
+          </section>
+        </el-tab-pane>
+
         <el-tab-pane label="PDF 转 Word" name="word">
           <section class="panel">
             <header>
@@ -887,6 +941,15 @@ const state = reactive({
     saveFile: false,
     preview: '',
     segments: []
+  },
+  toc: {
+    file: null,
+    outputDir: '',
+    outputName: '带目录版.pdf',
+    saveText: false,
+    preview: '',
+    output: '',
+    textOutput: ''
   },
   word: {
     file: null,
@@ -1301,6 +1364,27 @@ const runExtractText = async () => {
     state.extractText.segments = res.segments || []
     if (res.output) {
       state.extractText.outputDir = res.output.split(/[\\/]/).slice(0, -1).join('/') || state.extractText.outputDir
+    }
+  }
+}
+
+const runGenerateToc = async () => {
+  if (!state.toc.file) {
+    ElMessage.warning('请选择 PDF 文件')
+    return
+  }
+  const res = await callApi('pdf_generate_toc', {
+    filePath: state.toc.file.path,
+    outputDir: state.toc.outputDir,
+    outputName: state.toc.outputName,
+    saveText: state.toc.saveText
+  })
+  if (res) {
+    state.toc.output = res.output || ''
+    state.toc.preview = res.tocText || ''
+    state.toc.textOutput = res.textOutput || ''
+    if (res.output) {
+      state.toc.outputDir = res.output.split(/[\\/]/).slice(0, -1).join('/') || state.toc.outputDir
     }
   }
 }
