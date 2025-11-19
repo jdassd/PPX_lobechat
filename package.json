@@ -1,7 +1,7 @@
 {
   "name": "tools",
   "private": true,
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "多功能工具箱的目标是采用简洁美观现代的界面，提供常用的一些工具，一次付费，终身使用，无广告，包更新",
   "author": "jdassd <jdassd@163.com>",
   "scripts": {
