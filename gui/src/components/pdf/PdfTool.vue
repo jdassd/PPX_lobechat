@@ -1473,108 +1473,17 @@ const runImagesToPdf = async () => {
 </script>
 
 <style scoped>
-.pdf-tool-drawer :deep(.el-drawer__header) {
-  margin-bottom: 0;
-  padding-bottom: 0;
-}
-
-.drawer-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  width: 100%;
-}
-
-.drawer-head h3 {
-  margin: 4px 0;
-  font-size: 24px;
-}
-
-.drawer-head .eyebrow {
-  margin: 0;
-  font-size: 12px;
-  letter-spacing: 0.2em;
-  color: #9094a6;
-}
-
-.drawer-head .sub {
-  margin: 0;
-  color: #6c7185;
-  font-size: 14px;
-}
+/* 使用全局深空玻璃主题样式 */
 
 .pdf-tool {
-  padding-right: 12px;
+  padding: 0 12px 12px;
 }
 
 .pdf-tabs {
   margin-bottom: 20px;
 }
 
-.panel {
-  background: #fdfdff;
-  padding: 20px;
-  border: 1px solid #edf0f5;
-  border-radius: 18px;
-  margin-bottom: 24px;
-}
-
-.panel header {
-  margin-bottom: 16px;
-}
-
-.panel header h4 {
-  margin: 0;
-}
-
-.panel header p {
-  margin: 6px 0 0;
-  color: #7a8093;
-  font-size: 13px;
-}
-
-.field-row {
-  display: flex;
-  gap: 12px;
-  flex: 1;
-  align-items: center;
-}
-
-.field-wrap {
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.dpi-hint {
-  margin: 8px 0 0;
-  color: #7a8093;
-  font-size: 13px;
-}
-
-.file-chip {
-  padding: 6px 10px;
-  border-radius: 8px;
-  background: #eef2ff;
-  color: #4058d7;
-  font-size: 13px;
-}
-
-.result-block {
-  margin-top: 16px;
-}
-
-.result-title {
-  margin: 0 0 10px;
-  font-weight: 600;
-  color: #4d5366;
-}
-
-.result-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
+/* 页面重排预览 */
 .reorder-preview {
   display: flex;
   flex-direction: column;
@@ -1584,7 +1493,7 @@ const runImagesToPdf = async () => {
 .reorder-hint,
 .reorder-empty-hint {
   margin: 8px 0 0;
-  color: #9094a6;
+  color: var(--ppx-text-muted);
   font-size: 12px;
 }
 
@@ -1596,14 +1505,20 @@ const runImagesToPdf = async () => {
 }
 
 .reorder-page {
-  background: #fff;
+  background: var(--ppx-glass-bg);
   border-radius: 10px;
-  border: 1px solid #e0e4f0;
+  border: 1px solid var(--ppx-glass-border);
   padding: 8px;
   cursor: grab;
   display: flex;
   flex-direction: column;
   align-items: center;
+  transition: all var(--ppx-transition-fast);
+}
+
+.reorder-page:hover {
+  border-color: var(--ppx-glass-border-hover);
+  background: var(--ppx-glass-bg-hover);
 }
 
 .reorder-page:active {
@@ -1616,7 +1531,7 @@ const runImagesToPdf = async () => {
   position: relative;
   overflow: hidden;
   border-radius: 6px;
-  background: #f3f4fb;
+  background: var(--ppx-bg-elevated);
 }
 
 .reorder-thumb img {
@@ -1630,12 +1545,12 @@ const runImagesToPdf = async () => {
 .reorder-page-label {
   margin: 6px 0 0;
   font-size: 12px;
-  color: #5f6475;
+  color: var(--ppx-text-secondary);
 }
 
 .image-pdf-hint {
   margin: 4px 0 12px;
-  color: #9094a6;
+  color: var(--ppx-text-muted);
   font-size: 12px;
 }
 
@@ -1650,27 +1565,22 @@ const runImagesToPdf = async () => {
 }
 
 .range-sep {
-  color: #9094a6;
+  color: var(--ppx-text-muted);
 }
 
-.log-panel {
-  background: #fff;
-  padding: 18px;
-  border-radius: 18px;
-  border: 1px solid #edf0f5;
-}
-
+/* 日志面板 - 使用全局样式变量 */
 .log-panel header {
   margin-bottom: 12px;
 }
 
 .log-panel header h4 {
   margin: 0;
+  color: var(--ppx-text-primary);
 }
 
 .log-panel header p {
   margin: 4px 0 0;
-  color: #9498aa;
+  color: var(--ppx-text-muted);
   font-size: 13px;
 }
 
@@ -1682,7 +1592,7 @@ const runImagesToPdf = async () => {
 
 .log-entry .log-sub {
   margin: 0;
-  color: #99a0b3;
+  color: var(--ppx-text-muted);
   font-size: 12px;
 }
 </style>

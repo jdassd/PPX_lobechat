@@ -638,34 +638,7 @@ const runMergeTables = async () => {
 </script>
 
 <style scoped>
-.excel-tool-drawer :deep(.el-drawer__header) {
-  margin-bottom: 0;
-  padding-bottom: 0;
-}
-
-.drawer-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-}
-
-.drawer-head h3 {
-  margin: 4px 0;
-  font-size: 24px;
-}
-
-.drawer-head .eyebrow {
-  margin: 0;
-  font-size: 12px;
-  letter-spacing: 0.2em;
-  color: #7a8093;
-}
-
-.drawer-head .sub {
-  margin: 0;
-  color: #6c7185;
-  font-size: 14px;
-}
+/* 使用全局深空玻璃主题样式 */
 
 .excel-tool {
   padding-right: 12px;
@@ -675,38 +648,7 @@ const runMergeTables = async () => {
   margin-bottom: 20px;
 }
 
-.panel {
-  background: #fdfdff;
-  padding: 20px;
-  border: 1px solid #edf0f5;
-  border-radius: 18px;
-  margin-bottom: 24px;
-}
-
-.panel header h4 {
-  margin: 0;
-}
-
-.panel header p {
-  margin: 6px 0 0;
-  color: #7a8093;
-  font-size: 13px;
-}
-
-.field-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.file-chip {
-  padding: 6px 10px;
-  border-radius: 8px;
-  background: #eef2ff;
-  color: #4058d7;
-  font-size: 13px;
-}
-
+/* 结构标签 */
 .schema-chips {
   margin-top: 10px;
 }
@@ -720,7 +662,7 @@ const runMergeTables = async () => {
 .schema-note {
   margin: 8px 0 0;
   font-size: 12px;
-  color: #868c9f;
+  color: var(--ppx-text-muted);
 }
 
 .result-block {
@@ -730,11 +672,7 @@ const runMergeTables = async () => {
 .result-title {
   margin: 0 0 10px;
   font-weight: 600;
-  color: #4d5366;
-}
-
-.table-header {
-  background: #f0f2f9 !important;
+  color: var(--ppx-text-secondary);
 }
 
 .toggle-row {
@@ -743,12 +681,13 @@ const runMergeTables = async () => {
   flex-wrap: wrap;
 }
 
+/* 子面板 */
 .subpanel {
   margin-top: 18px;
-  border: 1px dashed #dbe1ee;
-  border-radius: 14px;
+  border: 1px dashed var(--ppx-glass-border);
+  border-radius: var(--ppx-radius-md);
   padding: 12px;
-  background: #ffffff;
+  background: var(--ppx-glass-bg);
 }
 
 .subpanel-head {
@@ -761,11 +700,12 @@ const runMergeTables = async () => {
 .subpanel-head h5 {
   margin: 0;
   font-size: 15px;
+  color: var(--ppx-text-primary);
 }
 
 .subpanel-head p {
   margin: 6px 0 0;
-  color: #8c92a6;
+  color: var(--ppx-text-muted);
   font-size: 12px;
 }
 
@@ -783,25 +723,27 @@ const runMergeTables = async () => {
   gap: 8px;
 }
 
+.tag-list .el-tag {
+  cursor: pointer;
+}
+
 .merge-form {
   margin-top: 18px;
 }
 
-.log-panel {
-  padding: 18px;
-}
-
+/* 日志面板 */
 .log-panel header {
   margin-bottom: 10px;
 }
 
 .log-panel header h4 {
   margin: 0;
+  color: var(--ppx-text-primary);
 }
 
 .log-panel header p {
   margin: 6px 0 0;
-  color: #9299ae;
+  color: var(--ppx-text-muted);
   font-size: 12px;
 }
 
@@ -813,7 +755,7 @@ const runMergeTables = async () => {
 
 .log-sub {
   margin: 0;
-  color: #9da3b4;
+  color: var(--ppx-text-muted);
   font-size: 12px;
 }
 </style>

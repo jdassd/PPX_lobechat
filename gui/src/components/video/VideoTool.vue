@@ -1026,43 +1026,9 @@ const openFramesDir = () => {
 </template>
 
 <style scoped>
-.drawer-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+/* 使用全局深空玻璃主题样式 */
 
-.eyebrow {
-  margin: 0;
-  font-size: 12px;
-  color: #8d93a8;
-  letter-spacing: 2px;
-}
-
-.panel {
-  background: #fff;
-  border: 1px solid #e9edf5;
-  border-radius: 18px;
-  padding: 20px;
-  margin-bottom: 24px;
-}
-
-.panel header h4 {
-  margin: 0;
-}
-
-.panel header p {
-  margin: 6px 0 0;
-  color: #7a829d;
-  font-size: 13px;
-}
-
-.field-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
+/* 视频预览 */
 .video-preview-block {
   margin-bottom: 16px;
 }
@@ -1070,8 +1036,8 @@ const openFramesDir = () => {
 .video-preview {
   width: 100%;
   max-height: 260px;
-  border-radius: 12px;
-  background: #000;
+  border-radius: var(--ppx-radius-md);
+  background: var(--ppx-bg-deep);
 }
 
 .video-range-slider {
@@ -1081,14 +1047,14 @@ const openFramesDir = () => {
 .video-range-meta {
   margin-top: 4px;
   font-size: 12px;
-  color: #7a829d;
+  color: var(--ppx-text-muted);
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
 }
 
 .link {
-  color: #2f73ff;
+  color: var(--ppx-neon-blue);
   cursor: pointer;
 }
 </style>

@@ -287,6 +287,8 @@ const summaryText = computed(() => {
 </template>
 
 <style scoped>
+/* 使用全局深空玻璃主题样式 */
+
 .process-manager :deep(.el-dialog__body) {
   padding-top: 0;
 }
@@ -297,7 +299,7 @@ const summaryText = computed(() => {
 }
 
 .dialog-title small {
-  color: #909399;
+  color: var(--ppx-text-muted);
   margin-top: 2px;
   font-size: 12px;
 }
@@ -330,7 +332,7 @@ const summaryText = computed(() => {
 .more-tag {
   margin-left: 6px;
   font-size: 12px;
-  color: #a0a3b1;
+  color: var(--ppx-text-muted);
 }
 
 .table-footer {
@@ -339,12 +341,12 @@ const summaryText = computed(() => {
   justify-content: space-between;
   margin-top: 12px;
   font-size: 13px;
-  color: #5a6074;
+  color: var(--ppx-text-secondary);
   flex-wrap: wrap;
   gap: 8px;
 }
 
-/* 超小屏幕 */
+/* 响应式布局 */
 @media (max-width: 600px) {
   .toolbar {
     flex-direction: column;
@@ -365,7 +367,6 @@ const summaryText = computed(() => {
   }
 }
 
-/* 小屏幕 */
 @media (max-width: 768px) {
   .port-input {
     width: 100px;

@@ -1594,49 +1594,10 @@ const removeFile = (target, file) => {
 </template>
 
 <style scoped>
-.drawer-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.eyebrow {
-  margin: 0;
-  font-size: 12px;
-  color: #8a90a6;
-  letter-spacing: 2px;
-}
+/* 使用全局深空玻璃主题样式 */
 
 .image-tabs {
   margin-top: 10px;
-}
-
-.panel {
-  background: #fff;
-  border: 1px solid #e9edf5;
-  border-radius: 18px;
-  padding: 20px;
-  margin-bottom: 24px;
-}
-
-.panel header h4 {
-  margin: 0;
-}
-
-.panel header p {
-  margin: 6px 0 0;
-  color: #7a829d;
-  font-size: 13px;
-}
-
-.field-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.field-row--wrap {
-  flex-wrap: wrap;
 }
 
 .form-block {
@@ -1649,6 +1610,7 @@ const removeFile = (target, file) => {
   gap: 16px;
 }
 
+/* 裁剪预览 */
 .crop-preview {
   margin-top: 8px;
 }
@@ -1657,9 +1619,9 @@ const removeFile = (target, file) => {
   position: relative;
   display: inline-block;
   max-width: 100%;
-  border-radius: 8px;
+  border-radius: var(--ppx-radius-sm);
   overflow: hidden;
-  background: #050713;
+  background: var(--ppx-bg-deep);
 }
 
 .crop-preview-image {
@@ -1669,8 +1631,8 @@ const removeFile = (target, file) => {
 
 .crop-preview-rect {
   position: absolute;
-  border: 2px solid #2f73ff;
-  box-shadow: 0 0 0 1px rgba(47, 115, 255, 0.35);
+  border: 2px solid var(--ppx-neon-blue);
+  box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.35);
   pointer-events: auto;
 }
 
@@ -1679,9 +1641,9 @@ const removeFile = (target, file) => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: #ffffff;
-  border: 1px solid #2f73ff;
-  box-shadow: 0 0 0 1px rgba(47, 115, 255, 0.3);
+  background-color: var(--ppx-bg-surface);
+  border: 1px solid var(--ppx-neon-blue);
+  box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.3);
 }
 
 .crop-handle-nw {
@@ -1739,11 +1701,11 @@ const removeFile = (target, file) => {
 .crop-preview-hint {
   margin-top: 6px;
   font-size: 12px;
-  color: #7a829d;
+  color: var(--ppx-text-muted);
 }
 
 .link {
-  color: #2f73ff;
+  color: var(--ppx-neon-blue);
   cursor: pointer;
 }
 
@@ -1753,6 +1715,7 @@ const removeFile = (target, file) => {
   gap: 12px;
 }
 
+/* 高级批量处理 */
 .advanced-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
@@ -1760,15 +1723,15 @@ const removeFile = (target, file) => {
 }
 
 .advanced-card {
-  border: 1px solid #e8ebf5;
-  border-radius: 16px;
+  border: 1px solid var(--ppx-glass-border);
+  border-radius: var(--ppx-radius-lg);
   padding: 16px;
-  background: #f9fbff;
+  background: var(--ppx-glass-bg);
 }
 
-:global(:root[data-theme='dark']) .advanced-card {
-  background: #1f2030;
-  border-color: #2d3045;
+.advanced-card:hover {
+  border-color: var(--ppx-glass-border-hover);
+  background: var(--ppx-glass-bg-hover);
 }
 </style>
 

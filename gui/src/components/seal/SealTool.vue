@@ -406,67 +406,17 @@ const resetDefaults = () => {
 </script>
 
 <style scoped>
+/* 使用全局深空玻璃主题样式 */
+
 .seal-tool {
   display: grid;
   grid-template-columns: 1.4fr 0.6fr;
   gap: 20px;
 }
 
-.drawer-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.drawer-head h3 {
-  margin: 4px 0;
-  font-size: 24px;
-}
-
-.drawer-head .eyebrow {
-  margin: 0;
-  font-size: 12px;
-  letter-spacing: 0.2em;
-  color: #9094a6;
-}
-
-.drawer-head .sub {
-  margin: 0;
-  color: #6c7185;
-  font-size: 14px;
-}
-
-.panel {
-  background: #fff;
-  border-radius: 18px;
-  padding: 22px;
-  border: 1px solid #edf0f5;
-}
-
-.config-panel header,
-.preview-panel header {
-  margin-bottom: 16px;
-}
-
-.config-panel header h4,
-.preview-panel header h4 {
-  margin: 0;
-}
-
-.config-panel header p,
-.preview-panel header p {
-  margin: 6px 0 0;
-  color: #7a8093;
-}
-
+/* 表单区域 */
 .form-grid {
   margin-bottom: 12px;
-}
-
-.field-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
 }
 
 .field-row.compact {
@@ -474,10 +424,11 @@ const resetDefaults = () => {
 }
 
 .field-row .hint {
-  color: #a0a4b5;
+  color: var(--ppx-text-muted);
   font-size: 12px;
 }
 
+/* 参数网格 */
 .param-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -486,17 +437,23 @@ const resetDefaults = () => {
 
 .param-card {
   padding: 14px;
-  border: 1px solid #eef0f7;
-  border-radius: 14px;
-  background: #fdfdff;
+  border: 1px solid var(--ppx-glass-border);
+  border-radius: var(--ppx-radius-md);
+  background: var(--ppx-glass-bg);
+  transition: all var(--ppx-transition-fast);
+}
+
+.param-card:hover {
+  border-color: var(--ppx-glass-border-hover);
 }
 
 .param-card .label {
   margin: 0 0 8px;
   font-size: 13px;
-  color: #4d5366;
+  color: var(--ppx-text-secondary);
 }
 
+/* 排版网格 */
 .typography-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -506,7 +463,7 @@ const resetDefaults = () => {
 .typography-grid .title {
   margin: 0 0 8px;
   font-weight: 600;
-  color: #4d5366;
+  color: var(--ppx-text-secondary);
 }
 
 .actions {
@@ -516,16 +473,20 @@ const resetDefaults = () => {
   margin-top: 18px;
 }
 
+/* 预览区域 */
 .preview-stage {
   min-height: 320px;
-  border-radius: 18px;
-  border: 1px dashed #dcdfea;
+  border-radius: var(--ppx-radius-lg);
+  border: 1px dashed var(--ppx-glass-border);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
   margin-bottom: 18px;
-  background-image: linear-gradient(45deg, #f3f5fb 25%, transparent 25%), linear-gradient(-45deg, #f3f5fb 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f3f5fb 75%), linear-gradient(-45deg, transparent 75%, #f3f5fb 75%);
+  background-image: linear-gradient(45deg, var(--ppx-glass-bg) 25%, transparent 25%),
+                    linear-gradient(-45deg, var(--ppx-glass-bg) 25%, transparent 25%),
+                    linear-gradient(45deg, transparent 75%, var(--ppx-glass-bg) 75%),
+                    linear-gradient(-45deg, transparent 75%, var(--ppx-glass-bg) 75%);
   background-size: 20px 20px;
   background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
 }
@@ -549,13 +510,10 @@ const resetDefaults = () => {
   margin-top: 40px;
 }
 
+/* 响应式布局 */
 @media (max-width: 1440px) {
   .seal-tool {
     gap: 16px;
-  }
-
-  .panel {
-    padding: 16px;
   }
 
   .preview-stage {
@@ -567,14 +525,6 @@ const resetDefaults = () => {
   .seal-tool {
     grid-template-columns: 1.2fr 0.8fr;
     gap: 14px;
-  }
-
-  .drawer-head h3 {
-    font-size: 20px;
-  }
-
-  .panel {
-    padding: 14px;
   }
 
   .param-grid {
@@ -598,14 +548,6 @@ const resetDefaults = () => {
     gap: 14px;
   }
 
-  .panel {
-    padding: 12px;
-  }
-
-  .field-row {
-    gap: 10px;
-  }
-
   .param-grid {
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   }
@@ -621,23 +563,8 @@ const resetDefaults = () => {
 }
 
 @media (max-width: 768px) {
-  .drawer-head {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-
-  .drawer-head h3 {
-    font-size: 18px;
-  }
-
   .seal-tool {
     gap: 12px;
-  }
-
-  .panel {
-    padding: 10px;
-    border-radius: 12px;
   }
 
   .param-grid {
@@ -668,37 +595,8 @@ const resetDefaults = () => {
 }
 
 @media (max-width: 480px) {
-  .drawer-head h3 {
-    font-size: 16px;
-  }
-
-  .drawer-head .eyebrow {
-    font-size: 11px;
-  }
-
-  .panel {
-    padding: 8px;
-    border-radius: 10px;
-  }
-
-  .config-panel header,
-  .preview-panel header {
-    margin-bottom: 10px;
-  }
-
-  .config-panel header h4,
-  .preview-panel header h4 {
-    font-size: 14px;
-  }
-
-  .field-row {
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
   .param-card {
     padding: 10px;
-    border-radius: 10px;
   }
 
   .param-grid {

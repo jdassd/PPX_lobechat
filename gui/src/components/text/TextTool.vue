@@ -918,37 +918,9 @@ const openFile = (path) => {
 </template>
 
 <style scoped>
-.drawer-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+/* 使用全局深空玻璃主题样式 */
 
-.eyebrow {
-  margin: 0;
-  font-size: 12px;
-  color: #8d90a2;
-  letter-spacing: 2px;
-}
-
-.panel {
-  background: #fff;
-  border: 1px solid #e9edf5;
-  border-radius: 18px;
-  padding: 20px;
-  margin-bottom: 24px;
-}
-
-.panel header h4 {
-  margin: 0;
-}
-
-.panel header p {
-  margin: 6px 0 0;
-  color: #7a829d;
-  font-size: 13px;
-}
-
+/* 文本网格布局 */
 .text-grid {
   margin-top: 16px;
   display: grid;
@@ -962,12 +934,6 @@ const openFile = (path) => {
   justify-content: center;
 }
 
-.field-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
 .form-gap {
   margin-top: 12px;
 }
@@ -977,9 +943,11 @@ const openFile = (path) => {
 }
 
 .link {
-  color: #2f73ff;
+  color: var(--ppx-neon-blue);
+  cursor: pointer;
 }
 
+/* 批量替换规则 */
 .rule-toolbar {
   display: flex;
   justify-content: space-between;
@@ -995,12 +963,18 @@ const openFile = (path) => {
 }
 
 .rule-row {
-  border: 1px dashed #d8deee;
-  border-radius: 14px;
+  border: 1px dashed var(--ppx-glass-border);
+  border-radius: var(--ppx-radius-md);
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  background: var(--ppx-glass-bg);
+  transition: all var(--ppx-transition-fast);
+}
+
+.rule-row:hover {
+  border-color: var(--ppx-glass-border-hover);
 }
 
 .rule-row-line {

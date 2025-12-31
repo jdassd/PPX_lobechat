@@ -1202,42 +1202,7 @@ const runCompare = async () => {
 </template>
 
 <style scoped>
-.drawer-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.eyebrow {
-  margin: 0;
-  font-size: 12px;
-  color: #8d93a8;
-  letter-spacing: 2px;
-}
-
-.panel {
-  background: #fff;
-  border: 1px solid #e9edf5;
-  border-radius: 18px;
-  padding: 20px;
-  margin-bottom: 24px;
-}
-
-.panel header h4 {
-  margin: 0;
-}
-
-.panel header p {
-  margin: 6px 0 0;
-  color: #7a829d;
-  font-size: 13px;
-}
-
-.field-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
+/* 使用全局深空玻璃主题样式 */
 
 .stats-panel {
   margin-top: 18px;
@@ -1252,14 +1217,16 @@ const runCompare = async () => {
 
 .stat-cols h5 {
   margin: 0 0 8px;
+  color: var(--ppx-text-primary);
 }
 
 .stat-cols ul {
   margin: 0;
   padding-left: 16px;
-  color: #5f657c;
+  color: var(--ppx-text-secondary);
 }
 
+/* 压缩/解压网格 */
 .archive-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
@@ -1267,18 +1234,25 @@ const runCompare = async () => {
 }
 
 .archive-card {
-  border: 1px solid #e4e7f3;
-  border-radius: 14px;
+  border: 1px solid var(--ppx-glass-border);
+  border-radius: var(--ppx-radius-md);
   padding: 16px;
-  background: #fbfcff;
+  background: var(--ppx-glass-bg);
+  transition: all var(--ppx-transition-fast);
+}
+
+.archive-card:hover {
+  border-color: var(--ppx-glass-border-hover);
 }
 
 .archive-card h5 {
   margin: 0 0 12px;
+  color: var(--ppx-text-primary);
 }
 
 .link {
-  color: #2f73ff;
+  color: var(--ppx-neon-blue);
+  cursor: pointer;
 }
 
 .dedup-list {
@@ -1289,5 +1263,9 @@ const runCompare = async () => {
 
 .dedup-list li {
   margin-bottom: 4px;
+}
+
+.form-gap {
+  margin-top: 12px;
 }
 </style>
