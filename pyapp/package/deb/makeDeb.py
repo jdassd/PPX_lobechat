@@ -42,8 +42,7 @@ logoPath = os.path.join(rootDir, 'pyapp', 'icon', 'logo.png')
 
 
 # 生成软件包的控制文件 (Package name must be alphanumeric, use English name)
-getControl = f"""
-Package: {appDistName}
+getControl = f"""Package: {appDistName}
 Version: {appVersion}
 Section: base
 Priority: optional
@@ -51,15 +50,13 @@ Architecture: all
 Depends: python3
 Maintainer: {appDeveloper}
 Description: {appName} - {appBlogs}
-
 """
 with open(os.path.join(scriptDir, 'control'), 'w+', encoding='utf-8') as f:
     f.write(getControl)
 
 
 # 生成桌面文件 (Name can be Chinese for display, but paths must be English)
-getDesktop = f"""
-[Desktop Entry]
+getDesktop = f"""[Desktop Entry]
 Name={appName}
 Comment={appBlogs}
 Exec=/opt/{appDistName}/bin/{appDistName}
@@ -67,15 +64,13 @@ Icon=/usr/share/icons/hicolor/128x128/apps/{appDistName}.png
 Terminal=false
 Type=Application
 Categories=Utility;
-
 """
 with open(os.path.join(scriptDir, f'{appDistName}.desktop'), 'w+', encoding='utf-8') as f:
     f.write(getDesktop)
 
 
 # 生成安装完成调用的 postinst 脚本
-getPostinst = """
-#!/bin/bash
+getPostinst = """#!/bin/bash
 # 更新桌面图标数据库
 update-desktop-database /usr/share/applications || true
 # 获取当前的用户名
@@ -90,7 +85,6 @@ echo '桌面文件夹不存在'
 # 中文系统自动复制到中文桌面
 cp """ + f'/usr/share/applications/{appDistName}.desktop' + """ /home/${username}/桌面
 fi
-
 """
 with open(os.path.join(scriptDir, 'postinst'), 'w+', encoding='utf-8') as f:
     f.write(getPostinst)
@@ -103,18 +97,18 @@ buildPath = Path(buildDir)
 scriptPath = Path(scriptDir)
 logoFile = Path(logoPath)
 
-# 创建目录结构 (use English name for all paths)
+# 先移动可执行文件到 bin 目录，避免与目录结构冲突
 (buildPath / 'bin').mkdir(parents=True, exist_ok=True)
-(buildPath / appDistName / 'DEBIAN').mkdir(parents=True, exist_ok=True)
-(buildPath / appDistName / 'opt' / appDistName / 'bin').mkdir(parents=True, exist_ok=True)
-(buildPath / appDistName / 'usr' / 'share' / 'applications').mkdir(parents=True, exist_ok=True)
-(buildPath / appDistName / 'usr' / 'share' / 'icons' / 'hicolor' / '128x128' / 'apps').mkdir(parents=True, exist_ok=True)
-
-# 移动可执行文件到 bin 目录
 src_exe = buildPath / appDistName
 dst_exe = buildPath / 'bin' / appDistName
 if src_exe.exists():
     shutil.move(str(src_exe), str(dst_exe))
+
+# 创建目录结构 (use English name for all paths)
+(buildPath / appDistName / 'DEBIAN').mkdir(parents=True, exist_ok=True)
+(buildPath / appDistName / 'opt' / appDistName / 'bin').mkdir(parents=True, exist_ok=True)
+(buildPath / appDistName / 'usr' / 'share' / 'applications').mkdir(parents=True, exist_ok=True)
+(buildPath / appDistName / 'usr' / 'share' / 'icons' / 'hicolor' / '128x128' / 'apps').mkdir(parents=True, exist_ok=True)
 
 # 复制文件
 shutil.copy2(str(dst_exe), str(buildPath / appDistName / 'opt' / appDistName / 'bin' / appDistName))
