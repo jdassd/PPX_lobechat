@@ -14,6 +14,7 @@ import hashlib
 import json
 import os
 import platform
+import shlex
 import shutil
 import subprocess
 import uuid
@@ -105,7 +106,7 @@ class System():
     def system_py2js(self, func, info):
         '''调用js中挂载到window的函数'''
         infoJson = json.dumps(info)
-        System._window.evaluate_js(f"{func}('{infoJson}')")
+        System._window.evaluate_js(f"{func}({infoJson})")
 
     def system_getAppInfo(self):
         '''程序基础配置信息'''
@@ -144,10 +145,12 @@ class System():
         else:
             os.startfile(str(file_path))
 
-    def system_pyCreateFileDialog(self, fileTypes=['全部文件 (*.*)'], directory=''):
+    def system_pyCreateFileDialog(self, fileTypes=None, directory=''):
         '''打开文件对话框'''
         # 可选文件类型
         # fileTypes = ['Excel表格 (*.xlsx;*.xls)']
+        if fileTypes is None:
+            fileTypes = ['全部文件 (*.*)']
         fileTypes = tuple(fileTypes)    # 要求必须是元组
         result = System._window.create_file_dialog(dialog_type=webview.OPEN_DIALOG, directory=directory, allow_multiple=True, file_types=fileTypes)
         resList = list()
@@ -532,8 +535,8 @@ class System():
         rule_hash = hashlib.md5(exe_path.encode('utf-8', errors='ignore')).hexdigest()[:8]
         directions = ('out', 'in')
 
-        def run_command(command: str):
-            result = subprocess.run(command, capture_output=True, text=True, shell=True)
+        def run_command(command):
+            result = subprocess.run(command, capture_output=True, text=True, shell=False)
             if result.returncode != 0:
                 raise RuntimeError(result.stderr.strip() or 'netsh 执行失败，需管理员权限')
 
@@ -542,20 +545,21 @@ class System():
             for direction in directions:
                 rule_name = f'PPX_{rule_hash}_{direction.upper()}'
                 if block:
-                    cleanup = (
-                        f'netsh advfirewall firewall delete rule name="{rule_name}" '
-                        f'program="{sanitized}"'
-                    )
-                    subprocess.run(cleanup, capture_output=True, text=True, shell=True)
-                    cmd = (
-                        f'netsh advfirewall firewall add rule name="{rule_name}" '
-                        f'dir={direction} action=block program="{sanitized}" enable=yes'
-                    )
+                    cleanup = [
+                        'netsh', 'advfirewall', 'firewall', 'delete', 'rule',
+                        f'name="{rule_name}"', f'program="{sanitized}"'
+                    ]
+                    subprocess.run(cleanup, capture_output=True, text=True, shell=False)
+                    cmd = [
+                        'netsh', 'advfirewall', 'firewall', 'add', 'rule',
+                        f'name="{rule_name}"', f'dir={direction}', 'action=block',
+                        f'program="{sanitized}"', 'enable=yes'
+                    ]
                 else:
-                    cmd = (
-                        f'netsh advfirewall firewall delete rule name="{rule_name}" '
-                        f'program="{sanitized}"'
-                    )
+                    cmd = [
+                        'netsh', 'advfirewall', 'firewall', 'delete', 'rule',
+                        f'name="{rule_name}"', f'program="{sanitized}"'
+                    ]
                 run_command(cmd)
             return {
                 'success': True,
