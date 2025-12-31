@@ -194,6 +194,8 @@ if ifMac:
     with open(os.path.join(specDir, 'macos-pre.spec'), 'w+', encoding='utf-8') as f:
         f.write(specFirstPart() + specPackagePartAPP())
 elif ifLinux:
+    # For Linux, use English name as executable name to avoid conflicts with deb packaging
+    appName = appCollectName
     console = False  # no console window
     # linux.spec
     with open(os.path.join(specDir, 'linux.spec'), 'w+', encoding='utf-8') as f:
