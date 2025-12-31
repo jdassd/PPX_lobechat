@@ -1,5 +1,5 @@
 <script setup>
-import { markRaw, ref } from 'vue'
+import { markRaw, ref, onMounted, onUnmounted } from 'vue'
 import { Document, Files, Monitor, Setting, Stamp, PictureFilled, Edit, VideoPlay, FolderOpened } from '@element-plus/icons-vue'
 import BtnUpdate from './components/BtnUpdate.vue'
 import PdfTool from './components/pdf/PdfTool.vue'
@@ -11,7 +11,34 @@ import TextTool from './components/text/TextTool.vue'
 import VideoTool from './components/video/VideoTool.vue'
 import FileTool from './components/file/FileTool.vue'
 
-const heroStats = []
+const isLoaded = ref(false)
+const isScrolled = ref(false)
+const contentAreaRef = ref(null)
+
+// 滚动监听处理
+const handleScroll = () => {
+  if (contentAreaRef.value) {
+    isScrolled.value = contentAreaRef.value.scrollTop > 30
+  }
+}
+
+onMounted(() => {
+  setTimeout(() => {
+    isLoaded.value = true
+  }, 100)
+
+  // 添加滚动监听
+  if (contentAreaRef.value) {
+    contentAreaRef.value.addEventListener('scroll', handleScroll)
+  }
+})
+
+onUnmounted(() => {
+  // 移除滚动监听
+  if (contentAreaRef.value) {
+    contentAreaRef.value.removeEventListener('scroll', handleScroll)
+  }
+})
 
 const featureCards = [
   {
@@ -19,74 +46,78 @@ const featureCards = [
     title: '图片处理',
     desc: '格式转换 / 缩放 / 压缩 / 水印',
     icon: markRaw(PictureFilled),
+    color: 'cyan',
     tags: ['批量操作', '高清输出'],
     action: '打开面板',
     disabled: false,
     points: [
-      '支持 PNG / JPG / TIFF / WEBP 互转，保持高画质',
-      '按百分比或像素缩放，支持锁定比例与输出目录',
-      '体积压缩支持质量或目标大小模式，适配分享需求',
-      '新增文字 / 图片水印、裁剪、旋转与图片转 PDF'
+      '支持 PNG / JPG / TIFF / WEBP 互转',
+      '按百分比或像素缩放，支持锁定比例',
+      '体积压缩支持质量或目标大小模式',
+      '新增文字/图片水印、裁剪、旋转'
     ]
   },
   {
     id: 'text',
     title: '文本工具',
-    desc: '编码、JSON、正则、CSV/JSON、去重',
+    desc: '编码、JSON、正则、去重',
     icon: markRaw(Edit),
+    color: 'purple',
     tags: ['Base64', 'JSONPath', '正则'],
     action: '打开面板',
     disabled: false,
     points: [
-      'Base64 / URL / HTML / UTF-8↔GBK 一次搞定',
+      'Base64 / URL / HTML / UTF-8↔GBK',
       'JSON 美化、压缩、校验与路径查询',
-      '新增正则工具、CSV↔JSON 转换、去重排序与时间戳互转',
-      '内置 MD5 / SHA 系列哈希，可选文本或文件'
+      '正则工具、CSV↔JSON 转换',
+      '内置 MD5 / SHA 系列哈希'
     ]
   },
   {
     id: 'video',
     title: '视频处理',
-    desc: '格式转换 / 压缩 / 截取 / 音频 / 帧图',
+    desc: '格式转换 / 压缩 / 截取',
     icon: markRaw(VideoPlay),
+    color: 'pink',
     tags: ['FFmpeg', '音频提取'],
     action: '打开面板',
     disabled: false,
     points: [
-      'MP4、MOV、AVI、MKV 等互转，提供质感预设',
+      'MP4、MOV、AVI、MKV 等互转',
       '三种压缩模式：预设、码率、目标大小',
-      '按时间轴快速截取片段，默认无损复制流',
-      '一键提取 MP3/WAV、导出帧图，查看码率/分辨率等参数'
+      '按时间轴快速截取片段',
+      '一键提取 MP3/WAV、导出帧图'
     ]
   },
   {
     id: 'file',
     title: '文件管理',
-    desc: '搜索 / 目录分析 / 复制 / 删除 / 改名 / 去重',
+    desc: '搜索 / 目录分析 / 批处理',
     icon: markRaw(FolderOpened),
+    color: 'green',
     tags: ['ZIP/7Z', '批量处理'],
     action: '打开面板',
     disabled: false,
     points: [
-      '按关键字、扩展名、大小范围搜索目录',
-      '新增批量复制、删除、重命名，与内容/名称去重扫描',
-      'ZIP / 7Z 压缩与解压并行，支持密码'
+      '按关键字、扩展名、大小范围搜索',
+      '批量复制、删除、重命名',
+      'ZIP / 7Z 压缩与解压，支持密码'
     ]
   },
   {
     id: 'excel',
     title: 'Excel 工具',
-    desc: '针对固定结构的电子表格批处理',
+    desc: '固定结构电子表格批处理',
     icon: markRaw(Document),
+    color: 'blue',
     tags: ['数据标准化', '图表导出'],
     action: '立即体验',
     disabled: false,
     points: [
-      '第一行支持自定义字段定义，允许通过分隔符快速匹配',
-      '从第二行开始逐行清洗，可插入自定义逻辑',
-      '按任意列分组输出分表，可选升序或降序排序',
-      '分组结果可导出 JSON，配合前端动态绘制图表',
-      '多分表可先合并回主表，再统一处理'
+      '自定义字段定义，分隔符快速匹配',
+      '逐行清洗，可插入自定义逻辑',
+      '按任意列分组输出分表',
+      '多分表可先合并再统一处理'
     ]
   },
   {
@@ -94,14 +125,15 @@ const featureCards = [
     title: 'PDF 工具',
     desc: '转换、合并与切割一体化',
     icon: markRaw(Files),
+    color: 'orange',
     tags: ['高清转换', '批量任务'],
     action: '立即体验',
     disabled: false,
     points: [
       'PDF 转高清图片，保留矢量细节',
       '一键生成仿真扫描件效果',
-      '多份 PDF 合并为单文件便于归档',
-      '按区间或指定页码拆分/切割，支持批量策略'
+      '多份 PDF 合并为单文件',
+      '按区间或指定页码拆分/切割'
     ]
   },
   {
@@ -109,27 +141,29 @@ const featureCards = [
     title: '公章生成',
     desc: '内置模板快速生成电子印章',
     icon: markRaw(Stamp),
+    color: 'red',
     tags: ['模板管理', '透明导出'],
     action: '立即体验',
     disabled: false,
     points: [
       '提供常见圆章、椭圆章等基础模板',
       '可自定义文字、字号、弧度与描边',
-      '导出透明 PNG，方便在 PDF/图片中叠加'
+      '导出透明 PNG，方便叠加使用'
     ]
   },
   {
     id: 'process',
     title: '进程管理',
-    desc: '定位占用端口的进程并一键结束',
+    desc: '定位占用端口的进程',
     icon: markRaw(Monitor),
+    color: 'indigo',
     tags: ['端口排查', '强制结束'],
     action: '打开面板',
     disabled: false,
     points: [
       '按进程名或命令模糊搜索',
-      '支持根据端口筛查冲突来源',
-      '内置强制结束能力，排除僵尸进程'
+      '根据端口筛查冲突来源',
+      '内置强制结束能力'
     ]
   },
   {
@@ -137,13 +171,14 @@ const featureCards = [
     title: '功能预告',
     desc: '共 6 类工具正在设计中',
     icon: markRaw(Setting),
+    color: 'gray',
     tags: ['需求收集中'],
     action: '提交想法',
     disabled: true,
     points: [
-      '更多 Office/PDF 自动化脚本接入',
-      '结合 TinyDB/SQLite 打造轻量数据管理',
-      '计划加入任务编排与批处理命令面板'
+      '更多 Office/PDF 自动化脚本',
+      '轻量数据管理',
+      '任务编排与批处理命令面板'
     ]
   }
 ]
@@ -151,18 +186,21 @@ const featureCards = [
 const checklist = [
   {
     title: '检查更新',
-    detail: '检查更新请点击上方小地球图标的方式进行更新，下载后的文件在用户的下载文件夹中，请打开安装即可完成更新操作。如果下载失败，请检查网络代理情况'
+    icon: '🔄',
+    detail: '点击上方地球图标检测更新，下载后打开安装即可。如下载失败，请检查网络代理'
   },
   {
     title: '通知公告',
-    detail: '该软件一次付费后永久更新，不再收费，没有广告，如需反馈软件使用问题，请发送名称为："工具软件问题反馈"的邮件到邮箱：dassdj@yandex.com'
+    icon: '📢',
+    detail: '一次付费永久更新，无广告。问题反馈请发邮件至：dassdj@yandex.com'
   },
   {
-    title: '视频功能无法使用',
+    title: '视频功能配置',
+    icon: '🎬',
     parts: [
-      '该软件部分功能需要安装配置FFMPEG后才可使用，请参照教程手动配置FFMPEG，windows用户：',
+      '部分功能需安装 FFMPEG，',
       {
-        text: '请点击此处访问教程',
+        text: '点击查看教程',
         url: 'https://blog.csdn.net/weixin_43914278/article/details/131722929'
       }
     ]
@@ -179,136 +217,144 @@ const videoToolVisible = ref(false)
 const fileToolVisible = ref(false)
 
 const onFeatureAction = (feature) => {
-  if (feature.disabled) {
-    return
+  if (feature.disabled) return
+
+  const visibilityMap = {
+    excel: excelToolVisible,
+    pdf: pdfToolVisible,
+    seal: sealToolVisible,
+    process: processToolVisible,
+    image: imageToolVisible,
+    text: textToolVisible,
+    video: videoToolVisible,
+    file: fileToolVisible
   }
-  if (feature.id === 'excel') {
-    excelToolVisible.value = true
-    return
-  }
-  if (feature.id === 'pdf') {
-    pdfToolVisible.value = true
-    return
-  }
-  if (feature.id === 'seal') {
-    sealToolVisible.value = true
-    return
-  }
-  if (feature.id === 'process') {
-    processToolVisible.value = true
-    return
-  }
-  if (feature.id === 'image') {
-    imageToolVisible.value = true
-    return
-  }
-  if (feature.id === 'text') {
-    textToolVisible.value = true
-    return
-  }
-  if (feature.id === 'video') {
-    videoToolVisible.value = true
-    return
-  }
-  if (feature.id === 'file') {
-    fileToolVisible.value = true
-    return
+
+  if (visibilityMap[feature.id]) {
+    visibilityMap[feature.id].value = true
   }
 }
-
 </script>
 
 <template>
-  <div class="app-shell">
-    <div class="toolbox-window">
-      <header class="hero">
-        <div class="hero-copy">
-          <p class="hero-eyebrow">桌面工具箱</p>
-          <h1>Excel、PDF、图片、文本、视频、文件多工具</h1>
-          <p class="hero-desc">
-            数据安全不离开本机，无广告，界面简洁美观
-          </p>
-          <div class="hero-actions">
-            <div class="update-entry">
-              <BtnUpdate />
-              <span style="font-size: 13px">👈检测更新</span>
-            </div>
+  <div class="app-container" :class="{ loaded: isLoaded }">
+    <!-- 背景装饰 -->
+    <div class="bg-decorations">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="orb orb-3"></div>
+      <div class="grid-pattern"></div>
+    </div>
+
+    <!-- 主内容区 -->
+    <div class="main-wrapper">
+      <!-- 顶部导航栏 -->
+      <header class="top-bar">
+        <div class="logo-area">
+          <div class="logo-icon">
+            <span class="logo-text">PPX</span>
           </div>
-<!--          <p class="hero-note">固定窗口尺寸 1200×720 px，所有页面都会在该画布内完整展示。</p>-->
+          <span class="logo-label">桌面工具箱</span>
         </div>
-        <div class="hero-panel">
-          <div v-for="stat in heroStats" :key="stat.label" class="stat-card">
-            <p class="stat-label">{{ stat.label }}</p>
-            <p class="stat-value">{{ stat.value }}</p>
-            <p class="stat-desc">{{ stat.desc }}</p>
-          </div>
+        <div class="top-bar-actions">
+          <BtnUpdate />
+          <span class="update-hint">检测更新</span>
         </div>
       </header>
 
-      <main class="content">
-        <section class="feature-section">
-          <div class="section-head">
-            <div>
-              <p class="section-eyebrow">核心能力</p>
-              <h2>常用工具</h2>
-            </div>
-            <el-tag type="success" effect="plain">首页预览</el-tag>
-          </div>
-          <div class="feature-grid">
-            <el-card v-for="feature in featureCards" :key="feature.id" class="feature-card" shadow="never">
-              <div class="feature-title">
-                <component :is="feature.icon" class="feature-icon" />
-                <div>
-                  <h3>{{ feature.title }}</h3>
-                  <p>{{ feature.desc }}</p>
-                </div>
-              </div>
-              <ul class="feature-list">
-                <li v-for="point in feature.points" :key="point">
-                  <span class="dot"></span>
-                  <span>{{ point }}</span>
-                </li>
-              </ul>
-              <div class="feature-footer">
-                <div class="tags">
-                  <el-tag v-for="tag in feature.tags" :key="tag" size="small" effect="plain">{{ tag }}</el-tag>
-                </div>
-                <el-button
-                  size="small"
-                  type="primary"
-                  plain
-                  :disabled="feature.disabled"
-                  @click="onFeatureAction(feature)"
-                >
-                  {{ feature.action }}
-                </el-button>
-              </div>
-            </el-card>
-          </div>
-        </section>
+      <!-- Hero 区域 -->
+      <section class="hero-section" :class="{ collapsed: isScrolled }">
+        <div class="hero-content">
+          <h1 class="hero-title">
+            <span class="title-gradient">多功能</span>桌面工具集
+          </h1>
+          <p class="hero-subtitle" :class="{ hidden: isScrolled }">
+            Excel / PDF / 图片 / 文本 / 视频 / 文件 —— 数据安全不离开本机
+          </p>
+        </div>
+      </section>
 
-        <section class="checklist">
-          <div class="section-head">
-            <div>
-              <p class="section-eyebrow">使用提示与软件介绍</p>
+      <!-- 工具卡片网格 -->
+      <main ref="contentAreaRef" class="content-area">
+        <div class="section-header">
+          <div class="section-title">
+            <span class="section-badge">核心能力</span>
+            <h2>常用工具</h2>
+          </div>
+        </div>
+
+        <div class="feature-grid">
+          <div
+            v-for="(feature, index) in featureCards"
+            :key="feature.id"
+            class="feature-card"
+            :class="[`card-${feature.color}`, { disabled: feature.disabled }]"
+            :style="{ '--delay': `${index * 0.05}s` }"
+            @click="onFeatureAction(feature)"
+          >
+            <!-- 卡片发光效果 -->
+            <div class="card-glow"></div>
+
+            <!-- 卡片内容 -->
+            <div class="card-header">
+              <div class="icon-wrapper">
+                <component :is="feature.icon" class="feature-icon" />
+              </div>
+              <div class="title-area">
+                <h3>{{ feature.title }}</h3>
+                <p>{{ feature.desc }}</p>
+              </div>
+            </div>
+
+            <ul class="feature-points">
+              <li v-for="point in feature.points" :key="point">
+                <span class="point-dot"></span>
+                <span>{{ point }}</span>
+              </li>
+            </ul>
+
+            <div class="card-footer">
+              <div class="tag-list">
+                <span v-for="tag in feature.tags" :key="tag" class="feature-tag">
+                  {{ tag }}
+                </span>
+              </div>
+              <button class="action-btn" :disabled="feature.disabled">
+                {{ feature.action }}
+                <span class="btn-arrow">→</span>
+              </button>
             </div>
           </div>
-          <div class="checklist-cards">
-            <el-card v-for="item in checklist" :key="item.title" class="check-card" shadow="hover">
-              <h3>{{ item.title }}</h3>
-              <p v-if="item.detail">{{ item.detail }}</p>
-              <p v-else class="detail-with-link">
-                <template v-for="(part, idx) in item.parts" :key="idx">
-                  <span v-if="typeof part === 'string'">{{ part }}</span>
-                  <a v-else :href="part.url" target="_blank" rel="noopener noreferrer" class="link-text">{{ part.text }}</a>
-                </template>
-              </p>
-            </el-card>
+        </div>
+
+        <!-- 提示信息 -->
+        <section class="tips-section">
+          <div class="tips-header">
+            <span class="tips-badge">使用提示</span>
+          </div>
+          <div class="tips-grid">
+            <div v-for="item in checklist" :key="item.title" class="tip-card">
+              <div class="tip-icon">{{ item.icon }}</div>
+              <div class="tip-content">
+                <h4>{{ item.title }}</h4>
+                <p v-if="item.detail">{{ item.detail }}</p>
+                <p v-else class="tip-with-link">
+                  <template v-for="(part, idx) in item.parts" :key="idx">
+                    <span v-if="typeof part === 'string'">{{ part }}</span>
+                    <a v-else :href="part.url" target="_blank" rel="noopener noreferrer" class="tip-link">
+                      {{ part.text }}
+                    </a>
+                  </template>
+                </p>
+              </div>
+            </div>
           </div>
         </section>
       </main>
     </div>
   </div>
+
+  <!-- 工具弹窗 -->
   <ImageTool v-model="imageToolVisible" />
   <TextTool v-model="textToolVisible" />
   <VideoTool v-model="videoToolVisible" />
@@ -320,477 +366,648 @@ const onFeatureAction = (feature) => {
 </template>
 
 <style scoped>
-.app-shell {
+/* ========================================
+   深空玻璃主题 - App 布局
+   ======================================== */
+
+.app-container {
+  width: 100%;
+  height: 100%;
+  background: var(--ppx-bg-deep);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 背景装饰 */
+.bg-decorations {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.4;
+  animation: float 20s ease-in-out infinite;
+}
+
+.orb-1 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(0, 212, 255, 0.3) 0%, transparent 70%);
+  top: -100px;
+  left: -100px;
+  animation-delay: 0s;
+}
+
+.orb-2 {
+  width: 350px;
+  height: 350px;
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.25) 0%, transparent 70%);
+  top: 50%;
+  right: -80px;
+  animation-delay: -7s;
+}
+
+.orb-3 {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(244, 114, 182, 0.2) 0%, transparent 70%);
+  bottom: -50px;
+  left: 30%;
+  animation-delay: -14s;
+}
+
+@keyframes float {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(30px, -30px) scale(1.05); }
+  50% { transform: translate(-20px, 20px) scale(0.95); }
+  75% { transform: translate(10px, 30px) scale(1.02); }
+}
+
+.grid-pattern {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse at center, black 0%, transparent 70%);
+}
+
+/* 主容器 */
+.main-wrapper {
   width: 100%;
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: radial-gradient(circle at top, #f4f6fb 0%, #e4e9f2 55%, #d7deea 100%);
-  padding: 0;
+  position: relative;
+  z-index: 1;
 }
 
-.toolbox-window {
-  width: 100%;
-  height: 100%;
-  max-width: 100%;
-  max-height: 100%;
-  background: #ffffff;
-  border-radius: 0;
-  box-shadow: none;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.hero {
-  display: flex;
-  padding: 24px 32px;
-  gap: 24px;
-  background: url("assets/backgroud2.png") center / cover no-repeat;
-  color: #ffffff;
-  flex-shrink: 0;
-  height: 140px;
-  overflow: hidden;
-}
-
-.hero-copy {
-  flex: 1;
-}
-
-.hero-eyebrow {
-  font-size: 16px;
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
-  margin-bottom: 12px;
-  color: rgba(255, 255, 255, 1);
-  font-weight: bold;
-}
-
-.hero h1 {
-  margin: 0;
-  font-size: 30px;
-  line-height: 1.3;
-}
-
-.hero-desc {
-  margin: 16px 0 24px;
-  color: rgba(255, 255, 255, 0.85);
-  line-height: 1.6;
-}
-
-.hero-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.update-entry {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 13px;
-}
-
-.hero-note {
-  display: none;
-}
-
-.hero-panel {
-  display: none;
-}
-
-.stat-card {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  padding: 16px 18px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.stat-label {
-  margin: 0;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.stat-value {
-  margin: 10px 0 6px;
-  font-size: 22px;
-  font-weight: 600;
-}
-
-.stat-desc {
-  margin: 0;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.75);
-}
-
-.content {
-  flex: 1;
-  padding: 20px 24px;
-  overflow: auto;
-  background: #f6f8fb;
-  min-height: 0;
-}
-
-.section-head {
+/* 顶部导航 */
+.top-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 16px 28px;
+  background: rgba(12, 13, 22, 0.8);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--ppx-glass-border);
+  flex-shrink: 0;
+}
+
+.logo-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo-icon {
+  width: 36px;
+  height: 36px;
+  background: var(--ppx-gradient-primary);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+}
+
+.logo-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.5px;
+}
+
+.logo-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ppx-text-primary);
+  letter-spacing: 0.5px;
+}
+
+.top-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.update-hint {
+  font-size: 12px;
+  color: var(--ppx-text-muted);
+}
+
+/* Hero 区域 */
+.hero-section {
+  padding: 32px 28px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  transition: padding 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hero-section.collapsed {
+  padding: 16px 28px 12px;
+}
+
+.hero-content {
+  flex: 1;
+}
+
+.hero-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--ppx-text-primary);
+  margin: 0 0 10px;
+  letter-spacing: -0.5px;
+  opacity: 0;
+  transform: translateY(20px);
+  animation: slideUp 0.6s ease forwards;
+  animation-delay: 0.1s;
+  transition: margin 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hero-section.collapsed .hero-title {
+  margin-bottom: 0;
+}
+
+.title-gradient {
+  background: var(--ppx-gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-subtitle {
+  font-size: 15px;
+  color: var(--ppx-text-secondary);
+  margin: 0;
+  opacity: 0;
+  transform: translateY(20px);
+  animation: slideUp 0.6s ease forwards;
+  animation-delay: 0.2s;
+  max-height: 30px;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hero-subtitle.hidden {
+  max-height: 0;
+  opacity: 0 !important;
+  margin-top: -5px;
+  transform: translateY(-10px);
+}
+
+.hero-stats {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 16px 24px;
+  background: var(--ppx-glass-bg);
+  border: 1px solid var(--ppx-glass-border);
+  border-radius: 16px;
+  backdrop-filter: blur(20px);
+  opacity: 0;
+  transform: translateY(20px);
+  animation: slideUp 0.6s ease forwards;
+  animation-delay: 0.3s;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.stat-number {
+  font-size: 22px;
+  font-weight: 700;
+  background: var(--ppx-gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--ppx-text-muted);
+}
+
+.stat-divider {
+  width: 1px;
+  height: 32px;
+  background: var(--ppx-glass-border);
+}
+
+@keyframes slideUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 内容区 */
+.content-area {
+  flex: 1;
+  padding: 0 28px 24px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.section-header {
   margin-bottom: 20px;
 }
 
-.section-eyebrow {
-  font-size: 12px;
-  letter-spacing: 0.2em;
-  color: #7c879c;
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.section-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ppx-neon-blue);
   text-transform: uppercase;
-  margin-bottom: 6px;
+  letter-spacing: 1px;
+  padding: 4px 10px;
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  border-radius: 6px;
 }
 
-h2 {
+.section-title h2 {
   margin: 0;
-  font-size: 24px;
-  color: #1d2433;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--ppx-text-primary);
 }
 
+/* 功能卡片网格 */
 .feature-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 18px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
 }
 
 .feature-card {
-  min-height: 220px;
-  border-radius: 18px;
+  position: relative;
+  background: var(--ppx-glass-bg);
+  border: 1px solid var(--ppx-glass-border);
+  border-radius: 16px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(20px);
+  animation: cardEnter 0.5s ease forwards;
+  animation-delay: var(--delay);
 }
 
-.feature-title {
+@keyframes cardEnter {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--ppx-glass-border-hover);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.feature-card.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.feature-card.disabled:hover {
+  transform: none;
+}
+
+/* 卡片发光效果 */
+.card-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100px;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+
+.feature-card:hover .card-glow {
+  opacity: 1;
+}
+
+/* 不同颜色的卡片 */
+.card-cyan .icon-wrapper { background: rgba(0, 212, 255, 0.15); }
+.card-cyan .feature-icon { color: #00d4ff; }
+.card-cyan .card-glow { background: radial-gradient(ellipse at top, rgba(0, 212, 255, 0.15) 0%, transparent 70%); }
+.card-cyan .point-dot { background: #00d4ff; }
+
+.card-purple .icon-wrapper { background: rgba(168, 85, 247, 0.15); }
+.card-purple .feature-icon { color: #a855f7; }
+.card-purple .card-glow { background: radial-gradient(ellipse at top, rgba(168, 85, 247, 0.15) 0%, transparent 70%); }
+.card-purple .point-dot { background: #a855f7; }
+
+.card-pink .icon-wrapper { background: rgba(244, 114, 182, 0.15); }
+.card-pink .feature-icon { color: #f472b6; }
+.card-pink .card-glow { background: radial-gradient(ellipse at top, rgba(244, 114, 182, 0.15) 0%, transparent 70%); }
+.card-pink .point-dot { background: #f472b6; }
+
+.card-green .icon-wrapper { background: rgba(74, 222, 128, 0.15); }
+.card-green .feature-icon { color: #4ade80; }
+.card-green .card-glow { background: radial-gradient(ellipse at top, rgba(74, 222, 128, 0.15) 0%, transparent 70%); }
+.card-green .point-dot { background: #4ade80; }
+
+.card-blue .icon-wrapper { background: rgba(96, 165, 250, 0.15); }
+.card-blue .feature-icon { color: #60a5fa; }
+.card-blue .card-glow { background: radial-gradient(ellipse at top, rgba(96, 165, 250, 0.15) 0%, transparent 70%); }
+.card-blue .point-dot { background: #60a5fa; }
+
+.card-orange .icon-wrapper { background: rgba(251, 146, 60, 0.15); }
+.card-orange .feature-icon { color: #fb923c; }
+.card-orange .card-glow { background: radial-gradient(ellipse at top, rgba(251, 146, 60, 0.15) 0%, transparent 70%); }
+.card-orange .point-dot { background: #fb923c; }
+
+.card-red .icon-wrapper { background: rgba(248, 113, 113, 0.15); }
+.card-red .feature-icon { color: #f87171; }
+.card-red .card-glow { background: radial-gradient(ellipse at top, rgba(248, 113, 113, 0.15) 0%, transparent 70%); }
+.card-red .point-dot { background: #f87171; }
+
+.card-indigo .icon-wrapper { background: rgba(129, 140, 248, 0.15); }
+.card-indigo .feature-icon { color: #818cf8; }
+.card-indigo .card-glow { background: radial-gradient(ellipse at top, rgba(129, 140, 248, 0.15) 0%, transparent 70%); }
+.card-indigo .point-dot { background: #818cf8; }
+
+.card-gray .icon-wrapper { background: rgba(148, 163, 184, 0.1); }
+.card-gray .feature-icon { color: #94a3b8; }
+.card-gray .card-glow { background: radial-gradient(ellipse at top, rgba(148, 163, 184, 0.1) 0%, transparent 70%); }
+.card-gray .point-dot { background: #94a3b8; }
+
+/* 卡片头部 */
+.card-header {
   display: flex;
-  gap: 12px;
   align-items: flex-start;
+  gap: 14px;
   margin-bottom: 14px;
 }
 
-.feature-title h3 {
-  margin: 0;
-  font-size: 18px;
-  color: #1e2235;
-}
-
-.feature-title p {
-  margin: 4px 0 0;
-  color: #6f7586;
+.icon-wrapper {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .feature-icon {
-  width: 42px;
-  height: 42px;
-  padding: 10px;
-  border-radius: 14px;
-  background: #eef2ff;
-  color: #4058d7;
+  width: 24px;
+  height: 24px;
 }
 
-.feature-list {
+.title-area h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ppx-text-primary);
+}
+
+.title-area p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--ppx-text-muted);
+}
+
+/* 功能列表 */
+.feature-points {
   list-style: none;
   padding: 0;
   margin: 0 0 16px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  color: #4a5162;
 }
 
-.feature-list li {
+.feature-points li {
   display: flex;
+  align-items: flex-start;
   gap: 8px;
-  font-size: 13px;
-  line-height: 1.4;
+  font-size: 12px;
+  color: var(--ppx-text-secondary);
+  line-height: 1.5;
 }
 
-.dot {
-  width: 6px;
-  height: 6px;
-  margin-top: 6px;
+.point-dot {
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
-  background: #4058d7;
+  margin-top: 6px;
   flex-shrink: 0;
 }
 
-.feature-footer {
+/* 卡片底部 */
+.card-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  margin-top: auto;
 }
 
-.tags {
+.tag-list {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
 }
 
-.checklist {
-  margin-top: 34px;
+.feature-tag {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 3px 8px;
+  background: var(--ppx-glass-bg);
+  border: 1px solid var(--ppx-glass-border);
+  border-radius: 4px;
+  color: var(--ppx-text-muted);
 }
 
-.checklist-cards {
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ppx-text-primary);
+  background: var(--ppx-glass-bg-hover);
+  border: 1px solid var(--ppx-glass-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.action-btn:hover:not(:disabled) {
+  background: rgba(0, 212, 255, 0.1);
+  border-color: rgba(0, 212, 255, 0.3);
+  color: var(--ppx-neon-blue);
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-arrow {
+  transition: transform 0.2s;
+}
+
+.action-btn:hover:not(:disabled) .btn-arrow {
+  transform: translateX(3px);
+}
+
+/* 提示区域 */
+.tips-section {
+  margin-top: 8px;
+}
+
+.tips-header {
+  margin-bottom: 14px;
+}
+
+.tips-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ppx-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.tips-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  gap: 14px;
 }
 
-.check-card {
-  border-radius: 16px;
-  min-height: 120px;
+.tip-card {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  background: var(--ppx-glass-bg);
+  border: 1px solid var(--ppx-glass-border);
+  border-radius: 12px;
+  transition: all 0.2s;
 }
 
-.check-card h3 {
-  margin: 0 0 10px;
-  font-size: 16px;
-  color: #232735;
+.tip-card:hover {
+  border-color: var(--ppx-glass-border-hover);
 }
 
-.check-card p {
+.tip-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.tip-content h4 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ppx-text-primary);
+}
+
+.tip-content p {
   margin: 0;
-  color: #5a6070;
-  line-height: 1.5;
-  font-size: 13px;
+  font-size: 12px;
+  color: var(--ppx-text-muted);
+  line-height: 1.6;
 }
 
-.detail-with-link {
-  margin: 0;
-  color: #5a6070;
-  line-height: 1.5;
-  font-size: 13px;
-}
-
-.link-text {
-  color: #4058d7;
+.tip-link {
+  color: var(--ppx-neon-blue);
   text-decoration: none;
-  cursor: pointer;
   font-weight: 500;
-  transition: color 0.3s ease;
+  transition: color 0.2s;
 }
 
-.link-text:hover {
-  color: #2e3fb3;
+.tip-link:hover {
+  color: #4de0ff;
   text-decoration: underline;
 }
 
-@media (max-width: 1440px) {
-  .hero {
-    padding: 20px 28px;
-    max-height: 160px;
-  }
-
-  .content {
-    padding: 16px 20px;
-  }
-
-  .feature-grid {
-    gap: 14px;
-  }
-
-  .hero-panel {
-    width: 300px;
-  }
-}
-
+/* 响应式 */
 @media (max-width: 1200px) {
-  .hero {
-    flex-direction: column;
-    padding: 16px 20px;
-    max-height: none;
-    gap: 16px;
-  }
-
-  .hero-copy h1 {
-    font-size: 24px;
-  }
-
-  .hero-desc {
-    font-size: 13px;
-    margin: 12px 0 16px;
-  }
-
-  .hero-panel {
-    width: 100%;
-    grid-template-columns: repeat(3, 1fr);
-  }
-
-  .content {
-    padding: 14px 16px;
-  }
-
   .feature-grid {
-    grid-template-columns: 1fr;
-    gap: 12px;
+    grid-template-columns: repeat(2, 1fr);
   }
 
-  .checklist-cards {
-    grid-template-columns: repeat(2, 1fr);
+  .hero-section {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+  }
+
+  .hero-stats {
+    width: 100%;
+    justify-content: center;
   }
 }
 
 @media (max-width: 900px) {
-  .hero-copy h1 {
-    font-size: 20px;
-  }
-
-  .hero-actions {
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-
-  .hero-panel {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  h2 {
-    font-size: 20px;
-  }
-
-  .section-head {
-    margin-bottom: 14px;
-  }
-
-  .checklist-cards {
+  .feature-grid {
     grid-template-columns: 1fr;
-    gap: 12px;
+  }
+
+  .tips-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-title {
+    font-size: 26px;
+  }
+
+  .hero-stats {
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .stat-divider {
+    display: none;
   }
 }
 
-@media (max-width: 768px) {
-  .hero {
-    padding: 12px 14px;
+@media (max-width: 600px) {
+  .top-bar {
+    padding: 12px 16px;
   }
 
-  .hero-copy h1 {
-    font-size: 18px;
-    line-height: 1.2;
+  .hero-section {
+    padding: 20px 16px;
   }
 
-  .hero-desc {
-    font-size: 12px;
-    line-height: 1.5;
+  .content-area {
+    padding: 0 16px 20px;
   }
 
-  .hero-panel {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-
-  .stat-card {
-    padding: 12px 14px;
-  }
-
-  .stat-value {
-    font-size: 18px;
-  }
-
-  .content {
-    padding: 12px;
-  }
-
-  h2 {
-    font-size: 18px;
-  }
-
-  .section-head {
-    margin-bottom: 12px;
+  .hero-title {
+    font-size: 22px;
   }
 
   .feature-card {
-    min-height: auto;
-  }
-
-  .feature-icon {
-    width: 36px;
-    height: 36px;
-    padding: 8px;
-  }
-
-  .feature-title h3 {
-    font-size: 16px;
-  }
-
-  .feature-list li {
-    font-size: 12px;
-  }
-}
-
-@media (max-width: 480px) {
-  .hero {
-    padding: 8px 12px;
-  }
-
-  .hero-copy h1 {
-    font-size: 16px;
-  }
-
-  .hero-desc {
-    display: none;
-  }
-
-  .hero-actions {
-    gap: 8px;
-  }
-
-  .hero-note {
-    font-size: 11px;
-  }
-
-  .hero-panel {
-    display: none;
-  }
-
-  .content {
-    padding: 8px;
-  }
-
-  h2 {
-    font-size: 16px;
-  }
-
-  .section-head {
-    margin-bottom: 10px;
-  }
-
-  .section-head {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-
-  .feature-title h3 {
-    font-size: 14px;
-  }
-
-  .feature-list {
-    gap: 6px;
-    margin: 0 0 12px;
-  }
-
-  .feature-list li {
-    font-size: 11px;
-    gap: 6px;
-  }
-
-  .dot {
-    width: 5px;
-    height: 5px;
-    margin-top: 5px;
-  }
-
-  .check-card h3 {
-    font-size: 14px;
-    margin-bottom: 8px;
-  }
-
-  .check-card p {
-    font-size: 12px;
+    padding: 16px;
   }
 }
 </style>
