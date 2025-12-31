@@ -308,10 +308,10 @@ class ImageTool:
     # -------------------- Phase 2 功能 --------------------
 
     def image_preview(self, options: Dict | None = None):
-        """ͼƬԤ�� - ���� data URL��֧�ֱ������� file:/// ��Դ"""
+        """图片预览 - 返回 data URL，支持避免跨域的 file:/// 资源"""
         try:
             opts = self._validate(options)
-            # ֧�� file / path �������ֶ�
+            # 支持 file / path 两种参数字段
             file_path = ensure_file_path(opts.get('file') or opts.get('path'))
             try:
                 max_size = int(opts.get('maxSize') or 1920)
@@ -322,7 +322,7 @@ class ImageTool:
             with Image.open(file_path) as img:
                 img = img.convert('RGBA')
                 orig_w, orig_h = img.size
-                # ����ͼƬ���������ʱ�������Сһ�£������ڸ�ǰ�˵���غ�����
+                # 当图片尺寸超过阈值时，缩小以减轻前端的渲染负担
                 if max(orig_w, orig_h) > max_size:
                     img.thumbnail((max_size, max_size), Image.LANCZOS)
 
@@ -331,9 +331,9 @@ class ImageTool:
                 encoded = base64.b64encode(buffer.getvalue()).decode('ascii')
 
             preview = f'data:image/png;base64,{encoded}'
-            return api_success('ͼƬԤ�����ɹ�', preview=preview, width=orig_w, height=orig_h)
+            return api_success('图片预览成功', preview=preview, width=orig_w, height=orig_h)
         except Exception as exc:
-            return api_error(f'ͼƬԤ��ʧ�ܣ�{exc}')
+            return api_error(f'图片预览失败：{exc}')
 
     def image_add_watermark(self, options: Dict | None = None):
         """批量添加文字或图片水印，支持平铺与旋转"""

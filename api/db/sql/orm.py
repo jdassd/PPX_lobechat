@@ -28,24 +28,28 @@ class ORM:
         '''获取储存变量'''
         resVal = ''
         dbSession = DB.session()
-        with dbSession.begin():
-            stmt = select(PPXStorageVar.val).where(PPXStorageVar.key == key)
-            result = dbSession.execute(stmt)
-            result = result.one_or_none()
-            if result is not None:
-                resVal = result[0]
-        dbSession.close()
+        try:
+            with dbSession.begin():
+                stmt = select(PPXStorageVar.val).where(PPXStorageVar.key == key)
+                result = dbSession.execute(stmt)
+                result = result.one_or_none()
+                if result is not None:
+                    resVal = result[0]
+        finally:
+            dbSession.close()
         return resVal
 
     def setStorageVar(self, key, val):
         '''更新储存变量'''
         dbSession = DB.session()
-        with dbSession.begin():
-            data = {'key': key, 'val': val}
-            stmt = insert(PPXStorageVar).values(**data)
-            stmt = stmt.on_conflict_do_update(
-                index_elements=['key'],  # 唯一索引或主键
-                set_=data
-            )
-            dbSession.execute(stmt)
-        dbSession.close()
+        try:
+            with dbSession.begin():
+                data = {'key': key, 'val': val}
+                stmt = insert(PPXStorageVar).values(**data)
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=['key'],  # 唯一索引或主键
+                    set_=data
+                )
+                dbSession.execute(stmt)
+        finally:
+            dbSession.close()

@@ -17,7 +17,7 @@ import platform
 import shutil
 import subprocess
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List
 
@@ -137,13 +137,12 @@ class System():
 
     def system_pyOpenFile(self, path):
         '''用电脑默认软件打开本地文件'''
-        # 判断以下当前系统类型
+        # 使用 pathlib 进行跨平台路径处理
+        file_path = Path(path).resolve()
         if Config.appIsMacOS:
-            path = path.replace("\\", "/")
-            subprocess.call(["open", path])
+            subprocess.call(["open", str(file_path)])
         else:
-            path = path.replace("/", "\\")
-            os.startfile(path)
+            os.startfile(str(file_path))
 
     def system_pyCreateFileDialog(self, fileTypes=['全部文件 (*.*)'], directory=''):
         '''打开文件对话框'''
@@ -297,7 +296,7 @@ class System():
         elif raw:
             pids = [raw]
         metrics = []
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.now(timezone.utc).isoformat()
         for pid in pids:
             try:
                 proc = psutil.Process(int(pid))
@@ -425,7 +424,7 @@ class System():
             description = rule.get('description', '')
             rules = self._load_startup_rules()
             rule_id = rule.get('id') or ''
-            now = datetime.utcnow().isoformat()
+            now = datetime.now(timezone.utc).isoformat()
             updated = False
             if rule_id:
                 for item in rules:
@@ -499,7 +498,7 @@ class System():
             if platform.system() == 'Windows' and hasattr(subprocess, 'CREATE_NO_WINDOW'):
                 creationflags = subprocess.CREATE_NO_WINDOW
             process = subprocess.Popen(command, shell=True, creationflags=creationflags)
-            target['lastRun'] = datetime.utcnow().isoformat()
+            target['lastRun'] = datetime.now(timezone.utc).isoformat()
             target['lastPid'] = process.pid
             self._save_startup_rules(rules)
             return {'success': True, 'pid': process.pid, 'rule': target}

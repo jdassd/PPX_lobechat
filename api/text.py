@@ -200,9 +200,14 @@ class TextTool:
                 result = self._query_json(data, query)
                 return api_success('查询完成', result=result)
             raise ValueError('未知操作类型')
+        except json.JSONDecodeError as exc:
+            return api_error(f'不是有效的 JSON 格式：第 {exc.lineno} 行第 {exc.colno} 列')
+        except KeyError as exc:
+            return api_error(f'查询路径不存在：{exc}')
+        except ValueError as exc:
+            return api_error(f'JSON 处理失败：{exc}')
         except Exception:
-            # 统一对外提示为“不是JSON格式数据”，避免暴露内部异常细节
-            return api_error('不是JSON格式数据')
+            return api_error('JSON 处理失败')
 
     def text_regex_match(self, options: Dict | None = None):
         """正则搜索 / 替换 / 提取"""

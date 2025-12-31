@@ -6,7 +6,7 @@ Date: 2025-07-04
 Description: PDF 工具相关 API
 '''
 
-from datetime import datetime
+from datetime import datetime, timezone
 import random
 from io import BytesIO
 from pathlib import Path
@@ -95,7 +95,7 @@ class PDF():
         from xml.sax.saxutils import escape as xml_escape
 
         dest.parent.mkdir(parents=True, exist_ok=True)
-        now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+        now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
         def _paragraph_xml(text: str) -> str:
             return f'<w:p><w:r><w:t>{xml_escape(text)}</w:t></w:r></w:p>'
@@ -165,19 +165,23 @@ class PDF():
             chunk = chunk.strip()
             if not chunk:
                 continue
-            if '-' in chunk:
-                start_str, end_str = chunk.split('-', 1)
-                start = int(start_str)
-                end = int(end_str)
-                if start > end:
-                    start, end = end, start
-                for page in range(start, end + 1):
+            try:
+                if '-' in chunk:
+                    start_str, end_str = chunk.split('-', 1)
+                    start = int(start_str.strip())
+                    end = int(end_str.strip())
+                    if start > end:
+                        start, end = end, start
+                    for page in range(start, end + 1):
+                        if 1 <= page <= total_pages:
+                            pages.append(page)
+                else:
+                    page = int(chunk)
                     if 1 <= page <= total_pages:
                         pages.append(page)
-            else:
-                page = int(chunk)
-                if 1 <= page <= total_pages:
-                    pages.append(page)
+            except (ValueError, TypeError):
+                # 忽略无效的页码格式
+                continue
         # 去重并保持顺序
         unique_pages: List[int] = []
         seen = set()

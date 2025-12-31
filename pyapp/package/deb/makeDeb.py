@@ -10,7 +10,10 @@ usage: 运行前，请确保本机已经搭建 Python3 开发环境，且已经�
 '''
 
 import os
+import shutil
+import subprocess
 import sys
+from pathlib import Path
 
 scriptDir = os.path.dirname(os.path.abspath(__file__))
 pyappDir = os.path.dirname(os.path.dirname(scriptDir))
@@ -95,21 +98,43 @@ with open(os.path.join(scriptDir, 'postinst'), 'w+', encoding='utf-8') as f:
 
 buildDir = os.path.join(rootDir, 'build')
 
-os.system(f'mkdir -p {buildDir}/bin && mv {buildDir}/{appDistName} {buildDir}/bin/{appDistName}')
-os.system(f'mkdir -p {buildDir}/{appName}/DEBIAN')
-os.system(f'mkdir -p {buildDir}/{appName}/opt/{appName}/bin')
-os.system(f'mkdir -p {buildDir}/{appName}/usr/share/applications')
-os.system(f'mkdir -p {buildDir}/{appName}/usr/share/icons/hicolor/128x128/apps')
-os.system(f'cp {buildDir}/bin/{appDistName} {buildDir}/{appName}/opt/{appName}/bin/{appName}')
-os.system(f'cp {scriptDir}/control {buildDir}/{appName}/DEBIAN/control')
-os.system(f'cp {scriptDir}/postinst {buildDir}/{appName}/DEBIAN/postinst && chmod 755 {buildDir}/{appName}/DEBIAN/postinst')
-os.system(f'cp {scriptDir}/{appName}.desktop {buildDir}/{appName}/usr/share/applications/{appName}.desktop')
-os.system(f'cp {logoPath} {buildDir}/{appName}/usr/share/icons/hicolor/128x128/apps/{appName}.png')
+# 使用 pathlib 和 shutil 进行文件操作，避免 shell 注入风险
+buildPath = Path(buildDir)
+scriptPath = Path(scriptDir)
+logoFile = Path(logoPath)
 
-os.system(f'cd {buildDir}')
-os.system(f'cd {buildDir} && dpkg-deb --build {appName}')
+# 创建目录结构
+(buildPath / 'bin').mkdir(parents=True, exist_ok=True)
+(buildPath / appName / 'DEBIAN').mkdir(parents=True, exist_ok=True)
+(buildPath / appName / 'opt' / appName / 'bin').mkdir(parents=True, exist_ok=True)
+(buildPath / appName / 'usr' / 'share' / 'applications').mkdir(parents=True, exist_ok=True)
+(buildPath / appName / 'usr' / 'share' / 'icons' / 'hicolor' / '128x128' / 'apps').mkdir(parents=True, exist_ok=True)
 
-os.system(f'rm -fr {buildDir}/{appName} && mv {buildDir}/bin/{appDistName} {buildDir}/{appDistName} && rm -fr {buildDir}/bin')
+# 移动可执行文件到 bin 目录
+src_exe = buildPath / appDistName
+dst_exe = buildPath / 'bin' / appDistName
+if src_exe.exists():
+    shutil.move(str(src_exe), str(dst_exe))
 
-os.system(f'mv {buildDir}/{appName}.deb {buildDir}/{appName}-V{appVersion}_Linux.deb')
+# 复制文件
+shutil.copy2(str(dst_exe), str(buildPath / appName / 'opt' / appName / 'bin' / appName))
+shutil.copy2(str(scriptPath / 'control'), str(buildPath / appName / 'DEBIAN' / 'control'))
+
+postinst_src = scriptPath / 'postinst'
+postinst_dst = buildPath / appName / 'DEBIAN' / 'postinst'
+shutil.copy2(str(postinst_src), str(postinst_dst))
+postinst_dst.chmod(0o755)
+
+shutil.copy2(str(scriptPath / f'{appName}.desktop'), str(buildPath / appName / 'usr' / 'share' / 'applications' / f'{appName}.desktop'))
+shutil.copy2(str(logoFile), str(buildPath / appName / 'usr' / 'share' / 'icons' / 'hicolor' / '128x128' / 'apps' / f'{appName}.png'))
+
+# 构建 deb 包
+subprocess.run(['dpkg-deb', '--build', appName], cwd=str(buildPath), check=True)
+
+# 清理并重命名
+shutil.rmtree(str(buildPath / appName), ignore_errors=True)
+shutil.move(str(buildPath / 'bin' / appDistName), str(buildPath / appDistName))
+shutil.rmtree(str(buildPath / 'bin'), ignore_errors=True)
+
+shutil.move(str(buildPath / f'{appName}.deb'), str(buildPath / f'{appName}-V{appVersion}_Linux.deb'))
 
