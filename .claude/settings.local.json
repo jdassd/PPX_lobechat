@@ -3,7 +3,8 @@
     "allow": [
       "Bash(findstr:*)",
       "Bash(powershell:*)",
-      "Skill(frontend-design)"
+      "Skill(frontend-design)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

@@ -145,6 +145,51 @@ class Excel():
             'generatedAt': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
 
+    def _coerce_number(self, value: Any) -> Optional[float]:
+        if value is None:
+            return None
+        try:
+            return float(str(value).replace(',', '').strip())
+        except Exception:
+            return None
+
+    def _build_echarts_option(
+        self,
+        chart_type: str,
+        labels: List[str],
+        values: List[float],
+        rows: List[Dict[str, Any]],
+        series_label: str
+    ) -> Dict[str, Any]:
+        if chart_type == 'pie':
+            return {
+                'tooltip': {'trigger': 'item'},
+                'legend': {'top': 'bottom'},
+                'series': [
+                    {
+                        'name': series_label,
+                        'type': 'pie',
+                        'radius': ['35%', '70%'],
+                        'data': rows,
+                        'label': {'formatter': '{b}: {c}'}
+                    }
+                ]
+            }
+        return {
+            'tooltip': {'trigger': 'axis'},
+            'grid': {'left': '3%', 'right': '4%', 'bottom': '3%', 'containLabel': True},
+            'xAxis': {'type': 'category', 'data': labels},
+            'yAxis': {'type': 'value'},
+            'series': [
+                {
+                    'name': series_label,
+                    'type': chart_type,
+                    'data': values,
+                    'smooth': chart_type == 'line'
+                }
+            ]
+        }
+
     # -------- APIs --------
 
     def excel_preview(self, options: Dict = None):
@@ -243,6 +288,87 @@ class Excel():
             }
         except Exception as exc:
             return {'code': -1, 'msg': f'处理失败：{exc}'}
+
+    def excel_chart_build(self, options: Dict = None):
+        '''构建 ECharts 图表数据'''
+        try:
+            opts = self._validate_payload(options)
+            source = self._ensure_excel_file(opts.get('filePath', ''))
+            sheet_name = opts.get('sheetName')
+            delimiter = opts.get('delimiter') or '|'
+            schema_text = opts.get('schemaText', '')
+            chart_type = (opts.get('chartType') or 'bar').lower()
+            dimension = opts.get('dimension') or ''
+            metric = opts.get('metric') or ''
+            aggregate = (opts.get('aggregate') or 'sum').lower()
+
+            if chart_type not in ('bar', 'line', 'pie'):
+                raise ValueError('仅支持 bar / line / pie 图表')
+            if not dimension:
+                raise ValueError('请选择维度列')
+
+            header, data_rows, active_sheet = self._load_sheet(source, sheet_name)
+            schema = self._normalize_schema(schema_text, delimiter, header)
+
+            if dimension not in schema:
+                raise ValueError(f'维度列不存在：{dimension}')
+            if aggregate in ('sum', 'avg'):
+                if not metric:
+                    raise ValueError('请选择数值列')
+                if metric not in schema:
+                    raise ValueError(f'数值列不存在：{metric}')
+
+            records = self._rows_to_dicts(schema, data_rows, active_sheet)
+            order: List[str] = []
+            counts: Dict[str, int] = {}
+            sums: Dict[str, float] = {}
+            for row in records:
+                key = str(row.get(dimension) or '').strip() or '未分类'
+                if key not in counts:
+                    order.append(key)
+                    counts[key] = 0
+                    sums[key] = 0.0
+                counts[key] += 1
+                if aggregate in ('sum', 'avg'):
+                    value = self._coerce_number(row.get(metric))
+                    if value is not None:
+                        sums[key] += value
+
+            rows: List[Dict[str, Any]] = []
+            for key in order:
+                if aggregate == 'count':
+                    value = counts.get(key, 0)
+                elif aggregate == 'avg':
+                    total = sums.get(key, 0.0)
+                    value = round(total / counts.get(key, 1), 4) if counts.get(key, 0) else 0
+                else:
+                    value = round(sums.get(key, 0.0), 4)
+                rows.append({'name': key, 'value': value})
+
+            labels = [item['name'] for item in rows]
+            values = [item['value'] for item in rows]
+
+            aggregate_label = {'sum': '求和', 'avg': '均值', 'count': '计数'}.get(aggregate, '求和')
+            metric_label = metric or '记录'
+            series_label = f'{metric_label} · {aggregate_label}'
+            option = self._build_echarts_option(chart_type, labels, values, rows, series_label)
+
+            return {
+                'code': 0,
+                'msg': '图表数据生成完成',
+                'schema': schema,
+                'sheet': active_sheet,
+                'data': {
+                    'dimension': dimension,
+                    'metric': metric,
+                    'aggregate': aggregate,
+                    'rows': rows,
+                    'generatedAt': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                },
+                'option': option
+            }
+        except Exception as exc:
+            return {'code': -1, 'msg': f'生成失败：{exc}'}
 
     def excel_merge_tables(self, options: Dict = None):
         '''将多个分表合并为主表'''
