@@ -5,7 +5,7 @@ import BtnUpdate from './components/BtnUpdate.vue'
 import PdfTool from './components/pdf/PdfTool.vue'
 import ExcelTool from './components/excel/ExcelTool.vue'
 import SealTool from './components/seal/SealTool.vue'
-import ProcessManager from './components/system/ProcessManager.vue'
+import SystemCenter from './components/system/SystemCenter.vue'
 import ImageTool from './components/image/ImageTool.vue'
 import TextTool from './components/text/TextTool.vue'
 import VideoTool from './components/video/VideoTool.vue'
@@ -152,21 +152,6 @@ const featureCards = [
       '导出透明 PNG，方便叠加使用'
     ]
   },
-  {
-    id: 'process',
-    title: '进程管理',
-    desc: '定位占用端口的进程',
-    icon: markRaw(Monitor),
-    color: 'indigo',
-    tags: ['端口排查', '强制结束'],
-    action: '打开面板',
-    disabled: false,
-    points: [
-      '按进程名或命令模糊搜索',
-      '根据端口筛查冲突来源',
-      '内置强制结束能力'
-    ]
-  },
 ]
 
 const financeCards = [
@@ -184,6 +169,25 @@ const financeCards = [
       '自动补全人民币前缀与元/角/分',
       '符合银行票据填写规范',
       '内置常见示例便于核对'
+    ]
+  }
+]
+
+
+const systemCards = [
+  {
+    id: 'system',
+    title: '系统管理',
+    desc: '性能监控、温度/电压/风扇、启动项',
+    icon: markRaw(Monitor),
+    color: 'indigo',
+    tags: ['CPU / GPU', '系统状态'],
+    action: '打开面板',
+    disabled: false,
+    points: [
+      'CPU / 内存 / 磁盘 / GPU 性能监控',
+      '温度、电压、风扇转速实时展示',
+      '开机启动项管理、系统运行时间'
     ]
   }
 ]
@@ -215,7 +219,7 @@ const checklist = [
 const pdfToolVisible = ref(false)
 const excelToolVisible = ref(false)
 const sealToolVisible = ref(false)
-const processToolVisible = ref(false)
+const systemToolVisible = ref(false)
 const imageToolVisible = ref(false)
 const textToolVisible = ref(false)
 const videoToolVisible = ref(false)
@@ -229,7 +233,7 @@ const onFeatureAction = (feature) => {
     excel: excelToolVisible,
     pdf: pdfToolVisible,
     seal: sealToolVisible,
-    process: processToolVisible,
+    system: systemToolVisible,
     image: imageToolVisible,
     text: textToolVisible,
     video: videoToolVisible,
@@ -383,6 +387,55 @@ const onFeatureAction = (feature) => {
           </div>
         </div>
 
+        <div class="section-header">
+          <div class="section-title">
+            <span class="section-badge">系统管理专区</span>
+            <h2>系统管理</h2>
+          </div>
+        </div>
+
+        <div class="feature-grid">
+          <div
+            v-for="(feature, index) in systemCards"
+            :key="feature.id"
+            class="feature-card"
+            :class="[`card-${feature.color}`, { disabled: feature.disabled }]"
+            :style="{ '--delay': `${index * 0.05}s` }"
+            @click="onFeatureAction(feature)"
+          >
+            <div class="card-glow"></div>
+
+            <div class="card-header">
+              <div class="icon-wrapper">
+                <component :is="feature.icon" class="feature-icon" />
+              </div>
+              <div class="title-area">
+                <h3>{{ feature.title }}</h3>
+                <p>{{ feature.desc }}</p>
+              </div>
+            </div>
+
+            <ul class="feature-points">
+              <li v-for="point in feature.points" :key="point">
+                <span class="point-dot"></span>
+                <span>{{ point }}</span>
+              </li>
+            </ul>
+
+            <div class="card-footer">
+              <div class="tag-list">
+                <span v-for="tag in feature.tags" :key="tag" class="feature-tag">
+                  {{ tag }}
+                </span>
+              </div>
+              <button class="action-btn" :disabled="feature.disabled">
+                {{ feature.action }}
+                <span class="btn-arrow">→</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- 提示信息 -->
         <section class="tips-section">
           <div class="tips-header">
@@ -418,7 +471,7 @@ const onFeatureAction = (feature) => {
   <PdfTool v-model="pdfToolVisible" />
   <ExcelTool v-model="excelToolVisible" />
   <SealTool v-model="sealToolVisible" />
-  <ProcessManager v-model="processToolVisible" />
+  <SystemCenter v-model="systemToolVisible" />
   <FinanceTool v-model="financeToolVisible" />
 </template>
 

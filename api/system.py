@@ -17,6 +17,7 @@ import platform
 import shlex
 import shutil
 import subprocess
+import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -413,6 +414,214 @@ class System():
             }
         except Exception as exc:
             return {'success': False, 'message': str(exc)}
+
+    def _format_duration(self, seconds: float) -> str:
+        seconds = max(0, int(seconds or 0))
+        days, rem = divmod(seconds, 86400)
+        hours, rem = divmod(rem, 3600)
+        minutes, secs = divmod(rem, 60)
+        if days:
+            return f'{days} 天 {hours} 小时'
+        if hours:
+            return f'{hours} 小时 {minutes} 分'
+        if minutes:
+            return f'{minutes} 分 {secs} 秒'
+        return f'{secs} 秒'
+
+    def _safe_float(self, value):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _query_nvidia_gpus(self):
+        if not shutil.which('nvidia-smi'):
+            return []
+        query_fields = [
+            'name',
+            'temperature.gpu',
+            'utilization.gpu',
+            'utilization.memory',
+            'memory.total',
+            'memory.used',
+            'fan.speed',
+            'power.draw'
+        ]
+        command = [
+            'nvidia-smi',
+            f'--query-gpu={",".join(query_fields)}',
+            '--format=csv,noheader,nounits'
+        ]
+        try:
+            output = subprocess.check_output(command, text=True, encoding='utf-8', errors='ignore')
+        except Exception:
+            return []
+        gpus = []
+        for line in output.splitlines():
+            if not line.strip():
+                continue
+            parts = [item.strip() for item in line.split(',')]
+            if len(parts) < len(query_fields):
+                continue
+            name = parts[0]
+            temperature = self._safe_float(parts[1])
+            utilization = self._safe_float(parts[2])
+            memory_util = self._safe_float(parts[3])
+            memory_total = self._safe_float(parts[4])
+            memory_used = self._safe_float(parts[5])
+            fan_speed = self._safe_float(parts[6])
+            power_draw = self._safe_float(parts[7])
+            memory_percent = None
+            if memory_total:
+                memory_percent = round((memory_used or 0) / memory_total * 100, 2)
+            gpus.append({
+                'name': name,
+                'temperature': temperature,
+                'temperatureLabel': f'{temperature:.1f}°C' if temperature is not None else '',
+                'utilization': round(utilization or 0, 2) if utilization is not None else 0,
+                'memoryUtilization': round(memory_util or 0, 2) if memory_util is not None else 0,
+                'memoryTotal': memory_total or 0,
+                'memoryUsed': memory_used or 0,
+                'memoryPercent': memory_percent or 0,
+                'memoryTotalText': format_bytes((memory_total or 0) * 1024 * 1024),
+                'memoryUsedText': format_bytes((memory_used or 0) * 1024 * 1024),
+                'fanSpeed': fan_speed,
+                'fanSpeedLabel': f'{fan_speed:.0f}%' if fan_speed is not None else '',
+                'powerDraw': power_draw
+            })
+        return gpus
+
+    def system_getSystemStatus(self):
+        '''获取系统概览与传感器信息'''
+        if psutil is None:
+            return self._psutil_missing_response()
+
+        cpu_percent = psutil.cpu_percent(interval=0.2)
+        cpu_count = psutil.cpu_count(logical=True) or 0
+        cpu_freq = psutil.cpu_freq()
+        cpu_freq_label = f'{cpu_freq.current:.0f} MHz' if cpu_freq else ''
+
+        memory = psutil.virtual_memory()
+        swap = psutil.swap_memory()
+
+        disks = []
+        try:
+            partitions = psutil.disk_partitions(all=False)
+        except Exception:
+            partitions = []
+        for part in partitions:
+            try:
+                usage = psutil.disk_usage(part.mountpoint)
+            except Exception:
+                continue
+            label = part.device or part.mountpoint
+            disks.append({
+                'device': part.device,
+                'mount': part.mountpoint,
+                'fstype': part.fstype,
+                'label': label,
+                'total': usage.total,
+                'used': usage.used,
+                'percent': round(usage.percent or 0, 2),
+                'totalText': format_bytes(usage.total),
+                'usedText': format_bytes(usage.used)
+            })
+
+        temperatures = []
+        fans = []
+        voltages = []
+        try:
+            temps_raw = psutil.sensors_temperatures(fahrenheit=False) or {}
+            for name, entries in temps_raw.items():
+                for entry in entries:
+                    temperatures.append({
+                        'name': name,
+                        'label': entry.label or name,
+                        'value': entry.current,
+                        'high': entry.high,
+                        'critical': entry.critical
+                    })
+        except Exception:
+            pass
+
+        try:
+            fans_raw = psutil.sensors_fans() or {}
+            for name, entries in fans_raw.items():
+                for entry in entries:
+                    fans.append({
+                        'name': name,
+                        'label': entry.label or name,
+                        'value': entry.current
+                    })
+        except Exception:
+            pass
+
+        gpus = self._query_nvidia_gpus()
+
+        cpu_temp_label = ''
+        for temp in temperatures:
+            label = f"{temp.get('name', '')} {temp.get('label', '')}".lower()
+            if 'cpu' in label or 'core' in label or 'package' in label:
+                if temp.get('value') is not None:
+                    cpu_temp_label = f"{temp.get('value')}°C"
+                break
+
+        boot_time = psutil.boot_time()
+        uptime_seconds = time.time() - boot_time if boot_time else 0
+        uptime = {
+            'seconds': round(uptime_seconds, 2),
+            'text': self._format_duration(uptime_seconds)
+        }
+
+        load_label = ''
+        load_data = {}
+        try:
+            load_avg = psutil.getloadavg()
+            load_data = {
+                'avg1': round(load_avg[0], 2),
+                'avg5': round(load_avg[1], 2),
+                'avg15': round(load_avg[2], 2)
+            }
+            load_label = f"{load_data['avg1']}/{load_data['avg5']}/{load_data['avg15']}"
+        except Exception:
+            load_label = f'CPU {cpu_percent:.1f}%'
+        load_data['label'] = load_label
+
+        now_label = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        return {
+            'success': True,
+            'updatedAt': now_label,
+            'uptime': uptime,
+            'load': load_data,
+            'cpu': {
+                'percent': round(cpu_percent or 0, 2),
+                'cores': cpu_count,
+                'freq': cpu_freq_label,
+                'tempLabel': cpu_temp_label
+            },
+            'memory': {
+                'percent': round(memory.percent or 0, 2),
+                'total': memory.total,
+                'used': memory.used,
+                'totalText': format_bytes(memory.total),
+                'usedText': format_bytes(memory.used),
+                'text': f"{format_bytes(memory.used)} / {format_bytes(memory.total)}"
+            },
+            'swap': {
+                'percent': round(swap.percent or 0, 2),
+                'total': swap.total,
+                'used': swap.used,
+                'text': f"{format_bytes(swap.used)} / {format_bytes(swap.total)}"
+            },
+            'disks': disks,
+            'gpus': gpus,
+            'sensors': {
+                'temperatures': temperatures,
+                'fans': fans,
+                'voltages': voltages
+            }
+        }
 
     def system_saveStartupRule(self, rule):
         '''新增或更新自动启动规则'''
