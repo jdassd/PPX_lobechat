@@ -78,10 +78,13 @@ const state = reactive({
     search: '',
     pattern: '',
     replace: '',
+    template: '{date}_{name}',
+    presetTemplate: '',
     conflictPolicy: 'skip',
     dryRun: true,
     result: [],
-    skipped: []
+    skipped: [],
+    showHelp: false
   },
   dedup: {
     directory: '',
@@ -399,6 +402,49 @@ const runDelete = async () => {
   }
 }
 
+// 预置模板选项
+const presetTemplates = [
+  { label: '日期 + 序号', value: '{date}_{index:3}' },
+  { label: '日期 + 原名', value: '{date}_{name}' },
+  { label: '原名 + 备份后缀', value: '{name}_backup' },
+  { label: '纯序号', value: 'IMG_{index:4}' },
+  { label: '年月日时分秒', value: '{datetime}_{index}' },
+  { label: '年/月/原名', value: '{year}{month}_{name}' }
+]
+
+// 变量说明
+const templateVariables = [
+  { var: '{name}', desc: '原文件名（不含扩展名）' },
+  { var: '{ext}', desc: '扩展名（如 .jpg）' },
+  { var: '{index}', desc: '序号（自动补零）' },
+  { var: '{index:4}', desc: '指定4位序号' },
+  { var: '{date}', desc: '日期 (YYYYMMDD)' },
+  { var: '{time}', desc: '时间 (HHMMSS)' },
+  { var: '{datetime}', desc: '日期时间' },
+  { var: '{year}', desc: '年份' },
+  { var: '{month}', desc: '月份' },
+  { var: '{day}', desc: '日' }
+]
+
+// 正则表达式示例
+const regexExamples = [
+  { target: '删除空格', pattern: '\\s+', replace: '_', desc: '空格 → 下划线' },
+  { target: '删除括号内容', pattern: '\\([^)]*\\)', replace: '', desc: '移除 (xxx)' },
+  { target: '删除开头数字', pattern: '^\\d+[._-]?', replace: '', desc: '移除开头 01-' },
+  { target: '仅保留字母数字', pattern: '[^a-zA-Z0-9]', replace: '_', desc: '其他字符变下划线' }
+]
+
+const applyPreset = (value) => {
+  if (value) {
+    state.rename.template = value
+  }
+}
+
+const applyRegexExample = (example) => {
+  state.rename.pattern = example.pattern
+  state.rename.replace = example.replace
+}
+
 const buildRenameParams = () => {
   if (state.rename.rule === 'sequence') {
     return {
@@ -415,8 +461,15 @@ const buildRenameParams = () => {
   }
   if (state.rename.rule === 'replace') {
     return {
-      pattern: state.rename.search,
+      search: state.rename.search,
       replace: state.rename.replace
+    }
+  }
+  if (state.rename.rule === 'template') {
+    return {
+      template: state.rename.template,
+      start: state.rename.start,
+      padding: state.rename.padding
     }
   }
   return {
@@ -825,7 +878,7 @@ const runCompare = async () => {
           <section class="panel">
             <header>
               <h4>重命名规则</h4>
-              <p>支持序号、时间戳、替换或正则表达式</p>
+              <p>支持序号、时间戳、替换、正则表达式或自定义模板</p>
             </header>
             <el-form :model="state.rename" label-width="120px">
               <el-form-item label="目录">
@@ -852,9 +905,12 @@ const runCompare = async () => {
                   <el-radio-button label="sequence">序号</el-radio-button>
                   <el-radio-button label="timestamp">时间戳</el-radio-button>
                   <el-radio-button label="replace">替换</el-radio-button>
+                  <el-radio-button label="template">模板</el-radio-button>
                   <el-radio-button label="regex">正则</el-radio-button>
                 </el-radio-group>
               </el-form-item>
+
+              <!-- 序号模式 -->
               <div v-if="state.rename.rule === 'sequence'" class="field-row">
                 <el-form-item label="前缀">
                   <el-input v-model="state.rename.prefix" placeholder="如 IMG_" />
@@ -866,6 +922,8 @@ const runCompare = async () => {
                   <el-input-number v-model="state.rename.padding" :min="1" :max="6" />
                 </el-form-item>
               </div>
+
+              <!-- 时间戳模式 -->
               <div v-else-if="state.rename.rule === 'timestamp'" class="field-row">
                 <el-form-item label="起始值">
                   <el-input-number v-model="state.rename.start" :min="1" />
@@ -874,29 +932,126 @@ const runCompare = async () => {
                   <el-input-number v-model="state.rename.padding" :min="1" :max="6" />
                 </el-form-item>
               </div>
-              <div v-else class="field-row">
-                <el-form-item label="匹配">
-                  <el-input
-                    v-if="state.rename.rule === 'regex'"
-                    v-model="state.rename.pattern"
-                    placeholder="正则表达式"
-                  />
-                  <el-input
-                    v-else
-                    v-model="state.rename.search"
-                    placeholder="要替换的文本"
-                  />
+
+              <!-- 模板模式 -->
+              <div v-else-if="state.rename.rule === 'template'" class="rename-template-section">
+                <el-form-item label="预置模板">
+                  <el-select
+                    v-model="state.rename.presetTemplate"
+                    placeholder="选择常用模板"
+                    style="width: 220px"
+                    clearable
+                    @change="applyPreset"
+                  >
+                    <el-option
+                      v-for="item in presetTemplates"
+                      :key="item.value"
+                      :label="item.label"
+                      :value="item.value"
+                    />
+                  </el-select>
+                </el-form-item>
+                <el-form-item label="自定义模板">
+                  <div class="field-row">
+                    <el-input
+                      v-model="state.rename.template"
+                      placeholder="如 {date}_{name}"
+                      style="flex: 1"
+                    />
+                    <el-popover placement="right" :width="320" trigger="hover">
+                      <template #reference>
+                        <el-button type="info" text>变量说明</el-button>
+                      </template>
+                      <div class="var-help">
+                        <p class="var-help-title">可用变量：</p>
+                        <el-table :data="templateVariables" size="small" border>
+                          <el-table-column prop="var" label="变量" width="100" />
+                          <el-table-column prop="desc" label="说明" />
+                        </el-table>
+                        <p class="var-help-example">示例：{date}_{name} → 20260104_photo.jpg</p>
+                      </div>
+                    </el-popover>
+                  </div>
+                </el-form-item>
+                <el-form-item label="起始序号">
+                  <el-input-number v-model="state.rename.start" :min="1" />
+                </el-form-item>
+              </div>
+
+              <!-- 正则模式 -->
+              <div v-else-if="state.rename.rule === 'regex'" class="rename-regex-section">
+                <el-form-item label="正则表达式">
+                  <div class="field-row">
+                    <el-input
+                      v-model="state.rename.pattern"
+                      placeholder="如 \s+ 匹配空格"
+                      style="flex: 1"
+                    />
+                    <el-popover placement="right" :width="400" trigger="hover">
+                      <template #reference>
+                        <el-button type="info" text>常用示例</el-button>
+                      </template>
+                      <div class="regex-help">
+                        <p class="regex-help-title">常用正则表达式示例（点击可应用）：</p>
+                        <el-table :data="regexExamples" size="small" border>
+                          <el-table-column prop="target" label="目标" width="100" />
+                          <el-table-column prop="pattern" label="匹配" width="120" />
+                          <el-table-column prop="desc" label="效果" />
+                          <el-table-column label="操作" width="70">
+                            <template #default="scope">
+                              <el-button size="small" text type="primary" @click="applyRegexExample(scope.row)">
+                                应用
+                              </el-button>
+                            </template>
+                          </el-table-column>
+                        </el-table>
+                      </div>
+                    </el-popover>
+                  </div>
+                </el-form-item>
+                <el-form-item label="替换为">
+                  <el-input v-model="state.rename.replace" placeholder="替换内容，留空表示删除匹配部分" />
+                </el-form-item>
+              </div>
+
+              <!-- 简单替换模式 -->
+              <div v-else-if="state.rename.rule === 'replace'" class="field-row">
+                <el-form-item label="查找文本">
+                  <el-input v-model="state.rename.search" placeholder="要替换的文本" />
                 </el-form-item>
                 <el-form-item label="替换为">
                   <el-input v-model="state.rename.replace" placeholder="替换内容" />
                 </el-form-item>
               </div>
+
               <el-form-item>
                 <el-button type="primary" :loading="state.loading" @click="runRename">
                   {{ state.rename.dryRun ? '预览结果' : '执行改名' }}
                 </el-button>
               </el-form-item>
             </el-form>
+
+            <!-- 使用说明 -->
+            <el-collapse v-model="state.rename.showHelp" class="rename-help-collapse">
+              <el-collapse-item title="📖 使用说明" name="help">
+                <div class="rename-help-content">
+                  <h5>规则说明</h5>
+                  <ul>
+                    <li><strong>序号</strong>：按序号重命名，如 FILE_001、FILE_002</li>
+                    <li><strong>时间戳</strong>：使用当前时间命名</li>
+                    <li><strong>替换</strong>：简单文本替换，无需正则知识</li>
+                    <li><strong>模板</strong>：使用变量组合自定义格式，推荐新手使用</li>
+                    <li><strong>正则</strong>：高级模式，支持正则表达式匹配</li>
+                  </ul>
+                  <h5>操作建议</h5>
+                  <ul>
+                    <li>首次操作请先开启「仅预览」模式，确认无误后再执行</li>
+                    <li>不熟悉正则？试试「模板」模式，选择预置模板或使用变量</li>
+                  </ul>
+                </div>
+              </el-collapse-item>
+            </el-collapse>
+
             <el-table
               v-if="state.rename.result.length"
               :data="state.rename.result"
@@ -904,8 +1059,8 @@ const runCompare = async () => {
               size="small"
               style="margin-top: 12px"
             >
-              <el-table-column label="原文件" prop="from" />
-              <el-table-column label="新文件" prop="to" />
+              <el-table-column label="原文件" prop="from" show-overflow-tooltip />
+              <el-table-column label="新文件" prop="to" show-overflow-tooltip />
             </el-table>
           </section>
         </el-tab-pane>
@@ -1266,5 +1421,67 @@ const runCompare = async () => {
 
 .form-gap {
   margin-top: 12px;
+}
+
+/* 重命名模块样式 */
+.rename-template-section,
+.rename-regex-section {
+  margin-bottom: 12px;
+}
+
+.var-help,
+.regex-help {
+  font-size: 13px;
+}
+
+.var-help-title,
+.regex-help-title {
+  font-weight: 600;
+  margin: 0 0 8px;
+  color: var(--ppx-text-primary);
+}
+
+.var-help-example {
+  margin: 8px 0 0;
+  padding: 6px 10px;
+  background: var(--ppx-glass-bg);
+  border-radius: var(--ppx-radius-sm);
+  color: var(--ppx-text-secondary);
+  font-size: 12px;
+}
+
+.rename-help-collapse {
+  margin-top: 16px;
+  border: 1px solid var(--ppx-glass-border);
+  border-radius: var(--ppx-radius-md);
+  overflow: hidden;
+}
+
+.rename-help-content {
+  font-size: 13px;
+  color: var(--ppx-text-secondary);
+}
+
+.rename-help-content h5 {
+  font-size: 14px;
+  margin: 0 0 8px;
+  color: var(--ppx-text-primary);
+}
+
+.rename-help-content h5:not(:first-child) {
+  margin-top: 16px;
+}
+
+.rename-help-content ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.rename-help-content li {
+  margin-bottom: 4px;
+}
+
+.rename-help-content strong {
+  color: var(--ppx-neon-blue);
 }
 </style>

@@ -191,6 +191,34 @@ class FileTool:
             repl = params.get('replace') or ''
             new_stem = re.sub(pattern, repl, stem)
             return f'{new_stem}{suffix}'
+        if rule == 'template':
+            template = params.get('template') or '{name}_{index}'
+            now = datetime.now()
+            # 处理 {index:N} 格式的自定义padding
+            def replace_index_with_padding(match):
+                pad = int(match.group(1)) if match.group(1) else padding
+                return str(index).zfill(pad)
+            result = re.sub(r'\{index(?::(\d+))?\}', replace_index_with_padding, template)
+            # 替换其他变量
+            replacements = {
+                '{name}': stem,
+                '{ext}': suffix,
+                '{date}': now.strftime('%Y%m%d'),
+                '{time}': now.strftime('%H%M%S'),
+                '{datetime}': now.strftime('%Y%m%d_%H%M%S'),
+                '{year}': now.strftime('%Y'),
+                '{month}': now.strftime('%m'),
+                '{day}': now.strftime('%d'),
+                '{hour}': now.strftime('%H'),
+                '{minute}': now.strftime('%M'),
+                '{second}': now.strftime('%S'),
+            }
+            for key, value in replacements.items():
+                result = result.replace(key, value)
+            # 如果模板已包含扩展名变量，则不再追加
+            if '{ext}' in template:
+                return result
+            return f'{result}{suffix}'
         return f'{stem}_{index}{suffix}'
 
     def _sanitize_category_name(self, label: str) -> str:
