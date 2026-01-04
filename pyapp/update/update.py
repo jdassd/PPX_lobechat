@@ -84,13 +84,20 @@ class AppUpdate:
         ifUpdate = False    # 判断是否需要更新
         oldVersionList = oldVersion.replace('V', '').split('.')
         newVersionList = newVersion.replace('V', '').split('.')
-        if newVersionList[0] > oldVersionList[0]:
+        # 将版本号转换为整数进行比较，避免字符串比较的问题（如 '9' > '13' 的错误结果）
+        try:
+            oldMajor, oldMinor, oldPatch = int(oldVersionList[0]), int(oldVersionList[1]), int(oldVersionList[2])
+            newMajor, newMinor, newPatch = int(newVersionList[0]), int(newVersionList[1]), int(newVersionList[2])
+        except (ValueError, IndexError):
+            # 如果版本号格式不正确，返回False
+            return False
+        if newMajor > oldMajor:
             ifUpdate = True
-        elif newVersionList[0] == oldVersionList[0]:
-            if newVersionList[1] > oldVersionList[1]:
+        elif newMajor == oldMajor:
+            if newMinor > oldMinor:
                 ifUpdate = True
-            elif newVersionList[1] == oldVersionList[1]:
-                if newVersionList[2] > oldVersionList[2]:
+            elif newMinor == oldMinor:
+                if newPatch > oldPatch:
                     ifUpdate = True
         return ifUpdate
 
