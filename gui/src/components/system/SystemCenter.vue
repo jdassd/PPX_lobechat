@@ -167,16 +167,28 @@
           <el-table-column prop="name" label="名称" min-width="140" />
           <el-table-column prop="command" label="命令" min-width="220" show-overflow-tooltip />
           <el-table-column prop="description" label="备注" min-width="160" show-overflow-tooltip />
+          <el-table-column label="类型" width="100">
+            <template #default="{ row }">
+              <el-tag v-if="row.isSystem" size="small" type="info">系统</el-tag>
+              <el-tag v-else size="small" type="success">自定义</el-tag>
+            </template>
+          </el-table-column>
           <el-table-column label="开机启动" width="120">
             <template #default="{ row }">
-              <el-switch v-model="row.autoStart" @change="() => toggleRule(row)" />
+              <el-switch v-model="row.autoStart" :disabled="row.isSystem" @change="() => toggleRule(row)" />
             </template>
           </el-table-column>
           <el-table-column label="操作" width="180">
             <template #default="{ row }">
-              <el-button size="small" text type="primary" @click="editRule(row)">编辑</el-button>
-              <el-button size="small" text @click="runRule(row)">运行</el-button>
-              <el-button size="small" text type="danger" @click="removeRule(row)">删除</el-button>
+              <template v-if="!row.isSystem">
+                <el-button size="small" text type="primary" @click="editRule(row)">编辑</el-button>
+                <el-button size="small" text @click="runRule(row)">运行</el-button>
+                <el-button size="small" text type="danger" @click="removeRule(row)">删除</el-button>
+              </template>
+              <template v-else>
+                <el-button size="small" text @click="runRule(row)">运行</el-button>
+                <el-button size="small" text type="info" @click="openStartupLocation(row)">打开位置</el-button>
+              </template>
             </template>
           </el-table-column>
         </el-table>
@@ -500,11 +512,33 @@ const removeRule = async (row) => {
 
 const runRule = async (row) => {
   if (!window.pywebview?.api?.system_runStartupRule) return
+  // 系统启动项直接运行命令
+  if (row.isSystem) {
+    const res = await window.pywebview.api.system_runSystemStartup({ command: row.command, filePath: row.filePath })
+    if (res?.success) {
+      ElMessage.success(`已启动`)
+    } else {
+      ElMessage.error(res?.message || '启动失败')
+    }
+    return
+  }
   const res = await window.pywebview.api.system_runStartupRule({ id: row.id })
   if (res?.success) {
     ElMessage.success(`已启动 PID ${res.pid}`)
   } else {
     ElMessage.error(res?.message || '启动失败')
+  }
+}
+
+const openStartupLocation = async (row) => {
+  if (!window.pywebview?.api?.system_openStartupLocation) return
+  const res = await window.pywebview.api.system_openStartupLocation({
+    source: row.source,
+    regKey: row.regKey,
+    filePath: row.filePath
+  })
+  if (!res?.success) {
+    ElMessage.error(res?.message || '打开位置失败')
   }
 }
 
