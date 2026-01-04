@@ -12,7 +12,6 @@
           <h3>PDF 工具集</h3>
           <p class="sub">在一个面板内完成转换、扫描件、合并、拆分与页码切割</p>
         </div>
-        <el-tag type="success" size="large">Beta</el-tag>
       </div>
     </template>
     <div class="pdf-tool">

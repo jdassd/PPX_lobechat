@@ -167,21 +167,6 @@ const featureCards = [
       '内置强制结束能力'
     ]
   },
-  {
-    id: 'roadmap',
-    title: '功能预告',
-    desc: '共 6 类工具正在设计中',
-    icon: markRaw(Setting),
-    color: 'gray',
-    tags: ['需求收集中'],
-    action: '提交想法',
-    disabled: true,
-    points: [
-      '更多 Office/PDF 自动化脚本',
-      '轻量数据管理',
-      '任务编排与批处理命令面板'
-    ]
-  }
 ]
 
 const financeCards = [

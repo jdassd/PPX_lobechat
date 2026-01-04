@@ -12,7 +12,6 @@
           <h3>公章生成器</h3>
           <p class="sub">自定义文字、字号、颜色与纹理，输出透明 PNG</p>
         </div>
-        <el-tag type="danger" size="large">Alpha</el-tag>
       </div>
     </template>
     <div class="seal-tool">

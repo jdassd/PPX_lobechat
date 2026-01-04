@@ -862,7 +862,6 @@ const removeFile = (target, file) => {
           <h3>图片处理工具</h3>
           <p class="sub">格式转换、缩放、压缩、水印及 PDF 合成</p>
         </div>
-        <el-tag type="warning" size="large">Phase 2</el-tag>
       </div>
     </template>
     <div class="image-tool">

@@ -567,7 +567,6 @@ const openFramesDir = () => {
           <h3>视频处理工具</h3>
           <p class="sub">格式转换、压缩、截取、音频与帧图导出</p>
         </div>
-        <el-tag type="warning">Phase 2</el-tag>
       </div>
     </template>
     <div class="video-tool">

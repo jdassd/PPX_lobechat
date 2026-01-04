@@ -565,7 +565,6 @@ const runCompare = async () => {
           <h3>文件管理工具</h3>
           <p class="sub">搜索、目录分析与压缩解压</p>
         </div>
-        <el-tag type="success">Phase 1</el-tag>
       </div>
     </template>
     <div class="file-tool">

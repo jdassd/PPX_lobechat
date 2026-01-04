@@ -12,7 +12,6 @@
           <h3>Excel 工具集</h3>
           <p class="sub">支持结构定义、按列分组、分表导出与 JSON 图表</p>
         </div>
-        <el-tag type="primary" size="large">Preview</el-tag>
       </div>
     </template>
     <div class="excel-tool">

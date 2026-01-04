@@ -90,7 +90,6 @@ const resetAll = () => {
           <h3>人民币大写</h3>
           <p class="sub">快速生成规范的票据金额大写格式</p>
         </div>
-        <el-tag type="success">已上线</el-tag>
       </div>
     </template>
     <div class="finance-tool">

@@ -439,7 +439,6 @@ const openFile = (path) => {
           <h3>文本与数据处理</h3>
           <p class="sub">编码、正则、CSV/JSON、排序、哈希一站完成</p>
         </div>
-        <el-tag type="warning">Phase 2</el-tag>
       </div>
     </template>
     <div class="text-tool">
