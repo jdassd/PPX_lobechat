@@ -18,9 +18,10 @@ from api.image import ImageTool
 from api.text import TextTool
 from api.video import VideoTool
 from api.file import FileTool
+from api.finance import FinanceTool
 
 
-class API(System, Storage, PDF, Excel, Seal, ImageTool, TextTool, VideoTool, FileTool):
+class API(System, Storage, PDF, Excel, Seal, ImageTool, TextTool, VideoTool, FileTool, FinanceTool):
     '''业务层API，供前端JS调用'''
 
     def setWindow(self, window):

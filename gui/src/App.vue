@@ -1,6 +1,6 @@
 <script setup>
 import { markRaw, ref, onMounted, onUnmounted } from 'vue'
-import { Document, Files, Monitor, Setting, Stamp, PictureFilled, Edit, VideoPlay, FolderOpened } from '@element-plus/icons-vue'
+import { Document, Files, Monitor, Setting, Stamp, PictureFilled, Edit, VideoPlay, FolderOpened, Coin } from '@element-plus/icons-vue'
 import BtnUpdate from './components/BtnUpdate.vue'
 import PdfTool from './components/pdf/PdfTool.vue'
 import ExcelTool from './components/excel/ExcelTool.vue'
@@ -10,6 +10,7 @@ import ImageTool from './components/image/ImageTool.vue'
 import TextTool from './components/text/TextTool.vue'
 import VideoTool from './components/video/VideoTool.vue'
 import FileTool from './components/file/FileTool.vue'
+import FinanceTool from './components/finance/FinanceTool.vue'
 
 const isLoaded = ref(false)
 const isScrolled = ref(false)
@@ -183,6 +184,25 @@ const featureCards = [
   }
 ]
 
+const financeCards = [
+  {
+    id: 'finance',
+    title: '财务工具',
+    desc: '人民币大写 / 票据规范',
+    icon: markRaw(Coin),
+    color: 'orange',
+    tags: ['人民币', '票据填写'],
+    action: '打开面板',
+    disabled: false,
+    points: [
+      '输入金额快速生成中文大写',
+      '自动补全人民币前缀与元/角/分',
+      '符合银行票据填写规范',
+      '内置常见示例便于核对'
+    ]
+  }
+]
+
 const checklist = [
   {
     title: '检查更新',
@@ -215,6 +235,7 @@ const imageToolVisible = ref(false)
 const textToolVisible = ref(false)
 const videoToolVisible = ref(false)
 const fileToolVisible = ref(false)
+const financeToolVisible = ref(false)
 
 const onFeatureAction = (feature) => {
   if (feature.disabled) return
@@ -227,7 +248,8 @@ const onFeatureAction = (feature) => {
     image: imageToolVisible,
     text: textToolVisible,
     video: videoToolVisible,
-    file: fileToolVisible
+    file: fileToolVisible,
+    finance: financeToolVisible
   }
 
   if (visibilityMap[feature.id]) {
@@ -327,6 +349,55 @@ const onFeatureAction = (feature) => {
           </div>
         </div>
 
+        <div class="section-header">
+          <div class="section-title">
+            <span class="section-badge">财务专区</span>
+            <h2>财务工具</h2>
+          </div>
+        </div>
+
+        <div class="feature-grid">
+          <div
+            v-for="(feature, index) in financeCards"
+            :key="feature.id"
+            class="feature-card"
+            :class="[`card-${feature.color}`, { disabled: feature.disabled }]"
+            :style="{ '--delay': `${index * 0.05}s` }"
+            @click="onFeatureAction(feature)"
+          >
+            <div class="card-glow"></div>
+
+            <div class="card-header">
+              <div class="icon-wrapper">
+                <component :is="feature.icon" class="feature-icon" />
+              </div>
+              <div class="title-area">
+                <h3>{{ feature.title }}</h3>
+                <p>{{ feature.desc }}</p>
+              </div>
+            </div>
+
+            <ul class="feature-points">
+              <li v-for="point in feature.points" :key="point">
+                <span class="point-dot"></span>
+                <span>{{ point }}</span>
+              </li>
+            </ul>
+
+            <div class="card-footer">
+              <div class="tag-list">
+                <span v-for="tag in feature.tags" :key="tag" class="feature-tag">
+                  {{ tag }}
+                </span>
+              </div>
+              <button class="action-btn" :disabled="feature.disabled">
+                {{ feature.action }}
+                <span class="btn-arrow">→</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- 提示信息 -->
         <section class="tips-section">
           <div class="tips-header">
@@ -363,6 +434,7 @@ const onFeatureAction = (feature) => {
   <ExcelTool v-model="excelToolVisible" />
   <SealTool v-model="sealToolVisible" />
   <ProcessManager v-model="processToolVisible" />
+  <FinanceTool v-model="financeToolVisible" />
 </template>
 
 <style scoped>
