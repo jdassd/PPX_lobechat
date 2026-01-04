@@ -9,7 +9,7 @@
     <template #title>
       <div class="dialog-title">
         <span>系统管理中心</span>
-        <small>性能监控 · 传感器 · 启动项 · 进程</small>
+        <small>性能监控 · 传感器 · 启动项 · 进程 · 清理优化</small>
       </div>
     </template>
 
@@ -257,6 +257,162 @@
           <el-button text type="primary" @click="fetchProcesses">刷新</el-button>
         </div>
       </el-tab-pane>
+
+      <el-tab-pane label="垃圾清理" name="junk">
+        <div class="toolbar">
+          <el-button type="primary" :loading="junkState.scanning" @click="scanJunk">
+            <template #icon><el-icon><Search /></el-icon></template>
+            扫描垃圾文件
+          </el-button>
+          <el-button
+            type="danger"
+            :loading="junkState.cleaning"
+            :disabled="!junkState.selectedCategories.length"
+            @click="cleanJunk"
+          >
+            <template #icon><el-icon><Delete /></el-icon></template>
+            清理选中项 ({{ junkState.selectedCategories.length }})
+          </el-button>
+          <div class="toolbar-info" v-if="junkState.totalSizeText">
+            <span>总计可清理: <strong>{{ junkState.totalSizeText }}</strong></span>
+          </div>
+        </div>
+
+        <el-table
+          :data="junkState.items"
+          v-loading="junkState.scanning"
+          border
+          size="small"
+          empty-text="点击“扫描垃圾文件”开始扫描"
+          @selection-change="onJunkSelectionChange"
+        >
+          <el-table-column type="selection" width="50" />
+          <el-table-column prop="name" label="类别" min-width="160" />
+          <el-table-column prop="fileCount" label="文件数" width="100" />
+          <el-table-column prop="sizeText" label="大小" width="120" />
+          <el-table-column prop="path" label="路径" min-width="200" show-overflow-tooltip />
+        </el-table>
+
+        <div v-if="junkState.cleanResult" class="clean-result">
+          <el-alert
+            :type="junkState.cleanResult.errors?.length ? 'warning' : 'success'"
+            show-icon
+            :closable="false"
+          >
+            <template #title>
+              已清理 {{ junkState.cleanResult.clearedCount }} 个项目，释放 {{ junkState.cleanResult.clearedSizeText }}
+            </template>
+            <template #default v-if="junkState.cleanResult.errors?.length">
+              <div v-for="err in junkState.cleanResult.errors" :key="err">{{ err }}</div>
+            </template>
+          </el-alert>
+        </div>
+      </el-tab-pane>
+
+      <el-tab-pane label="注册表清理" name="registry">
+        <el-alert v-if="!isWindows" type="info" show-icon :closable="false" class="helper-hint">
+          注册表清理仅支持 Windows 系统
+        </el-alert>
+        <template v-else>
+          <div class="toolbar">
+            <el-button type="primary" :loading="registryState.scanning" @click="scanRegistry">
+              <template #icon><el-icon><Search /></el-icon></template>
+              扫描无效注册表项
+            </el-button>
+            <el-button
+              type="danger"
+              :loading="registryState.cleaning"
+              :disabled="!registryState.selectedItems.length"
+              @click="cleanRegistry"
+            >
+              <template #icon><el-icon><Delete /></el-icon></template>
+              清理选中项 ({{ registryState.selectedItems.length }})
+            </el-button>
+          </div>
+
+          <el-table
+            :data="registryState.items"
+            v-loading="registryState.scanning"
+            border
+            size="small"
+            max-height="350"
+            empty-text="点击“扫描无效注册表项”开始扫描"
+            @selection-change="onRegistrySelectionChange"
+          >
+            <el-table-column type="selection" width="50" />
+            <el-table-column prop="name" label="名称" min-width="160" show-overflow-tooltip />
+            <el-table-column prop="reason" label="问题描述" min-width="250" show-overflow-tooltip />
+            <el-table-column prop="type" label="类型" width="100">
+              <template #default="{ row }">
+                <el-tag v-if="row.type === 'uninstall'" size="small" type="warning">卸载信息</el-tag>
+                <el-tag v-else-if="row.type === 'file_ext'" size="small" type="info">文件关联</el-tag>
+                <el-tag v-else size="small">{{ row.type }}</el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <div v-if="registryState.cleanResult" class="clean-result">
+            <el-alert
+              :type="registryState.cleanResult.errors?.length ? 'warning' : 'success'"
+              show-icon
+              :closable="false"
+            >
+              <template #title>
+                已清理 {{ registryState.cleanResult.clearedCount }} 个注册表项
+              </template>
+              <template #default v-if="registryState.cleanResult.errors?.length">
+                <div v-for="err in registryState.cleanResult.errors" :key="err">{{ err }}</div>
+              </template>
+            </el-alert>
+          </div>
+        </template>
+      </el-tab-pane>
+
+      <el-tab-pane label="磁盘空间分析" name="diskAnalyzer">
+        <div class="toolbar">
+          <el-select v-model="diskAnalyzerState.selectedDisk" placeholder="选择分区" class="disk-select">
+            <el-option
+              v-for="disk in status.disks"
+              :key="disk.mount"
+              :label="`${disk.label} (${disk.usedText} / ${disk.totalText})`"
+              :value="disk.mount"
+            />
+          </el-select>
+          <el-button type="primary" :loading="diskAnalyzerState.analyzing" @click="analyzeDisk">
+            <template #icon><el-icon><Search /></el-icon></template>
+            分析磁盘空间
+          </el-button>
+        </div>
+
+        <div v-if="diskAnalyzerState.tree" class="disk-tree-container">
+          <div class="disk-summary">
+            <span>总占用: <strong>{{ diskAnalyzerState.tree.sizeText }}</strong></span>
+            <span>文件数: <strong>{{ diskAnalyzerState.tree.fileCount }}</strong></span>
+            <span>目录数: <strong>{{ diskAnalyzerState.tree.dirCount }}</strong></span>
+          </div>
+          <el-tree
+            :data="diskAnalyzerState.tree.children"
+            :props="{ label: 'name', children: 'children' }"
+            default-expand-all
+            class="disk-tree"
+          >
+            <template #default="{ node, data }">
+              <div class="tree-node">
+                <el-icon v-if="data.isFile"><Document /></el-icon>
+                <el-icon v-else><Folder /></el-icon>
+                <span class="tree-label">{{ data.name }}</span>
+                <el-tag size="small" effect="plain">{{ data.sizeText }}</el-tag>
+              </div>
+            </template>
+          </el-tree>
+        </div>
+        <div v-else-if="!diskAnalyzerState.analyzing" class="empty-hint">
+          选择分区后点击“分析磁盘空间”开始分析
+        </div>
+        <div v-else class="empty-hint">
+          正在分析中，请稍候...
+        </div>
+      </el-tab-pane>
     </el-tabs>
   </el-dialog>
 </template>
@@ -264,6 +420,9 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search, Delete, Document, Folder } from '@element-plus/icons-vue'
+
+const isWindows = navigator.platform.toLowerCase().includes('win')
 
 const props = defineProps({
   modelValue: {
@@ -631,6 +790,194 @@ const processSummary = computed(() => {
   }
   return `共 ${processStats.total} 条记录`
 })
+
+// ==================== 垃圾清理 ====================
+
+const junkState = reactive({
+  scanning: false,
+  cleaning: false,
+  items: [],
+  selectedCategories: [],
+  totalSizeText: '',
+  cleanResult: null
+})
+
+const onJunkSelectionChange = (selection) => {
+  junkState.selectedCategories = selection.map(item => item.category)
+}
+
+const scanJunk = async () => {
+  if (!apiReady.value || !window.pywebview?.api?.system_scanJunk) {
+    ElMessage.warning('当前环境不支持垃圾清理功能')
+    return
+  }
+  junkState.scanning = true
+  junkState.cleanResult = null
+  try {
+    const res = await window.pywebview.api.system_scanJunk()
+    if (res?.success) {
+      junkState.items = res.items || []
+      junkState.totalSizeText = res.totalSizeText || ''
+    } else {
+      ElMessage.error(res?.message || '扫描失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '扫描失败')
+  } finally {
+    junkState.scanning = false
+  }
+}
+
+const cleanJunk = async () => {
+  if (!junkState.selectedCategories.length) {
+    ElMessage.warning('请先选择要清理的类别')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `确定要清理选中的 ${junkState.selectedCategories.length} 个类别吗？此操作不可撤销。`,
+      '确认清理',
+      {
+        confirmButtonText: '清理',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+  } catch {
+    return
+  }
+  junkState.cleaning = true
+  try {
+    const res = await window.pywebview.api.system_cleanJunk({
+      categories: junkState.selectedCategories
+    })
+    if (res?.success) {
+      junkState.cleanResult = res
+      ElMessage.success(`已清理 ${res.clearedCount} 个项目，释放 ${res.clearedSizeText}`)
+      // 重新扫描
+      await scanJunk()
+    } else {
+      ElMessage.error(res?.message || '清理失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '清理失败')
+  } finally {
+    junkState.cleaning = false
+  }
+}
+
+// ==================== 注册表清理 ====================
+
+const registryState = reactive({
+  scanning: false,
+  cleaning: false,
+  items: [],
+  selectedItems: [],
+  cleanResult: null
+})
+
+const onRegistrySelectionChange = (selection) => {
+  registryState.selectedItems = selection
+}
+
+const scanRegistry = async () => {
+  if (!apiReady.value || !window.pywebview?.api?.system_scanRegistry) {
+    ElMessage.warning('当前环境不支持注册表清理功能')
+    return
+  }
+  registryState.scanning = true
+  registryState.cleanResult = null
+  try {
+    const res = await window.pywebview.api.system_scanRegistry()
+    if (res?.success) {
+      registryState.items = res.items || []
+      if (!res.items?.length) {
+        ElMessage.success('未发现无效注册表项')
+      }
+    } else {
+      ElMessage.error(res?.message || '扫描失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '扫描失败')
+  } finally {
+    registryState.scanning = false
+  }
+}
+
+const cleanRegistry = async () => {
+  if (!registryState.selectedItems.length) {
+    ElMessage.warning('请先选择要清理的注册表项')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `确定要清理选中的 ${registryState.selectedItems.length} 个注册表项吗？此操作不可撤销。`,
+      '确认清理',
+      {
+        confirmButtonText: '清理',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+  } catch {
+    return
+  }
+  registryState.cleaning = true
+  try {
+    const res = await window.pywebview.api.system_cleanRegistry({
+      items: registryState.selectedItems
+    })
+    if (res?.success) {
+      registryState.cleanResult = res
+      ElMessage.success(`已清理 ${res.clearedCount} 个注册表项`)
+      // 重新扫描
+      await scanRegistry()
+    } else {
+      ElMessage.error(res?.message || '清理失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '清理失败')
+  } finally {
+    registryState.cleaning = false
+  }
+}
+
+// ==================== 磁盘空间分析 ====================
+
+const diskAnalyzerState = reactive({
+  selectedDisk: '',
+  analyzing: false,
+  tree: null
+})
+
+const analyzeDisk = async () => {
+  if (!diskAnalyzerState.selectedDisk) {
+    ElMessage.warning('请先选择要分析的分区')
+    return
+  }
+  if (!apiReady.value || !window.pywebview?.api?.system_analyzeDisk) {
+    ElMessage.warning('当前环境不支持磁盘分析功能')
+    return
+  }
+  diskAnalyzerState.analyzing = true
+  diskAnalyzerState.tree = null
+  try {
+    const res = await window.pywebview.api.system_analyzeDisk({
+      path: diskAnalyzerState.selectedDisk,
+      maxDepth: 3,
+      maxItems: 50
+    })
+    if (res?.success) {
+      diskAnalyzerState.tree = res.tree
+    } else {
+      ElMessage.error(res?.message || '分析失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '分析失败')
+  } finally {
+    diskAnalyzerState.analyzing = false
+  }
+}
 </script>
 
 <style scoped>
@@ -837,7 +1184,8 @@ const processSummary = computed(() => {
 
   .keyword-input,
   .port-input,
-  .limit-select {
+  .limit-select,
+  .disk-select {
     width: 100%;
   }
 
@@ -845,4 +1193,69 @@ const processSummary = computed(() => {
     width: 100%;
   }
 }
+
+/* Junk Cleanup Styles */
+.toolbar-info {
+  flex: 1;
+  text-align: right;
+  color: var(--ppx-text-secondary);
+  font-size: 13px;
+}
+
+.toolbar-info strong {
+  color: var(--el-color-primary);
+}
+
+.clean-result {
+  margin-top: 12px;
+}
+
+/* Disk Analyzer Styles */
+.disk-select {
+  width: 280px;
+}
+
+.disk-tree-container {
+  margin-top: 12px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.disk-summary {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--ppx-text-secondary);
+}
+
+.disk-summary strong {
+  color: var(--ppx-text-primary);
+}
+
+.disk-tree {
+  background: transparent;
+  --el-tree-node-hover-bg-color: rgba(148, 163, 184, 0.1);
+}
+
+.tree-node {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.tree-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-node .el-icon {
+  color: var(--ppx-text-muted);
+}
 </style>
+

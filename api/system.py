@@ -925,3 +925,549 @@ class System():
             return {'success': False, 'message': '无法确定启动项位置'}
         except Exception as exc:
             return {'success': False, 'message': str(exc)}
+
+    # ==================== 垃圾清理 ====================
+
+    def _get_junk_locations(self) -> List[Dict]:
+        '''获取垃圾文件扫描位置'''
+        locations = []
+        
+        # Windows 临时文件
+        temp_dir = os.environ.get('TEMP') or os.environ.get('TMP')
+        if temp_dir and Path(temp_dir).exists():
+            locations.append({
+                'category': 'temp_user',
+                'name': '用户临时文件',
+                'path': temp_dir,
+                'patterns': ['*']
+            })
+        
+        # Windows 系统临时文件
+        if platform.system() == 'Windows':
+            win_temp = Path('C:/Windows/Temp')
+            if win_temp.exists():
+                locations.append({
+                    'category': 'temp_system',
+                    'name': '系统临时文件',
+                    'path': str(win_temp),
+                    'patterns': ['*']
+                })
+            
+            # Windows 更新缓存
+            update_cache = Path('C:/Windows/SoftwareDistribution/Download')
+            if update_cache.exists():
+                locations.append({
+                    'category': 'windows_update',
+                    'name': 'Windows 更新缓存',
+                    'path': str(update_cache),
+                    'patterns': ['*']
+                })
+            
+            # Windows 预读取
+            prefetch = Path('C:/Windows/Prefetch')
+            if prefetch.exists():
+                locations.append({
+                    'category': 'prefetch',
+                    'name': '预读取文件',
+                    'path': str(prefetch),
+                    'patterns': ['*.pf']
+                })
+        
+        # 浏览器缓存
+        appdata_local = os.environ.get('LOCALAPPDATA', '')
+        if appdata_local:
+            # Chrome 缓存
+            chrome_cache = Path(appdata_local) / 'Google/Chrome/User Data/Default/Cache'
+            if chrome_cache.exists():
+                locations.append({
+                    'category': 'browser_chrome',
+                    'name': 'Chrome 浏览器缓存',
+                    'path': str(chrome_cache),
+                    'patterns': ['*']
+                })
+            
+            # Edge 缓存
+            edge_cache = Path(appdata_local) / 'Microsoft/Edge/User Data/Default/Cache'
+            if edge_cache.exists():
+                locations.append({
+                    'category': 'browser_edge',
+                    'name': 'Edge 浏览器缓存',
+                    'path': str(edge_cache),
+                    'patterns': ['*']
+                })
+        
+        # Firefox 缓存
+        appdata_roaming = os.environ.get('APPDATA', '')
+        if appdata_roaming:
+            firefox_profiles = Path(appdata_roaming) / 'Mozilla/Firefox/Profiles'
+            if firefox_profiles.exists():
+                for profile in firefox_profiles.iterdir():
+                    if profile.is_dir():
+                        cache_dir = profile / 'cache2'
+                        if cache_dir.exists():
+                            locations.append({
+                                'category': 'browser_firefox',
+                                'name': f'Firefox 缓存 ({profile.name})',
+                                'path': str(cache_dir),
+                                'patterns': ['*']
+                            })
+                            break  # 只取第一个 profile
+        
+        # 回收站 (Windows)
+        if platform.system() == 'Windows':
+            locations.append({
+                'category': 'recycle_bin',
+                'name': '回收站',
+                'path': '$Recycle.Bin',
+                'patterns': ['*'],
+                'special': True
+            })
+        
+        return locations
+
+    def _scan_directory(self, path: str, patterns: List[str], max_files: int = 5000) -> tuple:
+        '''扫描目录中的文件，返回 (文件列表, 总大小)'''
+        files = []
+        total_size = 0
+        try:
+            dir_path = Path(path)
+            if not dir_path.exists():
+                return files, total_size
+            
+            for pattern in patterns:
+                for item in dir_path.rglob(pattern):
+                    if len(files) >= max_files:
+                        break
+                    try:
+                        if item.is_file():
+                            size = item.stat().st_size
+                            files.append({
+                                'path': str(item),
+                                'name': item.name,
+                                'size': size,
+                                'sizeText': format_bytes(size)
+                            })
+                            total_size += size
+                    except (PermissionError, OSError):
+                        continue
+        except (PermissionError, OSError):
+            pass
+        return files, total_size
+
+    def _get_recycle_bin_size(self) -> tuple:
+        '''获取回收站大小 (仅 Windows)'''
+        files = []
+        total_size = 0
+        if platform.system() != 'Windows':
+            return files, total_size
+        
+        try:
+            # 使用 PowerShell 获取回收站内容
+            cmd = [
+                'powershell', '-Command',
+                "(New-Object -ComObject Shell.Application).NameSpace(10).Items() | "
+                "ForEach-Object { $_.Size } | Measure-Object -Sum | Select-Object -ExpandProperty Sum"
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            if result.returncode == 0 and result.stdout.strip():
+                total_size = int(result.stdout.strip())
+                files.append({
+                    'path': '$Recycle.Bin',
+                    'name': '回收站',
+                    'size': total_size,
+                    'sizeText': format_bytes(total_size)
+                })
+        except Exception:
+            pass
+        return files, total_size
+
+    def system_scanJunk(self, options=None):
+        '''扫描系统垃圾文件'''
+        categories = None
+        if isinstance(options, dict):
+            categories = options.get('categories')
+        
+        locations = self._get_junk_locations()
+        items = []
+        total_size = 0
+        
+        for loc in locations:
+            category = loc['category']
+            if categories and category not in categories:
+                continue
+            
+            if loc.get('special') and category == 'recycle_bin':
+                files, size = self._get_recycle_bin_size()
+            else:
+                files, size = self._scan_directory(loc['path'], loc['patterns'])
+            
+            if files:
+                items.append({
+                    'category': category,
+                    'name': loc['name'],
+                    'path': loc['path'],
+                    'fileCount': len(files),
+                    'size': size,
+                    'sizeText': format_bytes(size),
+                    'files': files[:100]  # 最多返回 100 个文件详情
+                })
+                total_size += size
+        
+        return {
+            'success': True,
+            'items': items,
+            'totalSize': total_size,
+            'totalSizeText': format_bytes(total_size),
+            'categoryCount': len(items)
+        }
+
+    def system_cleanJunk(self, options=None):
+        '''清理系统垃圾文件'''
+        categories = None
+        if isinstance(options, dict):
+            categories = options.get('categories')
+        
+        if not categories:
+            return {'success': False, 'message': '请选择要清理的类别'}
+        
+        locations = self._get_junk_locations()
+        cleared_size = 0
+        cleared_count = 0
+        errors = []
+        
+        for loc in locations:
+            category = loc['category']
+            if category not in categories:
+                continue
+            
+            # 回收站特殊处理
+            if loc.get('special') and category == 'recycle_bin':
+                try:
+                    if platform.system() == 'Windows':
+                        # 清空回收站
+                        cmd = ['powershell', '-Command', 'Clear-RecycleBin -Force -ErrorAction SilentlyContinue']
+                        subprocess.run(cmd, capture_output=True, timeout=60)
+                        cleared_count += 1
+                except Exception as e:
+                    errors.append(f'回收站清理失败: {str(e)}')
+                continue
+            
+            # 普通目录清理
+            try:
+                dir_path = Path(loc['path'])
+                if not dir_path.exists():
+                    continue
+                
+                for pattern in loc['patterns']:
+                    for item in dir_path.rglob(pattern):
+                        try:
+                            if item.is_file():
+                                size = item.stat().st_size
+                                item.unlink()
+                                cleared_size += size
+                                cleared_count += 1
+                            elif item.is_dir():
+                                shutil.rmtree(item, ignore_errors=True)
+                                cleared_count += 1
+                        except (PermissionError, OSError):
+                            continue
+            except Exception as e:
+                errors.append(f'{loc["name"]} 清理失败: {str(e)}')
+        
+        return {
+            'success': True,
+            'clearedSize': cleared_size,
+            'clearedSizeText': format_bytes(cleared_size),
+            'clearedCount': cleared_count,
+            'errors': errors if errors else None
+        }
+
+    # ==================== 注册表清理 ====================
+
+    def _scan_invalid_uninstall_entries(self) -> List[Dict]:
+        '''扫描无效的软件卸载信息'''
+        items = []
+        if platform.system() != 'Windows':
+            return items
+        
+        uninstall_paths = [
+            (winreg.HKEY_LOCAL_MACHINE, r'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'),
+            (winreg.HKEY_CURRENT_USER, r'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall'),
+            (winreg.HKEY_LOCAL_MACHINE, r'SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall'),
+        ]
+        
+        for hkey, subkey in uninstall_paths:
+            try:
+                with winreg.OpenKey(hkey, subkey, 0, winreg.KEY_READ) as key:
+                    i = 0
+                    while True:
+                        try:
+                            name = winreg.EnumKey(key, i)
+                            i += 1
+                            try:
+                                with winreg.OpenKey(key, name, 0, winreg.KEY_READ) as app_key:
+                                    try:
+                                        install_location, _ = winreg.QueryValueEx(app_key, 'InstallLocation')
+                                        if install_location and not Path(install_location).exists():
+                                            display_name = ''
+                                            try:
+                                                display_name, _ = winreg.QueryValueEx(app_key, 'DisplayName')
+                                            except (OSError, FileNotFoundError):
+                                                display_name = name
+                                            items.append({
+                                                'path': f'{subkey}\\{name}',
+                                                'name': display_name or name,
+                                                'reason': f'安装目录不存在: {install_location}',
+                                                'type': 'uninstall',
+                                                'hkey': 'HKLM' if hkey == winreg.HKEY_LOCAL_MACHINE else 'HKCU'
+                                            })
+                                    except (OSError, FileNotFoundError):
+                                        pass
+                            except (OSError, PermissionError):
+                                pass
+                        except OSError:
+                            break
+            except (OSError, PermissionError):
+                continue
+        
+        return items
+
+    def _scan_invalid_file_extensions(self) -> List[Dict]:
+        '''扫描无效的文件类型关联'''
+        items = []
+        if platform.system() != 'Windows':
+            return items
+        
+        try:
+            with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, '', 0, winreg.KEY_READ) as root:
+                i = 0
+                checked = 0
+                max_check = 500  # 限制检查数量
+                while checked < max_check:
+                    try:
+                        name = winreg.EnumKey(root, i)
+                        i += 1
+                        if not name.startswith('.'):
+                            continue
+                        checked += 1
+                        try:
+                            with winreg.OpenKey(root, name, 0, winreg.KEY_READ) as ext_key:
+                                try:
+                                    prog_id, _ = winreg.QueryValueEx(ext_key, '')
+                                    if prog_id:
+                                        # 检查 ProgID 是否存在
+                                        try:
+                                            winreg.OpenKey(root, prog_id, 0, winreg.KEY_READ).Close()
+                                        except OSError:
+                                            items.append({
+                                                'path': f'HKCR\\{name}',
+                                                'name': name,
+                                                'reason': f'关联的程序标识不存在: {prog_id}',
+                                                'type': 'file_ext',
+                                                'hkey': 'HKCR'
+                                            })
+                                except (OSError, FileNotFoundError):
+                                    pass
+                        except (OSError, PermissionError):
+                            pass
+                    except OSError:
+                        break
+        except (OSError, PermissionError):
+            pass
+        
+        return items[:50]  # 最多返回 50 个
+
+    def system_scanRegistry(self):
+        '''扫描无效注册表项'''
+        if platform.system() != 'Windows':
+            return {
+                'success': False,
+                'message': '注册表清理仅支持 Windows 系统'
+            }
+        
+        items = []
+        
+        # 扫描无效卸载信息
+        items.extend(self._scan_invalid_uninstall_entries())
+        
+        # 扫描无效文件关联
+        items.extend(self._scan_invalid_file_extensions())
+        
+        return {
+            'success': True,
+            'items': items,
+            'count': len(items)
+        }
+
+    def system_cleanRegistry(self, payload=None):
+        '''清理选中的注册表项'''
+        if platform.system() != 'Windows':
+            return {
+                'success': False,
+                'message': '注册表清理仅支持 Windows 系统'
+            }
+        
+        items = []
+        if isinstance(payload, dict):
+            items = payload.get('items', [])
+        
+        if not items:
+            return {'success': False, 'message': '请选择要清理的注册表项'}
+        
+        cleared_count = 0
+        errors = []
+        
+        for item in items:
+            try:
+                path = item.get('path', '')
+                hkey_str = item.get('hkey', '')
+                item_type = item.get('type', '')
+                
+                # 确定根键
+                if hkey_str == 'HKLM':
+                    hkey = winreg.HKEY_LOCAL_MACHINE
+                elif hkey_str == 'HKCU':
+                    hkey = winreg.HKEY_CURRENT_USER
+                elif hkey_str == 'HKCR':
+                    hkey = winreg.HKEY_CLASSES_ROOT
+                else:
+                    continue
+                
+                # 获取父路径和键名
+                if '\\' in path:
+                    parent_path, key_name = path.rsplit('\\', 1)
+                    # 移除开头的根键标识符
+                    if parent_path.startswith('SOFTWARE'):
+                        pass
+                    elif '\\' in parent_path:
+                        parent_path = parent_path.split('\\', 1)[-1]
+                else:
+                    continue
+                
+                # 删除键
+                try:
+                    winreg.DeleteKey(hkey, path)
+                    cleared_count += 1
+                except PermissionError:
+                    errors.append(f'权限不足: {path}')
+                except FileNotFoundError:
+                    cleared_count += 1  # 已经不存在，算成功
+                except OSError as e:
+                    errors.append(f'{path}: {str(e)}')
+            except Exception as e:
+                errors.append(str(e))
+        
+        return {
+            'success': True,
+            'clearedCount': cleared_count,
+            'errors': errors if errors else None
+        }
+
+    # ==================== 磁盘空间分析 ====================
+
+    def system_analyzeDisk(self, payload=None):
+        '''分析指定目录的磁盘占用'''
+        target_path = None
+        max_depth = 3
+        max_items = 100
+        
+        if isinstance(payload, dict):
+            target_path = payload.get('path')
+            max_depth = min(payload.get('maxDepth', 3), 5)
+            max_items = min(payload.get('maxItems', 100), 500)
+        elif isinstance(payload, str):
+            target_path = payload
+        
+        if not target_path:
+            return {'success': False, 'message': '请指定要分析的目录'}
+        
+        target = Path(target_path)
+        if not target.exists():
+            return {'success': False, 'message': '目录不存在'}
+        if not target.is_dir():
+            return {'success': False, 'message': '请指定一个目录'}
+        
+        def analyze_dir(dir_path: Path, current_depth: int) -> Dict:
+            result = {
+                'name': dir_path.name or str(dir_path),
+                'path': str(dir_path),
+                'size': 0,
+                'fileCount': 0,
+                'dirCount': 0,
+                'children': []
+            }
+            
+            try:
+                entries = list(dir_path.iterdir())
+            except (PermissionError, OSError):
+                return result
+            
+            child_items = []
+            
+            for entry in entries:
+                try:
+                    if entry.is_file():
+                        size = entry.stat().st_size
+                        result['size'] += size
+                        result['fileCount'] += 1
+                        if current_depth < max_depth:
+                            child_items.append({
+                                'name': entry.name,
+                                'path': str(entry),
+                                'size': size,
+                                'sizeText': format_bytes(size),
+                                'isFile': True
+                            })
+                    elif entry.is_dir():
+                        result['dirCount'] += 1
+                        if current_depth < max_depth:
+                            child_result = analyze_dir(entry, current_depth + 1)
+                            result['size'] += child_result['size']
+                            result['fileCount'] += child_result['fileCount']
+                            result['dirCount'] += child_result['dirCount']
+                            child_items.append({
+                                'name': child_result['name'],
+                                'path': child_result['path'],
+                                'size': child_result['size'],
+                                'sizeText': format_bytes(child_result['size']),
+                                'isFile': False,
+                                'fileCount': child_result['fileCount'],
+                                'dirCount': child_result['dirCount'],
+                                'children': child_result['children']
+                            })
+                        else:
+                            # 只计算大小，不递归子目录详情
+                            dir_size = 0
+                            try:
+                                for f in entry.rglob('*'):
+                                    if f.is_file():
+                                        try:
+                                            dir_size += f.stat().st_size
+                                        except (PermissionError, OSError):
+                                            pass
+                            except (PermissionError, OSError):
+                                pass
+                            result['size'] += dir_size
+                            child_items.append({
+                                'name': entry.name,
+                                'path': str(entry),
+                                'size': dir_size,
+                                'sizeText': format_bytes(dir_size),
+                                'isFile': False
+                            })
+                except (PermissionError, OSError):
+                    continue
+            
+            # 按大小排序，取前 N 个
+            child_items.sort(key=lambda x: x['size'], reverse=True)
+            result['children'] = child_items[:max_items]
+            result['sizeText'] = format_bytes(result['size'])
+            
+            return result
+        
+        tree = analyze_dir(target, 0)
+        
+        return {
+            'success': True,
+            'tree': tree
+        }
