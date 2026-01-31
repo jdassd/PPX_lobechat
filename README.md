@@ -41,6 +41,9 @@
 
 ## 快速开始
 
+### 开发环境启动方式
+参考：https://github.com/pangao1990/PPX
+
 ### 开发环境
 
 ```bash
