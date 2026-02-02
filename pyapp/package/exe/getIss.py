@@ -31,8 +31,8 @@ rootDir = os.path.dirname(pyappDir)
 if 'generate_logo_icons' in globals() and generate_logo_icons is not None:
     generate_logo_icons()
 
-buildDir = os.path.join(rootDir, 'build')
-logoPath = os.path.join(rootDir, 'pyapp', 'icon', 'logo.ico')
+buildDir = os.path.join(rootDir, 'build').replace('\\', '/')
+logoPath = os.path.join(rootDir, 'pyapp', 'icon', 'logo.ico').replace('\\', '/')
 appISSID = Config.appISSID    # 安装包唯一GUID
 
 
