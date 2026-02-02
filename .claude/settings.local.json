@@ -4,7 +4,8 @@
       "Bash(findstr:*)",
       "Bash(powershell:*)",
       "Skill(frontend-design)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(git -C \"D:/bc/PPX_lobechat\" status pyapp/package/exe/getIss.py)"
     ],
     "deny": [],
     "ask": []
