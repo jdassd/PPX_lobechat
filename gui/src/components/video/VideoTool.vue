@@ -1036,7 +1036,7 @@ const openFramesDir = () => {
   width: 100%;
   max-height: 260px;
   border-radius: var(--ppx-radius-md);
-  background: var(--ppx-bg-deep);
+  background: var(--ppx-bg-ink);
 }
 
 .video-range-slider {

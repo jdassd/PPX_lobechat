@@ -70,12 +70,12 @@ const props = defineProps({
 .title {
   margin: 0;
   font-weight: 600;
-  color: #303652;
+  color: var(--ppx-text-primary);
 }
 
 .desc {
   margin: 6px 0 0;
-  color: #868ba0;
+  color: var(--ppx-text-muted);
   font-size: 13px;
 }
 </style>

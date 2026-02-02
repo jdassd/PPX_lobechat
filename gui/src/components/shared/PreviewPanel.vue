@@ -26,26 +26,28 @@ const props = defineProps({
 
 <style scoped>
 .preview-panel {
-  border: 1px solid #e2e6f2;
-  border-radius: 12px;
+  border: 1px solid var(--ppx-glass-border);
+  border-radius: 14px;
   padding: 12px;
-  background: #fdfdff;
+  background: var(--ppx-glass-bg);
+  box-shadow: var(--ppx-shadow-sm);
 }
 
 .preview-title {
   margin: 0 0 8px;
   font-weight: 600;
-  color: #30374f;
+  color: var(--ppx-text-primary);
 }
 
 .preview-body {
   margin: 0;
   padding: 12px;
-  background: #0f172a;
-  color: #e2e8f0;
-  border-radius: 8px;
+  background: #17130f;
+  color: #f6f0e6;
+  border-radius: 10px;
   overflow: auto;
   font-size: 13px;
   line-height: 1.6;
+  font-family: var(--ppx-font-mono);
 }
 </style>

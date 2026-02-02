@@ -84,9 +84,10 @@ const resolveLabel = (file) => {
 <style scoped>
 .file-selector {
   padding: 12px 16px;
-  border: 1px dashed #d6dbea;
-  border-radius: 12px;
-  background: #fbfcff;
+  border: 1px dashed var(--ppx-glass-border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: var(--ppx-shadow-sm);
 }
 
 .selector-head {
@@ -99,12 +100,12 @@ const resolveLabel = (file) => {
 .selector-label {
   margin: 0;
   font-weight: 600;
-  color: #303857;
+  color: var(--ppx-text-primary);
 }
 
 .selector-desc {
   margin: 4px 0 0;
-  color: #7b8197;
+  color: var(--ppx-text-muted);
   font-size: 12px;
 }
 

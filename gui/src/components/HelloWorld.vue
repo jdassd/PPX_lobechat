@@ -44,6 +44,6 @@ const getOwner = () => {
 
 <style scoped>
 a {
-  color: #42b983;
+  color: var(--ppx-neon-blue);
 }
 </style>

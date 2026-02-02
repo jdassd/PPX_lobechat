@@ -193,7 +193,7 @@ const resetAll = () => {
 }
 
 .example-tags .el-tag:hover {
-  border-color: rgba(0, 212, 255, 0.4);
+  border-color: rgba(14, 165, 164, 0.4);
   color: var(--ppx-neon-blue);
 }
 

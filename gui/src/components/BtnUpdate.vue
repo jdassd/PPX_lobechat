@@ -8,9 +8,9 @@
 
     <el-dialog v-model="state.checkVisible" title="检测更新" top="30vh" draggable destroy-on-close :close-on-click-modal="false" :close-on-press-escape="false" :show-close="false" :center="false" append-to-body>
       <div>
-        <SvgIcon v-if="state.code == 1" name="ele-SuccessFilled" :size="18" color="#67C23A" style="top:4px"></SvgIcon>
-        <SvgIcon v-else-if="state.code == 0" name="ele-WarningFilled" :size="18" color="#E6A23C" style="top:4px"></SvgIcon>
-        <SvgIcon v-else-if="state.code == -1" name="ele-CircleCloseFilled" :size="18" color="#F56C6C" style="top:4px"></SvgIcon>
+        <SvgIcon v-if="state.code == 1" name="ele-SuccessFilled" :size="18" color="var(--ppx-success)" style="top:4px"></SvgIcon>
+        <SvgIcon v-else-if="state.code == 0" name="ele-WarningFilled" :size="18" color="var(--ppx-warning)" style="top:4px"></SvgIcon>
+        <SvgIcon v-else-if="state.code == -1" name="ele-CircleCloseFilled" :size="18" color="var(--ppx-danger)" style="top:4px"></SvgIcon>
         {{ state.msg }}
       </div>
       <div v-if="state.code == 0 && state.body != ''" class="update-info">
@@ -28,7 +28,7 @@
     <el-dialog v-model="state.downloadVisible" title="下载更新" align-center draggable destroy-on-close :close-on-click-modal="false" :close-on-press-escape="false" :show-close="false" append-to-body>
       <div>
         <div class="mb6">
-          <SvgIcon name="ele-Loading" :size="14" class="is-loading mr2" style="top:2px" color="#337ecc"></SvgIcon>
+          <SvgIcon name="ele-Loading" :size="14" class="is-loading mr2" style="top:2px" color="var(--ppx-neon-blue)"></SvgIcon>
           正在下载更新...
         </div>
         <el-progress :text-inside="true" :stroke-width="25" :percentage="state.downloadPercentage">
@@ -175,16 +175,18 @@ const onBack = () => {
   margin-left: 20px;
   margin-top: 10px;
   padding: 10px;
-  color: #909399;
+  color: var(--ppx-text-muted);
   font-size: 12px;
   overflow: scroll;
-  background-color: #F2F3F5;
+  background-color: var(--ppx-glass-bg);
+  border: 1px solid var(--ppx-glass-border);
+  border-radius: var(--ppx-radius-sm);
   max-height: 50px;
 }
 
 .tip {
   margin-top: 10px;
-  color: #A8ABB2;
+  color: var(--ppx-text-muted);
   font-size: 11px;
 }
 

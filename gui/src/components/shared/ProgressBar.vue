@@ -42,14 +42,14 @@ const percent = computed(() => {
 .progress-track {
   width: 100%;
   height: 8px;
-  background: #eef1f8;
+  background: var(--ppx-glass-bg);
   border-radius: 999px;
   overflow: hidden;
 }
 
 .progress-inner {
   height: 100%;
-  background: linear-gradient(90deg, #5a8bff, #7fc8ff);
+  background: var(--ppx-gradient-primary);
   transition: width 0.3s ease;
 }
 
@@ -58,6 +58,6 @@ const percent = computed(() => {
   display: flex;
   justify-content: space-between;
   font-size: 12px;
-  color: #798098;
+  color: var(--ppx-text-muted);
 }
 </style>

@@ -1620,7 +1620,7 @@ const removeFile = (target, file) => {
   max-width: 100%;
   border-radius: var(--ppx-radius-sm);
   overflow: hidden;
-  background: var(--ppx-bg-deep);
+  background: var(--ppx-bg-ink);
 }
 
 .crop-preview-image {
@@ -1631,7 +1631,7 @@ const removeFile = (target, file) => {
 .crop-preview-rect {
   position: absolute;
   border: 2px solid var(--ppx-neon-blue);
-  box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.35);
+  box-shadow: 0 0 0 1px rgba(14, 165, 164, 0.35);
   pointer-events: auto;
 }
 
@@ -1642,7 +1642,7 @@ const removeFile = (target, file) => {
   border-radius: 50%;
   background-color: var(--ppx-bg-surface);
   border: 1px solid var(--ppx-neon-blue);
-  box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.3);
+  box-shadow: 0 0 0 1px rgba(14, 165, 164, 0.3);
 }
 
 .crop-handle-nw {
