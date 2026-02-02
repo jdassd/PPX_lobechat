@@ -10,3 +10,7 @@ cryptography==46.0.3
 # tinyaes==1.1.0
 # sqlalchemy==2.0.7
 # alembic==1.10.2
+# Launcher dependencies
+keyboard==0.13.5
+Pillow==10.0.0
+pywin32==305; sys_platform == 'win32'

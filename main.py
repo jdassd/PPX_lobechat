@@ -50,8 +50,7 @@ def WebViewApp(ifDev=False, ifCef=False):
     # 视图层页面URL
     if Config.devEnv:
         # 开发环境
-        MAIN_DIR = f'http://localhost:{Config.devPort}/'
-        template = os.path.join(MAIN_DIR, "")    # 设置页面，指向远程
+        template = f'http://localhost:{Config.devPort}/'
     else:
         # 生产环境
         MAIN_DIR = os.path.join(".", "web")
@@ -65,14 +64,30 @@ def WebViewApp(ifDev=False, ifCef=False):
     screens = screens[0]
     width = screens.width
     height = screens.height
-    # 程序窗口大小
-    initWidth = int(width * 2 / 3)
-    initHeight = int(height * 4 / 5)
-    minWidth = int(initWidth / 2)
-    minHeight = int(initHeight / 2)
+    
+    # 启动器窗口大小（固定尺寸）
+    initWidth = Config.launcherWidth
+    initHeight = Config.launcherHeight
+    
+    # 计算居中位置
+    x = int((width - initWidth) / 2)
+    y = int((height - initHeight) / 2)
 
-    # 创建窗口
-    window = webview.create_window(title=Config.appName, url=template, js_api=api, width=initWidth, height=initHeight, min_size=(minWidth, minHeight))
+    # 创建窗口（启动器模式：无边框、固定大小、初始隐藏）
+    window = webview.create_window(
+        title=Config.appName, 
+        url=template, 
+        js_api=api, 
+        width=initWidth, 
+        height=initHeight,
+        x=x,
+        y=y,
+        resizable=False,  # 启动器窗口固定大小
+        frameless=True,  # 无边框窗口
+        easy_drag=True,  # 支持拖动
+        on_top=True,  # 窗口置顶
+        hidden=False  # 默认显示窗口
+    )
 
     # 获取窗口实例
     api.setWindow(window)
@@ -85,8 +100,15 @@ def WebViewApp(ifDev=False, ifCef=False):
     # CEF模式
     guiCEF = 'cef' if ifCef else None
 
+    # 启动全局快捷键监听
+    def start_hotkey_listener():
+        api.start_listener()
+    
+    # 在开发模式下不需要http_server，因为使用Vite服务器
+    use_http_server = not Config.devEnv
+    
     # 启动窗口
-    webview.start(debug=Config.devEnv, http_server=True, gui=guiCEF)
+    webview.start(func=start_hotkey_listener, debug=Config.devEnv, http_server=use_http_server, gui=guiCEF)
 
 
 if __name__ == "__main__":

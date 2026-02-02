@@ -10,6 +10,10 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     }
   },
+  server: {
+    port: 5173,
+    strictPort: true  // 如果端口被占用则报错，而不是自动切换
+  },
   build: {
     sourcemap: false,
     chunkSizeWarningLimit: 1500, // 块大小警告的限制（以 kbs 为单位）
