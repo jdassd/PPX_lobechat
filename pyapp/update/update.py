@@ -59,8 +59,8 @@ class AppUpdate:
     def __getNewInfo(self):
         '''获取服务端版本信息'''
         try:
-            # 3秒后连接超时，3秒后读取超时
-            r = httpx.get(Config.appUpdateUrl, timeout=(3, 3))
+            # 15秒后连接超时，15秒后读取超时
+            r = httpx.get(Config.appUpdateUrl, timeout=(15, 15))
             resJson = r.json()
             version = resJson['name']    # 版本号
             htmlUrl = resJson['html_url']    # 下载页面
@@ -82,8 +82,8 @@ class AppUpdate:
     def __compareVersion(self, oldVersion, newVersion):
         '''判断是否需要更新'''
         ifUpdate = False    # 判断是否需要更新
-        oldVersionList = oldVersion.replace('V', '').split('.')
-        newVersionList = newVersion.replace('V', '').split('.')
+        oldVersionList = oldVersion.lower().replace('v', '').split('.')
+        newVersionList = newVersion.lower().replace('v', '').split('.')
         # 将版本号转换为整数进行比较，避免字符串比较的问题（如 '9' > '13' 的错误结果）
         try:
             oldMajor, oldMinor, oldPatch = int(oldVersionList[0]), int(oldVersionList[1]), int(oldVersionList[2])

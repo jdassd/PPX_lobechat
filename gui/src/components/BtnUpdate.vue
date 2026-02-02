@@ -6,7 +6,7 @@
       </el-button>
     </el-tooltip>
 
-    <el-dialog v-model="state.checkVisible" title="检测更新" top="30vh" draggable destroy-on-close :close-on-click-modal="false" :close-on-press-escape="false" :show-close="false" :center="false">
+    <el-dialog v-model="state.checkVisible" title="检测更新" top="30vh" draggable destroy-on-close :close-on-click-modal="false" :close-on-press-escape="false" :show-close="false" :center="false" append-to-body>
       <div>
         <SvgIcon v-if="state.code == 1" name="ele-SuccessFilled" :size="18" color="#67C23A" style="top:4px"></SvgIcon>
         <SvgIcon v-else-if="state.code == 0" name="ele-WarningFilled" :size="18" color="#E6A23C" style="top:4px"></SvgIcon>
@@ -25,7 +25,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="state.downloadVisible" title="下载更新" align-center draggable destroy-on-close :close-on-click-modal="false" :close-on-press-escape="false" :show-close="false">
+    <el-dialog v-model="state.downloadVisible" title="下载更新" align-center draggable destroy-on-close :close-on-click-modal="false" :close-on-press-escape="false" :show-close="false" append-to-body>
       <div>
         <div class="mb6">
           <SvgIcon name="ele-Loading" :size="14" class="is-loading mr2" style="top:2px" color="#337ecc"></SvgIcon>
@@ -96,24 +96,35 @@ const onCheckUpdate = (init = false) => {
   } else {
     // 第一次打开
     state.btnLoading = true
-    window.pywebview.api.system_checkNewVersion().then((res) => {
-      // console.log(init, res)
-      // 程序第一次打开，自动检测更新 或 手动点击检测更新
-      if (!init || res.code == 0) {
-        state.code = res.code
-        state.msg = res.msg
-        if (res.htmlUrl != undefined) {
-          state.htmlUrl = res.htmlUrl
+    if (window.pywebview && window.pywebview.api) {
+      window.pywebview.api.system_checkNewVersion().then((res) => {
+        // console.log(init, res)
+        // 程序第一次打开，自动检测更新 或 手动点击检测更新
+        if (!init || res.code == 0) {
+          state.code = res.code
+          state.msg = res.msg || '获取更新信息失败'
+          if (res.htmlUrl != undefined) {
+            state.htmlUrl = res.htmlUrl
+          }
+          if (res.body != undefined) {
+            let body = res.body
+            body = body.replaceAll('\r', '')
+            state.body = body.split('\n')
+          }
+          state.checkVisible = true
         }
-        if (res.body != undefined) {
-          let body = res.body
-          body = body.replaceAll('\r', '')
-          state.body = body.split('\n')
+        state.btnLoading = false
+      }).catch((err) => {
+        if (!init) {
+          state.code = -1
+          state.msg = '检查更新出错: ' + err
+          state.checkVisible = true
         }
-        state.checkVisible = true
-      }
-      state.btnLoading = false
-    })
+        state.btnLoading = false
+      })
+    } else {
+       state.btnLoading = false
+    }
   }
 }
 
