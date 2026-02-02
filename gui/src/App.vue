@@ -11,6 +11,7 @@ import TextTool from './components/text/TextTool.vue'
 import VideoTool from './components/video/VideoTool.vue'
 import FileTool from './components/file/FileTool.vue'
 import FinanceTool from './components/finance/FinanceTool.vue'
+import AutomationTool from './components/automation/AutomationTool.vue'
 
 const isLoaded = ref(false)
 const isScrolled = ref(false)
@@ -103,6 +104,22 @@ const featureCards = [
       '按关键字、扩展名、大小范围搜索',
       '批量复制、删除、重命名',
       'ZIP / 7Z 压缩与解压，支持密码'
+    ]
+  },
+    {
+    id: 'automation',
+    title: '自动化',
+    desc: '录制回放 / 图片识别',
+    icon: markRaw(Setting),
+    color: 'gray',
+    tags: ['宏录制', '图片识别'],
+    action: '打开面板',
+    disabled: false,
+    points: [
+      '录制鼠标和键盘操作轨迹',
+      '可循环自动回放的设置',
+      '支持图片定位与自动点击',
+      '脚本可导入导出'
     ]
   },
   {
@@ -225,6 +242,7 @@ const textToolVisible = ref(false)
 const videoToolVisible = ref(false)
 const fileToolVisible = ref(false)
 const financeToolVisible = ref(false)
+const automationToolVisible = ref(false)
 
 const onFeatureAction = (feature) => {
   if (feature.disabled) return
@@ -238,7 +256,8 @@ const onFeatureAction = (feature) => {
     text: textToolVisible,
     video: videoToolVisible,
     file: fileToolVisible,
-    finance: financeToolVisible
+    finance: financeToolVisible,
+    automation: automationToolVisible
   }
 
   if (visibilityMap[feature.id]) {
@@ -468,6 +487,7 @@ const onFeatureAction = (feature) => {
   <TextTool v-model="textToolVisible" />
   <VideoTool v-model="videoToolVisible" />
   <FileTool v-model="fileToolVisible" />
+  <AutomationTool v-model="automationToolVisible" />
   <PdfTool v-model="pdfToolVisible" />
   <ExcelTool v-model="excelToolVisible" />
   <SealTool v-model="sealToolVisible" />
