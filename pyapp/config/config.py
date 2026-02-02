@@ -25,7 +25,7 @@ class Config:
     ##
     appName = '多功能工具箱'  # 应用名称
     appNameEN = 'tools'    # 应用名称-英文（用于生成缓存文件夹，必须是英文）
-    appVersion = "V1.0.17"  # 应用版本号
+    appVersion = "V1.0.18"  # 应用版本号
     appDeveloper = "Jdassd"  # 应用开发者
     appBlogs = "https://baidu.com"  # 个人博客
     appPackage = 'ppx.jdassd'    # 应用包名，用于在本地电脑生成 vip.pangao.ppx 唯一文件夹
