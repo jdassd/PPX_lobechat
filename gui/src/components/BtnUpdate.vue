@@ -80,10 +80,10 @@ window.addEventListener('pywebviewready', async () => {
 const setPy2Js = () => {
   // 来自py的调用
   window['py2js_updateAppProgress'] = (res) => {
-    const resDict = JSON.parse(res)
-    // console.log('js', resDict)
-    state.downloadSizeShow = resDict['sizeShow']
-    state.downloadPercentage = resDict['percentage']
+    // res 已经是对象，不需要 JSON.parse
+    // console.log('js', res)
+    state.downloadSizeShow = res['sizeShow']
+    state.downloadPercentage = res['percentage']
   }
 }
 

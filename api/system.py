@@ -141,13 +141,19 @@ class System():
         return getpass.getuser()
 
     def system_pyOpenFile(self, path):
-        '''用电脑默认软件打开本地文件'''
-        # 使用 pathlib 进行跨平台路径处理
-        file_path = Path(path).resolve()
-        if Config.appIsMacOS:
-            subprocess.call(["open", str(file_path)])
+        '''用电脑默认软件打开本地文件或URL'''
+        # 判断是否为URL
+        if path.startswith('http://') or path.startswith('https://'):
+            # 打开URL
+            import webbrowser
+            webbrowser.open(path)
         else:
-            os.startfile(str(file_path))
+            # 使用 pathlib 进行跨平台路径处理
+            file_path = Path(path).resolve()
+            if Config.appIsMacOS:
+                subprocess.call(["open", str(file_path)])
+            else:
+                os.startfile(str(file_path))
 
     def system_pyCreateFileDialog(self, fileTypes=None, directory=''):
         '''打开文件对话框'''

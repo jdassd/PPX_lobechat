@@ -45,8 +45,9 @@ class AppUpdate:
         resCheck = self.check()
         if resCheck['code'] == 0:
             resApp = self.__getApp(resCheck['assets'])
-            if not resApp['status']:
-                return {'code': -2, 'msg': '下载程序包失败: ' + resApp['msg']}
+            if not resApp or not resApp.get('status'):
+                msg = str(resApp.get('msg', '未知错误')) if resApp else '未找到适用的安装包'
+                return {'code': -2, 'msg': '下载程序包失败: ' + msg}
             else:
                 return {'code': 0, 'msg': '下载程序包成功', 'downloadPath': resApp['downloadPath']}
         else:
@@ -113,6 +114,12 @@ class AppUpdate:
             if ext == appExt:
                 size = assets['size']
                 url = assets['browser_download_url']
+                # 确保下载目录存在
+                if not os.path.exists(Config.downloadDir):
+                    try:
+                        os.makedirs(Config.downloadDir, exist_ok=True)
+                    except Exception as e:
+                        return {'status': False, 'msg': f'创建下载目录失败: {str(e)}'}
                 downloadPath = os.path.join(Config.downloadDir, name)
                 # 超时重连3次
                 timeoutCount = 0
@@ -122,6 +129,10 @@ class AppUpdate:
                         timeoutCount += 1
                     else:
                         return resDownload
+                # 超时3次后返回失败
+                return {'status': False, 'msg': '连接超时，请稍后重试'}
+        # 未找到匹配的安装包
+        return {'status': False, 'msg': f'未找到适用于当前系统的安装包（需要 {appExt} 文件）'}
 
     def __download(self, url, downloadPath, size):
         '''下载大文件'''
@@ -155,10 +166,10 @@ class AppUpdate:
             return {'status': False, 'msg': '联网失败'}
         except httpx.HTTPError as e:
             # print('HTTPError => ', e)
-            return {'status': False, 'msg': e}
+            return {'status': False, 'msg': str(e)}
         except Exception as e:
             # print('Exception => ', e)
-            return {'status': False, 'msg': e}
+            return {'status': False, 'msg': str(e)}
 
     def bytes2Size(self, bytes):
         '''将字节大小转为带单位的值'''
