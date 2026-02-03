@@ -290,7 +290,6 @@ const onFeatureAction = (feature) => {
         </div>
         <div class="top-bar-actions">
           <BtnUpdate />
-          <span class="update-hint">检测更新</span>
         </div>
       </header>
 

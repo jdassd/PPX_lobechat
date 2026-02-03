@@ -1,7 +1,8 @@
 <template>
   <div>
     <el-tooltip content="检测更新" placement="bottom" effect="light">
-      <el-button key="plain" size="small" link @click="onCheckUpdate(false)">
+      <el-button key="plain" size="small" link class="update-btn" @click="onCheckUpdate(false)">
+        <span v-show="state.btnLoading" class="update-label">检测更新</span>
         <SvgIcon :name="state.btnLoading ? 'ele-Loading' : 'icon-Update'" :size="20" :class="{ 'is-loading': state.btnLoading }"></SvgIcon>
       </el-button>
     </el-tooltip>
@@ -193,5 +194,28 @@ const onBack = () => {
 .tip-sd {
   font-size: 11px;
   top: -1px;
+}
+
+.update-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.update-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ppx-text-muted);
+  letter-spacing: 0.4px;
+  animation: updatePulse 1.2s ease-in-out infinite;
+}
+
+@keyframes updatePulse {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 </style>
