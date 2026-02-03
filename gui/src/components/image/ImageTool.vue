@@ -1595,9 +1595,6 @@ const removeFile = (target, file) => {
 <style scoped>
 /* 使用全局深空玻璃主题样式 */
 
-.image-tabs {
-  margin-top: 10px;
-}
 
 .form-block {
   margin-top: 18px;
@@ -1733,4 +1730,5 @@ const removeFile = (target, file) => {
   background: var(--ppx-glass-bg-hover);
 }
 </style>
+
 
