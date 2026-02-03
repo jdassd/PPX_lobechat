@@ -3,7 +3,7 @@
    ======================================== */
 
 /* 引入阿里字体图标 */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Serif+SC:wght@300;400;500;600;700&family=ZCOOL+QingKe+HuangYou&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@500;600;700&family=Noto+Serif+SC:wght@300;400;500;600;700&display=swap');
 @import "./iconfont/iconfont.css";
 
 /* ========================================
@@ -11,7 +11,7 @@
    ======================================== */
 :root {
   /* ?? */
-  --ppx-font-display: 'ZCOOL QingKe HuangYou', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --ppx-font-display: 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   --ppx-font-body: 'Noto Serif SC', 'Source Han Serif SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', serif;
   --ppx-font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
 
