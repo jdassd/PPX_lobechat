@@ -23,15 +23,15 @@ const handleClose = () => {
 
 <template>
   <div class="window-titlebar">
-    <div class="titlebar-drag-region"></div>
+    <div class="titlebar-drag-region pywebview-drag-region"></div>
 
     <!-- 左侧内容区域（logo 等） -->
-    <div class="titlebar-content-left">
+    <div class="titlebar-content-left pywebview-drag-region">
       <slot name="left"></slot>
     </div>
 
     <!-- 中间可拖拽区域 -->
-    <div class="titlebar-content-center"></div>
+    <div class="titlebar-content-center pywebview-drag-region"></div>
 
     <!-- 右侧内容区域（更新按钮等） -->
     <div class="titlebar-content-right">

@@ -2,6 +2,7 @@
 import { markRaw, ref, onMounted, onUnmounted } from 'vue'
 import { Document, Files, Monitor, Setting, Stamp, PictureFilled, Edit, VideoPlay, FolderOpened, Coin } from '@element-plus/icons-vue'
 import WindowTitleBar from './components/WindowTitleBar.vue'
+import WindowResizeHandles from './components/WindowResizeHandles.vue'
 import BtnUpdate from './components/BtnUpdate.vue'
 import PdfTool from './components/pdf/PdfTool.vue'
 import ExcelTool from './components/excel/ExcelTool.vue'
@@ -287,6 +288,8 @@ const onFeatureAction = (feature) => {
         <BtnUpdate />
       </template>
     </WindowTitleBar>
+
+    <WindowResizeHandles />
 
     <!-- 背景装饰 -->
     <div class="bg-decorations">

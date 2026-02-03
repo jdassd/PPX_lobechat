@@ -156,7 +156,9 @@ def WebViewApp(ifDev=False, ifCef=False):
         width=initWidth,
         height=initHeight,
         min_size=(minWidth, minHeight),
-        frameless=True  # 禁用系统默认窗口装饰，使用自定义顶栏
+        frameless=True,  # 禁用系统默认窗口装饰，使用自定义顶栏
+        resizable=True,
+        easy_drag=False
     )
 
     # 获取窗口实例

@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Dict, List
 
 import webview
+from webview.window import FixPoint
 
 if platform.system() == 'Windows':
     import winreg
@@ -1383,6 +1384,47 @@ class System():
                     return {'success': False, 'message': '当前窗口不支持最小化'}
                 return {'success': True}
             return {'success': False, 'message': '窗口对象未初始化'}
+        except Exception as e:
+            return {'success': False, 'message': str(e)}
+
+    def resize_window(self, payload=None):
+        '''调整窗口大小（用于无边框拖拽缩放）'''
+        try:
+            if not System._window:
+                return {'success': False, 'message': '窗口对象未初始化'}
+
+            if not isinstance(payload, dict):
+                return {'success': False, 'message': '参数无效'}
+
+            width = payload.get('width')
+            height = payload.get('height')
+            fix_point_raw = payload.get('fixPoint')
+
+            try:
+                width = int(width)
+                height = int(height)
+            except (TypeError, ValueError):
+                return {'success': False, 'message': '宽高无效'}
+
+            fix_point = FixPoint.NORTH | FixPoint.WEST
+            if isinstance(fix_point_raw, str) and fix_point_raw:
+                flags = []
+                token = fix_point_raw.upper()
+                if 'N' in token:
+                    flags.append(FixPoint.NORTH)
+                if 'S' in token:
+                    flags.append(FixPoint.SOUTH)
+                if 'E' in token:
+                    flags.append(FixPoint.EAST)
+                if 'W' in token:
+                    flags.append(FixPoint.WEST)
+                if flags:
+                    fix_point = FixPoint(0)
+                    for flag in flags:
+                        fix_point |= flag
+
+            System._window.resize(width, height, fix_point)
+            return {'success': True}
         except Exception as e:
             return {'success': False, 'message': str(e)}
 
