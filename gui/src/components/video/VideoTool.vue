@@ -1056,5 +1056,7 @@ const openFramesDir = () => {
   color: var(--ppx-neon-blue);
   cursor: pointer;
 }
+
 </style>
+
 

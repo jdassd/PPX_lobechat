@@ -1000,10 +1000,6 @@ const analyzeDisk = async () => {
   margin-bottom: 12px;
 }
 
-.system-tabs {
-  margin-top: 4px;
-}
-
 .overview-header {
   display: flex;
   align-items: center;

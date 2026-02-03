@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { computed, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
 
@@ -127,7 +127,7 @@ const parseExtensions = (value) =>
 
 const ensurePyReady = () => {
   if (!window.pywebview?.api) {
-    ElMessage.warning('该功能需在桌面客户端中使用')
+    ElMessage.warning('璇ュ姛鑳介渶鍦ㄦ闈㈠鎴风涓娇鐢?)
     return false
   }
   return true
@@ -162,7 +162,7 @@ const selectClassifyTarget = async () => {
 
 const selectCompareFile = async (target) => {
   if (!ensurePyReady()) return
-  const files = await window.pywebview.api.system_pyCreateFileDialog(['全部文件 (*.*)'])
+  const files = await window.pywebview.api.system_pyCreateFileDialog(['鍏ㄩ儴鏂囦欢 (*.*)'])
   if (files?.length) {
     state.compare[target] = files[0]
   }
@@ -170,7 +170,7 @@ const selectCompareFile = async (target) => {
 
 const selectArchiveFile = async () => {
   if (!ensurePyReady()) return
-  const res = await window.pywebview.api.system_pyCreateFileDialog(['压缩文件 (*.zip;*.7z)'])
+  const res = await window.pywebview.api.system_pyCreateFileDialog(['鍘嬬缉鏂囦欢 (*.zip;*.7z)'])
   if (res?.length) {
     state.extract.archiveFile = res[0]
   }
@@ -178,7 +178,7 @@ const selectArchiveFile = async () => {
 
 const addArchiveFiles = async () => {
   if (!ensurePyReady()) return
-  const files = await window.pywebview.api.system_pyCreateFileDialog(['全部文件 (*.*)'])
+  const files = await window.pywebview.api.system_pyCreateFileDialog(['鍏ㄩ儴鏂囦欢 (*.*)'])
   if (files?.length) {
     state.archive.items.push(...files.map((file) => ({ ...file, type: 'file' })))
   }
@@ -199,7 +199,7 @@ const removeArchiveItem = (index) => {
 const runSearch = async () => {
   if (!ensurePyReady()) return
   if (!state.search.directory) {
-    ElMessage.warning('请选择目录')
+    ElMessage.warning('璇烽€夋嫨鐩綍')
     return
   }
   state.loading = true
@@ -218,12 +218,12 @@ const runSearch = async () => {
     })
     if (res?.code === 0) {
       state.search.result = res.items || []
-      ElMessage.success(res.msg || '搜索完成')
+      ElMessage.success(res.msg || '鎼滅储瀹屾垚')
     } else {
-      ElMessage.error(res?.msg || '搜索失败')
+      ElMessage.error(res?.msg || '鎼滅储澶辫触')
     }
   } catch (error) {
-    ElMessage.error(error?.message || '搜索失败')
+    ElMessage.error(error?.message || '鎼滅储澶辫触')
   } finally {
     state.loading = false
   }
@@ -232,7 +232,7 @@ const runSearch = async () => {
 const runAnalyze = async () => {
   if (!ensurePyReady()) return
   if (!state.analyze.directory) {
-    ElMessage.warning('请选择目录')
+    ElMessage.warning('璇烽€夋嫨鐩綍')
     return
   }
   state.loading = true
@@ -242,12 +242,12 @@ const runAnalyze = async () => {
     })
     if (res?.code === 0) {
       state.analyze.stats = res.stats
-      ElMessage.success(res.msg || '分析完成')
+      ElMessage.success(res.msg || '鍒嗘瀽瀹屾垚')
     } else {
-      ElMessage.error(res?.msg || '分析失败')
+      ElMessage.error(res?.msg || '鍒嗘瀽澶辫触')
     }
   } catch (error) {
-    ElMessage.error(error?.message || '分析失败')
+    ElMessage.error(error?.message || '鍒嗘瀽澶辫触')
   } finally {
     state.loading = false
   }
@@ -256,7 +256,7 @@ const runAnalyze = async () => {
 const runCompress = async () => {
   if (!ensurePyReady()) return
   if (!state.archive.items.length) {
-    ElMessage.warning('请先添加文件或文件夹')
+    ElMessage.warning('璇峰厛娣诲姞鏂囦欢鎴栨枃浠跺す')
     return
   }
   state.loading = true
@@ -270,12 +270,12 @@ const runCompress = async () => {
     })
     if (res?.code === 0) {
       state.archive.result = res.file || ''
-      ElMessage.success(res.msg || '压缩完成')
+      ElMessage.success(res.msg || '鍘嬬缉瀹屾垚')
     } else {
-      ElMessage.error(res?.msg || '压缩失败')
+      ElMessage.error(res?.msg || '鍘嬬缉澶辫触')
     }
   } catch (error) {
-    ElMessage.error(error?.message || '压缩失败')
+    ElMessage.error(error?.message || '鍘嬬缉澶辫触')
   } finally {
     state.loading = false
   }
@@ -284,7 +284,7 @@ const runCompress = async () => {
 const runExtract = async () => {
   if (!ensurePyReady()) return
   if (!state.extract.archiveFile) {
-    ElMessage.warning('请选择压缩包')
+    ElMessage.warning('璇烽€夋嫨鍘嬬缉鍖?)
     return
   }
   state.loading = true
@@ -297,12 +297,12 @@ const runExtract = async () => {
     if (res?.code === 0) {
       state.extract.files = res.files || []
       state.extract.targetDir = res.outputDir || state.extract.targetDir
-      ElMessage.success(res.msg || '解压完成')
+      ElMessage.success(res.msg || '瑙ｅ帇瀹屾垚')
     } else {
-      ElMessage.error(res?.msg || '解压失败')
+      ElMessage.error(res?.msg || '瑙ｅ帇澶辫触')
     }
   } catch (error) {
-    ElMessage.error(error?.message || '解压失败')
+    ElMessage.error(error?.message || '瑙ｅ帇澶辫触')
   } finally {
     state.loading = false
   }
@@ -346,7 +346,7 @@ const selectDedupDir = async () => {
 const runCopy = async () => {
   if (!ensurePyReady()) return
   if (!state.copy.sourceDir || !state.copy.targetDir) {
-    ElMessage.warning('请选择源目录和目标目录')
+    ElMessage.warning('璇烽€夋嫨婧愮洰褰曞拰鐩爣鐩綍')
     return
   }
   state.loading = true
@@ -361,12 +361,12 @@ const runCopy = async () => {
     })
     if (res?.code === 0) {
       state.copy.result = res
-      ElMessage.success(res.msg || '复制完成')
+      ElMessage.success(res.msg || '澶嶅埗瀹屾垚')
     } else {
-      ElMessage.error(res?.msg || '复制失败')
+      ElMessage.error(res?.msg || '澶嶅埗澶辫触')
     }
   } catch (error) {
-    ElMessage.error(error?.message || '复制失败')
+    ElMessage.error(error?.message || '澶嶅埗澶辫触')
   } finally {
     state.loading = false
   }
@@ -375,7 +375,7 @@ const runCopy = async () => {
 const runDelete = async () => {
   if (!ensurePyReady()) return
   if (!state.remove.directory) {
-    ElMessage.warning('请选择目录')
+    ElMessage.warning('璇烽€夋嫨鐩綍')
     return
   }
   state.loading = true
@@ -391,47 +391,47 @@ const runDelete = async () => {
     if (res?.code === 0) {
       state.remove.preview = res.preview || []
       state.remove.summary = res
-      ElMessage.success(res.msg || (state.remove.dryRun ? '预览完成' : '删除完成'))
+      ElMessage.success(res.msg || (state.remove.dryRun ? '棰勮瀹屾垚' : '鍒犻櫎瀹屾垚'))
     } else {
-      ElMessage.error(res?.msg || '删除失败')
+      ElMessage.error(res?.msg || '鍒犻櫎澶辫触')
     }
   } catch (error) {
-    ElMessage.error(error?.message || '删除失败')
+    ElMessage.error(error?.message || '鍒犻櫎澶辫触')
   } finally {
     state.loading = false
   }
 }
 
-// 预置模板选项
+// 棰勭疆妯℃澘閫夐」
 const presetTemplates = [
-  { label: '日期 + 序号', value: '{date}_{index:3}' },
-  { label: '日期 + 原名', value: '{date}_{name}' },
-  { label: '原名 + 备份后缀', value: '{name}_backup' },
-  { label: '纯序号', value: 'IMG_{index:4}' },
-  { label: '年月日时分秒', value: '{datetime}_{index}' },
-  { label: '年/月/原名', value: '{year}{month}_{name}' }
+  { label: '鏃ユ湡 + 搴忓彿', value: '{date}_{index:3}' },
+  { label: '鏃ユ湡 + 鍘熷悕', value: '{date}_{name}' },
+  { label: '鍘熷悕 + 澶囦唤鍚庣紑', value: '{name}_backup' },
+  { label: '绾簭鍙?, value: 'IMG_{index:4}' },
+  { label: '骞存湀鏃ユ椂鍒嗙', value: '{datetime}_{index}' },
+  { label: '骞?鏈?鍘熷悕', value: '{year}{month}_{name}' }
 ]
 
-// 变量说明
+// 鍙橀噺璇存槑
 const templateVariables = [
-  { var: '{name}', desc: '原文件名（不含扩展名）' },
-  { var: '{ext}', desc: '扩展名（如 .jpg）' },
-  { var: '{index}', desc: '序号（自动补零）' },
-  { var: '{index:4}', desc: '指定4位序号' },
-  { var: '{date}', desc: '日期 (YYYYMMDD)' },
-  { var: '{time}', desc: '时间 (HHMMSS)' },
-  { var: '{datetime}', desc: '日期时间' },
-  { var: '{year}', desc: '年份' },
-  { var: '{month}', desc: '月份' },
-  { var: '{day}', desc: '日' }
+  { var: '{name}', desc: '鍘熸枃浠跺悕锛堜笉鍚墿灞曞悕锛? },
+  { var: '{ext}', desc: '鎵╁睍鍚嶏紙濡?.jpg锛? },
+  { var: '{index}', desc: '搴忓彿锛堣嚜鍔ㄨˉ闆讹級' },
+  { var: '{index:4}', desc: '鎸囧畾4浣嶅簭鍙? },
+  { var: '{date}', desc: '鏃ユ湡 (YYYYMMDD)' },
+  { var: '{time}', desc: '鏃堕棿 (HHMMSS)' },
+  { var: '{datetime}', desc: '鏃ユ湡鏃堕棿' },
+  { var: '{year}', desc: '骞翠唤' },
+  { var: '{month}', desc: '鏈堜唤' },
+  { var: '{day}', desc: '鏃? }
 ]
 
-// 正则表达式示例
+// 姝ｅ垯琛ㄨ揪寮忕ず渚?
 const regexExamples = [
-  { target: '删除空格', pattern: '\\s+', replace: '_', desc: '空格 → 下划线' },
-  { target: '删除括号内容', pattern: '\\([^)]*\\)', replace: '', desc: '移除 (xxx)' },
-  { target: '删除开头数字', pattern: '^\\d+[._-]?', replace: '', desc: '移除开头 01-' },
-  { target: '仅保留字母数字', pattern: '[^a-zA-Z0-9]', replace: '_', desc: '其他字符变下划线' }
+  { target: '鍒犻櫎绌烘牸', pattern: '\\s+', replace: '_', desc: '绌烘牸 鈫?涓嬪垝绾? },
+  { target: '鍒犻櫎鎷彿鍐呭', pattern: '\\([^)]*\\)', replace: '', desc: '绉婚櫎 (xxx)' },
+  { target: '鍒犻櫎寮€澶存暟瀛?, pattern: '^\\d+[._-]?', replace: '', desc: '绉婚櫎寮€澶?01-' },
+  { target: '浠呬繚鐣欏瓧姣嶆暟瀛?, pattern: '[^a-zA-Z0-9]', replace: '_', desc: '鍏朵粬瀛楃鍙樹笅鍒掔嚎' }
 ]
 
 const applyPreset = (value) => {
@@ -481,7 +481,7 @@ const buildRenameParams = () => {
 const runRename = async () => {
   if (!ensurePyReady()) return
   if (!state.rename.directory) {
-    ElMessage.warning('请选择目录')
+    ElMessage.warning('璇烽€夋嫨鐩綍')
     return
   }
   state.loading = true
@@ -498,12 +498,12 @@ const runRename = async () => {
     if (res?.code === 0) {
       state.rename.result = res.renamed || []
       state.rename.skipped = res.skipped || []
-      ElMessage.success(res.msg || (state.rename.dryRun ? '预览完成' : '重命名完成'))
+      ElMessage.success(res.msg || (state.rename.dryRun ? '棰勮瀹屾垚' : '閲嶅懡鍚嶅畬鎴?))
     } else {
-      ElMessage.error(res?.msg || '重命名失败')
+      ElMessage.error(res?.msg || '閲嶅懡鍚嶅け璐?)
     }
   } catch (error) {
-    ElMessage.error(error?.message || '重命名失败')
+    ElMessage.error(error?.message || '閲嶅懡鍚嶅け璐?)
   } finally {
     state.loading = false
   }
@@ -512,7 +512,7 @@ const runRename = async () => {
 const runDedup = async () => {
   if (!ensurePyReady()) return
   if (!state.dedup.directory) {
-    ElMessage.warning('请选择目录')
+    ElMessage.warning('璇烽€夋嫨鐩綍')
     return
   }
   state.loading = true
@@ -526,12 +526,12 @@ const runDedup = async () => {
     if (res?.code === 0) {
       state.dedup.result = res.groups || []
       state.dedup.summary = res
-      ElMessage.success(res.msg || '扫描完成')
+      ElMessage.success(res.msg || '鎵弿瀹屾垚')
     } else {
-      ElMessage.error(res?.msg || '扫描失败')
+      ElMessage.error(res?.msg || '鎵弿澶辫触')
     }
   } catch (error) {
-    ElMessage.error(error?.message || '扫描失败')
+    ElMessage.error(error?.message || '鎵弿澶辫触')
   } finally {
     state.loading = false
   }
@@ -540,7 +540,7 @@ const runDedup = async () => {
 const runClassify = async () => {
   if (!ensurePyReady()) return
   if (!state.classify.directory) {
-    ElMessage.warning('请选择源目录')
+    ElMessage.warning('璇烽€夋嫨婧愮洰褰?)
     return
   }
   state.loading = true
@@ -560,12 +560,12 @@ const runClassify = async () => {
       if (res.outputDir) {
         state.classify.targetDir = res.outputDir
       }
-      ElMessage.success(res.msg || '分类完成')
+      ElMessage.success(res.msg || '鍒嗙被瀹屾垚')
     } else {
-      ElMessage.error(res?.msg || '分类失败')
+      ElMessage.error(res?.msg || '鍒嗙被澶辫触')
     }
   } catch (error) {
-    ElMessage.error(error?.message || '分类失败')
+    ElMessage.error(error?.message || '鍒嗙被澶辫触')
   } finally {
     state.loading = false
   }
@@ -574,7 +574,7 @@ const runClassify = async () => {
 const runCompare = async () => {
   if (!ensurePyReady()) return
   if (!state.compare.fileA || !state.compare.fileB) {
-    ElMessage.warning('请先选择两个文件')
+    ElMessage.warning('璇峰厛閫夋嫨涓や釜鏂囦欢')
     return
   }
   state.loading = true
@@ -587,17 +587,17 @@ const runCompare = async () => {
       ignoreCase: state.compare.ignoreCase
     })
     if (res?.code === 0) {
-      state.compare.result = res.equal ? '两个文件内容一致' : '检测到差异'
+      state.compare.result = res.equal ? '涓や釜鏂囦欢鍐呭涓€鑷? : '妫€娴嬪埌宸紓'
       state.compare.diffText = (res.diff || []).join('\n')
       state.compare.hash = res.hash || null
       state.compare.size = res.size || null
       state.compare.encodingInfo = res.encoding || null
-      ElMessage.success(res.msg || '对比完成')
+      ElMessage.success(res.msg || '瀵规瘮瀹屾垚')
     } else {
-      ElMessage.error(res?.msg || '对比失败')
+      ElMessage.error(res?.msg || '瀵规瘮澶辫触')
     }
   } catch (error) {
-    ElMessage.error(error?.message || '对比失败')
+    ElMessage.error(error?.message || '瀵规瘮澶辫触')
   } finally {
     state.loading = false
   }
@@ -615,36 +615,36 @@ const runCompare = async () => {
       <div class="drawer-head">
         <div>
           <p class="eyebrow">FILE TOOLKIT</p>
-          <h3>文件管理工具</h3>
-          <p class="sub">搜索、目录分析与压缩解压</p>
+          <h3>鏂囦欢绠＄悊宸ュ叿</h3>
+          <p class="sub">鎼滅储銆佺洰褰曞垎鏋愪笌鍘嬬缉瑙ｅ帇</p>
         </div>
       </div>
     </template>
     <div class="file-tool">
       <el-tabs v-model="state.activeTab">
-        <el-tab-pane label="文件搜索" name="search">
+        <el-tab-pane label="鏂囦欢鎼滅储" name="search">
           <section class="panel">
             <header>
-              <h4>快速查找目录内文件</h4>
-              <p>支持扩展名筛选、大小范围与递归搜索</p>
+              <h4>蹇€熸煡鎵剧洰褰曞唴鏂囦欢</h4>
+              <p>鏀寔鎵╁睍鍚嶇瓫閫夈€佸ぇ灏忚寖鍥翠笌閫掑綊鎼滅储</p>
             </header>
             <el-form :model="state.search" label-width="120px">
-              <el-form-item label="目录">
+              <el-form-item label="鐩綍">
                 <div class="field-row">
-                  <el-input v-model="state.search.directory" placeholder="选择要搜索的目录" readonly />
-                  <el-button @click="selectDir('search')">选择</el-button>
+                  <el-input v-model="state.search.directory" placeholder="閫夋嫨瑕佹悳绱㈢殑鐩綍" readonly />
+                  <el-button @click="selectDir('search')">閫夋嫨</el-button>
                 </div>
               </el-form-item>
-              <el-form-item label="关键字">
-                <el-input v-model="state.search.keyword" placeholder="支持模糊匹配" clearable />
+              <el-form-item label="鍏抽敭瀛?>
+                <el-input v-model="state.search.keyword" placeholder="鏀寔妯＄硦鍖归厤" clearable />
               </el-form-item>
-              <el-form-item label="扩展名">
+              <el-form-item label="鎵╁睍鍚?>
                 <el-input
                   v-model="state.search.extensions"
-                  placeholder="以逗号分隔，如：pdf,jpg,docx"
+                  placeholder="浠ラ€楀彿鍒嗛殧锛屽锛歱df,jpg,docx"
                 />
               </el-form-item>
-              <el-form-item label="大小 (B)">
+              <el-form-item label="澶у皬 (B)">
                 <div class="field-row">
                   <el-input-number v-model="state.search.minSize" :min="0" />
                   <span>~</span>
@@ -652,90 +652,90 @@ const runCompare = async () => {
                 </div>
               </el-form-item>
               <el-form-item>
-                <el-checkbox v-model="state.search.recursive">包含子目录</el-checkbox>
+                <el-checkbox v-model="state.search.recursive">鍖呭惈瀛愮洰褰?/el-checkbox>
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" :loading="state.loading" @click="runSearch">开始搜索</el-button>
+                <el-button type="primary" :loading="state.loading" @click="runSearch">寮€濮嬫悳绱?/el-button>
               </el-form-item>
             </el-form>
             <ResultTable
               v-if="state.search.result.length"
-              title="搜索结果"
-              :description="`共 ${state.search.result.length} 条`"
+              title="鎼滅储缁撴灉"
+              :description="`鍏?${state.search.result.length} 鏉"
               :items="state.search.result"
               :columns="[
-                { label: '文件名', prop: 'name', width: 200 },
-                { label: '路径', prop: 'path' },
-                { label: '大小', prop: 'sizeText', width: 120 }
+                { label: '鏂囦欢鍚?, prop: 'name', width: 200 },
+                { label: '璺緞', prop: 'path' },
+                { label: '澶у皬', prop: 'sizeText', width: 120 }
               ]"
             >
               <template #actions>
                 <el-button text type="primary" @click="openPath(state.search.directory)">
-                  打开目录
+                  鎵撳紑鐩綍
                 </el-button>
               </template>
             </ResultTable>
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="自动分类" name="classify">
+        <el-tab-pane label="鑷姩鍒嗙被" name="classify">
           <section class="panel">
             <header>
-              <h4>按类型 / 大小 / 日期整理</h4>
-              <p>将目录中的文件批量复制/移动到分类子目录</p>
+              <h4>鎸夌被鍨?/ 澶у皬 / 鏃ユ湡鏁寸悊</h4>
+              <p>灏嗙洰褰曚腑鐨勬枃浠舵壒閲忓鍒?绉诲姩鍒板垎绫诲瓙鐩綍</p>
             </header>
             <el-form :model="state.classify" label-width="130px" class="form-gap">
-              <el-form-item label="源目录">
+              <el-form-item label="婧愮洰褰?>
                 <div class="field-row">
-                  <el-input v-model="state.classify.directory" placeholder="选择待整理目录" readonly />
-                  <el-button @click="selectClassifySource">选择</el-button>
+                  <el-input v-model="state.classify.directory" placeholder="閫夋嫨寰呮暣鐞嗙洰褰? readonly />
+                  <el-button @click="selectClassifySource">閫夋嫨</el-button>
                 </div>
               </el-form-item>
-              <el-form-item label="目标目录">
+              <el-form-item label="鐩爣鐩綍">
                 <div class="field-row">
                   <el-input
                     v-model="state.classify.targetDir"
-                    placeholder="留空则在源目录创建 _classified"
+                    placeholder="鐣欑┖鍒欏湪婧愮洰褰曞垱寤?_classified"
                     readonly
                   />
-                  <el-button @click="selectClassifyTarget">选择</el-button>
+                  <el-button @click="selectClassifyTarget">閫夋嫨</el-button>
                 </div>
               </el-form-item>
-              <el-form-item label="分类模式">
+              <el-form-item label="鍒嗙被妯″紡">
                 <el-radio-group v-model="state.classify.mode">
-                  <el-radio-button label="type">按文件类型</el-radio-button>
-                  <el-radio-button label="size">按大小区间</el-radio-button>
-                  <el-radio-button label="date">按日期（年月）</el-radio-button>
+                  <el-radio-button label="type">鎸夋枃浠剁被鍨?/el-radio-button>
+                  <el-radio-button label="size">鎸夊ぇ灏忓尯闂?/el-radio-button>
+                  <el-radio-button label="date">鎸夋棩鏈燂紙骞存湀锛?/el-radio-button>
                 </el-radio-group>
               </el-form-item>
-              <el-form-item label="操作方式">
+              <el-form-item label="鎿嶄綔鏂瑰紡">
                 <el-radio-group v-model="state.classify.operation">
-                  <el-radio-button label="copy">复制</el-radio-button>
-                  <el-radio-button label="move">移动</el-radio-button>
+                  <el-radio-button label="copy">澶嶅埗</el-radio-button>
+                  <el-radio-button label="move">绉诲姩</el-radio-button>
                 </el-radio-group>
                 <el-checkbox v-model="state.classify.recursive" style="margin-left: 12px">
-                  包含子目录
+                  鍖呭惈瀛愮洰褰?
                 </el-checkbox>
               </el-form-item>
-              <el-form-item label="冲突策略">
+              <el-form-item label="鍐茬獊绛栫暐">
                 <el-select v-model="state.classify.conflictPolicy" style="width: 200px">
-                  <el-option label="重命名" value="rename" />
-                  <el-option label="覆盖" value="overwrite" />
+                  <el-option label="閲嶅懡鍚? value="rename" />
+                  <el-option label="瑕嗙洊" value="overwrite" />
                 </el-select>
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" :loading="state.loading" @click="runClassify">执行分类</el-button>
+                <el-button type="primary" :loading="state.loading" @click="runClassify">鎵ц鍒嗙被</el-button>
               </el-form-item>
             </el-form>
             <div v-if="state.classify.summary" class="stats-panel">
               <el-descriptions :column="3" border size="small">
-                <el-descriptions-item label="匹配文件">
+                <el-descriptions-item label="鍖归厤鏂囦欢">
                   {{ state.classify.summary.matched }}
                 </el-descriptions-item>
-                <el-descriptions-item label="已处理">
+                <el-descriptions-item label="宸插鐞?>
                   {{ state.classify.summary.processed }}
                 </el-descriptions-item>
-                <el-descriptions-item label="总大小">
+                <el-descriptions-item label="鎬诲ぇ灏?>
                   {{ state.classify.summary.totalSize }}
                 </el-descriptions-item>
               </el-descriptions>
@@ -747,8 +747,8 @@ const runCompare = async () => {
               size="small"
               style="margin-top: 16px"
             >
-              <el-table-column prop="label" label="分类" />
-              <el-table-column prop="count" label="数量" width="140" />
+              <el-table-column prop="label" label="鍒嗙被" />
+              <el-table-column prop="count" label="鏁伴噺" width="140" />
             </el-table>
             <el-table
               v-if="state.classify.result.length"
@@ -757,47 +757,47 @@ const runCompare = async () => {
               size="small"
               style="margin-top: 16px"
             >
-              <el-table-column prop="category" label="分类" width="140" />
-              <el-table-column prop="from" label="源文件" show-overflow-tooltip />
-              <el-table-column prop="to" label="目标地址" show-overflow-tooltip />
+              <el-table-column prop="category" label="鍒嗙被" width="140" />
+              <el-table-column prop="from" label="婧愭枃浠? show-overflow-tooltip />
+              <el-table-column prop="to" label="鐩爣鍦板潃" show-overflow-tooltip />
             </el-table>
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="批量复制" name="copy">
+        <el-tab-pane label="鎵归噺澶嶅埗" name="copy">
           <section class="panel">
             <header>
-              <h4>按规则复制文件</h4>
-              <p>按关键字 / 扩展名筛选，自动复制到目标目录</p>
+              <h4>鎸夎鍒欏鍒舵枃浠?/h4>
+              <p>鎸夊叧閿瓧 / 鎵╁睍鍚嶇瓫閫夛紝鑷姩澶嶅埗鍒扮洰鏍囩洰褰?/p>
             </header>
             <el-form :model="state.copy" label-width="120px">
-              <el-form-item label="源目录">
+              <el-form-item label="婧愮洰褰?>
                 <div class="field-row">
-                  <el-input v-model="state.copy.sourceDir" placeholder="选择源目录" readonly />
-                  <el-button @click="selectCopySource">选择</el-button>
+                  <el-input v-model="state.copy.sourceDir" placeholder="閫夋嫨婧愮洰褰? readonly />
+                  <el-button @click="selectCopySource">閫夋嫨</el-button>
                 </div>
               </el-form-item>
-              <el-form-item label="目标目录">
+              <el-form-item label="鐩爣鐩綍">
                 <div class="field-row">
-                  <el-input v-model="state.copy.targetDir" placeholder="选择目标目录" readonly />
-                  <el-button @click="selectCopyTarget">选择</el-button>
+                  <el-input v-model="state.copy.targetDir" placeholder="閫夋嫨鐩爣鐩綍" readonly />
+                  <el-button @click="selectCopyTarget">閫夋嫨</el-button>
                 </div>
               </el-form-item>
-              <el-form-item label="关键字">
-                <el-input v-model="state.copy.keyword" placeholder="可选" />
+              <el-form-item label="鍏抽敭瀛?>
+                <el-input v-model="state.copy.keyword" placeholder="鍙€? />
               </el-form-item>
-              <el-form-item label="扩展名">
-                <el-input v-model="state.copy.extensions" placeholder="例如：pdf,jpg" />
+              <el-form-item label="鎵╁睍鍚?>
+                <el-input v-model="state.copy.extensions" placeholder="渚嬪锛歱df,jpg" />
               </el-form-item>
-              <el-form-item label="选项">
-                <el-checkbox v-model="state.copy.recursive">包含子目录</el-checkbox>
+              <el-form-item label="閫夐」">
+                <el-checkbox v-model="state.copy.recursive">鍖呭惈瀛愮洰褰?/el-checkbox>
                 <el-select v-model="state.copy.conflictPolicy" style="width: 200px">
-                  <el-option label="冲突跳过" value="skip" />
-                  <el-option label="覆盖同名文件" value="overwrite" />
+                  <el-option label="鍐茬獊璺宠繃" value="skip" />
+                  <el-option label="瑕嗙洊鍚屽悕鏂囦欢" value="overwrite" />
                 </el-select>
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" :loading="state.loading" @click="runCopy">开始复制</el-button>
+                <el-button type="primary" :loading="state.loading" @click="runCopy">寮€濮嬪鍒?/el-button>
               </el-form-item>
             </el-form>
             <el-descriptions
@@ -806,45 +806,45 @@ const runCompare = async () => {
               border
               size="small"
             >
-              <el-descriptions-item label="已复制">{{ state.copy.result.copied }}</el-descriptions-item>
-              <el-descriptions-item label="跳过">{{ state.copy.result.skipped }}</el-descriptions-item>
-              <el-descriptions-item label="总大小">{{ state.copy.result.sizeText }}</el-descriptions-item>
+              <el-descriptions-item label="宸插鍒?>{{ state.copy.result.copied }}</el-descriptions-item>
+              <el-descriptions-item label="璺宠繃">{{ state.copy.result.skipped }}</el-descriptions-item>
+              <el-descriptions-item label="鎬诲ぇ灏?>{{ state.copy.result.sizeText }}</el-descriptions-item>
             </el-descriptions>
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="批量删除" name="delete">
+        <el-tab-pane label="鎵归噺鍒犻櫎" name="delete">
           <section class="panel">
             <header>
-              <h4>按条件删除文件</h4>
-              <p>支持先预览，再执行永久删除或移动到回收站</p>
+              <h4>鎸夋潯浠跺垹闄ゆ枃浠?/h4>
+              <p>鏀寔鍏堥瑙堬紝鍐嶆墽琛屾案涔呭垹闄ゆ垨绉诲姩鍒板洖鏀剁珯</p>
             </header>
             <el-form :model="state.remove" label-width="120px">
-              <el-form-item label="目录">
+              <el-form-item label="鐩綍">
                 <div class="field-row">
-                  <el-input v-model="state.remove.directory" placeholder="选择目录" readonly />
-                  <el-button @click="selectRemoveDir">选择</el-button>
+                  <el-input v-model="state.remove.directory" placeholder="閫夋嫨鐩綍" readonly />
+                  <el-button @click="selectRemoveDir">閫夋嫨</el-button>
                 </div>
               </el-form-item>
-              <el-form-item label="关键字">
-                <el-input v-model="state.remove.keyword" placeholder="可选" />
+              <el-form-item label="鍏抽敭瀛?>
+                <el-input v-model="state.remove.keyword" placeholder="鍙€? />
               </el-form-item>
-              <el-form-item label="扩展名">
-                <el-input v-model="state.remove.extensions" placeholder="如：log,tmp" />
+              <el-form-item label="鎵╁睍鍚?>
+                <el-input v-model="state.remove.extensions" placeholder="濡傦細log,tmp" />
               </el-form-item>
-              <el-form-item label="选项">
-                <el-checkbox v-model="state.remove.recursive">包含子目录</el-checkbox>
+              <el-form-item label="閫夐」">
+                <el-checkbox v-model="state.remove.recursive">鍖呭惈瀛愮洰褰?/el-checkbox>
                 <el-radio-group v-model="state.remove.deletePolicy">
-                  <el-radio-button label="recycle">移动到回收站</el-radio-button>
-                  <el-radio-button label="permanent">永久删除</el-radio-button>
+                  <el-radio-button label="recycle">绉诲姩鍒板洖鏀剁珯</el-radio-button>
+                  <el-radio-button label="permanent">姘镐箙鍒犻櫎</el-radio-button>
                 </el-radio-group>
               </el-form-item>
-              <el-form-item label="预览模式">
-                <el-switch v-model="state.remove.dryRun" active-text="仅预览" inactive-text="直接删除" />
+              <el-form-item label="棰勮妯″紡">
+                <el-switch v-model="state.remove.dryRun" active-text="浠呴瑙? inactive-text="鐩存帴鍒犻櫎" />
               </el-form-item>
               <el-form-item>
                 <el-button type="primary" :loading="state.loading" @click="runDelete">
-                  {{ state.remove.dryRun ? '预览删除列表' : '立即删除' }}
+                  {{ state.remove.dryRun ? '棰勮鍒犻櫎鍒楄〃' : '绔嬪嵆鍒犻櫎' }}
                 </el-button>
               </el-form-item>
             </el-form>
@@ -855,7 +855,7 @@ const runCompare = async () => {
               size="small"
               style="margin-top: 16px"
             >
-              <el-table-column label="待删除文件">
+              <el-table-column label="寰呭垹闄ゆ枃浠?>
                 <template #default="scope">
                   <a class="link" @click.prevent="openPath(scope.row)">{{ scope.row }}</a>
                 </template>
@@ -868,77 +868,77 @@ const runCompare = async () => {
               size="small"
               style="margin-top: 16px"
             >
-              <el-descriptions-item label="删除数量">{{ state.remove.summary.deleted }}</el-descriptions-item>
-              <el-descriptions-item label="释放空间">{{ state.remove.summary.sizeText }}</el-descriptions-item>
+              <el-descriptions-item label="鍒犻櫎鏁伴噺">{{ state.remove.summary.deleted }}</el-descriptions-item>
+              <el-descriptions-item label="閲婃斁绌洪棿">{{ state.remove.summary.sizeText }}</el-descriptions-item>
             </el-descriptions>
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="批量改名" name="rename">
+        <el-tab-pane label="鎵归噺鏀瑰悕" name="rename">
           <section class="panel">
             <header>
-              <h4>重命名规则</h4>
-              <p>支持序号、时间戳、替换、正则表达式或自定义模板</p>
+              <h4>閲嶅懡鍚嶈鍒?/h4>
+              <p>鏀寔搴忓彿銆佹椂闂存埑銆佹浛鎹€佹鍒欒〃杈惧紡鎴栬嚜瀹氫箟妯℃澘</p>
             </header>
             <el-form :model="state.rename" label-width="120px">
-              <el-form-item label="目录">
+              <el-form-item label="鐩綍">
                 <div class="field-row">
-                  <el-input v-model="state.rename.directory" placeholder="选择目录" readonly />
-                  <el-button @click="selectRenameDir">选择</el-button>
+                  <el-input v-model="state.rename.directory" placeholder="閫夋嫨鐩綍" readonly />
+                  <el-button @click="selectRenameDir">閫夋嫨</el-button>
                 </div>
               </el-form-item>
-              <el-form-item label="扩展名">
-                <el-input v-model="state.rename.extensions" placeholder="可选，如：jpg,png" />
+              <el-form-item label="鎵╁睍鍚?>
+                <el-input v-model="state.rename.extensions" placeholder="鍙€夛紝濡傦細jpg,png" />
               </el-form-item>
-              <el-form-item label="选项">
-                <el-checkbox v-model="state.rename.recursive">包含子目录</el-checkbox>
-                <el-switch v-model="state.rename.dryRun" active-text="仅预览" inactive-text="立即改名" />
+              <el-form-item label="閫夐」">
+                <el-checkbox v-model="state.rename.recursive">鍖呭惈瀛愮洰褰?/el-checkbox>
+                <el-switch v-model="state.rename.dryRun" active-text="浠呴瑙? inactive-text="绔嬪嵆鏀瑰悕" />
               </el-form-item>
-              <el-form-item label="冲突策略">
+              <el-form-item label="鍐茬獊绛栫暐">
                 <el-select v-model="state.rename.conflictPolicy" style="width: 200px">
-                  <el-option label="跳过已有文件" value="skip" />
-                  <el-option label="直接覆盖" value="overwrite" />
+                  <el-option label="璺宠繃宸叉湁鏂囦欢" value="skip" />
+                  <el-option label="鐩存帴瑕嗙洊" value="overwrite" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="规则">
+              <el-form-item label="瑙勫垯">
                 <el-radio-group v-model="state.rename.rule">
-                  <el-radio-button label="sequence">序号</el-radio-button>
-                  <el-radio-button label="timestamp">时间戳</el-radio-button>
-                  <el-radio-button label="replace">替换</el-radio-button>
-                  <el-radio-button label="template">模板</el-radio-button>
-                  <el-radio-button label="regex">正则</el-radio-button>
+                  <el-radio-button label="sequence">搴忓彿</el-radio-button>
+                  <el-radio-button label="timestamp">鏃堕棿鎴?/el-radio-button>
+                  <el-radio-button label="replace">鏇挎崲</el-radio-button>
+                  <el-radio-button label="template">妯℃澘</el-radio-button>
+                  <el-radio-button label="regex">姝ｅ垯</el-radio-button>
                 </el-radio-group>
               </el-form-item>
 
-              <!-- 序号模式 -->
+              <!-- 搴忓彿妯″紡 -->
               <div v-if="state.rename.rule === 'sequence'" class="field-row">
-                <el-form-item label="前缀">
-                  <el-input v-model="state.rename.prefix" placeholder="如 IMG_" />
+                <el-form-item label="鍓嶇紑">
+                  <el-input v-model="state.rename.prefix" placeholder="濡?IMG_" />
                 </el-form-item>
-                <el-form-item label="起始值">
+                <el-form-item label="璧峰鍊?>
                   <el-input-number v-model="state.rename.start" :min="1" />
                 </el-form-item>
-                <el-form-item label="位数">
+                <el-form-item label="浣嶆暟">
                   <el-input-number v-model="state.rename.padding" :min="1" :max="6" />
                 </el-form-item>
               </div>
 
-              <!-- 时间戳模式 -->
+              <!-- 鏃堕棿鎴虫ā寮?-->
               <div v-else-if="state.rename.rule === 'timestamp'" class="field-row">
-                <el-form-item label="起始值">
+                <el-form-item label="璧峰鍊?>
                   <el-input-number v-model="state.rename.start" :min="1" />
                 </el-form-item>
-                <el-form-item label="位数">
+                <el-form-item label="浣嶆暟">
                   <el-input-number v-model="state.rename.padding" :min="1" :max="6" />
                 </el-form-item>
               </div>
 
-              <!-- 模板模式 -->
+              <!-- 妯℃澘妯″紡 -->
               <div v-else-if="state.rename.rule === 'template'" class="rename-template-section">
-                <el-form-item label="预置模板">
+                <el-form-item label="棰勭疆妯℃澘">
                   <el-select
                     v-model="state.rename.presetTemplate"
-                    placeholder="选择常用模板"
+                    placeholder="閫夋嫨甯哥敤妯℃澘"
                     style="width: 220px"
                     clearable
                     @change="applyPreset"
@@ -951,56 +951,56 @@ const runCompare = async () => {
                     />
                   </el-select>
                 </el-form-item>
-                <el-form-item label="自定义模板">
+                <el-form-item label="鑷畾涔夋ā鏉?>
                   <div class="field-row">
                     <el-input
                       v-model="state.rename.template"
-                      placeholder="如 {date}_{name}"
+                      placeholder="濡?{date}_{name}"
                       style="flex: 1"
                     />
                     <el-popover placement="right" :width="320" trigger="hover">
                       <template #reference>
-                        <el-button type="info" text>变量说明</el-button>
+                        <el-button type="info" text>鍙橀噺璇存槑</el-button>
                       </template>
                       <div class="var-help">
-                        <p class="var-help-title">可用变量：</p>
+                        <p class="var-help-title">鍙敤鍙橀噺锛?/p>
                         <el-table :data="templateVariables" size="small" border>
-                          <el-table-column prop="var" label="变量" width="100" />
-                          <el-table-column prop="desc" label="说明" />
+                          <el-table-column prop="var" label="鍙橀噺" width="100" />
+                          <el-table-column prop="desc" label="璇存槑" />
                         </el-table>
-                        <p class="var-help-example">示例：{date}_{name} → 20260104_photo.jpg</p>
+                        <p class="var-help-example">绀轰緥锛歿date}_{name} 鈫?20260104_photo.jpg</p>
                       </div>
                     </el-popover>
                   </div>
                 </el-form-item>
-                <el-form-item label="起始序号">
+                <el-form-item label="璧峰搴忓彿">
                   <el-input-number v-model="state.rename.start" :min="1" />
                 </el-form-item>
               </div>
 
-              <!-- 正则模式 -->
+              <!-- 姝ｅ垯妯″紡 -->
               <div v-else-if="state.rename.rule === 'regex'" class="rename-regex-section">
-                <el-form-item label="正则表达式">
+                <el-form-item label="姝ｅ垯琛ㄨ揪寮?>
                   <div class="field-row">
                     <el-input
                       v-model="state.rename.pattern"
-                      placeholder="如 \s+ 匹配空格"
+                      placeholder="濡?\s+ 鍖归厤绌烘牸"
                       style="flex: 1"
                     />
                     <el-popover placement="right" :width="400" trigger="hover">
                       <template #reference>
-                        <el-button type="info" text>常用示例</el-button>
+                        <el-button type="info" text>甯哥敤绀轰緥</el-button>
                       </template>
                       <div class="regex-help">
-                        <p class="regex-help-title">常用正则表达式示例（点击可应用）：</p>
+                        <p class="regex-help-title">甯哥敤姝ｅ垯琛ㄨ揪寮忕ず渚嬶紙鐐瑰嚮鍙簲鐢級锛?/p>
                         <el-table :data="regexExamples" size="small" border>
-                          <el-table-column prop="target" label="目标" width="100" />
-                          <el-table-column prop="pattern" label="匹配" width="120" />
-                          <el-table-column prop="desc" label="效果" />
-                          <el-table-column label="操作" width="70">
+                          <el-table-column prop="target" label="鐩爣" width="100" />
+                          <el-table-column prop="pattern" label="鍖归厤" width="120" />
+                          <el-table-column prop="desc" label="鏁堟灉" />
+                          <el-table-column label="鎿嶄綔" width="70">
                             <template #default="scope">
                               <el-button size="small" text type="primary" @click="applyRegexExample(scope.row)">
-                                应用
+                                搴旂敤
                               </el-button>
                             </template>
                           </el-table-column>
@@ -1009,44 +1009,44 @@ const runCompare = async () => {
                     </el-popover>
                   </div>
                 </el-form-item>
-                <el-form-item label="替换为">
-                  <el-input v-model="state.rename.replace" placeholder="替换内容，留空表示删除匹配部分" />
+                <el-form-item label="鏇挎崲涓?>
+                  <el-input v-model="state.rename.replace" placeholder="鏇挎崲鍐呭锛岀暀绌鸿〃绀哄垹闄ゅ尮閰嶉儴鍒? />
                 </el-form-item>
               </div>
 
-              <!-- 简单替换模式 -->
+              <!-- 绠€鍗曟浛鎹㈡ā寮?-->
               <div v-else-if="state.rename.rule === 'replace'" class="field-row">
-                <el-form-item label="查找文本">
-                  <el-input v-model="state.rename.search" placeholder="要替换的文本" />
+                <el-form-item label="鏌ユ壘鏂囨湰">
+                  <el-input v-model="state.rename.search" placeholder="瑕佹浛鎹㈢殑鏂囨湰" />
                 </el-form-item>
-                <el-form-item label="替换为">
-                  <el-input v-model="state.rename.replace" placeholder="替换内容" />
+                <el-form-item label="鏇挎崲涓?>
+                  <el-input v-model="state.rename.replace" placeholder="鏇挎崲鍐呭" />
                 </el-form-item>
               </div>
 
               <el-form-item>
                 <el-button type="primary" :loading="state.loading" @click="runRename">
-                  {{ state.rename.dryRun ? '预览结果' : '执行改名' }}
+                  {{ state.rename.dryRun ? '棰勮缁撴灉' : '鎵ц鏀瑰悕' }}
                 </el-button>
               </el-form-item>
             </el-form>
 
-            <!-- 使用说明 -->
+            <!-- 浣跨敤璇存槑 -->
             <el-collapse v-model="state.rename.showHelp" class="rename-help-collapse">
-              <el-collapse-item title="📖 使用说明" name="help">
+              <el-collapse-item title="馃摉 浣跨敤璇存槑" name="help">
                 <div class="rename-help-content">
-                  <h5>规则说明</h5>
+                  <h5>瑙勫垯璇存槑</h5>
                   <ul>
-                    <li><strong>序号</strong>：按序号重命名，如 FILE_001、FILE_002</li>
-                    <li><strong>时间戳</strong>：使用当前时间命名</li>
-                    <li><strong>替换</strong>：简单文本替换，无需正则知识</li>
-                    <li><strong>模板</strong>：使用变量组合自定义格式，推荐新手使用</li>
-                    <li><strong>正则</strong>：高级模式，支持正则表达式匹配</li>
+                    <li><strong>搴忓彿</strong>锛氭寜搴忓彿閲嶅懡鍚嶏紝濡?FILE_001銆丗ILE_002</li>
+                    <li><strong>鏃堕棿鎴?/strong>锛氫娇鐢ㄥ綋鍓嶆椂闂村懡鍚?/li>
+                    <li><strong>鏇挎崲</strong>锛氱畝鍗曟枃鏈浛鎹紝鏃犻渶姝ｅ垯鐭ヨ瘑</li>
+                    <li><strong>妯℃澘</strong>锛氫娇鐢ㄥ彉閲忕粍鍚堣嚜瀹氫箟鏍煎紡锛屾帹鑽愭柊鎵嬩娇鐢?/li>
+                    <li><strong>姝ｅ垯</strong>锛氶珮绾фā寮忥紝鏀寔姝ｅ垯琛ㄨ揪寮忓尮閰?/li>
                   </ul>
-                  <h5>操作建议</h5>
+                  <h5>鎿嶄綔寤鸿</h5>
                   <ul>
-                    <li>首次操作请先开启「仅预览」模式，确认无误后再执行</li>
-                    <li>不熟悉正则？试试「模板」模式，选择预置模板或使用变量</li>
+                    <li>棣栨鎿嶄綔璇峰厛寮€鍚€屼粎棰勮銆嶆ā寮忥紝纭鏃犺鍚庡啀鎵ц</li>
+                    <li>涓嶇啛鎮夋鍒欙紵璇曡瘯銆屾ā鏉裤€嶆ā寮忥紝閫夋嫨棰勭疆妯℃澘鎴栦娇鐢ㄥ彉閲?/li>
                   </ul>
                 </div>
               </el-collapse-item>
@@ -1059,39 +1059,39 @@ const runCompare = async () => {
               size="small"
               style="margin-top: 12px"
             >
-              <el-table-column label="原文件" prop="from" show-overflow-tooltip />
-              <el-table-column label="新文件" prop="to" show-overflow-tooltip />
+              <el-table-column label="鍘熸枃浠? prop="from" show-overflow-tooltip />
+              <el-table-column label="鏂版枃浠? prop="to" show-overflow-tooltip />
             </el-table>
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="文件去重" name="dedup">
+        <el-tab-pane label="鏂囦欢鍘婚噸" name="dedup">
           <section class="panel">
             <header>
-              <h4>重复文件检测</h4>
-              <p>按内容或文件名扫描重复项，展示可释放空间</p>
+              <h4>閲嶅鏂囦欢妫€娴?/h4>
+              <p>鎸夊唴瀹规垨鏂囦欢鍚嶆壂鎻忛噸澶嶉」锛屽睍绀哄彲閲婃斁绌洪棿</p>
             </header>
             <el-form :model="state.dedup" label-width="120px">
-              <el-form-item label="目录">
+              <el-form-item label="鐩綍">
                 <div class="field-row">
-                  <el-input v-model="state.dedup.directory" placeholder="选择目录" readonly />
-                  <el-button @click="selectDedupDir">选择</el-button>
+                  <el-input v-model="state.dedup.directory" placeholder="閫夋嫨鐩綍" readonly />
+                  <el-button @click="selectDedupDir">閫夋嫨</el-button>
                 </div>
               </el-form-item>
-              <el-form-item label="扩展名">
-                <el-input v-model="state.dedup.extensions" placeholder="可选，如：zip,iso" />
+              <el-form-item label="鎵╁睍鍚?>
+                <el-input v-model="state.dedup.extensions" placeholder="鍙€夛紝濡傦細zip,iso" />
               </el-form-item>
-              <el-form-item label="模式">
+              <el-form-item label="妯″紡">
                 <el-radio-group v-model="state.dedup.mode">
-                  <el-radio-button label="content">按内容 (哈希)</el-radio-button>
-                  <el-radio-button label="name">按文件名</el-radio-button>
+                  <el-radio-button label="content">鎸夊唴瀹?(鍝堝笇)</el-radio-button>
+                  <el-radio-button label="name">鎸夋枃浠跺悕</el-radio-button>
                 </el-radio-group>
               </el-form-item>
               <el-form-item>
-                <el-checkbox v-model="state.dedup.recursive">包含子目录</el-checkbox>
+                <el-checkbox v-model="state.dedup.recursive">鍖呭惈瀛愮洰褰?/el-checkbox>
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" :loading="state.loading" @click="runDedup">开始扫描</el-button>
+                <el-button type="primary" :loading="state.loading" @click="runDedup">寮€濮嬫壂鎻?/el-button>
               </el-form-item>
             </el-form>
             <el-descriptions
@@ -1100,8 +1100,8 @@ const runCompare = async () => {
               border
               size="small"
             >
-              <el-descriptions-item label="重复分组">{{ state.dedup.summary.totalGroups }}</el-descriptions-item>
-              <el-descriptions-item label="可释放空间">{{ state.dedup.summary.spaceSaved }}</el-descriptions-item>
+              <el-descriptions-item label="閲嶅鍒嗙粍">{{ state.dedup.summary.totalGroups }}</el-descriptions-item>
+              <el-descriptions-item label="鍙噴鏀剧┖闂?>{{ state.dedup.summary.spaceSaved }}</el-descriptions-item>
             </el-descriptions>
             <el-table
               v-if="state.dedup.result.length"
@@ -1110,7 +1110,7 @@ const runCompare = async () => {
               size="small"
               style="margin-top: 12px"
             >
-              <el-table-column label="重复文件">
+              <el-table-column label="閲嶅鏂囦欢">
                 <template #default="scope">
                   <ul class="dedup-list">
                     <li v-for="file in scope.row.files" :key="file">
@@ -1123,46 +1123,46 @@ const runCompare = async () => {
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="目录分析" name="analyze">
+        <el-tab-pane label="鐩綍鍒嗘瀽" name="analyze">
           <section class="panel">
             <header>
-              <h4>统计目录结构</h4>
-              <p>展示文件数量、空间占用与扩展名 Top N</p>
+              <h4>缁熻鐩綍缁撴瀯</h4>
+              <p>灞曠ず鏂囦欢鏁伴噺銆佺┖闂村崰鐢ㄤ笌鎵╁睍鍚?Top N</p>
             </header>
             <el-form :model="state.analyze" label-width="120px">
-              <el-form-item label="目录">
+              <el-form-item label="鐩綍">
                 <div class="field-row">
-                  <el-input v-model="state.analyze.directory" placeholder="选择目录" readonly />
-                  <el-button @click="selectDir('analyze')">选择</el-button>
+                  <el-input v-model="state.analyze.directory" placeholder="閫夋嫨鐩綍" readonly />
+                  <el-button @click="selectDir('analyze')">閫夋嫨</el-button>
                 </div>
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" :loading="state.loading" @click="runAnalyze">开始分析</el-button>
+                <el-button type="primary" :loading="state.loading" @click="runAnalyze">寮€濮嬪垎鏋?/el-button>
               </el-form-item>
             </el-form>
             <div v-if="state.analyze.stats" class="stats-panel">
               <el-descriptions :column="3" border size="small">
-                <el-descriptions-item label="总大小">
+                <el-descriptions-item label="鎬诲ぇ灏?>
                   {{ state.analyze.stats.totalSize }}
                 </el-descriptions-item>
-                <el-descriptions-item label="文件数">
+                <el-descriptions-item label="鏂囦欢鏁?>
                   {{ state.analyze.stats.fileCount }}
                 </el-descriptions-item>
-                <el-descriptions-item label="子目录数">
+                <el-descriptions-item label="瀛愮洰褰曟暟">
                   {{ state.analyze.stats.dirCount }}
                 </el-descriptions-item>
               </el-descriptions>
               <div class="stat-cols">
                 <div>
-                  <h5>热门扩展名</h5>
+                  <h5>鐑棬鎵╁睍鍚?/h5>
                   <ul>
                     <li v-for="item in state.analyze.stats.topExtensions" :key="item.ext">
-                      {{ item.ext }} · {{ item.count }}
+                      {{ item.ext }} 路 {{ item.count }}
                     </li>
                   </ul>
                 </div>
                 <div>
-                  <h5>最大文件</h5>
+                  <h5>鏈€澶ф枃浠?/h5>
                   <ul>
                     <li v-for="item in state.analyze.stats.largestFiles" :key="item.path">
                       <span>{{ item.name }}</span>
@@ -1175,38 +1175,38 @@ const runCompare = async () => {
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="文件对比" name="compare">
+        <el-tab-pane label="鏂囦欢瀵规瘮" name="compare">
           <section class="panel">
             <header>
-              <h4>文本 / 二进制对比</h4>
-              <p>快速确认两个文件是否一致，并给出差异 diff</p>
+              <h4>鏂囨湰 / 浜岃繘鍒跺姣?/h4>
+              <p>蹇€熺‘璁や袱涓枃浠舵槸鍚︿竴鑷达紝骞剁粰鍑哄樊寮?diff</p>
             </header>
             <el-form :model="state.compare" label-width="120px" class="form-gap">
-              <el-form-item label="文件 A">
+              <el-form-item label="鏂囦欢 A">
                 <div class="field-row">
-                  <el-input :model-value="state.compare.fileA?.path || ''" placeholder="尚未选择" readonly />
-                  <el-button @click="selectCompareFile('fileA')">选择</el-button>
+                  <el-input :model-value="state.compare.fileA?.path || ''" placeholder="灏氭湭閫夋嫨" readonly />
+                  <el-button @click="selectCompareFile('fileA')">閫夋嫨</el-button>
                 </div>
               </el-form-item>
-              <el-form-item label="文件 B">
+              <el-form-item label="鏂囦欢 B">
                 <div class="field-row">
-                  <el-input :model-value="state.compare.fileB?.path || ''" placeholder="尚未选择" readonly />
-                  <el-button @click="selectCompareFile('fileB')">选择</el-button>
+                  <el-input :model-value="state.compare.fileB?.path || ''" placeholder="灏氭湭閫夋嫨" readonly />
+                  <el-button @click="selectCompareFile('fileB')">閫夋嫨</el-button>
                 </div>
               </el-form-item>
-              <el-form-item label="模式">
+              <el-form-item label="妯″紡">
                 <el-radio-group v-model="state.compare.mode">
-                  <el-radio-button label="auto">自动</el-radio-button>
-                  <el-radio-button label="text">文本</el-radio-button>
-                  <el-radio-button label="binary">二进制</el-radio-button>
+                  <el-radio-button label="auto">鑷姩</el-radio-button>
+                  <el-radio-button label="text">鏂囨湰</el-radio-button>
+                  <el-radio-button label="binary">浜岃繘鍒?/el-radio-button>
                 </el-radio-group>
-                <el-checkbox v-model="state.compare.ignoreCase" style="margin-left: 12px">忽略大小写</el-checkbox>
+                <el-checkbox v-model="state.compare.ignoreCase" style="margin-left: 12px">蹇界暐澶у皬鍐?/el-checkbox>
               </el-form-item>
-              <el-form-item v-if="state.compare.mode !== 'binary'" label="首选编码">
-                <el-input v-model="state.compare.encoding" placeholder="默认 UTF-8" style="width: 220px" />
+              <el-form-item v-if="state.compare.mode !== 'binary'" label="棣栭€夌紪鐮?>
+                <el-input v-model="state.compare.encoding" placeholder="榛樿 UTF-8" style="width: 220px" />
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" :loading="state.loading" @click="runCompare">执行对比</el-button>
+                <el-button type="primary" :loading="state.loading" @click="runCompare">鎵ц瀵规瘮</el-button>
               </el-form-item>
             </el-form>
             <el-alert
@@ -1224,16 +1224,16 @@ const runCompare = async () => {
               size="small"
               style="margin-top: 12px"
             >
-              <el-descriptions-item label="文件 A 大小">
+              <el-descriptions-item label="鏂囦欢 A 澶у皬">
                 {{ state.compare.size?.leftText || state.compare.size?.left || '-' }}
               </el-descriptions-item>
-              <el-descriptions-item label="文件 B 大小">
+              <el-descriptions-item label="鏂囦欢 B 澶у皬">
                 {{ state.compare.size?.rightText || state.compare.size?.right || '-' }}
               </el-descriptions-item>
-              <el-descriptions-item label="文件 A 哈希">
+              <el-descriptions-item label="鏂囦欢 A 鍝堝笇">
                 {{ state.compare.hash?.left || '-' }}
               </el-descriptions-item>
-              <el-descriptions-item label="文件 B 哈希">
+              <el-descriptions-item label="鏂囦欢 B 鍝堝笇">
                 {{ state.compare.hash?.right || '-' }}
               </el-descriptions-item>
             </el-descriptions>
@@ -1248,17 +1248,17 @@ const runCompare = async () => {
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="压缩 / 解压" name="archive">
+        <el-tab-pane label="鍘嬬缉 / 瑙ｅ帇" name="archive">
           <section class="panel">
             <header>
-              <h4>批量压缩 ZIP/7Z，或解压文件</h4>
+              <h4>鎵归噺鍘嬬缉 ZIP/7Z锛屾垨瑙ｅ帇鏂囦欢</h4>
             </header>
             <div class="archive-grid">
               <div class="archive-card">
-                <h5>压缩打包</h5>
+                <h5>鍘嬬缉鎵撳寘</h5>
                 <div class="field-row">
-                  <el-button size="small" @click="addArchiveFiles">添加文件</el-button>
-                  <el-button size="small" @click="addArchiveFolder">添加文件夹</el-button>
+                  <el-button size="small" @click="addArchiveFiles">娣诲姞鏂囦欢</el-button>
+                  <el-button size="small" @click="addArchiveFolder">娣诲姞鏂囦欢澶?/el-button>
                 </div>
                 <el-table
                   v-if="state.archive.items.length"
@@ -1268,40 +1268,40 @@ const runCompare = async () => {
                   style="margin-top: 10px"
                 >
                   <el-table-column type="index" width="50" label="#" />
-                  <el-table-column prop="filename" label="名称" />
-                  <el-table-column label="类型" width="100">
+                  <el-table-column prop="filename" label="鍚嶇О" />
+                  <el-table-column label="绫诲瀷" width="100">
                     <template #default="scope">
-                      <el-tag size="small" effect="plain">{{ scope.row.type === 'folder' ? '文件夹' : '文件' }}</el-tag>
+                      <el-tag size="small" effect="plain">{{ scope.row.type === 'folder' ? '鏂囦欢澶? : '鏂囦欢' }}</el-tag>
                     </template>
                   </el-table-column>
-                  <el-table-column label="操作" width="80">
+                  <el-table-column label="鎿嶄綔" width="80">
                     <template #default="scope">
-                      <el-button link type="danger" @click="removeArchiveItem(scope.$index)">移除</el-button>
+                      <el-button link type="danger" @click="removeArchiveItem(scope.$index)">绉婚櫎</el-button>
                     </template>
                   </el-table-column>
                 </el-table>
-                <el-empty v-else description="尚未添加" />
+                <el-empty v-else description="灏氭湭娣诲姞" />
                 <el-form :model="state.archive" label-width="100px" style="margin-top: 12px">
-                  <el-form-item label="格式">
+                  <el-form-item label="鏍煎紡">
                     <el-radio-group v-model="state.archive.format">
                       <el-radio-button label="zip">ZIP</el-radio-button>
                       <el-radio-button label="7z">7Z</el-radio-button>
                     </el-radio-group>
                   </el-form-item>
-                  <el-form-item label="文件名">
-                    <el-input v-model="state.archive.archiveName" placeholder="可选，如 work_backup" />
+                  <el-form-item label="鏂囦欢鍚?>
+                    <el-input v-model="state.archive.archiveName" placeholder="鍙€夛紝濡?work_backup" />
                   </el-form-item>
-                  <el-form-item label="输出目录">
+                  <el-form-item label="杈撳嚭鐩綍">
                     <div class="field-row">
-                      <el-input v-model="state.archive.outputDir" placeholder="留空使用源目录" readonly />
-                      <el-button @click="selectDir('archive')">目录</el-button>
+                      <el-input v-model="state.archive.outputDir" placeholder="鐣欑┖浣跨敤婧愮洰褰? readonly />
+                      <el-button @click="selectDir('archive')">鐩綍</el-button>
                     </div>
                   </el-form-item>
-                  <el-form-item label="密码" v-if="state.archive.format === '7z'">
-                    <el-input v-model="state.archive.password" placeholder="可选" />
+                  <el-form-item label="瀵嗙爜" v-if="state.archive.format === '7z'">
+                    <el-input v-model="state.archive.password" placeholder="鍙€? />
                   </el-form-item>
                   <el-form-item>
-                    <el-button type="primary" :loading="state.loading" @click="runCompress">开始压缩</el-button>
+                    <el-button type="primary" :loading="state.loading" @click="runCompress">寮€濮嬪帇缂?/el-button>
                   </el-form-item>
                 </el-form>
                 <el-alert
@@ -1311,39 +1311,39 @@ const runCompare = async () => {
                   show-icon
                 >
                   <template #title>
-                    已生成：
+                    宸茬敓鎴愶細
                     <a class="link" @click.prevent="openPath(state.archive.result)">{{ state.archive.result }}</a>
                   </template>
                 </el-alert>
               </div>
 
               <div class="archive-card">
-                <h5>解压缩</h5>
+                <h5>瑙ｅ帇缂?/h5>
                 <el-form :model="state.extract" label-width="100px">
-                  <el-form-item label="压缩包">
+                  <el-form-item label="鍘嬬缉鍖?>
                     <div class="field-row">
-                      <el-input :model-value="state.extract.archiveFile?.path || ''" placeholder="选择 ZIP/7Z" readonly />
-                      <el-button @click="selectArchiveFile">选择</el-button>
+                      <el-input :model-value="state.extract.archiveFile?.path || ''" placeholder="閫夋嫨 ZIP/7Z" readonly />
+                      <el-button @click="selectArchiveFile">閫夋嫨</el-button>
                     </div>
                   </el-form-item>
-                  <el-form-item label="输出目录">
+                  <el-form-item label="杈撳嚭鐩綍">
                     <div class="field-row">
-                      <el-input v-model="state.extract.targetDir" placeholder="自动创建" readonly />
-                      <el-button @click="selectDir('extract')">目录</el-button>
+                      <el-input v-model="state.extract.targetDir" placeholder="鑷姩鍒涘缓" readonly />
+                      <el-button @click="selectDir('extract')">鐩綍</el-button>
                     </div>
                   </el-form-item>
-                  <el-form-item label="密码">
-                    <el-input v-model="state.extract.password" placeholder="如文件带密码" />
+                  <el-form-item label="瀵嗙爜">
+                    <el-input v-model="state.extract.password" placeholder="濡傛枃浠跺甫瀵嗙爜" />
                   </el-form-item>
                   <el-form-item>
-                    <el-button type="primary" :loading="state.loading" @click="runExtract">开始解压</el-button>
+                    <el-button type="primary" :loading="state.loading" @click="runExtract">寮€濮嬭В鍘?/el-button>
                   </el-form-item>
                 </el-form>
                 <ResultTable
                   v-if="state.extract.files.length"
-                  title="部分解压文件"
+                  title="閮ㄥ垎瑙ｅ帇鏂囦欢"
                   :items="state.extract.files.map((path) => ({ path }))"
-                  :columns="[{ label: '文件路径', prop: 'path' }]"
+                  :columns="[{ label: '鏂囦欢璺緞', prop: 'path' }]"
                   :max-height="200"
                 />
               </div>
@@ -1356,7 +1356,7 @@ const runCompare = async () => {
 </template>
 
 <style scoped>
-/* 使用全局深空玻璃主题样式 */
+/* 浣跨敤鍏ㄥ眬娣辩┖鐜荤拑涓婚鏍峰紡 */
 
 .stats-panel {
   margin-top: 18px;
@@ -1380,7 +1380,7 @@ const runCompare = async () => {
   color: var(--ppx-text-secondary);
 }
 
-/* 压缩/解压网格 */
+/* 鍘嬬缉/瑙ｅ帇缃戞牸 */
 .archive-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
@@ -1423,7 +1423,7 @@ const runCompare = async () => {
   margin-top: 12px;
 }
 
-/* 重命名模块样式 */
+/* 閲嶅懡鍚嶆ā鍧楁牱寮?*/
 .rename-template-section,
 .rename-regex-section {
   margin-bottom: 12px;
@@ -1485,3 +1485,4 @@ const runCompare = async () => {
   color: var(--ppx-neon-blue);
 }
 </style>
+

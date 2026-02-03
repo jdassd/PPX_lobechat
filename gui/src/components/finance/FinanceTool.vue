@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { computed, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
 
@@ -17,11 +17,11 @@ const visibleProxy = computed({
 })
 
 const examples = [
-  { label: '1409.50', note: '中间含 0' },
-  { label: '6007.14', note: '连续 0' },
-  { label: '1680.32', note: '角位有值' },
-  { label: '16409.02', note: '角位为 0' },
-  { label: '107000.53', note: '万位为 0' }
+  { label: '1409.50', note: '涓棿鍚?0' },
+  { label: '6007.14', note: '杩炵画 0' },
+  { label: '1680.32', note: '瑙掍綅鏈夊€? },
+  { label: '16409.02', note: '瑙掍綅涓?0' },
+  { label: '107000.53', note: '涓囦綅涓?0' }
 ]
 
 const state = reactive({
@@ -33,7 +33,7 @@ const state = reactive({
 
 const ensurePyReady = () => {
   if (!window.pywebview?.api) {
-    ElMessage.warning('该功能需在桌面客户端中使用')
+    ElMessage.warning('璇ュ姛鑳介渶鍦ㄦ闈㈠鎴风涓娇鐢?)
     return false
   }
   return true
@@ -42,7 +42,7 @@ const ensurePyReady = () => {
 const runConvert = async () => {
   if (!ensurePyReady()) return
   if (!state.amount.trim()) {
-    ElMessage.warning('请输入金额')
+    ElMessage.warning('璇疯緭鍏ラ噾棰?)
     return
   }
   state.loading = true
@@ -53,12 +53,12 @@ const runConvert = async () => {
     if (res?.code === 0) {
       state.result = res.result || ''
       state.normalized = res.amount || ''
-      ElMessage.success(res.msg || '转换完成')
+      ElMessage.success(res.msg || '杞崲瀹屾垚')
     } else {
-      ElMessage.error(res?.msg || '转换失败')
+      ElMessage.error(res?.msg || '杞崲澶辫触')
     }
   } catch (error) {
-    ElMessage.error(error?.message || '转换失败')
+    ElMessage.error(error?.message || '杞崲澶辫触')
   } finally {
     state.loading = false
   }
@@ -87,35 +87,35 @@ const resetAll = () => {
       <div class="drawer-head">
         <div>
           <p class="eyebrow">FINANCE TOOL</p>
-          <h3>人民币大写</h3>
-          <p class="sub">快速生成规范的票据金额大写格式</p>
+          <h3>浜烘皯甯佸ぇ鍐?/h3>
+          <p class="sub">蹇€熺敓鎴愯鑼冪殑绁ㄦ嵁閲戦澶у啓鏍煎紡</p>
         </div>
       </div>
     </template>
     <div class="finance-tool">
       <section class="panel">
         <header>
-          <h4>金额输入</h4>
-          <p>支持 ￥、RMB、CNY、千分位格式，自动保留两位小数</p>
+          <h4>閲戦杈撳叆</h4>
+          <p>鏀寔 锟ャ€丷MB銆丆NY銆佸崈鍒嗕綅鏍煎紡锛岃嚜鍔ㄤ繚鐣欎袱浣嶅皬鏁?/p>
         </header>
         <el-form label-width="120px">
-          <el-form-item label="小写金额">
+          <el-form-item label="灏忓啓閲戦">
             <el-input
               v-model="state.amount"
-              placeholder="如 1680.32 或 ￥1,680.32"
+              placeholder="濡?1680.32 鎴?锟?,680.32"
               clearable
             />
           </el-form-item>
           <el-form-item>
             <div class="field-row field-wrap">
-              <el-button type="primary" :loading="state.loading" @click="runConvert">生成大写</el-button>
-              <el-button @click="resetAll">清空</el-button>
+              <el-button type="primary" :loading="state.loading" @click="runConvert">鐢熸垚澶у啓</el-button>
+              <el-button @click="resetAll">娓呯┖</el-button>
             </div>
           </el-form-item>
         </el-form>
 
         <div class="example-strip">
-          <span class="example-title">常见示例</span>
+          <span class="example-title">甯歌绀轰緥</span>
           <div class="example-tags">
             <el-tag
               v-for="item in examples"
@@ -124,7 +124,7 @@ const resetAll = () => {
               type="info"
               @click="applyExample(item.label)"
             >
-              {{ item.label }} · {{ item.note }}
+              {{ item.label }} 路 {{ item.note }}
             </el-tag>
           </div>
         </div>
@@ -132,12 +132,12 @@ const resetAll = () => {
 
       <section class="panel">
         <header>
-          <h4>转换结果</h4>
-          <p>默认补全「人民币」前缀，符合银行票据规范</p>
+          <h4>杞崲缁撴灉</h4>
+          <p>榛樿琛ュ叏銆屼汉姘戝竵銆嶅墠缂€锛岀鍚堥摱琛岀エ鎹鑼?/p>
         </header>
         <el-form label-width="120px">
-          <el-form-item label="标准金额">
-            <el-input v-model="state.normalized" readonly placeholder="自动规范化后金额" />
+          <el-form-item label="鏍囧噯閲戦">
+            <el-input v-model="state.normalized" readonly placeholder="鑷姩瑙勮寖鍖栧悗閲戦" />
           </el-form-item>
         </el-form>
         <el-input
@@ -145,20 +145,20 @@ const resetAll = () => {
           type="textarea"
           :rows="4"
           readonly
-          placeholder="生成结果将在此显示"
+          placeholder="鐢熸垚缁撴灉灏嗗湪姝ゆ樉绀?
         />
       </section>
 
       <section class="panel">
         <header>
-          <h4>规范要点</h4>
-          <p>票据填写时常见要求，避免出现空白或误写</p>
+          <h4>瑙勮寖瑕佺偣</h4>
+          <p>绁ㄦ嵁濉啓鏃跺父瑙佽姹傦紝閬垮厤鍑虹幇绌虹櫧鎴栬鍐?/p>
         </header>
         <ul class="rule-list">
-          <li>金额到元为止，元后需写“整”(或“正”)，角位有值可不写。</li>
-          <li>金额前加“人民币”，大写金额需紧挨填写不得留空。</li>
-          <li>角位为 0 且分位有值时，元后需补写“零”。</li>
-          <li>连续多个 0 仅写一个“零”，避免重复堆叠。</li>
+          <li>閲戦鍒板厓涓烘锛屽厓鍚庨渶鍐欌€滄暣鈥?鎴栤€滄鈥?锛岃浣嶆湁鍊煎彲涓嶅啓銆?/li>
+          <li>閲戦鍓嶅姞鈥滀汉姘戝竵鈥濓紝澶у啓閲戦闇€绱ф尐濉啓涓嶅緱鐣欑┖銆?/li>
+          <li>瑙掍綅涓?0 涓斿垎浣嶆湁鍊兼椂锛屽厓鍚庨渶琛ュ啓鈥滈浂鈥濄€?/li>
+          <li>杩炵画澶氫釜 0 浠呭啓涓€涓€滈浂鈥濓紝閬垮厤閲嶅鍫嗗彔銆?/li>
         </ul>
       </section>
     </div>
@@ -166,10 +166,6 @@ const resetAll = () => {
 </template>
 
 <style scoped>
-.finance-tool {
-  padding-right: 12px;
-}
-
 .example-strip {
   margin-top: 12px;
 }
@@ -204,3 +200,4 @@ const resetAll = () => {
   line-height: 1.7;
 }
 </style>
+
