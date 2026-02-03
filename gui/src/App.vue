@@ -309,8 +309,7 @@ const onFeatureAction = (feature) => {
       <main ref="contentAreaRef" class="content-area">
         <div class="section-header">
           <div class="section-title">
-            <span class="section-badge">核心能力</span>
-            <h2>常用工具</h2>
+            <span class="section-badge">常用工具</span>
           </div>
         </div>
 
@@ -360,8 +359,7 @@ const onFeatureAction = (feature) => {
 
         <div class="section-header">
           <div class="section-title">
-            <span class="section-badge">财务专区</span>
-            <h2>财务工具</h2>
+            <span class="section-badge">财务工具</span>
           </div>
         </div>
 
@@ -409,8 +407,7 @@ const onFeatureAction = (feature) => {
 
         <div class="section-header">
           <div class="section-title">
-            <span class="section-badge">系统管理专区</span>
-            <h2>系统管理</h2>
+            <span class="section-badge">系统管理工具</span>
           </div>
         </div>
 
@@ -521,7 +518,6 @@ const onFeatureAction = (feature) => {
   pointer-events: none;
 }
 
-/* ???? */
 .bg-decorations {
   position: absolute;
   inset: 0;
@@ -758,7 +754,7 @@ const onFeatureAction = (feature) => {
 }
 
 .section-badge {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--ppx-neon-blue);
   text-transform: uppercase;
