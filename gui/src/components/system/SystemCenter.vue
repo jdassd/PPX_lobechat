@@ -1021,14 +1021,16 @@ const analyzeDisk = async () => {
   gap: 4px;
   padding: 10px 14px;
   border-radius: 12px;
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: var(--ppx-glass-bg);
+  border: 1px solid var(--ppx-glass-border);
+  box-shadow: var(--ppx-shadow-sm);
+  backdrop-filter: var(--ppx-blur-sm);
   min-width: 160px;
 }
 
 .meta-label {
   font-size: 11px;
-  color: var(--ppx-text-muted);
+  color: var(--ppx-text-secondary);
 }
 
 .metric-grid {
@@ -1038,13 +1040,14 @@ const analyzeDisk = async () => {
 }
 
 .metric-card {
-  background: rgba(15, 23, 42, 0.55);
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: linear-gradient(180deg, var(--ppx-glass-bg), rgba(255, 255, 255, 0.9));
+  border: 1px solid var(--ppx-glass-border);
   border-radius: 16px;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  box-shadow: var(--ppx-shadow-sm);
 }
 
 .metric-title {
@@ -1059,7 +1062,7 @@ const analyzeDisk = async () => {
   display: flex;
   justify-content: space-between;
   font-size: 12px;
-  color: var(--ppx-text-muted);
+  color: var(--ppx-text-secondary);
 }
 
 .disk-list,
@@ -1085,12 +1088,12 @@ const analyzeDisk = async () => {
   display: flex;
   justify-content: space-between;
   font-size: 12px;
-  color: var(--ppx-text-muted);
+  color: var(--ppx-text-secondary);
 }
 
 .empty-hint {
   font-size: 12px;
-  color: var(--ppx-text-muted);
+  color: var(--ppx-text-secondary);
   margin-top: 8px;
 }
 
@@ -1100,10 +1103,11 @@ const analyzeDisk = async () => {
 }
 
 .sensor-panel {
-  background: rgba(15, 23, 42, 0.55);
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: linear-gradient(180deg, var(--ppx-glass-bg), rgba(255, 255, 255, 0.9));
+  border: 1px solid var(--ppx-glass-border);
   border-radius: 16px;
   padding: 16px;
+  box-shadow: var(--ppx-shadow-sm);
 }
 
 .sensor-title {
