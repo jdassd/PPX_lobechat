@@ -49,8 +49,8 @@ const featureCards = [
     desc: '格式转换 / 缩放 / 压缩 / 水印',
     icon: markRaw(PictureFilled),
     color: 'cyan',
-    tags: ['批量操作', '高清输出'],
-    action: '打开面板',
+    // tags: ['批量操作', '高清输出'],
+    // action: '打开面板',
     disabled: false,
     points: [
       '支持 PNG / JPG / TIFF / WEBP 互转',
@@ -65,8 +65,8 @@ const featureCards = [
     desc: '编码、JSON、正则、去重',
     icon: markRaw(Edit),
     color: 'purple',
-    tags: ['Base64', 'JSONPath', '正则'],
-    action: '打开面板',
+    // tags: ['Base64', 'JSONPath', '正则'],
+    // action: '打开面板',
     disabled: false,
     points: [
       'Base64 / URL / HTML / UTF-8↔GBK',
@@ -81,8 +81,8 @@ const featureCards = [
     desc: '格式转换 / 压缩 / 截取',
     icon: markRaw(VideoPlay),
     color: 'pink',
-    tags: ['FFmpeg', '音频提取'],
-    action: '打开面板',
+    // tags: ['FFmpeg', '音频提取'],
+    // action: '打开面板',
     disabled: false,
     points: [
       'MP4、MOV、AVI、MKV 等互转',
@@ -97,8 +97,8 @@ const featureCards = [
     desc: '搜索 / 目录分析 / 批处理',
     icon: markRaw(FolderOpened),
     color: 'green',
-    tags: ['ZIP/7Z', '批量处理'],
-    action: '打开面板',
+    // tags: ['ZIP/7Z', '批量处理'],
+    // action: '打开面板',
     disabled: false,
     points: [
       '按关键字、扩展名、大小范围搜索',
@@ -112,8 +112,8 @@ const featureCards = [
     desc: '录制回放 / 图片识别',
     icon: markRaw(Setting),
     color: 'gray',
-    tags: ['宏录制', '图片识别'],
-    action: '打开面板',
+    // tags: ['宏录制', '图片识别'],
+    // action: '打开面板',
     disabled: false,
     points: [
       '录制鼠标和键盘操作轨迹',
@@ -128,8 +128,8 @@ const featureCards = [
     desc: '固定结构电子表格批处理',
     icon: markRaw(Document),
     color: 'blue',
-    tags: ['数据标准化', '图表导出'],
-    action: '立即体验',
+    // tags: ['数据标准化', '图表导出'],
+    // action: '立即体验',
     disabled: false,
     points: [
       '自定义字段定义，分隔符快速匹配',
@@ -144,8 +144,8 @@ const featureCards = [
     desc: '转换、合并与切割一体化',
     icon: markRaw(Files),
     color: 'orange',
-    tags: ['高清转换', '批量任务'],
-    action: '立即体验',
+    // tags: ['高清转换', '批量任务'],
+    // action: '立即体验',
     disabled: false,
     points: [
       'PDF 转高清图片，保留矢量细节',
@@ -160,8 +160,8 @@ const featureCards = [
     desc: '内置模板快速生成电子印章',
     icon: markRaw(Stamp),
     color: 'red',
-    tags: ['模板管理', '透明导出'],
-    action: '立即体验',
+    // tags: ['模板管理', '透明导出'],
+    // action: '立即体验',
     disabled: false,
     points: [
       '提供常见圆章、椭圆章等基础模板',
@@ -178,8 +178,8 @@ const financeCards = [
     desc: '人民币大写 / 票据规范',
     icon: markRaw(Coin),
     color: 'orange',
-    tags: ['人民币', '票据填写'],
-    action: '打开面板',
+    // tags: ['人民币', '票据填写'],
+    // action: '打开面板',
     disabled: false,
     points: [
       '输入金额快速生成中文大写',
@@ -198,8 +198,8 @@ const systemCards = [
     desc: '性能监控、温度/电压/风扇、启动项',
     icon: markRaw(Monitor),
     color: 'indigo',
-    tags: ['CPU / GPU', '系统状态'],
-    action: '打开面板',
+    // tags: ['CPU / GPU', '系统状态'],
+    // action: '打开面板',
     disabled: false,
     points: [
       'CPU / 内存 / 磁盘 / GPU 性能监控',
@@ -350,10 +350,10 @@ const onFeatureAction = (feature) => {
                   {{ tag }}
                 </span>
               </div>
-              <button class="action-btn" :disabled="feature.disabled">
-                {{ feature.action }}
-                <span class="btn-arrow">→</span>
-              </button>
+<!--              <button class="action-btn" :disabled="feature.disabled">-->
+<!--                {{ feature.action }}-->
+<!--                <span class="btn-arrow">→</span>-->
+<!--              </button>-->
             </div>
           </div>
         </div>
@@ -398,10 +398,10 @@ const onFeatureAction = (feature) => {
                   {{ tag }}
                 </span>
               </div>
-              <button class="action-btn" :disabled="feature.disabled">
-                {{ feature.action }}
-                <span class="btn-arrow">→</span>
-              </button>
+<!--              <button class="action-btn" :disabled="feature.disabled">-->
+<!--                {{ feature.action }}-->
+<!--                <span class="btn-arrow">→</span>-->
+<!--              </button>-->
             </div>
           </div>
         </div>
@@ -446,10 +446,10 @@ const onFeatureAction = (feature) => {
                   {{ tag }}
                 </span>
               </div>
-              <button class="action-btn" :disabled="feature.disabled">
-                {{ feature.action }}
-                <span class="btn-arrow">→</span>
-              </button>
+<!--              <button class="action-btn" :disabled="feature.disabled">-->
+<!--                {{ feature.action }}-->
+<!--                <span class="btn-arrow">→</span>-->
+<!--              </button>-->
             </div>
           </div>
         </div>
