@@ -273,8 +273,6 @@ const onFeatureAction = (feature) => {
       <div class="orb orb-1"></div>
       <div class="orb orb-2"></div>
       <div class="orb orb-3"></div>
-      <div class="tape tape-1"></div>
-      <div class="tape tape-2"></div>
       <div class="grid-pattern"></div>
       <div class="grain"></div>
     </div>
@@ -287,7 +285,7 @@ const onFeatureAction = (feature) => {
           <div class="logo-icon">
             <span class="logo-text">PPX</span>
           </div>
-          <span class="logo-label">桌面工具箱</span>
+          <span class="logo-label">工具箱</span>
         </div>
         <div class="top-bar-actions">
           <BtnUpdate />
@@ -299,10 +297,10 @@ const onFeatureAction = (feature) => {
       <section class="hero-section" :class="{ collapsed: isScrolled }">
         <div class="hero-content">
           <h1 class="hero-title">
-            <span class="title-gradient">多功能</span>桌面工具集
+            <span class="title-gradient">多功能</span>工具箱
           </h1>
           <p class="hero-subtitle" :class="{ hidden: isScrolled }">
-            Excel / PDF / 图片 / 文本 / 视频 / 文件 —— 数据安全不离开本机
+            Excel / PDF / 图片 / 文本 / 视频 / 文件 / 自动化 —— 数据安全不离开本机
           </p>
         </div>
       </section>
@@ -565,29 +563,6 @@ const onFeatureAction = (feature) => {
   bottom: -120px;
   left: 35%;
   animation-delay: -12s;
-}
-
-.tape {
-  position: absolute;
-  width: 240px;
-  height: 56px;
-  background: rgba(255, 255, 255, 0.75);
-  border: 1px solid rgba(44, 36, 29, 0.15);
-  box-shadow: var(--ppx-shadow-sm);
-  border-radius: 14px;
-  opacity: 0.7;
-}
-
-.tape-1 {
-  top: 90px;
-  left: 60px;
-  transform: rotate(-4deg);
-}
-
-.tape-2 {
-  bottom: 80px;
-  right: 120px;
-  transform: rotate(3deg);
 }
 
 .grid-pattern {
