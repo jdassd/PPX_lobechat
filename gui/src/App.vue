@@ -212,16 +212,17 @@ const systemCards = [
 const checklist = [
   {
     title: '检查更新',
-    icon: '🔄',
+    icon: '🆕',
     detail: '点击上方地球图标检测更新，下载后打开安装即可。如下载失败，请检查网络代理'
   },
   {
     title: '通知公告',
     icon: '📢',
-    detail: '一次付费永久更新，无广告。问题反馈请发邮件至：dassdj@yandex.com'
+    // detail: '一次付费永久更新，无广告。问题反馈请发邮件至：dassdj@yandex.com'
+    detail: '问题反馈请发邮件至：dassdj@yandex.com'
   },
   {
-    title: '视频功能配置',
+    title: '图片/视频功能配置',
     icon: '🎬',
     parts: [
       '部分功能需安装 FFMPEG，',
@@ -1046,6 +1047,7 @@ const onFeatureAction = (feature) => {
 .tip-icon {
   font-size: 20px;
   flex-shrink: 0;
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', 'Segoe UI Symbol', sans-serif;
 }
 
 .tip-content h4 {
