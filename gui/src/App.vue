@@ -1,6 +1,7 @@
 <script setup>
 import { markRaw, ref, onMounted, onUnmounted } from 'vue'
 import { Document, Files, Monitor, Setting, Stamp, PictureFilled, Edit, VideoPlay, FolderOpened, Coin } from '@element-plus/icons-vue'
+import WindowTitleBar from './components/WindowTitleBar.vue'
 import BtnUpdate from './components/BtnUpdate.vue'
 import PdfTool from './components/pdf/PdfTool.vue'
 import ExcelTool from './components/excel/ExcelTool.vue'
@@ -269,6 +270,24 @@ const onFeatureAction = (feature) => {
 
 <template>
   <div class="app-container" :class="{ loaded: isLoaded }">
+    <!-- 自定义窗口控制顶栏（融合原有顶栏内容） -->
+    <WindowTitleBar>
+      <!-- 左侧：Logo 和标题 -->
+      <template #left>
+        <div class="logo-area">
+          <div class="logo-icon">
+            <img class="logo-image" src="/logo.png" alt="PPX Logo" />
+          </div>
+          <span class="logo-label">工具箱</span>
+        </div>
+      </template>
+
+      <!-- 右侧：更新按钮 -->
+      <template #right>
+        <BtnUpdate />
+      </template>
+    </WindowTitleBar>
+
     <!-- 背景装饰 -->
     <div class="bg-decorations">
       <div class="orb orb-1"></div>
@@ -280,33 +299,20 @@ const onFeatureAction = (feature) => {
 
     <!-- 主内容区 -->
     <div class="main-wrapper">
-      <!-- 顶部导航栏 -->
-      <header class="top-bar">
-        <div class="logo-area">
-          <div class="logo-icon">
-            <img class="logo-image" src="/logo.png" alt="PPX Logo" />
-          </div>
-          <span class="logo-label">工具箱</span>
-        </div>
-        <div class="top-bar-actions">
-          <BtnUpdate />
-        </div>
-      </header>
-
-      <!-- Hero 区域 -->
-      <section class="hero-section" :class="{ collapsed: isScrolled }">
-        <div class="hero-content">
-          <h1 class="hero-title">
-            <span class="title-gradient">多功能</span>工具箱
-          </h1>
-          <p class="hero-subtitle" :class="{ hidden: isScrolled }">
-            Excel / PDF / 图片 / 文本 / 视频 / 文件 / 自动化 —— 数据安全不离开本机
-          </p>
-        </div>
-      </section>
-
       <!-- 工具卡片网格 -->
       <main ref="contentAreaRef" class="content-area">
+        <!-- Hero 区域 -->
+        <section class="hero-section" :class="{ collapsed: isScrolled }">
+          <div class="hero-content">
+            <h1 class="hero-title">
+              <span class="title-gradient">多功能</span>工具箱
+            </h1>
+            <p class="hero-subtitle" :class="{ hidden: isScrolled }">
+              Excel / PDF / 图片 / 文本 / 视频 / 文件 / 自动化 —— 数据安全不离开本机
+            </p>
+          </div>
+        </section>
+
         <div class="section-header">
           <div class="section-title">
             <span class="section-badge">常用工具</span>
@@ -504,6 +510,7 @@ const onFeatureAction = (feature) => {
   background: var(--ppx-bg-deep);
   position: relative;
   overflow: hidden;
+  --titlebar-height: 35px;
 }
 
 .app-container::before {
@@ -589,39 +596,27 @@ const onFeatureAction = (feature) => {
   75% { transform: translate(10px, 30px) scale(1.02); }
 }
 
-/* ??? */
 .main-wrapper {
   width: 100%;
-  height: 100%;
+  height: calc(100% - var(--titlebar-height, 35px)); /* 减去顶栏高度 */
   display: flex;
   flex-direction: column;
   position: relative;
   z-index: 1;
+  margin-top: var(--titlebar-height, 35px); /* 为融合后的自定义窗口控制顶栏留出空间 */
 }
 
-/* ???? */
-.top-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 18px 28px;
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: var(--ppx-blur-md);
-  border-bottom: 1px solid var(--ppx-glass-border);
-  box-shadow: var(--ppx-shadow-sm);
-  flex-shrink: 0;
-}
-
+/* Logo 区域样式（现在在 WindowTitleBar 中） */
 .logo-area {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .logo-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -637,23 +632,11 @@ const onFeatureAction = (feature) => {
   display: block;
 }
 
-
 .logo-label {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--ppx-text-primary);
-  letter-spacing: 1px;
-}
-
-.top-bar-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.update-hint {
-  font-size: 12px;
-  color: var(--ppx-text-muted);
+  letter-spacing: 0.5px;
 }
 
 /* Hero ?? */
@@ -662,7 +645,6 @@ const onFeatureAction = (feature) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-shrink: 0;
   transition: padding 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -729,13 +711,12 @@ const onFeatureAction = (feature) => {
 /* ??? */
 .content-area {
   flex: 1;
-  padding: 0 28px 24px;
   overflow-y: auto;
   overflow-x: hidden;
 }
 
 .section-header {
-  margin: 18px 0 18px;
+  margin: 18px 28px 18px;
 }
 
 .section-title {
@@ -769,7 +750,8 @@ const onFeatureAction = (feature) => {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 18px;
-  margin-bottom: 28px;
+  margin: 0 28px 28px;
+  padding: 0;
 }
 
 .feature-card {
@@ -995,7 +977,8 @@ const onFeatureAction = (feature) => {
 
 /* ???? */
 .tips-section {
-  margin-top: 8px;
+  margin: 8px 28px 28px;
+  padding-bottom: 24px;
 }
 
 .tips-header {
@@ -1080,16 +1063,24 @@ const onFeatureAction = (feature) => {
 }
 
 @media (max-width: 600px) {
-  .top-bar {
-    padding: 12px 16px;
+  .app-container {
+    --titlebar-height: 48px;
   }
 
   .hero-section {
     padding: 20px 16px;
   }
 
-  .content-area {
-    padding: 0 16px 20px;
+  .section-header {
+    margin: 18px 16px 18px;
+  }
+
+  .feature-grid {
+    margin: 0 16px 28px;
+  }
+
+  .tips-section {
+    margin: 8px 16px 28px;
   }
 
   .hero-title {

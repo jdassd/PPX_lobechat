@@ -166,6 +166,10 @@ const resetAll = () => {
 </template>
 
 <style scoped>
+.finance-tool {
+  padding: 20px;
+}
+
 .example-strip {
   margin-top: 12px;
 }

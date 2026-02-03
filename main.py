@@ -149,7 +149,15 @@ def WebViewApp(ifDev=False, ifCef=False):
     minHeight = int(initHeight / 2)
 
     # 创建窗口
-    window = webview.create_window(title=Config.appName, url=template, js_api=api, width=initWidth, height=initHeight, min_size=(minWidth, minHeight))
+    window = webview.create_window(
+        title=Config.appName,
+        url=template,
+        js_api=api,
+        width=initWidth,
+        height=initHeight,
+        min_size=(minWidth, minHeight),
+        frameless=True  # 禁用系统默认窗口装饰，使用自定义顶栏
+    )
 
     # 获取窗口实例
     api.setWindow(window)

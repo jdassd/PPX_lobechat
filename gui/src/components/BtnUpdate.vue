@@ -3,7 +3,7 @@
     <el-tooltip content="检测更新" placement="bottom" effect="light">
       <el-button key="plain" size="small" link class="update-btn" @click="onCheckUpdate(false)">
         <span v-show="state.btnLoading" class="update-label">检测更新</span>
-        <SvgIcon :name="state.btnLoading ? 'ele-Loading' : 'icon-Update'" :size="20" :class="{ 'is-loading': state.btnLoading }"></SvgIcon>
+        <SvgIcon :name="state.btnLoading ? 'ele-Loading' : 'icon-Update'" :size="16" :class="{ 'is-loading': state.btnLoading }"></SvgIcon>
       </el-button>
     </el-tooltip>
 
@@ -199,14 +199,16 @@ const onBack = () => {
 .update-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
+  padding: 4px 8px !important;
+  height: 24px !important;
 }
 
 .update-label {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--ppx-text-muted);
-  letter-spacing: 0.4px;
+  letter-spacing: 0.3px;
   animation: updatePulse 1.2s ease-in-out infinite;
 }
 

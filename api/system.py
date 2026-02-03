@@ -1371,6 +1371,36 @@ class System():
 
     # ==================== 磁盘空间分析 ====================
 
+    def minimize_window(self):
+        '''最小化窗口'''
+        try:
+            if System._window:
+                if hasattr(System._window, 'minimize'):
+                    System._window.minimize()
+                elif hasattr(System._window, 'hide'):
+                    System._window.hide()
+                else:
+                    return {'success': False, 'message': '当前窗口不支持最小化'}
+                return {'success': True}
+            return {'success': False, 'message': '窗口对象未初始化'}
+        except Exception as e:
+            return {'success': False, 'message': str(e)}
+
+    def close_window(self):
+        '''关闭窗口'''
+        try:
+            if System._window:
+                if hasattr(System._window, 'destroy'):
+                    System._window.destroy()
+                elif hasattr(System._window, 'close'):
+                    System._window.close()
+                else:
+                    return {'success': False, 'message': '当前窗口不支持关闭'}
+                return {'success': True}
+            return {'success': False, 'message': '窗口对象未初始化'}
+        except Exception as e:
+            return {'success': False, 'message': str(e)}
+
     def system_analyzeDisk(self, payload=None):
         '''分析指定目录的磁盘占用'''
         target_path = None
