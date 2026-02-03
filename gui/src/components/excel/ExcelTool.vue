@@ -9,54 +9,54 @@
       <div class="drawer-head">
         <div>
           <p class="eyebrow">EXCEL WORKSHOP</p>
-          <h3>Excel 宸ュ叿闆?/h3>
-          <p class="sub">鏀寔缁撴瀯瀹氫箟銆佹寜鍒楀垎缁勩€佸垎琛ㄥ鍑轰笌 JSON 鍥捐〃</p>
+          <h3>Excel 工具集</h3>
+          <p class="sub">支持结构定义、按列分组、分表导出与 JSON 图表</p>
         </div>
       </div>
     </template>
     <div class="excel-tool">
       <el-tabs v-model="activeTab" class="excel-tabs">
-        <el-tab-pane label="缁撴瀯瀹氫箟" name="structure">
+        <el-tab-pane label="结构定义" name="structure">
           <section class="panel">
             <header>
-              <h4>閰嶇疆鍥哄畾鏍煎紡</h4>
-              <p>瀹氫箟绗竴琛屽瓧娈点€侀€夋嫨宸ヤ綔琛ㄥ苟棰勮鏍蜂緥鏁版嵁</p>
+              <h4>配置固定格式</h4>
+              <p>定义第一行字段、选择工作表并预览样例数据</p>
             </header>
             <el-form :model="state.preview" label-width="110px">
-              <el-form-item label="婧?Excel">
+              <el-form-item label="源 Excel">
                 <div class="field-row">
-                  <el-button type="primary" @click="selectExcel('preview')">閫夋嫨鏂囦欢</el-button>
+                  <el-button type="primary" @click="selectExcel('preview')">选择文件</el-button>
                   <span v-if="state.preview.file" class="file-chip">{{ state.preview.file.filename }}</span>
-                  <el-tag v-else type="info" effect="plain">灏氭湭閫夋嫨</el-tag>
+                  <el-tag v-else type="info" effect="plain">尚未选择</el-tag>
                 </div>
               </el-form-item>
-              <el-form-item v-if="state.preview.sheets.length" label="宸ヤ綔琛?>
+              <el-form-item v-if="state.preview.sheets.length" label="工作表">
                 <el-select v-model="state.preview.sheet" style="width: 220px">
                   <el-option v-for="sheet in state.preview.sheets" :key="sheet" :label="sheet" :value="sheet" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="鍒嗛殧绗?>
+              <el-form-item label="分隔符">
                 <el-input
                   v-model="state.preview.delimiter"
-                  placeholder="榛樿浣跨敤 |"
+                  placeholder="默认使用 |"
                   maxlength="4"
                   style="width: 120px"
                 />
               </el-form-item>
-              <el-form-item label="缁撴瀯瀹氫箟">
+              <el-form-item label="结构定义">
                 <el-input
                   v-model="state.preview.schemaText"
                   type="textarea"
                   :rows="2"
-                  placeholder="绀轰緥锛氬鍚峾鎵嬫満鍙穦鍦板尯|涓氬姟绫诲瀷"
+                  placeholder="示例：姓名|手机号|地区|业务类型"
                 />
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" :loading="state.loading" @click="loadPreview">鍒锋柊棰勮</el-button>
+                <el-button type="primary" :loading="state.loading" @click="loadPreview">刷新预览</el-button>
               </el-form-item>
             </el-form>
             <div v-if="state.preview.schema.length" class="schema-chips">
-              <p class="result-title">瀛楁缁撴瀯</p>
+              <p class="result-title">字段结构</p>
               <div class="schema-tags">
                 <el-tag
                   v-for="field in state.preview.schema"
@@ -67,10 +67,10 @@
                   {{ field }}
                 </el-tag>
               </div>
-              <p class="schema-note">鎬昏鏁帮細{{ state.preview.rowCount }} 路 褰撳墠宸ヤ綔琛細{{ state.preview.sheet || '榛樿' }}</p>
+              <p class="schema-note">总行数：{{ state.preview.rowCount }} · 当前工作表：{{ state.preview.sheet || '默认' }}</p>
             </div>
             <div v-if="state.preview.sample.length" class="result-block">
-              <p class="result-title">鏍蜂緥鏁版嵁</p>
+              <p class="result-title">样例数据</p>
               <el-table
                 :data="state.preview.sample"
                 height="260"
@@ -90,15 +90,15 @@
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="鏁版嵁澶勭悊" name="process">
+        <el-tab-pane label="数据处理" name="process">
           <section class="panel">
             <header>
-              <h4>鍒嗙粍 / 鎺掑簭 / 瀵煎嚭</h4>
-              <p>鎸夌収鎸囧畾鍒楁媶鍒嗗垎琛紝鍙€夊鍑?JSON 渚涘浘琛ㄤ娇鐢?/p>
+              <h4>分组 / 排序 / 导出</h4>
+              <p>按照指定列拆分分表，可选导出 JSON 供图表使用</p>
             </header>
             <el-form :model="state.process" label-width="120px">
-              <el-form-item label="鎸夊垪鍒嗙粍">
-                <el-select v-model="state.process.groupBy" placeholder="鍙€? clearable style="width: 220px">
+              <el-form-item label="按列分组">
+                <el-select v-model="state.process.groupBy" placeholder="可选" clearable style="width: 220px">
                   <el-option
                     v-for="field in schemaFields"
                     :key="field"
@@ -107,9 +107,9 @@
                   />
                 </el-select>
               </el-form-item>
-              <el-form-item label="鎺掑簭瀛楁">
+              <el-form-item label="排序字段">
                 <div class="field-row">
-                  <el-select v-model="state.process.sortBy" placeholder="鍙€? clearable style="width: 220px">
+                  <el-select v-model="state.process.sortBy" placeholder="可选" clearable style="width: 220px">
                     <el-option
                       v-for="field in schemaFields"
                       :key="field"
@@ -118,31 +118,31 @@
                     />
                   </el-select>
                   <el-radio-group v-model="state.process.sortOrder" size="small">
-                    <el-radio-button label="asc">鍗囧簭</el-radio-button>
-                    <el-radio-button label="desc">闄嶅簭</el-radio-button>
+                    <el-radio-button label="asc">升序</el-radio-button>
+                    <el-radio-button label="desc">降序</el-radio-button>
                   </el-radio-group>
                 </div>
               </el-form-item>
-              <el-form-item label="杈撳嚭鐩綍">
+              <el-form-item label="输出目录">
                 <div class="field-row">
                   <el-input
                     v-model="state.process.outputDir"
-                    placeholder="鐣欑┖鍒欒嚜鍔ㄥ垱寤?
+                    placeholder="留空则自动创建"
                     readonly
                   />
-                  <el-button @click="selectDir('process')">閫夋嫨鐩綍</el-button>
+                  <el-button @click="selectDir('process')">选择目录</el-button>
                 </div>
               </el-form-item>
-              <el-form-item label="瀵煎嚭閫夐」">
+              <el-form-item label="导出选项">
                 <div class="toggle-row">
                   <el-checkbox v-model="state.process.exportGroups" :disabled="!state.process.groupBy">
-                    鍒嗙粍瀵煎嚭 Excel
+                    分组导出 Excel
                   </el-checkbox>
                   <el-checkbox v-model="state.process.exportJson" :disabled="!state.process.groupBy">
-                    瀵煎嚭 JSON 鍥捐〃
+                    导出 JSON 图表
                   </el-checkbox>
                   <el-checkbox v-model="state.process.exportCombined">
-                    鍚堝苟涓昏〃
+                    合并主表
                   </el-checkbox>
                 </div>
               </el-form-item>
@@ -151,13 +151,13 @@
             <div class="subpanel">
               <div class="subpanel-head">
                 <div>
-                  <h5>闄勫姞鍒嗚〃</h5>
-                  <p>鏀寔鍦ㄤ富琛ㄥ墠鎵归噺鍚堝苟澶氫釜鍒嗚〃锛屽啀杩涘叆鍒嗙粍娴佺▼</p>
+                  <h5>附加分表</h5>
+                  <p>支持在主表前批量合并多个分表，再进入分组流程</p>
                 </div>
                 <div class="field-row">
-                  <el-button size="small" @click="selectExcel('processMerge', true)">娣诲姞鍒嗚〃</el-button>
+                  <el-button size="small" @click="selectExcel('processMerge', true)">添加分表</el-button>
                   <el-button size="small" text type="danger" @click="clearList('processMerge')" :disabled="!state.process.mergeFiles.length">
-                    娓呯┖
+                    清空
                   </el-button>
                 </div>
               </div>
@@ -168,56 +168,56 @@
                 border
               >
                 <el-table-column type="index" width="50" label="#" />
-                <el-table-column prop="filename" label="鏂囦欢鍚? />
-                <el-table-column label="宸ヤ綔琛? width="220">
+                <el-table-column prop="filename" label="文件名" />
+                <el-table-column label="工作表" width="220">
                   <template #default="scope">
                     <el-input
                       v-model="scope.row.sheet"
                       size="small"
-                      placeholder="鐣欑┖浣跨敤榛樿宸ヤ綔琛?
+                      placeholder="留空使用默认工作表"
                     />
                   </template>
                 </el-table-column>
-                <el-table-column label="鎿嶄綔" width="80">
+                <el-table-column label="操作" width="80">
                   <template #default="scope">
-                    <el-button link type="danger" @click="removeFile('processMerge', scope.$index)">绉婚櫎</el-button>
+                    <el-button link type="danger" @click="removeFile('processMerge', scope.$index)">移除</el-button>
                   </template>
                 </el-table-column>
               </el-table>
-              <el-empty v-else description="灏氭湭娣诲姞鍒嗚〃" />
+              <el-empty v-else description="尚未添加分表" />
             </div>
 
             <div class="actions">
-              <el-button type="primary" :loading="state.loading" @click="runProcess">鎵ц澶勭悊</el-button>
+              <el-button type="primary" :loading="state.loading" @click="runProcess">执行处理</el-button>
             </div>
 
             <div v-if="state.process.summary" class="result-block">
-              <p class="result-title">澶勭悊鎽樿</p>
+              <p class="result-title">处理摘要</p>
               <el-descriptions :column="2" size="small" border>
-                <el-descriptions-item label="鎬昏鏁?>
+                <el-descriptions-item label="总行数">
                   {{ state.process.summary.totalRows }}
                 </el-descriptions-item>
-                <el-descriptions-item label="鍒嗙粍鍒?>
-                  {{ state.process.summary.groupBy || '鏈缃? }}
+                <el-descriptions-item label="分组列">
+                  {{ state.process.summary.groupBy || '未设置' }}
                 </el-descriptions-item>
-                <el-descriptions-item label="鎺掑簭鍒?>
-                  {{ state.process.summary.sortBy || '鏈缃? }}锛坽{ state.process.summary.sortOrder === 'desc' ? '闄嶅簭' : '鍗囧簭' }}锛?
+                <el-descriptions-item label="排序列">
+                  {{ state.process.summary.sortBy || '未设置' }}（{{ state.process.summary.sortOrder === 'desc' ? '降序' : '升序' }}）
                 </el-descriptions-item>
-                <el-descriptions-item label="鍒嗙粍鏁伴噺">
+                <el-descriptions-item label="分组数量">
                   {{ state.process.summary.groupCount }}
                 </el-descriptions-item>
               </el-descriptions>
 
               <div v-if="state.process.groups.length" class="group-table">
                 <el-table :data="state.process.groups" size="small" border>
-                  <el-table-column prop="key" label="鍒嗙粍鍊? />
-                  <el-table-column prop="count" label="琛屾暟" width="120" />
+                  <el-table-column prop="key" label="分组值" />
+                  <el-table-column prop="count" label="行数" width="120" />
                 </el-table>
               </div>
 
               <div class="result-list">
                 <template v-if="state.process.groupFiles.length">
-                  <p class="result-title">鍒嗙粍鏂囦欢</p>
+                  <p class="result-title">分组文件</p>
                   <el-scrollbar max-height="140px">
                     <div class="tag-list">
                       <el-tag
@@ -240,7 +240,7 @@
                     effect="plain"
                     @click="openPath(state.process.jsonPath)"
                   >
-                    JSON锛歿{ state.process.jsonPath }}
+                    JSON：{{ state.process.jsonPath }}
                   </el-tag>
                   <el-tag
                     v-if="state.process.combinedPath"
@@ -248,7 +248,7 @@
                     effect="plain"
                     @click="openPath(state.process.combinedPath)"
                   >
-                    涓昏〃锛歿{ state.process.combinedPath }}
+                    主表：{{ state.process.combinedPath }}
                   </el-tag>
                 </div>
               </div>
@@ -256,60 +256,60 @@
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="鍥捐〃鍒朵綔" name="chart">
+        <el-tab-pane label="图表制作" name="chart">
           <section class="panel">
             <header>
-              <h4>Excel 鈫?ECharts</h4>
-              <p>鑷姩杞崲涓?JSON 鏁版嵁骞跺疄鏃舵覆鏌撳浘琛?/p>
+              <h4>Excel → ECharts</h4>
+              <p>自动转换为 JSON 数据并实时渲染图表</p>
             </header>
             <el-form :model="state.chart" label-width="120px">
-              <el-form-item label="婧?Excel">
+              <el-form-item label="源 Excel">
                 <div class="field-row">
-                  <el-button type="primary" @click="selectExcel('chart')">閫夋嫨鏂囦欢</el-button>
+                  <el-button type="primary" @click="selectExcel('chart')">选择文件</el-button>
                   <span v-if="state.chart.file" class="file-chip">{{ state.chart.file.filename }}</span>
-                  <el-tag v-else type="info" effect="plain">灏氭湭閫夋嫨</el-tag>
+                  <el-tag v-else type="info" effect="plain">尚未选择</el-tag>
                 </div>
               </el-form-item>
-              <el-form-item v-if="state.chart.sheets.length" label="宸ヤ綔琛?>
+              <el-form-item v-if="state.chart.sheets.length" label="工作表">
                 <el-select v-model="state.chart.sheet" style="width: 220px">
                   <el-option v-for="sheet in state.chart.sheets" :key="sheet" :label="sheet" :value="sheet" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="鍒嗛殧绗?>
+              <el-form-item label="分隔符">
                 <el-input
                   v-model="state.chart.delimiter"
-                  placeholder="榛樿浣跨敤 |"
+                  placeholder="默认使用 |"
                   maxlength="4"
                   style="width: 120px"
                 />
               </el-form-item>
-              <el-form-item label="缁撴瀯瀹氫箟">
+              <el-form-item label="结构定义">
                 <el-input
                   v-model="state.chart.schemaText"
                   type="textarea"
                   :rows="2"
-                  placeholder="绀轰緥锛氬湴鍖簗閿€閲弢璐熻矗浜?
+                  placeholder="示例：地区|销量|负责人"
                 />
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" :loading="state.loading" @click="loadChartPreview">鍒锋柊缁撴瀯</el-button>
+                <el-button type="primary" :loading="state.loading" @click="loadChartPreview">刷新结构</el-button>
               </el-form-item>
-              <el-form-item label="鍥捐〃绫诲瀷">
+              <el-form-item label="图表类型">
                 <el-radio-group v-model="state.chart.chartType">
-                  <el-radio-button label="bar">鏌辩姸鍥?/el-radio-button>
-                  <el-radio-button label="line">鎶樼嚎鍥?/el-radio-button>
-                  <el-radio-button label="pie">楗煎浘</el-radio-button>
+                  <el-radio-button label="bar">柱状图</el-radio-button>
+                  <el-radio-button label="line">折线图</el-radio-button>
+                  <el-radio-button label="pie">饼图</el-radio-button>
                 </el-radio-group>
               </el-form-item>
-              <el-form-item label="缁村害鍒?>
-                <el-select v-model="state.chart.dimension" placeholder="閫夋嫨鍒嗙被瀛楁" style="width: 220px">
+              <el-form-item label="维度列">
+                <el-select v-model="state.chart.dimension" placeholder="选择分类字段" style="width: 220px">
                   <el-option v-for="field in chartFields" :key="field" :label="field" :value="field" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="鏁板€煎垪">
+              <el-form-item label="数值列">
                 <el-select
                   v-model="state.chart.metric"
-                  placeholder="閫夋嫨鏁板€煎瓧娈?
+                  placeholder="选择数值字段"
                   clearable
                   :disabled="state.chart.aggregate === 'count'"
                   style="width: 220px"
@@ -317,24 +317,24 @@
                   <el-option v-for="field in chartFields" :key="field" :label="field" :value="field" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="缁熻鏂瑰紡">
+              <el-form-item label="统计方式">
                 <el-select v-model="state.chart.aggregate" style="width: 220px">
-                  <el-option label="姹傚拰" value="sum" />
-                  <el-option label="鍧囧€? value="avg" />
-                  <el-option label="璁℃暟" value="count" />
+                  <el-option label="求和" value="sum" />
+                  <el-option label="均值" value="avg" />
+                  <el-option label="计数" value="count" />
                 </el-select>
               </el-form-item>
             </el-form>
 
             <div class="actions">
-              <el-button type="primary" :loading="state.loading" @click="runChartBuild">鐢熸垚鍥捐〃</el-button>
+              <el-button type="primary" :loading="state.loading" @click="runChartBuild">生成图表</el-button>
             </div>
 
             <div class="format-block">
-              <p class="result-title">鏁版嵁鏍煎紡璇存槑</p>
+              <p class="result-title">数据格式说明</p>
               <div class="format-grid">
                 <div class="format-card">
-                  <p class="format-title">鍥捐〃鏁版嵁 JSON</p>
+                  <p class="format-title">图表数据 JSON</p>
                   <pre class="format-code">{{ chartDataSample }}</pre>
                 </div>
                 <div class="format-card">
@@ -345,32 +345,32 @@
             </div>
 
             <div v-if="state.chart.data" class="result-block">
-              <p class="result-title">鐢熸垚缁撴灉</p>
+              <p class="result-title">生成结果</p>
               <el-descriptions :column="2" size="small" border>
-                <el-descriptions-item label="缁村害鍒?>
+                <el-descriptions-item label="维度列">
                   {{ state.chart.data.dimension }}
                 </el-descriptions-item>
-                <el-descriptions-item label="鏁板€煎垪">
-                  {{ state.chart.data.metric || '璁℃暟' }}
+                <el-descriptions-item label="数值列">
+                  {{ state.chart.data.metric || '计数' }}
                 </el-descriptions-item>
-                <el-descriptions-item label="缁熻鏂瑰紡">
+                <el-descriptions-item label="统计方式">
                   {{ state.chart.data.aggregate }}
                 </el-descriptions-item>
-                <el-descriptions-item label="鐢熸垚鏃堕棿">
+                <el-descriptions-item label="生成时间">
                   {{ state.chart.data.generatedAt }}
                 </el-descriptions-item>
               </el-descriptions>
 
               <div v-if="state.chart.data.rows?.length" class="group-table">
                 <el-table :data="state.chart.data.rows" size="small" border>
-                  <el-table-column prop="name" label="鍒嗙被" />
-                  <el-table-column prop="value" label="鏁板€? width="140" />
+                  <el-table-column prop="name" label="分类" />
+                  <el-table-column prop="value" label="数值" width="140" />
                 </el-table>
               </div>
 
               <div class="json-view">
                 <div class="json-block">
-                  <p class="result-title">鍥捐〃鏁版嵁 JSON</p>
+                  <p class="result-title">图表数据 JSON</p>
                   <el-input
                     :model-value="state.chart.dataJson"
                     type="textarea"
@@ -391,27 +391,27 @@
             </div>
 
             <div class="chart-preview">
-              <p class="result-title">鍥捐〃棰勮</p>
+              <p class="result-title">图表预览</p>
               <div v-show="state.chart.option" ref="chartRef" class="echart-canvas"></div>
-              <el-empty v-if="!state.chart.option" description="璇峰厛鐢熸垚鍥捐〃" />
+              <el-empty v-if="!state.chart.option" description="请先生成图表" />
             </div>
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="鍒嗚〃鍚堝苟" name="merge">
+        <el-tab-pane label="分表合并" name="merge">
           <section class="panel">
             <header>
-              <h4>鐙珛鍚堝苟宸ュ叿</h4>
-              <p>灏嗗涓垎琛ㄧ粺涓€瀵煎嚭涓轰竴涓?Excel锛屾柟渚跨敓鎴愪富琛?/p>
+              <h4>独立合并工具</h4>
+              <p>将多个分表统一导出为一个 Excel，方便生成主表</p>
             </header>
             <div class="subpanel">
               <div class="subpanel-head">
                 <div>
-                  <h5>鍒嗚〃鍒楄〃</h5>
-                  <p>鏀寔鎵归噺閫夋嫨鎴栧娆℃坊鍔?/p>
+                  <h5>分表列表</h5>
+                  <p>支持批量选择或多次添加</p>
                 </div>
                 <div class="field-row">
-                  <el-button size="small" @click="selectExcel('mergeTables', true)">閫夋嫨鏂囦欢</el-button>
+                  <el-button size="small" @click="selectExcel('mergeTables', true)">选择文件</el-button>
                   <el-button
                     size="small"
                     text
@@ -419,7 +419,7 @@
                     @click="clearList('mergeTables')"
                     :disabled="!state.merge.tables.length"
                   >
-                    娓呯┖
+                    清空
                   </el-button>
                 </div>
               </div>
@@ -430,42 +430,42 @@
                 border
               >
                 <el-table-column type="index" width="50" label="#" />
-                <el-table-column prop="filename" label="鏂囦欢鍚? />
-                <el-table-column label="宸ヤ綔琛? width="220">
+                <el-table-column prop="filename" label="文件名" />
+                <el-table-column label="工作表" width="220">
                   <template #default="scope">
                     <el-input
                       v-model="scope.row.sheet"
                       size="small"
-                      placeholder="鐣欑┖浣跨敤榛樿宸ヤ綔琛?
+                      placeholder="留空使用默认工作表"
                     />
                   </template>
                 </el-table-column>
-                <el-table-column label="鎿嶄綔" width="80">
+                <el-table-column label="操作" width="80">
                   <template #default="scope">
-                    <el-button link type="danger" @click="removeFile('mergeTables', scope.$index)">绉婚櫎</el-button>
+                    <el-button link type="danger" @click="removeFile('mergeTables', scope.$index)">移除</el-button>
                   </template>
                 </el-table-column>
               </el-table>
-              <el-empty v-else description="灏氭湭娣诲姞鍒嗚〃" />
+              <el-empty v-else description="尚未添加分表" />
             </div>
             <el-form :model="state.merge" label-width="120px" class="merge-form">
-              <el-form-item label="杈撳嚭鐩綍">
+              <el-form-item label="输出目录">
                 <div class="field-row">
-                  <el-input v-model="state.merge.outputDir" readonly placeholder="鐣欑┖鑷姩鍒涘缓" />
-                  <el-button @click="selectDir('merge')">閫夋嫨鐩綍</el-button>
+                  <el-input v-model="state.merge.outputDir" readonly placeholder="留空自动创建" />
+                  <el-button @click="selectDir('merge')">选择目录</el-button>
                 </div>
               </el-form-item>
-              <el-form-item label="杈撳嚭鏂囦欢鍚?>
-                <el-input v-model="state.merge.outputName" placeholder="渚嬪锛氭眹鎬讳富琛?xlsx" />
+              <el-form-item label="输出文件名">
+                <el-input v-model="state.merge.outputName" placeholder="例如：汇总主表.xlsx" />
               </el-form-item>
             </el-form>
             <div class="actions">
               <el-button type="primary" :loading="state.loading" @click="runMergeTables">
-                寮€濮嬪悎骞?
+                开始合并
               </el-button>
             </div>
             <div v-if="state.merge.result" class="result-block">
-              <p class="result-title">杈撳嚭缁撴灉</p>
+              <p class="result-title">输出结果</p>
               <el-tag type="success" effect="plain" @click="openPath(state.merge.result)">
                 {{ state.merge.result }}
               </el-tag>
@@ -476,8 +476,8 @@
 
       <section class="panel log-panel">
         <header>
-          <h4>鎿嶄綔鏃ュ織</h4>
-          <p>灞曠ず鏈€杩戠殑鎵ц璁板綍涓庤繑鍥炰俊鎭?/p>
+          <h4>操作日志</h4>
+          <p>展示最近的执行记录与返回信息</p>
         </header>
         <el-timeline>
           <el-timeline-item
@@ -503,16 +503,16 @@ import { computed, reactive, ref, watch, onMounted, onUnmounted, nextTick, shall
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 
-const excelFilter = ['Excel 鏂囦欢 (*.xlsx;*.xlsm;*.xltx;*.xltm)']
+const excelFilter = ['Excel 文件 (*.xlsx;*.xlsm;*.xltx;*.xltm)']
 const chartDataSample = JSON.stringify(
   {
-    dimension: '鍦板尯',
-    metric: '閿€閲?,
+    dimension: '地区',
+    metric: '销量',
     aggregate: 'sum',
     rows: [
-      { name: '鍗庡寳', value: 120 },
-      { name: '鍗庝笢', value: 98 },
-      { name: '鍗庡崡', value: 76 }
+      { name: '华北', value: 120 },
+      { name: '华东', value: 98 },
+      { name: '华南', value: 76 }
     ]
   },
   null,
@@ -521,7 +521,7 @@ const chartDataSample = JSON.stringify(
 const chartOptionSample = JSON.stringify(
   {
     tooltip: { trigger: 'axis' },
-    xAxis: { type: 'category', data: ['鍗庡寳', '鍗庝笢', '鍗庡崡'] },
+    xAxis: { type: 'category', data: ['华北', '华东', '华南'] },
     yAxis: { type: 'value' },
     series: [{ type: 'bar', data: [120, 98, 76] }]
   },
@@ -591,7 +591,7 @@ const state = reactive({
   merge: {
     tables: [],
     outputDir: '',
-    outputName: '鍚堝苟涓昏〃.xlsx',
+    outputName: '合并主表.xlsx',
     result: ''
   },
   logs: []
@@ -716,7 +716,7 @@ watch(
 
 const ensurePyReady = () => {
   if (!window.pywebview?.api) {
-    ElMessage.warning('璇ュ姛鑳介渶鍦ㄦ闈㈠鎴风涓娇鐢?)
+    ElMessage.warning('该功能需在桌面客户端中使用')
     return false
   }
   return true
@@ -726,24 +726,24 @@ const callApi = async (method, payload) => {
   if (!ensurePyReady()) return null
   const api = window.pywebview.api
   if (!api[method]) {
-    ElMessage.error('褰撳墠瀹㈡埛绔増鏈己灏?Excel 鑳藉姏')
+    ElMessage.error('当前客户端版本缺少 Excel 能力')
     return null
   }
   state.loading = true
   try {
     const res = await api[method](payload)
     if (res?.code === 0) {
-      ElMessage.success(res.msg || '鎿嶄綔鎴愬姛')
-      pushLog('success', res.msg || '鎿嶄綔鎴愬姛', method)
+      ElMessage.success(res.msg || '操作成功')
+      pushLog('success', res.msg || '操作成功', method)
       return res
     }
-    const msg = res?.msg || '鎿嶄綔澶辫触'
+    const msg = res?.msg || '操作失败'
     ElMessage.error(msg)
     pushLog('warning', msg, method)
     return null
   } catch (error) {
-    ElMessage.error(error.message || '鎵ц澶辫触')
-    pushLog('danger', error.message || '鎵ц澶辫触', method)
+    ElMessage.error(error.message || '执行失败')
+    pushLog('danger', error.message || '执行失败', method)
     return null
   } finally {
     state.loading = false
@@ -864,7 +864,7 @@ const openPath = (path) => {
 const loadPreview = async (silent = false) => {
   if (!state.preview.file) {
     if (!silent) {
-      ElMessage.warning('璇烽€夋嫨 Excel 鏂囦欢')
+      ElMessage.warning('请选择 Excel 文件')
     }
     return
   }
@@ -891,7 +891,7 @@ const loadPreview = async (silent = false) => {
 const loadChartPreview = async (silent = false) => {
   if (!state.chart.file) {
     if (!silent) {
-      ElMessage.warning('璇烽€夋嫨 Excel 鏂囦欢')
+      ElMessage.warning('请选择 Excel 文件')
     }
     return
   }
@@ -915,7 +915,7 @@ const loadChartPreview = async (silent = false) => {
 
 const runProcess = async () => {
   if (!state.preview.file) {
-    ElMessage.warning('璇峰厛瀹屾垚缁撴瀯瀹氫箟')
+    ElMessage.warning('请先完成结构定义')
     return
   }
   const payload = {
@@ -949,15 +949,15 @@ const runProcess = async () => {
 
 const runChartBuild = async () => {
   if (!state.chart.file) {
-    ElMessage.warning('璇峰厛閫夋嫨 Excel 鏂囦欢')
+    ElMessage.warning('请先选择 Excel 文件')
     return
   }
   if (!state.chart.dimension) {
-    ElMessage.warning('璇烽€夋嫨缁村害鍒?)
+    ElMessage.warning('请选择维度列')
     return
   }
   if (state.chart.aggregate !== 'count' && !state.chart.metric) {
-    ElMessage.warning('璇烽€夋嫨鏁板€煎垪')
+    ElMessage.warning('请选择数值列')
     return
   }
   const payload = {
@@ -981,7 +981,7 @@ const runChartBuild = async () => {
 
 const runMergeTables = async () => {
   if (!state.merge.tables.length) {
-    ElMessage.warning('璇峰厛閫夋嫨闇€瑕佸悎骞剁殑鍒嗚〃')
+    ElMessage.warning('请先选择需要合并的分表')
     return
   }
   const res = await callApi('excel_merge_tables', {
@@ -1000,9 +1000,9 @@ const runMergeTables = async () => {
 </script>
 
 <style scoped>
-/* 浣跨敤鍏ㄥ眬娣辩┖鐜荤拑涓婚鏍峰紡 */
+/* 使用全局深空玻璃主题样式 */
 
-/* 缁撴瀯鏍囩 */
+/* 结构标签 */
 .schema-chips {
   margin-top: 10px;
 }
@@ -1035,7 +1035,7 @@ const runMergeTables = async () => {
   flex-wrap: wrap;
 }
 
-/* 瀛愰潰鏉?*/
+/* 子面板 */
 .subpanel {
   margin-top: 18px;
   border: 1px dashed var(--ppx-glass-border);
@@ -1144,7 +1144,7 @@ const runMergeTables = async () => {
   margin-top: 18px;
 }
 
-/* 鏃ュ織闈㈡澘 */
+/* 日志面板 */
 .log-panel header {
   margin-bottom: 10px;
 }
@@ -1172,4 +1172,3 @@ const runMergeTables = async () => {
   font-size: 12px;
 }
 </style>
-

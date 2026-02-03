@@ -60,7 +60,7 @@ const state = reactive({
 
 const ensurePyReady = () => {
   if (!window.pywebview?.api) {
-    ElMessage.warning('璇ュ姛鑳介渶鍦ㄦ闈㈠鎴风鍐呬娇鐢?)
+    ElMessage.warning('该功能需在桌面客户端内使用')
     return false
   }
   return true
@@ -94,12 +94,12 @@ const startRecord = async () => {
       state.record.active = true
       state.record.count = 0
       state.record.duration = 0
-      ElMessage.success(res.msg || '宸插紑濮嬪綍鍒?)
+      ElMessage.success(res.msg || '已开始录制')
     } else {
-      ElMessage.error(res?.msg || '鍚姩褰曞埗澶辫触')
+      ElMessage.error(res?.msg || '启动录制失败')
     }
   } catch (error) {
-    ElMessage.error(error?.message || '鍚姩褰曞埗澶辫触')
+    ElMessage.error(error?.message || '启动录制失败')
   } finally {
     state.loading = false
   }
@@ -116,12 +116,12 @@ const stopRecord = async () => {
       state.record.duration = res.duration || 0
       state.macro.payload = res.macro || { actions: res.actions || [] }
       state.macro.text = JSON.stringify(state.macro.payload, null, 2)
-      ElMessage.success(res.msg || '褰曞埗瀹屾垚')
+      ElMessage.success(res.msg || '录制完成')
     } else {
-      ElMessage.error(res?.msg || '鍋滄褰曞埗澶辫触')
+      ElMessage.error(res?.msg || '停止录制失败')
     }
   } catch (error) {
-    ElMessage.error(error?.message || '鍋滄褰曞埗澶辫触')
+    ElMessage.error(error?.message || '停止录制失败')
   } finally {
     state.loading = false
   }
@@ -130,17 +130,17 @@ const stopRecord = async () => {
 const parseMacroText = () => {
   try {
     if (!state.macro.text.trim()) {
-      throw new Error('鑴氭湰涓虹┖')
+      throw new Error('脚本为空')
     }
     const parsed = JSON.parse(state.macro.text)
     const actions = Array.isArray(parsed) ? parsed : parsed.actions
     if (!Array.isArray(actions)) {
-      throw new Error('鑴氭湰鏍煎紡涓嶆纭?)
+      throw new Error('脚本格式不正确')
     }
     state.macro.payload = Array.isArray(parsed) ? { actions: parsed } : parsed
-    ElMessage.success('鑴氭湰瑙ｆ瀽鎴愬姛')
+    ElMessage.success('脚本解析成功')
   } catch (error) {
-    ElMessage.error(error?.message || '鑴氭湰瑙ｆ瀽澶辫触')
+    ElMessage.error(error?.message || '脚本解析失败')
   }
 }
 
@@ -163,11 +163,11 @@ const exportMacro = async () => {
     parseMacroText()
   }
   if (!state.macro.payload) {
-    ElMessage.warning('璇峰厛褰曞埗鎴栧姞杞借剼鏈?)
+    ElMessage.warning('请先录制或加载脚本')
     return
   }
   if (!state.macro.outputDir) {
-    ElMessage.warning('璇烽€夋嫨杈撳嚭鐩綍')
+    ElMessage.warning('请选择输出目录')
     return
   }
   state.loading = true
@@ -178,12 +178,12 @@ const exportMacro = async () => {
       macro: state.macro.payload
     })
     if (res?.code === 0) {
-      ElMessage.success(res.msg || '淇濆瓨鎴愬姛')
+      ElMessage.success(res.msg || '保存成功')
     } else {
-      ElMessage.error(res?.msg || '淇濆瓨澶辫触')
+      ElMessage.error(res?.msg || '保存失败')
     }
   } catch (error) {
-    ElMessage.error(error?.message || '淇濆瓨澶辫触')
+    ElMessage.error(error?.message || '保存失败')
   } finally {
     state.loading = false
   }
@@ -191,7 +191,7 @@ const exportMacro = async () => {
 
 const importMacro = async () => {
   if (!ensurePyReady()) return
-  const files = await window.pywebview.api.system_pyCreateFileDialog(['JSON 鏂囦欢 (*.json)'])
+  const files = await window.pywebview.api.system_pyCreateFileDialog(['JSON 文件 (*.json)'])
   if (!files?.length) return
   state.loading = true
   try {
@@ -201,12 +201,12 @@ const importMacro = async () => {
     if (res?.code === 0) {
       state.macro.payload = res.macro || { actions: res.actions || [] }
       state.macro.text = JSON.stringify(state.macro.payload, null, 2)
-      ElMessage.success(res.msg || '鍔犺浇瀹屾垚')
+      ElMessage.success(res.msg || '加载完成')
     } else {
-      ElMessage.error(res?.msg || '鍔犺浇澶辫触')
+      ElMessage.error(res?.msg || '加载失败')
     }
   } catch (error) {
-    ElMessage.error(error?.message || '鍔犺浇澶辫触')
+    ElMessage.error(error?.message || '加载失败')
   } finally {
     state.loading = false
   }
@@ -249,7 +249,7 @@ const startPlayback = async () => {
     parseMacroText()
   }
   if (!state.macro.payload || !state.macro.payload.actions?.length) {
-    ElMessage.warning('璇峰厛褰曞埗鎴栧姞杞借剼鏈?)
+    ElMessage.warning('请先录制或加载脚本')
     return
   }
   state.loading = true
@@ -263,13 +263,13 @@ const startPlayback = async () => {
     })
     if (res?.code === 0) {
       state.playback.running = true
-      ElMessage.success(res.msg || '鍥炴斁宸插惎鍔?)
+      ElMessage.success(res.msg || '回放已启动')
       startStatusTimer()
     } else {
-      ElMessage.error(res?.msg || '鍥炴斁鍚姩澶辫触')
+      ElMessage.error(res?.msg || '回放启动失败')
     }
   } catch (error) {
-    ElMessage.error(error?.message || '鍥炴斁鍚姩澶辫触')
+    ElMessage.error(error?.message || '回放启动失败')
   } finally {
     state.loading = false
   }
@@ -282,13 +282,13 @@ const stopPlayback = async () => {
     const res = await window.pywebview.api.automation_stop_playback()
     if (res?.code === 0) {
       state.playback.running = false
-      ElMessage.success(res.msg || '宸插仠姝㈠洖鏀?)
+      ElMessage.success(res.msg || '已停止回放')
       stopStatusTimer()
     } else {
-      ElMessage.error(res?.msg || '鍋滄澶辫触')
+      ElMessage.error(res?.msg || '停止失败')
     }
   } catch (error) {
-    ElMessage.error(error?.message || '鍋滄澶辫触')
+    ElMessage.error(error?.message || '停止失败')
   } finally {
     state.loading = false
   }
@@ -297,7 +297,7 @@ const stopPlayback = async () => {
 const selectImage = async () => {
   if (!ensurePyReady()) return
   const files = await window.pywebview.api.system_pyCreateFileDialog([
-    '鍥剧墖鏂囦欢 (*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp)'
+    '图片文件 (*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp)'
   ])
   if (files?.length) {
     state.image.file = files[0]
@@ -307,7 +307,7 @@ const selectImage = async () => {
 const runFindImage = async () => {
   if (!ensurePyReady()) return
   if (!state.image.file?.path) {
-    ElMessage.warning('璇峰厛閫夋嫨鍥剧墖')
+    ElMessage.warning('请先选择图片')
     return
   }
   state.loading = true
@@ -321,12 +321,12 @@ const runFindImage = async () => {
     })
     state.image.lastResult = res
     if (res?.code === 0) {
-      ElMessage.success(res.msg || '瀹氫綅鎴愬姛')
+      ElMessage.success(res.msg || '定位成功')
     } else {
-      ElMessage.error(res?.msg || '瀹氫綅澶辫触')
+      ElMessage.error(res?.msg || '定位失败')
     }
   } catch (error) {
-    ElMessage.error(error?.message || '瀹氫綅澶辫触')
+    ElMessage.error(error?.message || '定位失败')
   } finally {
     state.loading = false
   }
@@ -335,7 +335,7 @@ const runFindImage = async () => {
 const runClickImage = async () => {
   if (!ensurePyReady()) return
   if (!state.image.file?.path) {
-    ElMessage.warning('璇峰厛閫夋嫨鍥剧墖')
+    ElMessage.warning('请先选择图片')
     return
   }
   state.loading = true
@@ -351,12 +351,12 @@ const runClickImage = async () => {
     })
     state.image.lastResult = res
     if (res?.code === 0) {
-      ElMessage.success(res.msg || '鐐瑰嚮鎴愬姛')
+      ElMessage.success(res.msg || '点击成功')
     } else {
-      ElMessage.error(res?.msg || '鐐瑰嚮澶辫触')
+      ElMessage.error(res?.msg || '点击失败')
     }
   } catch (error) {
-    ElMessage.error(error?.message || '鐐瑰嚮澶辫触')
+    ElMessage.error(error?.message || '点击失败')
   } finally {
     state.loading = false
   }
@@ -364,7 +364,7 @@ const runClickImage = async () => {
 
 const appendImageStep = () => {
   if (!state.image.file?.path) {
-    ElMessage.warning('璇峰厛閫夋嫨鍥剧墖')
+    ElMessage.warning('请先选择图片')
     return
   }
   if (!state.macro.payload) {
@@ -383,7 +383,7 @@ const appendImageStep = () => {
   state.macro.payload.actions = state.macro.payload.actions || []
   state.macro.payload.actions.push(action)
   state.macro.text = JSON.stringify(state.macro.payload, null, 2)
-  ElMessage.success('宸插姞鍏ヨ剼鏈楠?)
+  ElMessage.success('已加入脚本步骤')
 }
 
 onUnmounted(() => {
@@ -397,38 +397,39 @@ onUnmounted(() => {
       <div class="drawer-head">
         <div>
           <p class="eyebrow">AUTOMATION</p>
-          <h3>鑷姩鍖栧綍鍒朵笌鍥惧儚璇嗗埆</h3>
-          <p class="sub">褰曞埗榧犳爣/閿洏杞ㄨ抗锛屽洖鏀捐剼鏈紝鏀寔鍥剧墖瀹氫綅涓庣偣鍑?/p>
+          <h3>自动化录制与图像识别</h3>
+          <p class="sub">录制鼠标/键盘轨迹，回放脚本，支持图片定位与点击</p>
         </div>
       </div>
     </template>
 
     <div class="automation-tool">
       <el-tabs v-model="state.activeTab">
-        <el-tab-pane label="褰曞埗 / 鍥炴斁" name="record">
+        <el-tab-pane label="录制 / 回放" name="record">
           <section class="panel">
             <header>
-              <h4>褰曞埗璁剧疆</h4>
-              <p>鏀寔榧犳爣杞ㄨ抗銆佺偣鍑汇€佹粴杞笌閿洏鎸夐敭浜嬩欢鐨勫綍鍒?/p>
+              <h4>录制设置</h4>
+              <p>支持鼠标轨迹、点击、滚轮与键盘按键事件的录制</p>
             </header>
             <el-form :model="state.record" label-width="140px" class="form-gap">
-              <el-form-item label="褰曞埗鍐呭">
-                <el-checkbox v-model="state.record.recordMouse">榧犳爣</el-checkbox>
-                <el-checkbox v-model="state.record.recordKeyboard">閿洏</el-checkbox>
+              <el-form-item label="录制内容">
+                <el-checkbox v-model="state.record.recordMouse">鼠标</el-checkbox>
+                <el-checkbox v-model="state.record.recordKeyboard">键盘</el-checkbox>
               </el-form-item>
-              <el-form-item label="璁板綍杞ㄨ抗">
+              <el-form-item label="记录轨迹">
                 <el-switch v-model="state.record.captureMove" />
-                <span class="form-hint">璁板綍榧犳爣绉诲姩杞ㄨ抗</span>
+                <span class="form-hint">记录鼠标移动轨迹</span>
               </el-form-item>
-              <el-form-item label="杞ㄨ抗閲囨牱闂撮殧">
+              <el-form-item label="轨迹采样间隔">
                 <el-input-number v-model="state.record.moveInterval" :min="20" :max="1000" :step="10" />
-                <span class="form-hint">鍗曚綅姣锛屾暟鍊艰秺灏忚秺绮剧粏</span>
+                <span class="form-hint">单位毫秒，数值越小越精细</span>
               </el-form-item>
               <el-form-item>
                 <el-button type="primary" :loading="state.loading" :disabled="state.record.active" @click="startRecord">
-                  寮€濮嬪綍鍒?                </el-button>
-                <el-button :disabled="!state.record.active" @click="stopRecord">鍋滄褰曞埗</el-button>
-                <el-button text @click="refreshRecordStatus">鍒锋柊鐘舵€?/el-button>
+                  开始录制
+                </el-button>
+                <el-button :disabled="!state.record.active" @click="stopRecord">停止录制</el-button>
+                <el-button text @click="refreshRecordStatus">刷新状态</el-button>
               </el-form-item>
             </el-form>
             <el-alert
@@ -437,64 +438,66 @@ onUnmounted(() => {
               show-icon
             >
               <template #title>
-                褰曞埗涓彲鎿嶄綔浠绘剰搴旂敤锛屽畬鎴愬悗鍥炲埌鏈潰鏉跨偣鍑烩€滃仠姝㈠綍鍒垛€?              </template>
+                录制中可操作任意应用，完成后回到本面板点击“停止录制”
+              </template>
             </el-alert>
             <div class="record-summary">
-              <el-tag type="info" effect="plain">鍔ㄤ綔鏁帮細{{ state.record.count }}</el-tag>
-              <el-tag type="info" effect="plain">鏃堕暱锛歿{ state.record.duration }} 绉?/el-tag>
+              <el-tag type="info" effect="plain">动作数：{{ state.record.count }}</el-tag>
+              <el-tag type="info" effect="plain">时长：{{ state.record.duration }} 秒</el-tag>
             </div>
           </section>
 
           <section class="panel">
             <header>
-              <h4>鑴氭湰缂栬緫涓庣鐞?/h4>
-              <p>鏀寔瀵煎叆/瀵煎嚭 JSON 鑴氭湰锛屼篃鍙洿鎺ョ紪杈?/p>
+              <h4>脚本编辑与管理</h4>
+              <p>支持导入/导出 JSON 脚本，也可直接编辑</p>
             </header>
             <div class="macro-toolbar">
-              <el-button @click="importMacro">瀵煎叆鑴氭湰</el-button>
-              <el-button @click="parseMacroText">瑙ｆ瀽鑴氭湰</el-button>
-              <el-button @click="clearMacro">娓呯┖</el-button>
+              <el-button @click="importMacro">导入脚本</el-button>
+              <el-button @click="parseMacroText">解析脚本</el-button>
+              <el-button @click="clearMacro">清空</el-button>
             </div>
             <el-input
               v-model="state.macro.text"
               type="textarea"
               :rows="10"
-              placeholder="杩欓噷鏄剼鏈?JSON"
+              placeholder="这里是脚本 JSON"
             />
             <div class="macro-save">
               <div class="field-row">
-                <el-input v-model="state.macro.outputDir" placeholder="閫夋嫨杈撳嚭鐩綍" readonly />
-                <el-button @click="chooseMacroDir">鐩綍</el-button>
+                <el-input v-model="state.macro.outputDir" placeholder="选择输出目录" readonly />
+                <el-button @click="chooseMacroDir">目录</el-button>
               </div>
-              <el-input v-model="state.macro.fileName" placeholder="鏂囦欢鍚嶏紙.json锛? />
-              <el-button type="primary" :loading="state.loading" @click="exportMacro">瀵煎嚭鑴氭湰</el-button>
+              <el-input v-model="state.macro.fileName" placeholder="文件名（.json）" />
+              <el-button type="primary" :loading="state.loading" @click="exportMacro">导出脚本</el-button>
             </div>
           </section>
 
           <section class="panel">
             <header>
-              <h4>鍥炴斁璁剧疆</h4>
-              <p>寤鸿鍏堝皢鐩爣绐楀彛缃簬鍓嶅彴锛屽苟纭繚鍒嗚鲸鐜囦竴鑷存垨寮€鍚嚜鍔ㄧ缉鏀?/p>
+              <h4>回放设置</h4>
+              <p>建议先将目标窗口置于前台，并确保分辨率一致或开启自动缩放</p>
             </header>
             <el-form :model="state.playback" label-width="140px" class="form-gap">
-              <el-form-item label="寰幆娆℃暟">
+              <el-form-item label="循环次数">
                 <el-input-number v-model="state.playback.loop" :min="1" :max="999" />
               </el-form-item>
-              <el-form-item label="閫熷害鍊嶇巼">
+              <el-form-item label="速度倍率">
                 <el-input-number v-model="state.playback.speed" :min="0.2" :max="8" :step="0.1" />
               </el-form-item>
-              <el-form-item label="鍚姩寤惰繜">
+              <el-form-item label="启动延迟">
                 <el-input-number v-model="state.playback.startDelay" :min="0" :max="60" :step="0.5" />
-                <span class="form-hint">鍗曚綅绉掞紝鐣欏嚭鍒囨崲绐楀彛鏃堕棿</span>
+                <span class="form-hint">单位秒，留出切换窗口时间</span>
               </el-form-item>
-              <el-form-item label="鑷姩缂╂斁">
+              <el-form-item label="自动缩放">
                 <el-switch v-model="state.playback.autoScale" />
-                <span class="form-hint">灞忓箷鍒嗚鲸鐜囧彉鍖栨椂鑷姩缂╂斁鍧愭爣</span>
+                <span class="form-hint">屏幕分辨率变化时自动缩放坐标</span>
               </el-form-item>
               <el-form-item>
                 <el-button type="primary" :loading="state.loading" :disabled="state.playback.running" @click="startPlayback">
-                  寮€濮嬪洖鏀?                </el-button>
-                <el-button :disabled="!state.playback.running" @click="stopPlayback">鍋滄鍥炴斁</el-button>
+                  开始回放
+                </el-button>
+                <el-button :disabled="!state.playback.running" @click="stopPlayback">停止回放</el-button>
               </el-form-item>
             </el-form>
             <el-alert
@@ -503,52 +506,52 @@ onUnmounted(() => {
               show-icon
             >
               <template #title>
-                PyAutoGUI 榛樿鍚敤鈥滅Щ鍒板乏涓婅绱ф€ュ仠姝⑩€濓紝鎵ц涓娉ㄦ剰瀹夊叏
+                PyAutoGUI 默认启用“移到左上角紧急停止”，执行中请注意安全
               </template>
             </el-alert>
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="鍥惧儚璇嗗埆" name="image">
+        <el-tab-pane label="图像识别" name="image">
           <section class="panel">
             <header>
-              <h4>鍥剧墖瀹氫綅涓庣偣鍑?/h4>
-              <p>涓婁紶鐩爣鎴浘锛岃嚜鍔ㄥ湪灞忓箷涓畾浣嶅苟鐐瑰嚮</p>
+              <h4>图片定位与点击</h4>
+              <p>上传目标截图，自动在屏幕中定位并点击</p>
             </header>
             <el-form :model="state.image" label-width="140px" class="form-gap">
-              <el-form-item label="鐩爣鍥剧墖">
+              <el-form-item label="目标图片">
                 <div class="field-row">
-                  <el-input :model-value="state.image.file?.path || ''" placeholder="灏氭湭閫夋嫨" readonly />
-                  <el-button @click="selectImage">閫夋嫨</el-button>
+                  <el-input :model-value="state.image.file?.path || ''" placeholder="尚未选择" readonly />
+                  <el-button @click="selectImage">选择</el-button>
                 </div>
               </el-form-item>
-              <el-form-item label="鐩镐技搴﹂槇鍊?>
+              <el-form-item label="相似度阈值">
                 <el-input-number v-model="state.image.confidence" :min="0.5" :max="1" :step="0.05" />
-                <span class="form-hint">闇€瑕?OpenCV 鏀寔</span>
+                <span class="form-hint">需要 OpenCV 支持</span>
               </el-form-item>
-              <el-form-item label="鐏板害鍖归厤">
+              <el-form-item label="灰度匹配">
                 <el-switch v-model="state.image.grayscale" />
               </el-form-item>
-              <el-form-item label="瓒呮椂 / 闂撮殧">
+              <el-form-item label="超时 / 间隔">
                 <el-input-number v-model="state.image.timeout" :min="1" :max="60" :step="1" />
                 <el-input-number v-model="state.image.interval" :min="0.1" :max="2" :step="0.1" />
-                <span class="form-hint">鍗曚綅绉掞紙瓒呮椂 / 閲嶈瘯闂撮殧锛?/span>
+                <span class="form-hint">单位秒（超时 / 重试间隔）</span>
               </el-form-item>
-              <el-form-item label="鐐瑰嚮鍙傛暟">
+              <el-form-item label="点击参数">
                 <el-input-number v-model="state.image.clicks" :min="1" :max="5" />
                 <el-select v-model="state.image.button" style="width: 120px">
-                  <el-option label="宸﹂敭" value="left" />
-                  <el-option label="鍙抽敭" value="right" />
-                  <el-option label="涓敭" value="middle" />
+                  <el-option label="左键" value="left" />
+                  <el-option label="右键" value="right" />
+                  <el-option label="中键" value="middle" />
                 </el-select>
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" :loading="state.loading" @click="runFindImage">浠呭畾浣?/el-button>
-                <el-button :loading="state.loading" @click="runClickImage">瀹氫綅骞剁偣鍑?/el-button>
-                <el-button @click="appendImageStep">鍔犲叆鑴氭湰</el-button>
+                <el-button type="primary" :loading="state.loading" @click="runFindImage">仅定位</el-button>
+                <el-button :loading="state.loading" @click="runClickImage">定位并点击</el-button>
+                <el-button @click="appendImageStep">加入脚本</el-button>
               </el-form-item>
             </el-form>
-            <PreviewPanel v-if="state.image.lastResult" title="璇嗗埆缁撴灉" :content="state.image.lastResult" />
+            <PreviewPanel v-if="state.image.lastResult" title="识别结果" :content="state.image.lastResult" />
           </section>
         </el-tab-pane>
       </el-tabs>
@@ -588,4 +591,3 @@ onUnmounted(() => {
   gap: 12px;
 }
 </style>
-
