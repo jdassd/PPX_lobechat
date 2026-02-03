@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <el-drawer
     v-model="visibleProxy"
     size="80%"
@@ -9,30 +9,30 @@
       <div class="drawer-head">
         <div>
           <p class="eyebrow">SEAL WORKSHOP</p>
-          <h3>鍏珷鐢熸垚鍣?/h3>
-          <p class="sub">鑷畾涔夋枃瀛椼€佸瓧鍙枫€侀鑹蹭笌绾圭悊锛岃緭鍑洪€忔槑 PNG</p>
+          <h3>公章生成器</h3>
+          <p class="sub">自定义文字、字号、颜色与纹理，输出透明 PNG</p>
         </div>
       </div>
     </template>
     <div class="seal-tool">
       <section v-if="state.locked" class="panel lock-panel">
         <header>
-          <h4>鏁忔劅鍔熻兘璁块棶纭</h4>
-          <p>鍏珷鐢熸垚娑夊強浼佷笟鍙婁釜浜烘晱鎰熶俊鎭紝璇疯緭鍏ヨ闂瘑鐮佸悗缁х画鎿嶄綔銆?/p>
+          <h4>敏感功能访问确认</h4>
+          <p>公章生成涉及企业及个人敏感信息，请输入访问密码后继续操作。</p>
         </header>
         <el-form label-width="110px">
-          <el-form-item label="璁块棶瀵嗙爜">
+          <el-form-item label="访问密码">
             <el-input
               v-model="state.password"
               type="password"
               autocomplete="off"
-              placeholder="璇疯緭鍏ヨ闂瘑鐮?
+              placeholder="请输入访问密码"
               show-password
               @keyup.enter="unlockSeal"
             />
           </el-form-item>
           <el-form-item>
-            <el-button type="primary" @click="unlockSeal">瑙ｉ攣鍏珷鐢熸垚</el-button>
+            <el-button type="primary" @click="unlockSeal">解锁公章生成</el-button>
           </el-form-item>
           <el-alert
             v-if="state.passwordError"
@@ -46,54 +46,54 @@
       </section>
       <section v-else class="panel config-panel">
         <header>
-          <h4>妯℃澘涓庢枃瀛?/h4>
-          <p>鐩墠鎻愪緵鍦嗗舰浼佷笟鍏珷妯℃澘锛屽彲鑷敱璋冩暣鍐呭涓庢牱寮?/p>
+          <h4>模板与文字</h4>
+          <p>目前提供圆形企业公章模板，可自由调整内容与样式</p>
         </header>
         <el-form :model="state.form" label-width="110px" class="form-grid">
-          <el-form-item label="妯℃澘">
+          <el-form-item label="模板">
             <el-radio-group v-model="state.template">
-              <el-radio-button label="round">鍦嗗舰鍏珷</el-radio-button>
+              <el-radio-button label="round">圆形公章</el-radio-button>
             </el-radio-group>
           </el-form-item>
-          <el-form-item label="涓婄幆鏂囧瓧">
-            <el-input v-model="state.form.topText" placeholder="绀轰緥锛氭煇鏌愮鎶€鏈夐檺鍏徃" />
+          <el-form-item label="上环文字">
+            <el-input v-model="state.form.topText" placeholder="示例：某某科技有限公司" />
           </el-form-item>
-          <el-form-item label="涓績鏂囧瓧">
-            <el-input v-model="state.form.middleText" placeholder="绀轰緥锛氬叕绔?/ 涓撶敤绔? />
+          <el-form-item label="中心文字">
+            <el-input v-model="state.form.middleText" placeholder="示例：公章 / 专用章" />
           </el-form-item>
-          <el-form-item label="涓嬬幆鏂囧瓧">
-            <el-input v-model="state.form.bottomText" placeholder="绀轰緥锛氱粺涓€绀句細淇＄敤浠ｇ爜" />
+          <el-form-item label="下环文字">
+            <el-input v-model="state.form.bottomText" placeholder="示例：统一社会信用代码" />
           </el-form-item>
-          <el-form-item label="鍗扮珷棰滆壊">
+          <el-form-item label="印章颜色">
             <div class="field-row">
               <el-color-picker v-model="state.form.color" show-alpha :predefine="predefinedColors" />
               <el-input-number v-model="state.form.alpha" :min="60" :max="255" controls-position="right" />
-              <span class="hint">閫忔槑搴?/span>
+              <span class="hint">透明度</span>
             </div>
           </el-form-item>
         </el-form>
 
         <header class="mt40">
-          <h4>缁嗚妭鍙傛暟</h4>
-          <p>鎸夐渶寰皟灏衡绩銆佹弿杈广€佸瓧浣撲笌鏄熷窘</p>
+          <h4>细节参数</h4>
+          <p>按需微调尺⼨、描边、字体与星徽</p>
         </header>
         <div class="param-grid">
           <div class="param-card">
-            <p class="label">澶栫幆鍗婂緞 (px)</p>
+            <p class="label">外环半径 (px)</p>
             <el-slider v-model="state.form.outerRadius" :min="160" :max="320" :step="10" show-input />
           </div>
           <div class="param-card">
-            <p class="label">鍦嗙幆杈硅窛</p>
+            <p class="label">圆环边距</p>
             <el-slider v-model="state.form.edge" :min="4" :max="24" :step="1" show-input />
           </div>
           <div class="param-card">
-            <p class="label">鎻忚竟绮楃粏</p>
+            <p class="label">描边粗细</p>
             <el-slider v-model="state.form.border" :min="8" :max="32" :step="1" show-input />
           </div>
           <div class="param-card">
-            <p class="label">浜旀槦灏哄</p>
+            <p class="label">五星尺寸</p>
             <el-slider v-model="state.form.starRadius" :min="40" :max="160" :step="2" show-input />
-            <el-switch v-model="state.form.starEnabled" size="small" active-text="鏄剧ず浜旇鏄? />
+            <el-switch v-model="state.form.starEnabled" size="small" active-text="显示五角星" />
           </div>
         </div>
 
@@ -101,7 +101,7 @@
 
         <div class="typography-grid">
           <div>
-            <p class="title">涓婄幆鏂囧瓧</p>
+            <p class="title">上环文字</p>
             <div class="field-row">
               <el-input-number v-model="state.form.fontSizeTop" :min="24" :max="160" />
               <el-input-number v-model="state.form.topAngle" :min="120" :max="320" />
@@ -112,7 +112,7 @@
             </div>
           </div>
           <div>
-            <p class="title">涓績鏂囧瓧</p>
+            <p class="title">中心文字</p>
             <div class="field-row">
               <el-input-number v-model="state.form.fontSizeMiddle" :min="20" :max="120" />
               <el-input-number v-model="state.form.middleRadius" :min="60" :max="260" />
@@ -123,7 +123,7 @@
             </div>
           </div>
           <div>
-            <p class="title">涓嬬幆鏂囧瓧</p>
+            <p class="title">下环文字</p>
             <div class="field-row">
               <el-input-number v-model="state.form.fontSizeBottom" :min="12" :max="80" />
               <el-input-number v-model="state.form.bottomAngle" :min="40" :max="180" />
@@ -138,54 +138,54 @@
         <el-divider />
 
         <el-form label-width="110px">
-          <el-form-item label="绾圭悊鍥剧墖">
+          <el-form-item label="纹理图片">
             <div class="field-row">
-              <el-input v-model="state.form.texturePath" placeholder="鍙€夛紝涓哄嵃绔犲鍔犵焊绾硅川鎰? readonly />
-              <el-button @click="selectTexture">閫夋嫨</el-button>
-              <el-button text type="danger" @click="clearTexture" :disabled="!state.form.texturePath">娓呴櫎</el-button>
+              <el-input v-model="state.form.texturePath" placeholder="可选，为印章增加纸纹质感" readonly />
+              <el-button @click="selectTexture">选择</el-button>
+              <el-button text type="danger" @click="clearTexture" :disabled="!state.form.texturePath">清除</el-button>
             </div>
           </el-form-item>
-          <el-form-item label="杈撳嚭鐩綍">
+          <el-form-item label="输出目录">
             <div class="field-row">
-              <el-input v-model="state.outputDir" placeholder="鐣欑┖鍒欒緭鍑哄埌 static/seals" readonly />
-              <el-button @click="selectOutputDir">閫夋嫨</el-button>
+              <el-input v-model="state.outputDir" placeholder="留空则输出到 static/seals" readonly />
+              <el-button @click="selectOutputDir">选择</el-button>
             </div>
           </el-form-item>
-          <el-form-item label="鏂囦欢鍚?>
-            <el-input v-model="state.outputName" placeholder="绀轰緥锛氫紒涓氬叕绔?png" />
+          <el-form-item label="文件名">
+            <el-input v-model="state.outputName" placeholder="示例：企业公章.png" />
           </el-form-item>
         </el-form>
 
         <div class="actions">
-          <el-button @click="resetDefaults">鎭㈠榛樿妯℃澘</el-button>
-          <el-button type="primary" :loading="state.loading" @click="runPreview">鐢熸垚棰勮</el-button>
-          <el-button type="danger" :loading="state.loading" @click="runExport">瀵煎嚭 PNG</el-button>
+          <el-button @click="resetDefaults">恢复默认模板</el-button>
+          <el-button type="primary" :loading="state.loading" @click="runPreview">生成预览</el-button>
+          <el-button type="danger" :loading="state.loading" @click="runExport">导出 PNG</el-button>
         </div>
       </section>
 
       <section v-if="!state.locked" class="panel preview-panel">
         <header>
-          <h4>瀹炴椂棰勮</h4>
-          <p>鎵€鏈夊弬鏁拌皟鏁村悗鍙珛鍗虫煡鐪嬮€忔槑 PNG 缁撴灉</p>
+          <h4>实时预览</h4>
+          <p>所有参数调整后可立即查看透明 PNG 结果</p>
         </header>
         <div class="preview-stage">
           <div v-if="state.preview" class="preview-box">
             <img :src="state.preview" alt="seal preview" />
           </div>
-          <el-empty v-else description="灏氭湭鐢熸垚棰勮" />
+          <el-empty v-else description="尚未生成预览" />
         </div>
         <el-descriptions :column="1" border size="small" class="meta">
-          <el-descriptions-item label="鐢诲竷灏哄">
+          <el-descriptions-item label="画布尺寸">
             {{ canvasSize }} px
           </el-descriptions-item>
-          <el-descriptions-item label="棰滆壊 / 閫忔槑搴?>
+          <el-descriptions-item label="颜色 / 透明度">
             {{ state.form.color }} / {{ state.form.alpha }}
           </el-descriptions-item>
-          <el-descriptions-item label="鏈€杩戣緭鍑?>
+          <el-descriptions-item label="最近输出">
             <template v-if="state.resultPath">
               <el-link type="primary" @click="openOutput">{{ state.resultPath }}</el-link>
             </template>
-            <span v-else>鏃?/span>
+            <span v-else>无</span>
           </el-descriptions-item>
         </el-descriptions>
       </section>
@@ -215,9 +215,9 @@ const predefinedColors = ['#d4252c', '#c11f26', '#cf1b2c', '#bb1f2c', '#a2192e']
 const SEAL_UNLOCK_PASSWORD = 'Jd_251114'
 
 const makeDefaultForm = () => ({
-  topText: '鏌愭煇绉戞妧鏈夐檺鍏徃',
-  middleText: '鍏珷',
-  bottomText: '缁熶竴绀句細淇＄敤浠ｇ爜',
+  topText: '某某科技有限公司',
+  middleText: '公章',
+  bottomText: '统一社会信用代码',
   color: '#d4252c',
   alpha: 220,
   outerRadius: 240,
@@ -247,7 +247,7 @@ const state = reactive({
   preview: '',
   loading: false,
   outputDir: '',
-  outputName: '浼佷笟鍏珷.png',
+  outputName: '企业公章.png',
   resultPath: '',
   locked: true,
   password: '',
@@ -267,11 +267,11 @@ watch(
 
 const ensurePyReady = () => {
   if (!window.pywebview?.api) {
-    ElMessage.warning('璇ュ姛鑳介渶鍦ㄦ闈㈠鎴风涓娇鐢?)
+    ElMessage.warning('该功能需在桌面客户端中使用')
     return false
   }
   if (!window.pywebview.api.seal_generate) {
-    ElMessage.error('褰撳墠瀹㈡埛绔己灏戝叕绔犵敓鎴愯兘鍔?)
+    ElMessage.error('当前客户端缺少公章生成能力')
     return false
   }
   return true
@@ -325,10 +325,10 @@ const callSealApi = async (mode) => {
       }
       return res
     }
-    ElMessage.error(res?.msg || '鐢熸垚澶辫触')
+    ElMessage.error(res?.msg || '生成失败')
     return null
   } catch (error) {
-    ElMessage.error(error?.message || '鎵ц澶辫触')
+    ElMessage.error(error?.message || '执行失败')
     return null
   } finally {
     state.loading = false
@@ -351,7 +351,7 @@ const runExport = async () => {
 
 const selectTexture = async () => {
   if (!ensurePyReady()) return
-  const result = await window.pywebview.api.system_pyCreateFileDialog(['鍥剧墖鏂囦欢 (*.png;*.jpg;*.jpeg;*.webp)'])
+  const result = await window.pywebview.api.system_pyCreateFileDialog(['图片文件 (*.png;*.jpg;*.jpeg;*.webp)'])
   if (result?.length) {
     state.form.texturePath = result[0].path
   }
@@ -376,8 +376,8 @@ const openOutput = () => {
 
 const unlockSeal = () => {
   if (!state.password) {
-    state.passwordError = '璇疯緭鍏ヨ闂瘑鐮?
-    ElMessage.warning('璇疯緭鍏ヨ闂瘑鐮?)
+    state.passwordError = '请输入访问密码'
+    ElMessage.warning('请输入访问密码')
     return
   }
   if (state.password === SEAL_UNLOCK_PASSWORD) {
@@ -389,8 +389,8 @@ const unlockSeal = () => {
       runPreview()
     }
   } else {
-    state.passwordError = '瀵嗙爜閿欒锛屾棤娉曡闂叕绔犵敓鎴?
-    ElMessage.error('瀵嗙爜閿欒')
+    state.passwordError = '密码错误，无法访问公章生成'
+    ElMessage.error('密码错误')
   }
 }
 
@@ -405,7 +405,7 @@ const resetDefaults = () => {
 </script>
 
 <style scoped>
-/* 浣跨敤鍏ㄥ眬娣辩┖鐜荤拑涓婚鏍峰紡 */
+/* 使用全局深空玻璃主题样式 */
 
 .seal-tool {
   display: grid;
@@ -413,7 +413,7 @@ const resetDefaults = () => {
   gap: 20px;
 }
 
-/* 琛ㄥ崟鍖哄煙 */
+/* 表单区域 */
 .form-grid {
   margin-bottom: 12px;
 }
@@ -427,7 +427,7 @@ const resetDefaults = () => {
   font-size: 12px;
 }
 
-/* 鍙傛暟缃戞牸 */
+/* 参数网格 */
 .param-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -452,7 +452,7 @@ const resetDefaults = () => {
   color: var(--ppx-text-secondary);
 }
 
-/* 鎺掔増缃戞牸 */
+/* 排版网格 */
 .typography-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -472,7 +472,7 @@ const resetDefaults = () => {
   margin-top: 18px;
 }
 
-/* 棰勮鍖哄煙 */
+/* 预览区域 */
 .preview-stage {
   min-height: 320px;
   border-radius: var(--ppx-radius-lg);
@@ -509,7 +509,7 @@ const resetDefaults = () => {
   margin-top: 40px;
 }
 
-/* 鍝嶅簲寮忓竷灞€ */
+/* 响应式布局 */
 @media (max-width: 1440px) {
   .seal-tool {
     gap: 16px;
@@ -622,4 +622,3 @@ const resetDefaults = () => {
   }
 }
 </style>
-

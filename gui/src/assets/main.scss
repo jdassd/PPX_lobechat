@@ -338,7 +338,6 @@ body,
     margin: 0;
     background: var(--ppx-bg-elevated);
     border-bottom: 1px solid var(--ppx-glass-border);
-    padding: 0 12px;
   }
 
   .el-tabs__nav-wrap::after {
@@ -375,7 +374,6 @@ body,
   color: var(--ppx-text-secondary);
   font-weight: 500;
 }
-
 
 .el-input {
   .el-input__wrapper {

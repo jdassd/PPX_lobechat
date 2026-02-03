@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <el-drawer
     v-model="visibleProxy"
     size="80%"
@@ -9,34 +9,34 @@
       <div class="drawer-head">
         <div>
           <p class="eyebrow">PDF TOOLKIT</p>
-          <h3>PDF 宸ュ叿闆?/h3>
-          <p class="sub">鍦ㄤ竴涓潰鏉垮唴瀹屾垚杞崲銆佹壂鎻忎欢銆佸悎骞躲€佹媶鍒嗕笌椤电爜鍒囧壊</p>
+          <h3>PDF 工具集</h3>
+          <p class="sub">在一个面板内完成转换、扫描件、合并、拆分与页码切割</p>
         </div>
       </div>
     </template>
     <div class="pdf-tool">
       <el-tabs v-model="activeTab" class="pdf-tabs">
-        <el-tab-pane label="PDF 杞珮娓呭浘鐗? name="image">
+        <el-tab-pane label="PDF 转高清图片" name="image">
           <section class="panel">
             <header>
-              <h4>杈撳嚭姣忛〉楂樻竻鍥剧墖</h4>
-              <p>閫傚悎浜屾鎺掔増銆佹墦鍗版垨瀵煎叆鍥惧儚杞欢</p>
+              <h4>输出每页高清图片</h4>
+              <p>适合二次排版、打印或导入图像软件</p>
             </header>
             <el-form :model="state.toImage" label-width="110px">
-              <el-form-item label="婧?PDF">
+              <el-form-item label="源 PDF">
                 <div class="field-row">
-                  <el-button @click="selectPdf('toImage')">閫夋嫨 PDF</el-button>
+                  <el-button @click="selectPdf('toImage')">选择 PDF</el-button>
                   <span v-if="state.toImage.file" class="file-chip">{{ state.toImage.file.filename }}</span>
-                  <el-tag v-else type="info" effect="plain">灏氭湭閫夋嫨</el-tag>
+                  <el-tag v-else type="info" effect="plain">尚未选择</el-tag>
                 </div>
               </el-form-item>
-              <el-form-item label="鍒嗚鲸鐜?(DPI)">
+              <el-form-item label="分辨率 (DPI)">
                 <div class="field-row field-wrap">
                   <el-radio-group v-model="state.toImage.dpiPreset">
-                    <el-radio-button label="ultra">瓒呮竻</el-radio-button>
-                    <el-radio-button label="high">楂樻竻</el-radio-button>
-                    <el-radio-button label="standard">鏍囨竻</el-radio-button>
-                    <el-radio-button label="custom">鑷畾涔?/el-radio-button>
+                    <el-radio-button label="ultra">超清</el-radio-button>
+                    <el-radio-button label="high">高清</el-radio-button>
+                    <el-radio-button label="standard">标清</el-radio-button>
+                    <el-radio-button label="custom">自定义</el-radio-button>
                   </el-radio-group>
                   <el-input-number
                     v-model="state.toImage.dpi"
@@ -47,10 +47,10 @@
                   />
                 </div>
                 <p class="dpi-hint">
-                  DPI 瓒婇珮锛屽鍑哄浘鐗囪秺娓呮櫚锛屾枃浠朵綋绉篃浼氭洿澶с€傛帹鑽愶細瓒呮竻 400 DPI锛岄珮娓?300 DPI锛屾爣娓?200 DPI銆?
+                  DPI 越高，导出图片越清晰，文件体积也会更大。推荐：超清 400 DPI，高清 300 DPI，标清 200 DPI。
                 </p>
               </el-form-item>
-              <el-form-item label="鍥剧墖鏍煎紡">
+              <el-form-item label="图片格式">
                 <el-select v-model="state.toImage.format" style="width: 160px">
                   <el-option label="PNG" value="png" />
                   <el-option label="JPG" value="jpg" />
@@ -60,10 +60,10 @@
                   <el-option label="WEBP" value="webp" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="杈撳嚭鐩綍">
+              <el-form-item label="输出目录">
                 <div class="field-row">
-                  <el-input v-model="state.toImage.outputDir" placeholder="鐣欑┖鍒欎笌婧愭枃浠跺悓绾? readonly />
-                  <el-button @click="selectDir('toImage')">閫夋嫨鐩綍</el-button>
+                  <el-input v-model="state.toImage.outputDir" placeholder="留空则与源文件同级" readonly />
+                  <el-button @click="selectDir('toImage')">选择目录</el-button>
                 </div>
               </el-form-item>
               <el-form-item>
@@ -72,12 +72,12 @@
                   :loading="state.loading"
                   @click="runConvertImages"
                 >
-                  寮€濮嬭浆鎹?
+                  开始转换
                 </el-button>
               </el-form-item>
             </el-form>
             <div v-if="state.toImage.result.length" class="result-block">
-              <p class="result-title">宸茬敓鎴愬浘鐗?/p>
+              <p class="result-title">已生成图片</p>
               <el-scrollbar max-height="160px">
                 <div class="result-list">
                   <el-tag
@@ -95,42 +95,42 @@
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="PDF 鈫?鎵弿浠? name="scan">
+        <el-tab-pane label="PDF → 扫描件" name="scan">
           <section class="panel">
             <header>
-              <h4>妯℃嫙鎵弿浠舵晥鏋?/h4>
-              <p>鑷姩娣诲姞绾哥汗銆佸井鍊捐鍜屾潅鐐癸紝渚夸簬褰掓。鎴栬蛋浼犵粺娴佺▼</p>
+              <h4>模拟扫描件效果</h4>
+              <p>自动添加纸纹、微倾角和杂点，便于归档或走传统流程</p>
             </header>
             <el-form :model="state.scan" label-width="110px">
-              <el-form-item label="婧?PDF">
+              <el-form-item label="源 PDF">
                 <div class="field-row">
-                  <el-button @click="selectPdf('scan')">閫夋嫨 PDF</el-button>
+                  <el-button @click="selectPdf('scan')">选择 PDF</el-button>
                   <span v-if="state.scan.file" class="file-chip">{{ state.scan.file.filename }}</span>
-                  <el-tag v-else type="info" effect="plain">灏氭湭閫夋嫨</el-tag>
+                  <el-tag v-else type="info" effect="plain">尚未选择</el-tag>
                 </div>
               </el-form-item>
-              <el-form-item label="鍒嗚鲸鐜?(DPI)">
+              <el-form-item label="分辨率 (DPI)">
                 <el-input-number v-model="state.scan.dpi" :min="120" :max="400" />
               </el-form-item>
-              <el-form-item label="鍥剧墖鏍煎紡">
+              <el-form-item label="图片格式">
                 <el-select v-model="state.scan.format" style="width: 160px">
                   <el-option label="JPG" value="jpg" />
                   <el-option label="PNG" value="png" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="绾稿紶绾圭悊">
+              <el-form-item label="纸张纹理">
                 <el-switch v-model="state.scan.texture" />
               </el-form-item>
-              <el-form-item label="杞诲井鍊炬枩">
+              <el-form-item label="轻微倾斜">
                 <el-switch v-model="state.scan.tilt" />
               </el-form-item>
-              <el-form-item label="鍣偣寮哄害">
+              <el-form-item label="噪点强度">
                 <el-slider v-model="state.scan.noise" :min="0" :max="10" :step="0.5" show-input />
               </el-form-item>
-              <el-form-item label="杈撳嚭鐩綍">
+              <el-form-item label="输出目录">
                 <div class="field-row">
-                  <el-input v-model="state.scan.outputDir" placeholder="鐣欑┖鍒欎笌婧愭枃浠跺悓绾? readonly />
-                  <el-button @click="selectDir('scan')">閫夋嫨鐩綍</el-button>
+                  <el-input v-model="state.scan.outputDir" placeholder="留空则与源文件同级" readonly />
+                  <el-button @click="selectDir('scan')">选择目录</el-button>
                 </div>
               </el-form-item>
               <el-form-item>
@@ -139,12 +139,12 @@
                   :loading="state.loading"
                   @click="runScanEffect"
                 >
-                  鐢熸垚鎵弿浠?
+                  生成扫描件
                 </el-button>
               </el-form-item>
             </el-form>
             <div v-if="state.scan.result.length" class="result-block">
-              <p class="result-title">杈撳嚭鍥剧墖</p>
+              <p class="result-title">输出图片</p>
               <el-scrollbar max-height="160px">
                 <div class="result-list">
                   <el-tag
@@ -162,41 +162,41 @@
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="PDF 鍘嬬缉" name="compress">
+        <el-tab-pane label="PDF 压缩" name="compress">
           <section class="panel">
             <header>
-              <h4>鎸夐渶鍘嬬缉 PDF</h4>
+              <h4>按需压缩 PDF</h4>
             </header>
             <el-form :model="state.compress" label-width="110px">
-              <el-form-item label="婧?PDF">
+              <el-form-item label="源 PDF">
                 <div class="field-row">
-                  <el-button @click="selectPdf('compress')">閫夋嫨 PDF</el-button>
+                  <el-button @click="selectPdf('compress')">选择 PDF</el-button>
                   <span v-if="state.compress.file" class="file-chip">{{ state.compress.file.filename }}</span>
-                  <el-tag v-else type="info" effect="plain">灏氭湭閫夋嫨</el-tag>
+                  <el-tag v-else type="info" effect="plain">尚未选择</el-tag>
                 </div>
               </el-form-item>
-              <el-form-item label="鍘嬬缉鐜?>
+              <el-form-item label="压缩率">
                 <div class="field-row field-wrap">
                   <el-radio-group v-model="state.compress.mode">
-                    <el-radio-button label="low">浣庯紙楂樻竻锛?/el-radio-button>
-                    <el-radio-button label="medium">涓紙鍧囪　锛?/el-radio-button>
-                    <el-radio-button label="high">楂橈紙灏忎綋绉級</el-radio-button>
-                    <el-radio-button label="custom">鑷畾涔?/el-radio-button>
+                    <el-radio-button label="low">低（高清）</el-radio-button>
+                    <el-radio-button label="medium">中（均衡）</el-radio-button>
+                    <el-radio-button label="high">高（小体积）</el-radio-button>
+                    <el-radio-button label="custom">自定义</el-radio-button>
                   </el-radio-group>
-                  <el-tag type="info" effect="plain">褰撳墠 DPI锛歿{ compressCurrentDpi }} DPI</el-tag>
+                  <el-tag type="info" effect="plain">当前 DPI：{{ compressCurrentDpi }} DPI</el-tag>
                 </div>
               </el-form-item>
-              <el-form-item v-if="state.compress.mode === 'custom'" label="鑷畾涔?DPI">
+              <el-form-item v-if="state.compress.mode === 'custom'" label="自定义 DPI">
                 <el-input-number v-model="state.compress.customDpi" :min="72" :max="400" />
               </el-form-item>
-              <el-form-item label="杈撳嚭鐩綍">
+              <el-form-item label="输出目录">
                 <div class="field-row">
-                  <el-input v-model="state.compress.outputDir" placeholder="鍙€? readonly />
-                  <el-button @click="selectDir('compress')">閫夋嫨鐩綍</el-button>
+                  <el-input v-model="state.compress.outputDir" placeholder="可选" readonly />
+                  <el-button @click="selectDir('compress')">选择目录</el-button>
                 </div>
               </el-form-item>
-              <el-form-item label="杈撳嚭鏂囦欢鍚?>
-                <el-input v-model="state.compress.outputName" placeholder="渚嬪锛氬帇缂╃粨鏋?pdf" />
+              <el-form-item label="输出文件名">
+                <el-input v-model="state.compress.outputName" placeholder="例如：压缩结果.pdf" />
               </el-form-item>
               <el-form-item>
                 <el-button
@@ -204,15 +204,15 @@
                   :loading="state.loading"
                   @click="runCompress"
                 >
-                  寮€濮嬪帇缂?
+                  开始压缩
                 </el-button>
               </el-form-item>
             </el-form>
             <p class="dpi-hint">
-              鎺ㄨ崘锛氫綆鈮?80 DPI锛堥珮娓呮墦鍗帮級銆佷腑鈮?00 DPI锛堥€氱敤浼犺緭锛夈€侀珮鈮?30 DPI锛堝揩閫熷垎浜級銆侱PI 瓒婁綆鏂囦欢瓒婂皬锛岃秺楂樿秺娓呮櫚銆?
+              推荐：低≈280 DPI（高清打印）、中≈200 DPI（通用传输）、高≈130 DPI（快速分享）。DPI 越低文件越小，越高越清晰。
             </p>
             <div v-if="state.compress.output" class="result-block">
-              <p class="result-title">鍘嬬缉鍚庣殑 PDF</p>
+              <p class="result-title">压缩后的 PDF</p>
               <el-scrollbar max-height="120px">
                 <div class="result-list">
                   <el-tag
@@ -228,15 +228,15 @@
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="鍚堝苟 PDF" name="merge">
+        <el-tab-pane label="合并 PDF" name="merge">
           <section class="panel">
             <header>
-              <h4>灏嗗涓?PDF 鍚堝苟</h4>
-              <p>鏀寔鑷畾涔夐『搴忥紝鐢熸垚鍗曚竴褰掓。鏂囦欢</p>
+              <h4>将多个 PDF 合并</h4>
+              <p>支持自定义顺序，生成单一归档文件</p>
             </header>
             <div class="merge-toolbar">
-              <el-button @click="selectPdf('merge', true)">娣诲姞 PDF</el-button>
-              <el-button text type="danger" @click="clearMerge">娓呯┖鍒楄〃</el-button>
+              <el-button @click="selectPdf('merge', true)">添加 PDF</el-button>
+              <el-button text type="danger" @click="clearMerge">清空列表</el-button>
             </div>
             <el-table
               v-if="state.merge.files.length"
@@ -245,34 +245,34 @@
               border
             >
               <el-table-column type="index" label="#" width="50" />
-              <el-table-column label="椤电爜閫夋嫨" width="220">
+              <el-table-column label="页码选择" width="220">
                 <template #default="scope">
                   <el-input
                     v-model="scope.row.pageSpec"
                     size="small"
-                    placeholder="濡?1-3,5,8"
+                    placeholder="如 1-3,5,8"
                   />
                 </template>
               </el-table-column>
-              <el-table-column prop="filename" label="鏂囦欢鍚? />
-              <el-table-column label="鎿嶄綔" width="180">
+              <el-table-column prop="filename" label="文件名" />
+              <el-table-column label="操作" width="180">
                 <template #default="scope">
-                  <el-button link type="primary" @click="moveMerge(scope.$index, -1)" :disabled="scope.$index === 0">涓婄Щ</el-button>
-                  <el-button link type="primary" @click="moveMerge(scope.$index, 1)" :disabled="scope.$index === state.merge.files.length - 1">涓嬬Щ</el-button>
-                  <el-button link type="danger" @click="removeMerge(scope.$index)">绉婚櫎</el-button>
+                  <el-button link type="primary" @click="moveMerge(scope.$index, -1)" :disabled="scope.$index === 0">上移</el-button>
+                  <el-button link type="primary" @click="moveMerge(scope.$index, 1)" :disabled="scope.$index === state.merge.files.length - 1">下移</el-button>
+                  <el-button link type="danger" @click="removeMerge(scope.$index)">移除</el-button>
                 </template>
               </el-table-column>
             </el-table>
-            <el-empty v-else description="璇峰厛娣诲姞闇€瑕佸悎骞剁殑 PDF" />
+            <el-empty v-else description="请先添加需要合并的 PDF" />
             <el-form label-width="110px" class="mt24">
-              <el-form-item label="杈撳嚭鐩綍">
+              <el-form-item label="输出目录">
                 <div class="field-row">
-                  <el-input v-model="state.merge.outputDir" placeholder="鍙€? readonly />
-                  <el-button @click="selectDir('merge')">閫夋嫨鐩綍</el-button>
+                  <el-input v-model="state.merge.outputDir" placeholder="可选" readonly />
+                  <el-button @click="selectDir('merge')">选择目录</el-button>
                 </div>
               </el-form-item>
-              <el-form-item label="杈撳嚭鏂囦欢鍚?>
-                <el-input v-model="state.merge.outputName" placeholder="渚嬪锛氬悎骞剁粨鏋?pdf" />
+              <el-form-item label="输出文件名">
+                <el-input v-model="state.merge.outputName" placeholder="例如：合并结果.pdf" />
               </el-form-item>
               <el-form-item>
                 <el-button
@@ -281,12 +281,12 @@
                   :loading="state.loading"
                   @click="runMerge"
                 >
-                  鍚堝苟 PDF
+                  合并 PDF
                 </el-button>
               </el-form-item>
             </el-form>
             <div v-if="state.merge.output" class="result-block">
-              <p class="result-title">杈撳嚭鏂囦欢</p>
+              <p class="result-title">输出文件</p>
               <el-scrollbar max-height="120px">
                 <div class="result-list">
                   <el-tag
@@ -302,27 +302,27 @@
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="鎷嗗垎 PDF" name="split">
+        <el-tab-pane label="拆分 PDF" name="split">
           <section class="panel">
             <header>
-              <h4>鎷嗗垎妯″紡涓€锛氭寜鍥哄畾椤垫暟鎷嗗垎</h4>
-              <p>姣?N 椤垫媶鍒嗘垚涓€涓枃浠讹紝閫傚悎鎸夌珷鑺傛垨鍒嗛〉瀵煎嚭澶氫釜 PDF</p>
+              <h4>拆分模式一：按固定页数拆分</h4>
+              <p>每 N 页拆分成一个文件，适合按章节或分页导出多个 PDF</p>
             </header>
             <el-form :model="state.split" label-width="110px">
-              <el-form-item label="婧?PDF">
+              <el-form-item label="源 PDF">
                 <div class="field-row">
-                  <el-button @click="selectPdf('split')">閫夋嫨 PDF</el-button>
+                  <el-button @click="selectPdf('split')">选择 PDF</el-button>
                   <span v-if="state.split.file" class="file-chip">{{ state.split.file.filename }}</span>
-                  <el-tag v-else type="info" effect="plain">灏氭湭閫夋嫨</el-tag>
+                  <el-tag v-else type="info" effect="plain">尚未选择</el-tag>
                 </div>
               </el-form-item>
-              <el-form-item label="姣忎釜鏂囦欢椤垫暟">
+              <el-form-item label="每个文件页数">
                 <el-input-number v-model="state.split.pagesPerFile" :min="1" :max="50" />
               </el-form-item>
-              <el-form-item label="杈撳嚭鐩綍">
+              <el-form-item label="输出目录">
                 <div class="field-row">
-                  <el-input v-model="state.split.outputDir" placeholder="鐣欑┖鍒欎笌婧愭枃浠跺悓绾? readonly />
-                  <el-button @click="selectDir('split')">閫夋嫨鐩綍</el-button>
+                  <el-input v-model="state.split.outputDir" placeholder="留空则与源文件同级" readonly />
+                  <el-button @click="selectDir('split')">选择目录</el-button>
                 </div>
               </el-form-item>
               <el-form-item>
@@ -331,12 +331,12 @@
                   :loading="state.loading"
                   @click="runSplit"
                 >
-                  寮€濮嬫媶鍒?
+                  开始拆分
                 </el-button>
               </el-form-item>
             </el-form>
             <div v-if="state.split.result.length" class="result-block">
-              <p class="result-title">鎷嗗垎缁撴灉</p>
+              <p class="result-title">拆分结果</p>
               <el-scrollbar max-height="160px">
                 <div class="result-list">
                   <el-tag
@@ -354,54 +354,54 @@
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="椤电爜鍒囧壊" name="cut">
+        <el-tab-pane label="页码切割" name="cut">
           <section class="panel">
             <header>
-              <h4>鎷嗗垎妯″紡浜岋細鎸夐〉鐮佹媶鍒?/ 鎽樺彇</h4>
-              <p>閫氳繃椤电爜鍖洪棿鎴栬嚜瀹氫箟椤电爜鍒楄〃鎽樺彇椤甸潰锛岀敓鎴愪竴浠芥柊鐨?PDF 鎽樺綍</p>
+              <h4>拆分模式二：按页码拆分 / 摘取</h4>
+              <p>通过页码区间或自定义页码列表摘取页面，生成一份新的 PDF 摘录</p>
             </header>
             <el-form :model="state.cut" label-width="110px">
-              <el-form-item label="婧?PDF">
+              <el-form-item label="源 PDF">
                 <div class="field-row">
-                  <el-button @click="selectPdf('cut')">閫夋嫨 PDF</el-button>
+                  <el-button @click="selectPdf('cut')">选择 PDF</el-button>
                   <span v-if="state.cut.file" class="file-chip">{{ state.cut.file.filename }}</span>
-                  <el-tag v-else type="info" effect="plain">灏氭湭閫夋嫨</el-tag>
+                  <el-tag v-else type="info" effect="plain">尚未选择</el-tag>
                 </div>
               </el-form-item>
-              <el-form-item label="妯″紡">
+              <el-form-item label="模式">
                 <el-radio-group v-model="state.cut.mode">
-                  <el-radio-button label="range">鍖洪棿</el-radio-button>
-                  <el-radio-button label="custom">鎸囧畾椤电爜</el-radio-button>
+                  <el-radio-button label="range">区间</el-radio-button>
+                  <el-radio-button label="custom">指定页码</el-radio-button>
                 </el-radio-group>
               </el-form-item>
-              <el-form-item v-if="state.cut.mode === 'range'" label="璧锋椤?>
+              <el-form-item v-if="state.cut.mode === 'range'" label="起止页">
                 <div class="field-row">
                   <el-input-number v-model="state.cut.startPage" :min="1" />
-                  <span class="range-sep">鑷?/span>
+                  <span class="range-sep">至</span>
                   <el-input-number v-model="state.cut.endPage" :min="1" />
                 </div>
               </el-form-item>
-              <el-form-item v-else label="椤电爜鍒楄〃">
+              <el-form-item v-else label="页码列表">
                 <el-input
                   v-model="state.cut.pageSpec"
-                  placeholder="绀轰緥锛?-3,5,8锛涙敮鎸佺敤鍒嗗彿鎴栨崲琛屽垎闅斿涓尯闂?
+                  placeholder="示例：1-3,5,8；支持用分号或换行分隔多个区间"
                   type="textarea"
                   :rows="3"
                 />
               </el-form-item>
               <el-form-item v-if="state.cut.mode === 'custom'">
                 <el-checkbox v-model="state.cut.multi">
-                  鎸夊涓尯闂村垎鍒鍑哄涓?PDF 鏂囦欢
+                  按多个区间分别导出多个 PDF 文件
                 </el-checkbox>
               </el-form-item>
-              <el-form-item label="杈撳嚭鐩綍">
+              <el-form-item label="输出目录">
                 <div class="field-row">
-                  <el-input v-model="state.cut.outputDir" placeholder="鍙€? readonly />
-                  <el-button @click="selectDir('cut')">閫夋嫨鐩綍</el-button>
+                  <el-input v-model="state.cut.outputDir" placeholder="可选" readonly />
+                  <el-button @click="selectDir('cut')">选择目录</el-button>
                 </div>
               </el-form-item>
-              <el-form-item label="杈撳嚭鏂囦欢鍚?>
-                <el-input v-model="state.cut.outputName" placeholder="渚嬪锛氭憳褰?pdf" />
+              <el-form-item label="输出文件名">
+                <el-input v-model="state.cut.outputName" placeholder="例如：摘录.pdf" />
               </el-form-item>
               <el-form-item>
                 <el-button
@@ -409,12 +409,12 @@
                   :loading="state.loading"
                   @click="runCut"
                 >
-                  鐢熸垚鏂?PDF
+                  生成新 PDF
                 </el-button>
               </el-form-item>
             </el-form>
             <div v-if="state.cut.output || state.cut.outputs.length" class="result-block">
-              <p class="result-title">鐢熸垚鏂囦欢</p>
+              <p class="result-title">生成文件</p>
               <el-scrollbar max-height="120px">
                 <div class="result-list">
                   <el-tag
@@ -432,21 +432,21 @@
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="椤甸潰閲嶆帓" name="reorder">
+        <el-tab-pane label="页面重排" name="reorder">
           <section class="panel">
             <header>
-              <h4>鎷栧姩缂╃暐鍥捐皟鏁撮〉闈㈤『搴?/h4>
-              <p>鍏堢敓鎴愰瑙堬紝鍐嶉€氳繃鎷栧姩椤甸潰缂╃暐鍥鹃噸鎺掗『搴忥紝鏃犻渶鎵嬪姩濉啓椤电爜</p>
+              <h4>拖动缩略图调整页面顺序</h4>
+              <p>先生成预览，再通过拖动页面缩略图重排顺序，无需手动填写页码</p>
             </header>
             <el-form :model="state.reorder" label-width="120px">
-              <el-form-item label="婧?PDF">
+              <el-form-item label="源 PDF">
                 <div class="field-row">
-                  <el-button @click="selectPdf('reorder')">閫夋嫨 PDF</el-button>
+                  <el-button @click="selectPdf('reorder')">选择 PDF</el-button>
                   <span v-if="state.reorder.file" class="file-chip">{{ state.reorder.file.filename }}</span>
-                  <el-tag v-else type="info" effect="plain">灏氭湭閫夋嫨</el-tag>
+                  <el-tag v-else type="info" effect="plain">尚未选择</el-tag>
                 </div>
               </el-form-item>
-              <el-form-item label="椤甸潰棰勮">
+              <el-form-item label="页面预览">
                 <div class="reorder-preview">
                   <div class="field-row">
                     <el-button
@@ -456,9 +456,9 @@
                       :disabled="!state.reorder.file"
                       @click="loadReorderPreview"
                     >
-                      鐢熸垚棰勮
+                      生成预览
                     </el-button>
-                    <span class="reorder-hint">鐢熸垚鍚庡彲鍦ㄤ笅鏂规嫋鍔ㄩ〉闈㈢缉鐣ュ浘璋冩暣椤哄簭锛堝綋鍓嶉瑙堟渶澶氬墠 80 椤碉級</span>
+                    <span class="reorder-hint">生成后可在下方拖动页面缩略图调整顺序（当前预览最多前 80 页）</span>
                   </div>
                   <template v-if="state.reorder.pages && state.reorder.pages.length">
                     <el-scrollbar max-height="260px">
@@ -473,26 +473,26 @@
                           @drop.prevent="onReorderDrop(index, $event)"
                         >
                           <div class="reorder-thumb">
-                            <img :src="page.image" :alt="`绗?${page.page} 椤礰" />
+                            <img :src="page.image" :alt="`第 ${page.page} 页`" />
                           </div>
-                          <p class="reorder-page-label">绗?{{ page.page }} 椤?/p>
+                          <p class="reorder-page-label">第 {{ page.page }} 页</p>
                         </div>
                       </div>
                     </el-scrollbar>
-                    <p class="reorder-hint">褰撳墠椤哄簭鍗充负閲嶆帓鍚庣殑椤哄簭锛屾墽琛屽墠鍙娆¤皟鏁淬€?/p>
+                    <p class="reorder-hint">当前顺序即为重排后的顺序，执行前可多次调整。</p>
                   </template>
-                  <p v-else class="reorder-empty-hint">璇烽€夋嫨 PDF 鍚庣偣鍑烩€滅敓鎴愰瑙堚€濄€?/p>
+                  <p v-else class="reorder-empty-hint">请选择 PDF 后点击“生成预览”。</p>
                 </div>
               </el-form-item>
               <el-form-item>
-                <el-checkbox v-model="state.reorder.appendRemaining">鑷姩杩藉姞鍓╀綑椤电爜</el-checkbox>
+                <el-checkbox v-model="state.reorder.appendRemaining">自动追加剩余页码</el-checkbox>
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" :loading="state.loading" @click="runReorder">鎵ц閲嶆帓</el-button>
+                <el-button type="primary" :loading="state.loading" @click="runReorder">执行重排</el-button>
               </el-form-item>
             </el-form>
             <div v-if="state.reorder.output" class="result-block">
-              <p class="result-title">杈撳嚭鏂囦欢</p>
+              <p class="result-title">输出文件</p>
               <el-tag type="success" effect="plain" @click="openPath(state.reorder.output)">
                 {{ state.reorder.output }}
               </el-tag>
@@ -500,56 +500,56 @@
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="鎻愬彇鏂囨湰" name="text">
+        <el-tab-pane label="提取文本" name="text">
           <section class="panel">
             <header>
-              <h4>瀵煎嚭 PDF 鏂囨湰鍐呭</h4>
-              <p>鏀寔绾枃鏈€丮arkdown銆丠TML銆丅locks 绛夋ā寮?/p>
+              <h4>导出 PDF 文本内容</h4>
+              <p>支持纯文本、Markdown、HTML、Blocks 等模式</p>
             </header>
             <el-form :model="state.extractText" label-width="120px">
-              <el-form-item label="婧?PDF">
+              <el-form-item label="源 PDF">
                 <div class="field-row">
-                  <el-button @click="selectPdf('extractText')">閫夋嫨 PDF</el-button>
+                  <el-button @click="selectPdf('extractText')">选择 PDF</el-button>
                   <span v-if="state.extractText.file" class="file-chip">{{ state.extractText.file.filename }}</span>
-                  <el-tag v-else type="info" effect="plain">灏氭湭閫夋嫨</el-tag>
+                  <el-tag v-else type="info" effect="plain">尚未选择</el-tag>
                 </div>
               </el-form-item>
-              <el-form-item label="妯″紡">
+              <el-form-item label="模式">
                 <el-radio-group v-model="state.extractText.mode">
-                  <el-radio-button label="plain">绾枃鏈?/el-radio-button>
+                  <el-radio-button label="plain">纯文本</el-radio-button>
                   <el-radio-button label="markdown">Markdown</el-radio-button>
                   <el-radio-button label="html">HTML</el-radio-button>
                   <el-radio-button label="blocks">Blocks</el-radio-button>
                 </el-radio-group>
               </el-form-item>
-              <el-form-item label="椤电爜鍖洪棿">
+              <el-form-item label="页码区间">
                 <div class="field-row">
                   <el-input-number v-model="state.extractText.startPage" :min="1" />
-                  <span class="range-sep">鑷?/span>
+                  <span class="range-sep">至</span>
                   <el-input-number v-model="state.extractText.endPage" :min="1" />
                 </div>
               </el-form-item>
-              <el-form-item label="鑷畾涔夐〉鐮?>
+              <el-form-item label="自定义页码">
                 <el-input
                   v-model="state.extractText.pageSpec"
-                  placeholder="鍙€夛紝渚嬪锛?-3,5"
+                  placeholder="可选，例如：1-3,5"
                 />
               </el-form-item>
-              <el-form-item label="杈撳嚭鐩綍">
+              <el-form-item label="输出目录">
                 <div class="field-row">
-                  <el-input v-model="state.extractText.outputDir" placeholder="淇濆瓨鎻愬彇鏂囨湰" readonly />
-                  <el-button @click="selectDir('extractText')">閫夋嫨鐩綍</el-button>
+                  <el-input v-model="state.extractText.outputDir" placeholder="保存提取文本" readonly />
+                  <el-button @click="selectDir('extractText')">选择目录</el-button>
                 </div>
               </el-form-item>
               <el-form-item>
-                <el-checkbox v-model="state.extractText.saveFile">淇濆瓨涓?.txt</el-checkbox>
+                <el-checkbox v-model="state.extractText.saveFile">保存为 .txt</el-checkbox>
               </el-form-item>
               <el-form-item>
-              <el-button type="primary" :loading="state.loading" @click="runExtractText">寮€濮嬫彁鍙?/el-button>
+              <el-button type="primary" :loading="state.loading" @click="runExtractText">开始提取</el-button>
               </el-form-item>
             </el-form>
             <div v-if="state.extractText.preview" class="result-block">
-              <p class="result-title">鏂囨湰棰勮</p>
+              <p class="result-title">文本预览</p>
               <el-input
                 v-model="state.extractText.preview"
                 type="textarea"
@@ -560,50 +560,50 @@
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="鐢熸垚鐩綍" name="toc">
+        <el-tab-pane label="生成目录" name="toc">
           <section class="panel">
             <header>
-              <h4>涓?PDF 鑷姩鐢熸垚鐩綍</h4>
-              <p>鏍规嵁姣忛〉鏍囬鑷姩鎺ㄦ柇鐩綍锛屽苟鐢熸垚涓€浠藉甫鐩綍鐨?PDF</p>
+              <h4>为 PDF 自动生成目录</h4>
+              <p>根据每页标题自动推断目录，并生成一份带目录的 PDF</p>
             </header>
             <el-form :model="state.toc" label-width="120px">
-              <el-form-item label="婧?PDF">
+              <el-form-item label="源 PDF">
                 <div class="field-row">
-                  <el-button @click="selectPdf('toc')">閫夋嫨 PDF</el-button>
+                  <el-button @click="selectPdf('toc')">选择 PDF</el-button>
                   <span v-if="state.toc.file" class="file-chip">{{ state.toc.file.filename }}</span>
-                  <el-tag v-else type="info" effect="plain">灏氭湭閫夋嫨</el-tag>
+                  <el-tag v-else type="info" effect="plain">尚未选择</el-tag>
                 </div>
               </el-form-item>
-              <el-form-item label="杈撳嚭鐩綍">
+              <el-form-item label="输出目录">
                 <div class="field-row">
-                  <el-input v-model="state.toc.outputDir" placeholder="淇濆瓨甯︾洰褰曠殑 PDF" readonly />
-                  <el-button @click="selectDir('toc')">閫夋嫨鐩綍</el-button>
+                  <el-input v-model="state.toc.outputDir" placeholder="保存带目录的 PDF" readonly />
+                  <el-button @click="selectDir('toc')">选择目录</el-button>
                 </div>
               </el-form-item>
-              <el-form-item label="杈撳嚭鏂囦欢鍚?>
-                <el-input v-model="state.toc.outputName" placeholder="濡傦細甯︾洰褰曠増.pdf" />
+              <el-form-item label="输出文件名">
+                <el-input v-model="state.toc.outputName" placeholder="如：带目录版.pdf" />
               </el-form-item>
               <el-form-item>
-                <el-checkbox v-model="state.toc.saveText">鍚屾椂瀵煎嚭鐩綍涓?.txt</el-checkbox>
+                <el-checkbox v-model="state.toc.saveText">同时导出目录为 .txt</el-checkbox>
               </el-form-item>
               <el-form-item>
                 <el-button type="primary" :loading="state.loading" @click="runGenerateToc">
-                  鐢熸垚鐩綍
+                  生成目录
                 </el-button>
               </el-form-item>
             </el-form>
             <div v-if="state.toc.output" class="result-block">
-              <p class="result-title">杈撳嚭鏂囦欢</p>
+              <p class="result-title">输出文件</p>
               <el-tag type="success" effect="plain" @click="openPath(state.toc.output)">
                 {{ state.toc.output }}
               </el-tag>
               <p v-if="state.toc.textOutput" class="result-title" style="margin-top: 8px">
-                鐩綍鏂囨湰宸插彟瀛樹负锛?
+                目录文本已另存为：
                 <a class="link" @click.prevent="openPath(state.toc.textOutput)">{{ state.toc.textOutput }}</a>
               </p>
             </div>
             <div v-if="state.toc.preview" class="result-block">
-              <p class="result-title">鐩綍棰勮</p>
+              <p class="result-title">目录预览</p>
               <el-input
                 v-model="state.toc.preview"
                 type="textarea"
@@ -614,41 +614,41 @@
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="PDF 杞?Word" name="word">
+        <el-tab-pane label="PDF 转 Word" name="word">
           <section class="panel">
             <header>
-              <h4>杞崲涓哄彲缂栬緫 Word 鏂囨。</h4>
-              <p>鎸夐〉鎻愬彇鏂囨湰骞剁敓鎴?.docx锛岄€傚悎鍐嶆鎺掔増缂栬緫</p>
+              <h4>转换为可编辑 Word 文档</h4>
+              <p>按页提取文本并生成 .docx，适合再次排版编辑</p>
             </header>
             <el-form :model="state.word" label-width="120px">
-              <el-form-item label="婧?PDF">
+              <el-form-item label="源 PDF">
                 <div class="field-row">
-                  <el-button @click="selectPdf('word')">閫夋嫨 PDF</el-button>
+                  <el-button @click="selectPdf('word')">选择 PDF</el-button>
                   <span v-if="state.word.file" class="file-chip">{{ state.word.file.filename }}</span>
-                  <el-tag v-else type="info" effect="plain">灏氭湭閫夋嫨</el-tag>
+                  <el-tag v-else type="info" effect="plain">尚未选择</el-tag>
                 </div>
               </el-form-item>
-              <el-form-item label="鏂囨湰妯″紡">
+              <el-form-item label="文本模式">
                 <el-radio-group v-model="state.word.textMode">
-                  <el-radio-button label="plain">绾枃鏈?/el-radio-button>
+                  <el-radio-button label="plain">纯文本</el-radio-button>
                   <el-radio-button label="markdown">Markdown</el-radio-button>
                   <el-radio-button label="html">HTML</el-radio-button>
                 </el-radio-group>
               </el-form-item>
-              <el-form-item label="杈撳嚭鐩綍">
+              <el-form-item label="输出目录">
                 <div class="field-row">
-                  <el-input v-model="state.word.outputDir" placeholder="淇濆瓨鐢熸垚鐨?.docx" readonly />
-                  <el-button @click="selectDir('word')">閫夋嫨鐩綍</el-button>
+                  <el-input v-model="state.word.outputDir" placeholder="保存生成的 .docx" readonly />
+                  <el-button @click="selectDir('word')">选择目录</el-button>
                 </div>
               </el-form-item>
               <el-form-item>
                 <el-button type="primary" :loading="state.loading" @click="runPdfToWord">
-                  杞崲涓?Word
+                  转换为 Word
                 </el-button>
               </el-form-item>
             </el-form>
             <div v-if="state.word.output" class="result-block">
-              <p class="result-title">杈撳嚭鏂囦欢</p>
+              <p class="result-title">输出文件</p>
               <el-tag type="success" effect="plain" @click="openPath(state.word.output)">
                 {{ state.word.output }}
               </el-tag>
@@ -656,50 +656,50 @@
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="鎻愬彇鍥剧墖" name="images">
+        <el-tab-pane label="提取图片" name="images">
           <section class="panel">
             <header>
-              <h4>瀵煎嚭 PDF 鍐呭祵鍥剧墖</h4>
-              <p>鍙寚瀹氶〉鐮佽寖鍥翠笌杈撳嚭鏍煎紡锛岃嚜鍔ㄤ繚瀛樺埌鐩綍</p>
+              <h4>导出 PDF 内嵌图片</h4>
+              <p>可指定页码范围与输出格式，自动保存到目录</p>
             </header>
             <el-form :model="state.extractImages" label-width="120px">
-              <el-form-item label="婧?PDF">
+              <el-form-item label="源 PDF">
                 <div class="field-row">
-                  <el-button @click="selectPdf('extractImages')">閫夋嫨 PDF</el-button>
+                  <el-button @click="selectPdf('extractImages')">选择 PDF</el-button>
                   <span v-if="state.extractImages.file" class="file-chip">{{ state.extractImages.file.filename }}</span>
-                  <el-tag v-else type="info" effect="plain">灏氭湭閫夋嫨</el-tag>
+                  <el-tag v-else type="info" effect="plain">尚未选择</el-tag>
                 </div>
               </el-form-item>
-              <el-form-item label="椤电爜鍖洪棿">
+              <el-form-item label="页码区间">
                 <div class="field-row">
                   <el-input-number v-model="state.extractImages.startPage" :min="1" />
-                  <span class="range-sep">鑷?/span>
+                  <span class="range-sep">至</span>
                   <el-input-number v-model="state.extractImages.endPage" :min="1" />
                 </div>
               </el-form-item>
-              <el-form-item label="鑷畾涔夐〉鐮?>
-                <el-input v-model="state.extractImages.pageSpec" placeholder="鍙€夛細1-3,5" />
+              <el-form-item label="自定义页码">
+                <el-input v-model="state.extractImages.pageSpec" placeholder="可选：1-3,5" />
               </el-form-item>
-              <el-form-item label="鍥剧墖鏍煎紡">
+              <el-form-item label="图片格式">
                 <el-select v-model="state.extractImages.format" style="width: 160px">
                   <el-option label="PNG" value="png" />
                   <el-option label="JPG" value="jpg" />
                 </el-select>
               </el-form-item>
-              <el-form-item label="杈撳嚭鐩綍">
+              <el-form-item label="输出目录">
                 <div class="field-row">
-                  <el-input v-model="state.extractImages.outputDir" placeholder="鑷姩鍒涘缓" readonly />
-                  <el-button @click="selectDir('extractImages')">閫夋嫨鐩綍</el-button>
+                  <el-input v-model="state.extractImages.outputDir" placeholder="自动创建" readonly />
+                  <el-button @click="selectDir('extractImages')">选择目录</el-button>
                 </div>
               </el-form-item>
               <el-form-item>
                 <el-button type="primary" :loading="state.loading" @click="runExtractImages">
-                  寮€濮嬫彁鍙?
+                  开始提取
                 </el-button>
               </el-form-item>
             </el-form>
             <div v-if="state.extractImages.result.length" class="result-block">
-              <p class="result-title">杈撳嚭鍥剧墖锛堥儴鍒嗭級</p>
+              <p class="result-title">输出图片（部分）</p>
               <el-scrollbar max-height="160px">
                 <div class="result-list">
                   <el-tag
@@ -717,17 +717,17 @@
           </section>
         </el-tab-pane>
 
-        <el-tab-pane label="鍥剧墖杞?PDF" name="imagePdf">
+        <el-tab-pane label="图片转 PDF" name="imagePdf">
           <section class="panel">
             <header>
-              <h4>灏嗗浘鐗囬泦鍚堝鍑轰负 PDF</h4>
-              <p>鏀寔 1/2/4 鍥惧竷灞€锛岃嚜瀹氫箟绾稿紶涓庤竟璺?/p>
+              <h4>将图片集合导出为 PDF</h4>
+              <p>支持 1/2/4 图布局，自定义纸张与边距</p>
             </header>
-            <p class="image-pdf-hint">涓庡浘鐗囧伐鍏蜂腑鐨勩€屽浘鐗囪浆 PDF銆嶅姛鑳界瓑浠凤紝杩欓噷浠呮彁渚涗竴涓揩鎹峰叆鍙ｃ€?/p>
+            <p class="image-pdf-hint">与图片工具中的「图片转 PDF」功能等价，这里仅提供一个快捷入口。</p>
             <div class="field-row">
-              <el-button @click="addImagePdfFiles">娣诲姞鍥剧墖</el-button>
+              <el-button @click="addImagePdfFiles">添加图片</el-button>
               <el-button text type="danger" :disabled="!state.imagePdf.files.length" @click="clearImagePdf">
-                娓呯┖
+                清空
               </el-button>
             </div>
             <el-table
@@ -738,50 +738,50 @@
               style="margin: 12px 0"
             >
               <el-table-column type="index" width="50" label="#" />
-              <el-table-column prop="filename" label="鏂囦欢鍚? />
-              <el-table-column label="鎿嶄綔" width="160">
+              <el-table-column prop="filename" label="文件名" />
+              <el-table-column label="操作" width="160">
                 <template #default="scope">
-                  <el-button link type="primary" @click="moveImagePdfFile(scope.$index, -1)" :disabled="scope.$index === 0">涓婄Щ</el-button>
-                  <el-button link type="primary" @click="moveImagePdfFile(scope.$index, 1)" :disabled="scope.$index === state.imagePdf.files.length - 1">涓嬬Щ</el-button>
-                  <el-button link type="danger" @click="removeImagePdfFile(scope.$index)">绉婚櫎</el-button>
+                  <el-button link type="primary" @click="moveImagePdfFile(scope.$index, -1)" :disabled="scope.$index === 0">上移</el-button>
+                  <el-button link type="primary" @click="moveImagePdfFile(scope.$index, 1)" :disabled="scope.$index === state.imagePdf.files.length - 1">下移</el-button>
+                  <el-button link type="danger" @click="removeImagePdfFile(scope.$index)">移除</el-button>
                 </template>
               </el-table-column>
             </el-table>
             <el-form :model="state.imagePdf" label-width="140px" class="form-gap">
-              <el-form-item label="绾稿紶灏哄">
+              <el-form-item label="纸张尺寸">
                 <el-select v-model="state.imagePdf.pageSize" style="width: 200px">
                   <el-option label="A4" value="a4" />
                   <el-option label="A5" value="a5" />
                   <el-option label="Letter" value="letter" />
-                  <el-option label="鑷畾涔? value="custom" />
+                  <el-option label="自定义" value="custom" />
                 </el-select>
               </el-form-item>
               <div v-if="state.imagePdf.pageSize === 'custom'" class="field-row">
-                <el-form-item label="瀹?(px)">
+                <el-form-item label="宽 (px)">
                   <el-input-number v-model="state.imagePdf.customWidth" :min="600" :max="6000" />
                 </el-form-item>
-                <el-form-item label="楂?(px)">
+                <el-form-item label="高 (px)">
                   <el-input-number v-model="state.imagePdf.customHeight" :min="600" :max="6000" />
                 </el-form-item>
               </div>
-              <el-form-item label="姣忛〉甯冨眬">
+              <el-form-item label="每页布局">
                 <el-radio-group v-model="state.imagePdf.perPage">
-                  <el-radio-button :label="1">1 / 椤?/el-radio-button>
-                  <el-radio-button :label="2">2 / 椤?/el-radio-button>
-                  <el-radio-button :label="4">4 / 椤?/el-radio-button>
+                  <el-radio-button :label="1">1 / 页</el-radio-button>
+                  <el-radio-button :label="2">2 / 页</el-radio-button>
+                  <el-radio-button :label="4">4 / 页</el-radio-button>
                 </el-radio-group>
               </el-form-item>
-              <el-form-item label="杈硅窛 (px)">
+              <el-form-item label="边距 (px)">
                 <el-input-number v-model="state.imagePdf.margin" :min="10" :max="200" />
               </el-form-item>
-              <el-form-item label="杈撳嚭鐩綍">
+              <el-form-item label="输出目录">
                 <div class="field-row">
-                  <el-input v-model="state.imagePdf.outputDir" placeholder="鐣欑┖鑷姩鍒涘缓" readonly />
-                  <el-button @click="selectDir('imagePdf')">閫夋嫨鐩綍</el-button>
+                  <el-input v-model="state.imagePdf.outputDir" placeholder="留空自动创建" readonly />
+                  <el-button @click="selectDir('imagePdf')">选择目录</el-button>
                 </div>
               </el-form-item>
-              <el-form-item label="杈撳嚭鏂囦欢鍚?>
-                <el-input v-model="state.imagePdf.outputName" placeholder="濡傦細鍥剧墖鍚堥泦.pdf" />
+              <el-form-item label="输出文件名">
+                <el-input v-model="state.imagePdf.outputName" placeholder="如：图片合集.pdf" />
               </el-form-item>
               <el-form-item>
                 <el-button
@@ -790,12 +790,12 @@
                   :disabled="!state.imagePdf.files.length"
                   @click="runImagesToPdf"
                 >
-                  鐢熸垚 PDF
+                  生成 PDF
                 </el-button>
               </el-form-item>
             </el-form>
             <div v-if="state.imagePdf.output" class="result-block">
-              <p class="result-title">杈撳嚭鏂囦欢</p>
+              <p class="result-title">输出文件</p>
               <el-tag type="info" effect="plain" @click="openPath(state.imagePdf.output)">
                 {{ state.imagePdf.output }}
               </el-tag>
@@ -806,8 +806,8 @@
 
       <section class="log-panel">
         <header>
-          <h4>鏈€杩戞搷浣?/h4>
-          <p>淇濈暀鏈€杩?8 鏉★紝渚夸簬瀹氫綅杈撳嚭鐩綍</p>
+          <h4>最近操作</h4>
+          <p>保留最近 8 条，便于定位输出目录</p>
         </header>
         <el-timeline v-if="state.logs.length">
           <el-timeline-item
@@ -825,12 +825,12 @@
                 type="primary"
                 @click="openPath(item.detail.output)"
               >
-                鎵撳紑杈撳嚭
+                打开输出
               </el-link>
             </div>
           </el-timeline-item>
         </el-timeline>
-        <el-empty v-else description="鏆傛棤璁板綍" />
+        <el-empty v-else description="暂无记录" />
       </section>
     </div>
   </el-drawer>
@@ -868,7 +868,7 @@ const toImageDpiPresetMap = {
   standard: 200
 }
 
-const imageFilter = ['鍥剧墖 (*.png;*.jpg;*.jpeg;*.webp;*.bmp)']
+const imageFilter = ['图片 (*.png;*.jpg;*.jpeg;*.webp;*.bmp)']
 
 const state = reactive({
   loading: false,
@@ -895,13 +895,13 @@ const state = reactive({
     mode: 'medium',
     customDpi: 200,
     outputDir: '',
-    outputName: '鍘嬬缉缁撴灉.pdf',
+    outputName: '压缩结果.pdf',
     output: ''
   },
   merge: {
     files: [],
     outputDir: '',
-    outputName: '鍚堝苟缁撴灉.pdf',
+    outputName: '合并结果.pdf',
     output: ''
   },
   split: {
@@ -913,7 +913,7 @@ const state = reactive({
   cut: {
     file: null,
     outputDir: '',
-    outputName: '鎽樺綍.pdf',
+    outputName: '摘录.pdf',
     mode: 'range',
     startPage: 1,
     endPage: 1,
@@ -944,7 +944,7 @@ const state = reactive({
   toc: {
     file: null,
     outputDir: '',
-    outputName: '甯︾洰褰曠増.pdf',
+    outputName: '带目录版.pdf',
     saveText: false,
     preview: '',
     output: '',
@@ -973,7 +973,7 @@ const state = reactive({
     perPage: 1,
     margin: 40,
     outputDir: '',
-    outputName: '鍥剧墖鍚堥泦.pdf',
+    outputName: '图片合集.pdf',
     output: ''
   },
   logs: []
@@ -1014,7 +1014,7 @@ watch(
 
 const ensurePyReady = () => {
   if (!window.pywebview?.api) {
-    ElMessage.warning('璇ュ姛鑳介渶鍦ㄦ闈㈠鎴风涓娇鐢?)
+    ElMessage.warning('该功能需在桌面客户端中使用')
     return false
   }
   return true
@@ -1022,7 +1022,7 @@ const ensurePyReady = () => {
 
 const selectPdf = async (key, multiple = false) => {
   if (!ensurePyReady()) return
-  const result = await window.pywebview.api.system_pyCreateFileDialog(['PDF 鏂囦欢 (*.pdf)'])
+  const result = await window.pywebview.api.system_pyCreateFileDialog(['PDF 文件 (*.pdf)'])
   if (!result || !result.length) return
   if (multiple) {
     const existing = new Set(state[key].files.map((item) => item.path))
@@ -1066,25 +1066,25 @@ const callApi = async (method, payload) => {
   if (!ensurePyReady()) return null
   const api = window.pywebview.api
   if (!api[method]) {
-    ElMessage.error('褰撳墠瀹㈡埛绔増鏈己灏?PDF 鑳藉姏')
+    ElMessage.error('当前客户端版本缺少 PDF 能力')
     return null
   }
   state.loading = true
   try {
     const res = await api[method](payload)
     if (res?.code === 0) {
-      ElMessage.success(res.msg || '鎿嶄綔鎴愬姛')
-      pushLog('success', res.msg || '鎿嶄綔鎴愬姛', method, res)
+      ElMessage.success(res.msg || '操作成功')
+      pushLog('success', res.msg || '操作成功', method, res)
       return res
     } else {
-      const msg = res?.msg || '鎿嶄綔澶辫触'
+      const msg = res?.msg || '操作失败'
       ElMessage.error(msg)
       pushLog('warning', msg, method, res)
       return null
     }
   } catch (error) {
-    ElMessage.error(error.message || '鎵ц澶辫触')
-    pushLog('danger', error.message || '鎵ц澶辫触', method)
+    ElMessage.error(error.message || '执行失败')
+    pushLog('danger', error.message || '执行失败', method)
     return null
   } finally {
     state.loading = false
@@ -1098,7 +1098,7 @@ const openPath = async (path) => {
 
 const runConvertImages = async () => {
   if (!state.toImage.file) {
-    ElMessage.warning('璇烽€夋嫨 PDF 鏂囦欢')
+    ElMessage.warning('请选择 PDF 文件')
     return
   }
   const res = await callApi('pdf_convert_to_images', {
@@ -1114,7 +1114,7 @@ const runConvertImages = async () => {
 
 const runScanEffect = async () => {
   if (!state.scan.file) {
-    ElMessage.warning('璇烽€夋嫨 PDF 鏂囦欢')
+    ElMessage.warning('请选择 PDF 文件')
     return
   }
   const res = await callApi('pdf_convert_to_scan', {
@@ -1133,17 +1133,17 @@ const runScanEffect = async () => {
 
 const runCompress = async () => {
   if (!state.compress.file) {
-    ElMessage.warning('璇烽€夋嫨 PDF 鏂囦欢')
+    ElMessage.warning('请选择 PDF 文件')
     return
   }
   if (state.compress.mode === 'custom') {
     const dpi = Number(state.compress.customDpi)
     if (!dpi) {
-      ElMessage.warning('璇疯緭鍏ヨ嚜瀹氫箟 DPI')
+      ElMessage.warning('请输入自定义 DPI')
       return
     }
     if (dpi < 72 || dpi > 400) {
-      ElMessage.warning('鑷畾涔?DPI 闇€鍦?72 - 400 涔嬮棿')
+      ElMessage.warning('自定义 DPI 需在 72 - 400 之间')
       return
     }
   }
@@ -1178,7 +1178,7 @@ const clearMerge = () => {
 
 const runMerge = async () => {
   if (!state.merge.files.length) {
-    ElMessage.warning('璇疯嚦灏戦€夋嫨涓や釜 PDF')
+    ElMessage.warning('请至少选择两个 PDF')
     return
   }
   const res = await callApi('pdf_merge', {
@@ -1196,7 +1196,7 @@ const runMerge = async () => {
 
 const runSplit = async () => {
   if (!state.split.file) {
-    ElMessage.warning('璇烽€夋嫨 PDF 鏂囦欢')
+    ElMessage.warning('请选择 PDF 文件')
     return
   }
   const res = await callApi('pdf_split', {
@@ -1211,11 +1211,11 @@ const runSplit = async () => {
 
 const runCut = async () => {
   if (!state.cut.file) {
-    ElMessage.warning('璇烽€夋嫨 PDF 鏂囦欢')
+    ElMessage.warning('请选择 PDF 文件')
     return
   }
   if (state.cut.mode === 'custom' && !state.cut.pageSpec.trim()) {
-    ElMessage.warning('璇疯緭鍏ラ〉鐮侀泦鍚?)
+    ElMessage.warning('请输入页码集合')
     return
   }
   const payload = {
@@ -1244,7 +1244,7 @@ const runCut = async () => {
 
 const runReorder = async () => {
   if (!state.reorder.file) {
-    ElMessage.warning('璇烽€夋嫨 PDF 鏂囦欢')
+    ElMessage.warning('请选择 PDF 文件')
     return
   }
   let order = []
@@ -1257,7 +1257,7 @@ const runReorder = async () => {
       .filter((num) => Number.isInteger(num) && num > 0)
   }
   if (!order.length) {
-    ElMessage.warning('璇峰厛鐢熸垚棰勮骞舵嫋鍔ㄨ皟鏁撮〉闈㈤『搴?)
+    ElMessage.warning('请先生成预览并拖动调整页面顺序')
     return
   }
   const res = await callApi('pdf_reorder_pages', {
@@ -1280,7 +1280,7 @@ const syncReorderOrderText = () => {
 
 const loadReorderPreview = async () => {
   if (!state.reorder.file) {
-    ElMessage.warning('璇烽€夋嫨 PDF 鏂囦欢')
+    ElMessage.warning('请选择 PDF 文件')
     return
   }
   state.reorder.loadingPreview = true
@@ -1346,7 +1346,7 @@ const onReorderDrop = (index, event) => {
 
 const runExtractText = async () => {
   if (!state.extractText.file) {
-    ElMessage.warning('璇烽€夋嫨 PDF 鏂囦欢')
+    ElMessage.warning('请选择 PDF 文件')
     return
   }
   const res = await callApi('pdf_extract_text', {
@@ -1369,7 +1369,7 @@ const runExtractText = async () => {
 
 const runGenerateToc = async () => {
   if (!state.toc.file) {
-    ElMessage.warning('璇烽€夋嫨 PDF 鏂囦欢')
+    ElMessage.warning('请选择 PDF 文件')
     return
   }
   const res = await callApi('pdf_generate_toc', {
@@ -1390,7 +1390,7 @@ const runGenerateToc = async () => {
 
 const runPdfToWord = async () => {
   if (!state.word.file) {
-    ElMessage.warning('璇烽€夋嫨 PDF 鏂囦欢')
+    ElMessage.warning('请选择 PDF 文件')
     return
   }
   const res = await callApi('pdf_to_word', {
@@ -1408,7 +1408,7 @@ const runPdfToWord = async () => {
 
 const runExtractImages = async () => {
   if (!state.extractImages.file) {
-    ElMessage.warning('璇烽€夋嫨 PDF 鏂囦欢')
+    ElMessage.warning('请选择 PDF 文件')
     return
   }
   const res = await callApi('pdf_extract_images', {
@@ -1452,7 +1452,7 @@ const clearImagePdf = () => {
 
 const runImagesToPdf = async () => {
   if (!state.imagePdf.files.length) {
-    ElMessage.warning('璇峰厛閫夋嫨鍥剧墖')
+    ElMessage.warning('请先选择图片')
     return
   }
   const res = await callApi('pdf_images_to_pdf', {
@@ -1472,9 +1472,17 @@ const runImagesToPdf = async () => {
 </script>
 
 <style scoped>
-/* 浣跨敤鍏ㄥ眬娣辩┖鐜荤拑涓婚鏍峰紡 */
+/* 使用全局深空玻璃主题样式 */
 
-/* 椤甸潰閲嶆帓棰勮 */
+.pdf-tool {
+  padding: 0 12px 12px;
+}
+
+.pdf-tabs {
+  margin-bottom: 20px;
+}
+
+/* 页面重排预览 */
 .reorder-preview {
   display: flex;
   flex-direction: column;
@@ -1559,7 +1567,7 @@ const runImagesToPdf = async () => {
   color: var(--ppx-text-muted);
 }
 
-/* 鏃ュ織闈㈡澘 - 浣跨敤鍏ㄥ眬鏍峰紡鍙橀噺 */
+/* 日志面板 - 使用全局样式变量 */
 .log-panel header {
   margin-bottom: 12px;
 }
@@ -1587,4 +1595,3 @@ const runImagesToPdf = async () => {
   font-size: 12px;
 }
 </style>
-
