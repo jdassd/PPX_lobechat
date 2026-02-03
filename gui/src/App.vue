@@ -284,7 +284,7 @@ const onFeatureAction = (feature) => {
       <header class="top-bar">
         <div class="logo-area">
           <div class="logo-icon">
-            <span class="logo-text">PPX</span>
+            <img class="logo-image" src="/logo.png" alt="PPX Logo" />
           </div>
           <span class="logo-label">工具箱</span>
         </div>
@@ -621,7 +621,6 @@ const onFeatureAction = (feature) => {
 .logo-icon {
   width: 38px;
   height: 38px;
-  background: var(--ppx-gradient-primary);
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -631,21 +630,13 @@ const onFeatureAction = (feature) => {
   overflow: hidden;
 }
 
-.logo-icon::after {
-  content: '';
-  position: absolute;
-  inset: 2px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.6);
+.logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
-.logo-text {
-  font-size: 14px;
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: 1px;
-  font-family: var(--ppx-font-display);
-}
 
 .logo-label {
   font-size: 16px;
@@ -888,8 +879,6 @@ const onFeatureAction = (feature) => {
   align-items: center;
   justify-content: center;
   background: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(44, 36, 29, 0.12);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
 }
 
 .feature-icon {
