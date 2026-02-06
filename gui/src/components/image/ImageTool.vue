@@ -43,7 +43,10 @@ const state = reactive({
     photoPreset: '',
     outputDir: '',
     generatedDir: '',
-    result: []
+    result: [],
+    previewLoading: false,
+    previewFailed: 0,
+    previewItems: []
   },
   compress: {
     files: [],
@@ -164,6 +167,7 @@ const toFileUrl = (path) => {
 }
 
 const cropPreviewRef = ref(null)
+const resizePreviewToken = ref(0)
 
 const cropInteraction = reactive({
   dragging: false,
@@ -406,6 +410,14 @@ watch(
 )
 
 watch(
+  () => state.resize.files,
+  () => {
+    loadResizePreviews()
+  },
+  { deep: true }
+)
+
+watch(
   () => [state.crop.mode, state.crop.ratio],
   () => {
     if (!hasCropImage.value) return
@@ -529,6 +541,150 @@ const ensureSingleFile = (target) => {
 }
 
 const pickPaths = (files = []) => files.map((item) => item?.path || item)
+
+const getFileNameFromPath = (filePath) => {
+  if (!filePath) return '未命名图片'
+  const normalized = String(filePath).replace(/\\/g, '/')
+  const parts = normalized.split('/')
+  return parts[parts.length - 1] || normalized
+}
+
+const normalizePositiveInt = (value, fallback = 1) => {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback
+  return Math.max(1, Math.round(parsed))
+}
+
+const resolveResizeTargetSize = (sourceWidth, sourceHeight) => {
+  const safeWidth = normalizePositiveInt(sourceWidth, 1)
+  const safeHeight = normalizePositiveInt(sourceHeight, 1)
+  if (state.resize.mode === 'pixel') {
+    const targetWidth = normalizePositiveInt(state.resize.width, safeWidth)
+    const targetHeight = normalizePositiveInt(state.resize.height, safeHeight)
+    if (!state.resize.keepRatio) {
+      return {
+        width: targetWidth,
+        height: targetHeight
+      }
+    }
+    const ratio = Math.min(targetWidth / safeWidth, targetHeight / safeHeight)
+    return {
+      width: Math.max(1, Math.round(safeWidth * ratio)),
+      height: Math.max(1, Math.round(safeHeight * ratio))
+    }
+  }
+
+  const percent = Math.max(10, normalizePositiveInt(state.resize.percent, 100))
+  return {
+    width: Math.max(1, Math.round((safeWidth * percent) / 100)),
+    height: Math.max(1, Math.round((safeHeight * percent) / 100))
+  }
+}
+
+const getResizeSizeLabel = (item) => {
+  const sourceWidth = normalizePositiveInt(item.width, 0)
+  const sourceHeight = normalizePositiveInt(item.height, 0)
+  if (!sourceWidth || !sourceHeight) {
+    return '未能读取原图尺寸'
+  }
+  const target = resolveResizeTargetSize(sourceWidth, sourceHeight)
+  return `${sourceWidth} × ${sourceHeight} → ${target.width} × ${target.height}`
+}
+
+const resolveResizePreviewStyle = (item) => {
+  const target = resolveResizeTargetSize(item.width, item.height)
+  return {
+    width: `${Math.max(1, Math.round(target.width))}px`,
+    height: `${Math.max(1, Math.round(target.height))}px`
+  }
+}
+
+const loadResizePreviews = async () => {
+  const files = (state.resize.files || [])
+    .map((item) => {
+      const path = item?.path || item
+      return {
+        path,
+        name: item?.filename || getFileNameFromPath(path)
+      }
+    })
+    .filter((item) => !!item.path)
+
+  if (!files.length) {
+    state.resize.previewItems = []
+    state.resize.previewFailed = 0
+    state.resize.previewLoading = false
+    return
+  }
+
+  if (!window.pywebview?.api?.image_preview) {
+    state.resize.previewItems = files.map((item) => ({
+      ...item,
+      previewUrl: '',
+      width: 0,
+      height: 0,
+      error: '当前环境不支持预览'
+    }))
+    state.resize.previewFailed = files.length
+    state.resize.previewLoading = false
+    return
+  }
+
+  const currentToken = resizePreviewToken.value + 1
+  resizePreviewToken.value = currentToken
+  state.resize.previewLoading = true
+
+  const results = await Promise.allSettled(
+    files.map(async (item) => {
+      const response = await window.pywebview.api.image_preview({
+        file: item.path,
+        maxSize: 960
+      })
+      if (response?.code === 0 && response.preview) {
+        return {
+          ...item,
+          previewUrl: response.preview,
+          width: normalizePositiveInt(response.width, 0),
+          height: normalizePositiveInt(response.height, 0),
+          error: ''
+        }
+      }
+      return {
+        ...item,
+        previewUrl: '',
+        width: 0,
+        height: 0,
+        error: response?.msg || '预览失败'
+      }
+    })
+  )
+
+  if (resizePreviewToken.value !== currentToken) return
+
+  const previewItems = []
+  let failed = 0
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled') {
+      if (!result.value.previewUrl) {
+        failed += 1
+      }
+      previewItems.push(result.value)
+      return
+    }
+    failed += 1
+    previewItems.push({
+      ...files[index],
+      previewUrl: '',
+      width: 0,
+      height: 0,
+      error: result.reason?.message || '预览失败'
+    })
+  })
+
+  state.resize.previewItems = previewItems
+  state.resize.previewFailed = failed
+  state.resize.previewLoading = false
+}
 
 const runFormatConvert = async () => {
   if (!ensurePyReady() || !ensureFilesReady('format')) return
@@ -978,6 +1134,56 @@ const removeFile = (target, file) => {
                 <el-button type="primary" :loading="state.loading" @click="runResize">开始处理</el-button>
               </el-form-item>
             </el-form>
+            <div v-if="state.resize.files.length" class="resize-preview">
+              <div class="resize-preview-header">
+                <p class="result-title">效果预览（全部 {{ state.resize.previewItems.length }} 张）</p>
+                <div class="resize-preview-meta">
+                  <span v-if="state.resize.previewLoading" class="resize-preview-status">预览生成中...</span>
+                  <span
+                    v-else-if="state.resize.previewFailed"
+                    class="resize-preview-status resize-preview-status--warn"
+                  >
+                    {{ state.resize.previewFailed }} 张图片预览失败
+                  </span>
+                  <el-button
+                    class="resize-preview-refresh-btn"
+                    text
+                    type="primary"
+                    :loading="state.resize.previewLoading"
+                    @click="loadResizePreviews"
+                  >
+                    刷新预览
+                  </el-button>
+                </div>
+              </div>
+              <div v-if="state.resize.previewItems.length" class="resize-preview-grid">
+                <div
+                  v-for="item in state.resize.previewItems"
+                  :key="item.path"
+                  class="resize-preview-card"
+                >
+                  <p class="resize-preview-name">{{ item.name }}</p>
+                  <div class="resize-preview-stage">
+                    <img
+                      v-if="item.previewUrl"
+                      :src="item.previewUrl"
+                      alt="缩放预览"
+                      class="resize-preview-image"
+                      :style="resolveResizePreviewStyle(item)"
+                    />
+                    <p v-else class="resize-preview-empty">
+                      {{ item.error || '预览失败' }}
+                    </p>
+                  </div>
+                  <p class="resize-preview-size">
+                    {{ getResizeSizeLabel(item) }}
+                  </p>
+                </div>
+              </div>
+              <p v-else class="resize-preview-empty-state">
+                {{ state.resize.previewLoading ? '正在生成预览...' : '暂无可预览图片' }}
+              </p>
+            </div>
             <ResultTable
               v-if="state.resize.result.length"
               title="输出文件"
@@ -1606,6 +1812,107 @@ const removeFile = (target, file) => {
   gap: 16px;
 }
 
+.resize-preview {
+  margin-top: 8px;
+}
+
+.resize-preview-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.resize-preview-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.resize-preview-status {
+  font-size: 12px;
+  color: var(--ppx-text-muted);
+}
+
+.resize-preview-status--warn {
+  color: var(--el-color-warning);
+}
+
+.resize-preview-grid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.resize-preview-card {
+  padding: 10px;
+  border-radius: var(--ppx-radius-sm);
+  border: 1px solid var(--ppx-glass-border);
+  background: var(--ppx-glass-bg);
+}
+
+.resize-preview-name {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--ppx-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resize-preview-stage {
+  min-height: 160px;
+  border-radius: var(--ppx-radius-sm);
+  border: 1px dashed var(--ppx-glass-border);
+  display: block;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  padding: 8px;
+  scrollbar-gutter: stable;
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.04) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.04) 75%),
+    linear-gradient(45deg, rgba(255, 255, 255, 0.04) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.04) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 8px 8px;
+}
+
+.resize-preview-image {
+  display: block;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+.resize-preview-empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ppx-text-muted);
+  text-align: center;
+}
+
+.resize-preview-size {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--ppx-text-muted);
+}
+
+.resize-preview-empty-state {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--ppx-text-muted);
+}
+
+.resize-preview-refresh-btn {
+  color: #fff !important;
+}
+
+.resize-preview-refresh-btn:hover,
+.resize-preview-refresh-btn:focus {
+  color: #fff !important;
+}
+
 /* 裁剪预览 */
 .crop-preview {
   margin-top: 8px;
@@ -1730,5 +2037,3 @@ const removeFile = (target, file) => {
   background: var(--ppx-glass-bg-hover);
 }
 </style>
-
-
