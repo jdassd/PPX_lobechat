@@ -13,6 +13,8 @@ import argparse
 import json
 import mimetypes
 import os
+import signal
+import subprocess
 import socket
 import time
 from contextlib import closing
@@ -43,7 +45,42 @@ def on_loaded():
 
 def on_closing():
     # print('程序关闭')
-    pass
+    _terminate_dev_supervisor()
+    _force_exit_dev_backend()
+
+
+def _terminate_dev_supervisor():
+    '''开发环境下由 nodemon 启动时，关闭窗口后连带结束其父进程'''
+    if not Config.devEnv:
+        return
+
+    nodemon_flag = str(os.getenv('NODEMON', '')).strip().lower()
+    if nodemon_flag not in ('1', 'true', 'yes', 'on'):
+        return
+
+    parent_pid = os.getppid()
+    if parent_pid <= 1:
+        return
+
+    try:
+        if Config.appSystem == 'Windows':
+            subprocess.run(
+                ['taskkill', '/PID', str(parent_pid), '/T', '/F'],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+        else:
+            os.kill(parent_pid, signal.SIGTERM)
+    except Exception as err:
+        print(f'[Shutdown] 结束开发父进程失败: {err}')
+
+
+def _force_exit_dev_backend():
+    '''开发环境下，窗口关闭后强制结束 Python 进程，避免命令行悬挂'''
+    if not Config.devEnv:
+        return
+    os._exit(0)
 
 
 def _probe_port(host: str, port: int) -> bool:
