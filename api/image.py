@@ -22,8 +22,6 @@ from api.utils import (
     api_success,
     api_error,
     format_bytes,
-    parse_percentage,
-    clamp_int,
 )
 
 
@@ -220,43 +218,6 @@ class ImageTool:
             return api_success(f'已转换 {len(rewritten)} 个文件', files=rewritten, outputDir=str(output_dir))
         except Exception as exc:
             return api_error(f'转换失败：{exc}')
-
-    def image_batch_resize(self, options: Dict | None = None):
-        """批量缩放"""
-        try:
-            opts = self._validate(options)
-            files = ensure_files_payload(opts)
-            mode = opts.get('mode', 'percent')
-            keep_ratio = bool(opts.get('keepRatio', True))
-            output_dir = self._prepare_output_dir(files, opts.get('outputDir'), 'image_resize')
-            percent = parse_percentage(opts.get('percent', 100))
-            width = opts.get('width')
-            height = opts.get('height')
-
-            resized = []
-            for file_path in files:
-                with Image.open(file_path) as image:
-                    if mode == 'pixel':
-                        new_width = int(width) if width else image.width
-                        new_height = int(height) if height else image.height
-                        if keep_ratio:
-                            image = image.resize((new_width, new_height), Image.LANCZOS)
-                        else:
-                            image = image.resize((new_width, new_height))
-                    else:
-                        ratio = percent / 100.0
-                        new_width = max(1, int(image.width * ratio))
-                        new_height = max(1, int(image.height * ratio))
-                        if keep_ratio:
-                            image.thumbnail((new_width, new_height), Image.LANCZOS)
-                        else:
-                            image = image.resize((new_width, new_height))
-                    dest = output_dir / f'{file_path.stem}_resize{file_path.suffix}'
-                    self._save_image(image, dest, file_path.suffix.lstrip('.').lower())
-                    resized.append(str(dest))
-            return api_success(f'已缩放 {len(resized)} 个文件', files=resized, outputDir=str(output_dir))
-        except Exception as exc:
-            return api_error(f'缩放失败：{exc}')
 
     def image_batch_compress(self, options: Dict | None = None):
         """批量压缩"""

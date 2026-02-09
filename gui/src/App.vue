@@ -48,7 +48,7 @@ const featureCards = [
   {
     id: 'image',
     title: '图片处理',
-    desc: '格式转换 / 缩放 / 压缩 / 水印',
+    desc: '格式转换 / 压缩 / 水印',
     icon: markRaw(PictureFilled),
     color: 'cyan',
     // tags: ['批量操作', '高清输出'],
@@ -56,7 +56,7 @@ const featureCards = [
     disabled: false,
     points: [
       '支持 PNG / JPG / TIFF / WEBP 互转',
-      '按百分比或像素缩放，支持锁定比例',
+      '支持图片拼接、图片转 PDF 与批量重命名',
       '体积压缩支持质量或目标大小模式',
       '新增文字/图片水印、裁剪、旋转'
     ]
