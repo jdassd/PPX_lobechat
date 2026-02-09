@@ -9,7 +9,9 @@ import base64
 import io
 import math
 import shutil
+import tempfile
 import time
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple
@@ -37,6 +39,8 @@ class ImageTool:
         'square': (3000, 3000),
         'slide_16_9': (3508, 1973),
     }
+    _image_groups: Dict[str, Dict] = {}
+    _image_group_root = Path(tempfile.gettempdir()) / 'ppx_image_groups'
 
     def _validate(self, options: Dict | None) -> Dict:
         if options is None:
@@ -175,6 +179,444 @@ class ImageTool:
         if isinstance(value, (list, tuple)):
             return ', '.join(self._stringify_exif_value(item) for item in value)
         return str(value)
+
+    def _ensure_group_root(self) -> Path:
+        self._image_group_root.mkdir(parents=True, exist_ok=True)
+        return self._image_group_root
+
+    def _normalize_file_name(self, path: Path) -> str:
+        name = path.name or f'image_{int(time.time())}.png'
+        return name
+
+    def _unique_path(self, directory: Path, name: str) -> Path:
+        stem = Path(name).stem
+        suffix = Path(name).suffix
+        candidate = directory / name
+        index = 1
+        while candidate.exists():
+            index += 1
+            candidate = directory / f'{stem}_{index}{suffix}'
+        return candidate
+
+    def _serialize_files(self, files: Sequence[Path]) -> List[Dict]:
+        payload: List[Dict] = []
+        for item in files:
+            try:
+                size = item.stat().st_size
+            except Exception:
+                size = 0
+            payload.append({
+                'path': str(item),
+                'name': item.name,
+                'size': size,
+                'sizeText': format_bytes(size),
+            })
+        return payload
+
+    def _require_group(self, group_id: str, allow_empty: bool = False) -> Dict:
+        if not group_id:
+            raise ValueError('缺少图片组 ID')
+        group = self._image_groups.get(group_id)
+        if not group:
+            raise ValueError(f'图片组不存在：{group_id}')
+        current_files = group.get('currentFiles') or []
+        if not allow_empty and not current_files:
+            raise ValueError('图片组为空，请先导入图片')
+        return group
+
+    def _next_group_stage(self, group: Dict, stage: str) -> Tuple[int, Path]:
+        next_step = int(group.get('step') or 0) + 1
+        stage_dir = group['root'] / f'{next_step:03d}_{stage}'
+        stage_dir.mkdir(parents=True, exist_ok=True)
+        return next_step, stage_dir
+
+    def _update_group_files(self, group: Dict, files: Sequence[Path]):
+        normalized = [Path(item) for item in files if item]
+        if not normalized:
+            raise ValueError('处理后未生成任何图片')
+        group['currentFiles'] = normalized
+
+    def _resolve_group_selected(
+        self,
+        group: Dict,
+        selected_raw,
+        allow_all: bool = True,
+    ) -> List[Path]:
+        current_files: List[Path] = [Path(item) for item in (group.get('currentFiles') or [])]
+        if not current_files:
+            raise ValueError('图片组为空，请先导入图片')
+        if not selected_raw:
+            if allow_all:
+                return list(current_files)
+            raise ValueError('请先选择图片')
+
+        lookup = {str(path.resolve()): path for path in current_files}
+        selected: List[Path] = []
+        seen = set()
+        for item in selected_raw:
+            if isinstance(item, dict):
+                item = item.get('path')
+            if not item:
+                continue
+            key = str(Path(item).resolve())
+            target = lookup.get(key)
+            if not target or key in seen:
+                continue
+            seen.add(key)
+            selected.append(target)
+        if not selected:
+            raise ValueError('未匹配到图片组中的有效图片')
+        return selected
+
+    def _merge_group_processed_files(
+        self,
+        group: Dict,
+        selected: Sequence[Path],
+        outputs: Sequence[Path],
+        keep_original: bool,
+    ) -> List[Path]:
+        current_files: List[Path] = [Path(item) for item in (group.get('currentFiles') or [])]
+        selected_list = [Path(item) for item in selected]
+        output_list = [Path(item) for item in outputs if item]
+        if not output_list:
+            raise ValueError('处理后未生成任何图片')
+
+        if keep_original:
+            merged = current_files + output_list
+        else:
+            if len(output_list) != len(selected_list):
+                raise ValueError('处理结果数量与选中图片数量不一致，无法替换')
+            mapping = {str(src.resolve()): out for src, out in zip(selected_list, output_list)}
+            merged = []
+            for source in current_files:
+                key = str(source.resolve())
+                merged.append(mapping.get(key, source))
+
+        deduped: List[Path] = []
+        seen = set()
+        for item in merged:
+            path = Path(item)
+            key = str(path.resolve())
+            if key in seen:
+                continue
+            if path.exists():
+                deduped.append(path)
+                seen.add(key)
+        if not deduped:
+            raise ValueError('图片组为空，请重新导入图片')
+        group['currentFiles'] = deduped
+        return deduped
+
+    # -------------------- 图片组流水线 --------------------
+
+    def image_group_create(self, options: Dict | None = None):
+        """创建图片组，将源图片复制到临时工作区"""
+        try:
+            opts = self._validate(options)
+            files = ensure_files_payload(opts)
+            group_id = opts.get('groupId') or uuid.uuid4().hex
+            if group_id in self._image_groups:
+                raise ValueError(f'图片组 ID 已存在：{group_id}')
+            root = self._ensure_group_root() / group_id
+            source_dir = root / '000_source'
+            source_dir.mkdir(parents=True, exist_ok=True)
+
+            copied: List[Path] = []
+            for file_path in files:
+                dest = self._unique_path(source_dir, self._normalize_file_name(file_path))
+                shutil.copy2(file_path, dest)
+                copied.append(dest)
+
+            group = {
+                'id': group_id,
+                'root': root,
+                'step': 0,
+                'createdAt': datetime.now().isoformat(timespec='seconds'),
+                'currentFiles': copied,
+            }
+            self._image_groups[group_id] = group
+            return api_success(
+                f'图片组已创建，共 {len(copied)} 张',
+                groupId=group_id,
+                step=0,
+                files=self._serialize_files(copied),
+                createdAt=group['createdAt'],
+            )
+        except Exception as exc:
+            return api_error(f'创建图片组失败：{exc}')
+
+    def image_group_get(self, options: Dict | None = None):
+        """获取图片组当前文件列表"""
+        try:
+            opts = self._validate(options)
+            group = self._require_group(str(opts.get('groupId') or ''), allow_empty=True)
+            files = group.get('currentFiles') or []
+            return api_success(
+                '获取图片组成功',
+                groupId=group['id'],
+                step=int(group.get('step') or 0),
+                files=self._serialize_files(files),
+                createdAt=group.get('createdAt'),
+            )
+        except Exception as exc:
+            return api_error(f'获取图片组失败：{exc}')
+
+    def image_group_dispose(self, options: Dict | None = None):
+        """释放图片组临时文件"""
+        try:
+            opts = self._validate(options)
+            group_id = str(opts.get('groupId') or '')
+            if not group_id:
+                raise ValueError('缺少图片组 ID')
+            group = self._image_groups.pop(group_id, None)
+            if group and group.get('root'):
+                shutil.rmtree(group['root'], ignore_errors=True)
+            return api_success('图片组已释放', groupId=group_id)
+        except Exception as exc:
+            return api_error(f'释放图片组失败：{exc}')
+
+    def image_group_compress(self, options: Dict | None = None):
+        """对图片组选中项执行批量压缩并回写缓存"""
+        try:
+            opts = self._validate(options)
+            group = self._require_group(str(opts.get('groupId') or ''))
+            selected = self._resolve_group_selected(group, opts.get('selectedFiles'))
+            keep_original = bool(opts.get('keepOriginal', False))
+            next_step, stage_dir = self._next_group_stage(group, 'compress')
+            res = self.image_batch_compress({
+                'files': [str(path) for path in selected],
+                'mode': opts.get('mode', 'quality'),
+                'quality': opts.get('quality', 80),
+                'targetSizeKB': opts.get('targetSizeKB'),
+                'outputDir': str(stage_dir),
+            })
+            if res.get('code') != 0:
+                return res
+            output_lookup = {}
+            for item in (res.get('items') or []):
+                source = item.get('source')
+                output = item.get('output')
+                if source and output:
+                    output_lookup[str(Path(source).resolve())] = Path(output)
+            outputs: List[Path] = []
+            for source in selected:
+                mapped = output_lookup.get(str(source.resolve()))
+                if mapped:
+                    outputs.append(mapped)
+            merged = self._merge_group_processed_files(group, selected, outputs, keep_original)
+            group['step'] = next_step
+            return api_success(
+                f'图片组压缩完成，处理 {len(outputs)} 张',
+                groupId=group['id'],
+                step=group['step'],
+                files=self._serialize_files(merged),
+                processedFiles=self._serialize_files(outputs),
+            )
+        except Exception as exc:
+            return api_error(f'图片组压缩失败：{exc}')
+
+    def image_group_watermark(self, options: Dict | None = None):
+        """对图片组选中项执行批量水印并回写缓存"""
+        try:
+            opts = self._validate(options)
+            group = self._require_group(str(opts.get('groupId') or ''))
+            selected = self._resolve_group_selected(group, opts.get('selectedFiles'))
+            keep_original = bool(opts.get('keepOriginal', False))
+            next_step, stage_dir = self._next_group_stage(group, 'watermark')
+            res = self.image_add_watermark({
+                'files': [str(path) for path in selected],
+                'watermarkType': opts.get('watermarkType', 'text'),
+                'text': opts.get('text'),
+                'fontSize': opts.get('fontSize'),
+                'color': opts.get('color'),
+                'opacity': opts.get('opacity'),
+                'position': opts.get('position'),
+                'tile': opts.get('tile'),
+                'tileSpacing': opts.get('tileSpacing'),
+                'rotation': opts.get('rotation'),
+                'watermarkImage': opts.get('watermarkImage'),
+                'scalePercent': opts.get('scalePercent'),
+                'outputDir': str(stage_dir),
+            })
+            if res.get('code') != 0:
+                return res
+            outputs = [Path(item) for item in (res.get('files') or []) if item]
+            merged = self._merge_group_processed_files(group, selected, outputs, keep_original)
+            group['step'] = next_step
+            return api_success(
+                f'图片组水印完成，处理 {len(outputs)} 张',
+                groupId=group['id'],
+                step=group['step'],
+                files=self._serialize_files(merged),
+                processedFiles=self._serialize_files(outputs),
+            )
+        except Exception as exc:
+            return api_error(f'图片组水印失败：{exc}')
+
+    def image_group_crop(self, options: Dict | None = None):
+        """对图片组选中项执行批量裁剪并回写缓存"""
+        try:
+            opts = self._validate(options)
+            group = self._require_group(str(opts.get('groupId') or ''))
+            selected = self._resolve_group_selected(group, opts.get('selectedFiles'))
+            keep_original = bool(opts.get('keepOriginal', False))
+            next_step, stage_dir = self._next_group_stage(group, 'crop')
+            outputs: List[Path] = []
+            for file_path in selected:
+                res = self.image_crop({
+                    'file': str(file_path),
+                    'mode': opts.get('mode', 'custom'),
+                    'x': opts.get('x'),
+                    'y': opts.get('y'),
+                    'width': opts.get('width'),
+                    'height': opts.get('height'),
+                    'ratio': opts.get('ratio'),
+                    'ratioWidth': opts.get('ratioWidth'),
+                    'ratioHeight': opts.get('ratioHeight'),
+                    'outputDir': str(stage_dir),
+                })
+                if res.get('code') != 0:
+                    return res
+                output = res.get('file')
+                if output:
+                    outputs.append(Path(output))
+            merged = self._merge_group_processed_files(group, selected, outputs, keep_original)
+            group['step'] = next_step
+            return api_success(
+                f'图片组裁剪完成，处理 {len(outputs)} 张',
+                groupId=group['id'],
+                step=group['step'],
+                files=self._serialize_files(merged),
+                processedFiles=self._serialize_files(outputs),
+            )
+        except Exception as exc:
+            return api_error(f'图片组裁剪失败：{exc}')
+
+    def image_group_format_convert(self, options: Dict | None = None):
+        """对图片组选中项执行格式转换并回写缓存"""
+        try:
+            opts = self._validate(options)
+            group = self._require_group(str(opts.get('groupId') or ''))
+            selected = self._resolve_group_selected(group, opts.get('selectedFiles'))
+            keep_original = bool(opts.get('keepOriginal', False))
+            next_step, stage_dir = self._next_group_stage(group, 'convert')
+            res = self.image_format_convert({
+                'files': [str(path) for path in selected],
+                'targetFormat': opts.get('targetFormat', 'png'),
+                'quality': opts.get('quality'),
+                'keepName': opts.get('keepName', True),
+                'outputDir': str(stage_dir),
+            })
+            if res.get('code') != 0:
+                return res
+            outputs = [Path(item) for item in (res.get('files') or []) if item]
+            merged = self._merge_group_processed_files(group, selected, outputs, keep_original)
+            group['step'] = next_step
+            return api_success(
+                f'图片组格式转换完成，处理 {len(outputs)} 张',
+                groupId=group['id'],
+                step=group['step'],
+                files=self._serialize_files(merged),
+                processedFiles=self._serialize_files(outputs),
+            )
+        except Exception as exc:
+            return api_error(f'图片组格式转换失败：{exc}')
+
+    def image_group_rotate(self, options: Dict | None = None):
+        """对图片组选中项执行旋转/翻转并回写缓存"""
+        try:
+            opts = self._validate(options)
+            group = self._require_group(str(opts.get('groupId') or ''))
+            selected = self._resolve_group_selected(group, opts.get('selectedFiles'))
+            keep_original = bool(opts.get('keepOriginal', False))
+            next_step, stage_dir = self._next_group_stage(group, 'rotate')
+            res = self.image_rotate_flip({
+                'files': [str(path) for path in selected],
+                'operation': opts.get('operation', 'rotate90'),
+                'angle': opts.get('angle'),
+                'flipHorizontal': opts.get('flipHorizontal'),
+                'flipVertical': opts.get('flipVertical'),
+                'outputDir': str(stage_dir),
+            })
+            if res.get('code') != 0:
+                return res
+            outputs = [Path(item) for item in (res.get('files') or []) if item]
+            merged = self._merge_group_processed_files(group, selected, outputs, keep_original)
+            group['step'] = next_step
+            return api_success(
+                f'图片组旋转/翻转完成，处理 {len(outputs)} 张',
+                groupId=group['id'],
+                step=group['step'],
+                files=self._serialize_files(merged),
+                processedFiles=self._serialize_files(outputs),
+            )
+        except Exception as exc:
+            return api_error(f'图片组旋转/翻转失败：{exc}')
+
+    def image_group_remove_files(self, options: Dict | None = None):
+        """从图片组中移除选中图片（仅移出缓存）"""
+        try:
+            opts = self._validate(options)
+            group = self._require_group(str(opts.get('groupId') or ''), allow_empty=True)
+            current_files: List[Path] = [Path(item) for item in (group.get('currentFiles') or [])]
+            if not current_files:
+                return api_success('图片组为空', groupId=group['id'], files=[])
+            selected = self._resolve_group_selected(group, opts.get('selectedFiles'), allow_all=False)
+            remove_keys = {str(path.resolve()) for path in selected}
+            remaining = [path for path in current_files if str(path.resolve()) not in remove_keys]
+            group['currentFiles'] = remaining
+            return api_success(
+                f'已移除 {len(selected)} 张图片',
+                groupId=group['id'],
+                files=self._serialize_files(remaining),
+                removedFiles=self._serialize_files(selected),
+            )
+        except Exception as exc:
+            return api_error(f'移除图片失败：{exc}')
+
+    def image_group_export(self, options: Dict | None = None):
+        """导出图片组当前文件，可按选中项或整组批量导出"""
+        try:
+            opts = self._validate(options)
+            group = self._require_group(str(opts.get('groupId') or ''))
+            current_files: List[Path] = group.get('currentFiles') or []
+            output_dir_raw = opts.get('outputDir')
+            if not output_dir_raw:
+                raise ValueError('请选择导出目录')
+            output_dir = Path(output_dir_raw)
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            selected_raw = opts.get('selectedFiles') or []
+            selected: List[Path] = []
+            if selected_raw:
+                lookup = {str(path.resolve()): path for path in current_files}
+                for item in selected_raw:
+                    if not item:
+                        continue
+                    key = str(Path(item).resolve())
+                    target = lookup.get(key)
+                    if target:
+                        selected.append(target)
+                if not selected:
+                    raise ValueError('未匹配到可导出的图片，请重新选择')
+            else:
+                selected = list(current_files)
+
+            exported: List[Path] = []
+            for source in selected:
+                dest = self._unique_path(output_dir, self._normalize_file_name(source))
+                shutil.copy2(source, dest)
+                exported.append(dest)
+
+            return api_success(
+                f'已导出 {len(exported)} 张图片',
+                groupId=group['id'],
+                outputDir=str(output_dir),
+                files=self._serialize_files(exported),
+                count=len(exported),
+            )
+        except Exception as exc:
+            return api_error(f'导出图片组失败：{exc}')
 
     # -------------------- P0 功能 --------------------
 

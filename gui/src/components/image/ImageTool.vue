@@ -42,6 +42,49 @@ const state = reactive({
     generatedDir: '',
     result: []
   },
+  pipeline: {
+    sourceFiles: [],
+    groupId: '',
+    step: 0,
+    scope: 'selected',
+    keepOriginal: false,
+    files: [],
+    selected: [],
+    lastProcessed: [],
+    outputDir: '',
+    exported: [],
+    compress: {
+      mode: 'quality',
+      quality: 80,
+      targetSizeKB: 512
+    },
+    watermark: {
+      watermarkType: 'text',
+      text: '',
+      fontSize: 32,
+      color: '#ffffff',
+      opacity: 60,
+      position: 'bottom-right',
+      tile: false,
+      tileSpacing: 80,
+      rotation: 0,
+      watermarkImage: null,
+      scalePercent: 30
+    },
+    crop: {
+      mode: 'custom',
+      x: 0,
+      y: 0,
+      width: 800,
+      height: 600,
+      ratio: '16:9'
+    },
+    format: {
+      targetFormat: 'png',
+      quality: 90,
+      keepName: true
+    }
+  },
   watermark: {
     files: [],
     watermarkType: 'text',
@@ -167,7 +210,7 @@ const rotatePreviewUrl = computed(() => {
   if (!first) return ''
   const path = first.path || first
   if (!path) return ''
-  return getFileUrl(path)
+  return toFileUrl(path)
 })
 
 const rotatePreviewStyle = computed(() => {
@@ -200,6 +243,12 @@ const rotatePreviewStyle = computed(() => {
     transformOrigin: '50% 50%',
     transition: 'transform 0.2s ease-out'
   }
+})
+
+const pipelinePreviewUrl = computed(() => {
+  const first = state.pipeline.files[0]
+  if (!first?.path) return ''
+  return toFileUrl(first.path)
 })
 
 const getCropDisplayRect = () => {
@@ -394,6 +443,15 @@ const ensurePyReady = () => {
   return true
 }
 
+const ensureApiMethod = (methodName) => {
+  const apiMethod = window.pywebview?.api?.[methodName]
+  if (typeof apiMethod !== 'function') {
+    ElMessage.error(`后端接口未加载：${methodName}，请重启桌面端`)
+    return null
+  }
+  return apiMethod
+}
+
 const selectImages = async (target) => {
   if (!ensurePyReady()) return
   const files = await window.pywebview.api.system_pyCreateFileDialog(imageFilter)
@@ -472,6 +530,399 @@ const selectWatermarkImage = async () => {
 
 const clearWatermarkImage = () => {
   state.watermark.watermarkImage = null
+}
+
+const selectPipelineSourceImages = async () => {
+  if (!ensurePyReady()) return
+  const files = await window.pywebview.api.system_pyCreateFileDialog(imageFilter)
+  if (files?.length) {
+    state.pipeline.sourceFiles = files
+  }
+}
+
+const selectPipelineWatermarkImage = async () => {
+  if (!ensurePyReady()) return
+  const files = await window.pywebview.api.system_pyCreateFileDialog(imageFilter)
+  if (files?.length) {
+    state.pipeline.watermark.watermarkImage = files[0]
+  }
+}
+
+const clearPipelineWatermarkImage = () => {
+  state.pipeline.watermark.watermarkImage = null
+}
+
+const normalizePipelineFiles = (files = []) =>
+  files
+    .map((item) => {
+      const path = item?.path || item
+      if (!path) return null
+      return {
+        path,
+        name: item?.name || path.split(/[\\/]/).pop() || path,
+        sizeText: item?.sizeText || ''
+      }
+    })
+    .filter(Boolean)
+
+const syncPipelineFiles = (files = []) => {
+  const normalized = normalizePipelineFiles(files)
+  const validPathSet = new Set(normalized.map((item) => item.path))
+  state.pipeline.files = normalized
+  state.pipeline.selected = state.pipeline.selected.filter((item) => validPathSet.has(item))
+}
+
+const clearPipelineSelection = () => {
+  state.pipeline.selected = []
+}
+
+const ensurePipelineGroupReady = () => {
+  if (!state.pipeline.groupId) {
+    ElMessage.warning('请先创建图片组')
+    return false
+  }
+  if (!state.pipeline.files.length) {
+    ElMessage.warning('图片组中暂无图片')
+    return false
+  }
+  return true
+}
+
+const createPipelineGroup = async () => {
+  if (!ensurePyReady()) return
+  if (!state.pipeline.sourceFiles.length) {
+    ElMessage.warning('请先选择图片')
+    return
+  }
+  state.loading = true
+  try {
+    if (state.pipeline.groupId) {
+      const disposeMethod = ensureApiMethod('image_group_dispose')
+      if (!disposeMethod) return
+      await disposeMethod({ groupId: state.pipeline.groupId })
+    }
+    const createMethod = ensureApiMethod('image_group_create')
+    if (!createMethod) return
+    const res = await createMethod({
+      files: pickPaths(state.pipeline.sourceFiles)
+    })
+    if (res?.code === 0) {
+      state.pipeline.groupId = res.groupId || ''
+      state.pipeline.step = res.step || 0
+      state.pipeline.exported = []
+      state.pipeline.lastProcessed = []
+      state.pipeline.selected = []
+      syncPipelineFiles(res.files || [])
+      ElMessage.success(res.msg || '图片组创建成功')
+    } else {
+      ElMessage.error(res?.msg || '创建图片组失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '创建图片组失败')
+  } finally {
+    state.loading = false
+  }
+}
+
+const disposePipelineGroup = async () => {
+  if (!ensurePyReady()) return
+  if (!state.pipeline.groupId) return
+  state.loading = true
+  try {
+    const disposeMethod = ensureApiMethod('image_group_dispose')
+    if (!disposeMethod) return
+    const res = await disposeMethod({
+      groupId: state.pipeline.groupId
+    })
+    if (res?.code === 0) {
+      state.pipeline.groupId = ''
+      state.pipeline.step = 0
+      state.pipeline.files = []
+      state.pipeline.selected = []
+      state.pipeline.exported = []
+      state.pipeline.lastProcessed = []
+      ElMessage.success(res.msg || '图片组已释放')
+    } else {
+      ElMessage.error(res?.msg || '释放图片组失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '释放图片组失败')
+  } finally {
+    state.loading = false
+  }
+}
+
+const refreshPipelineGroup = async () => {
+  if (!ensurePyReady() || !state.pipeline.groupId) return
+  state.loading = true
+  try {
+    const getMethod = ensureApiMethod('image_group_get')
+    if (!getMethod) return
+    const res = await getMethod({ groupId: state.pipeline.groupId })
+    if (res?.code === 0) {
+      state.pipeline.step = res.step || state.pipeline.step
+      syncPipelineFiles(res.files || [])
+      ElMessage.success(res.msg || '图片组已刷新')
+    } else {
+      ElMessage.error(res?.msg || '刷新失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '刷新失败')
+  } finally {
+    state.loading = false
+  }
+}
+
+const removePipelineSelected = async () => {
+  if (!ensurePyReady() || !ensurePipelineGroupReady()) return
+  if (!state.pipeline.selected.length) {
+    ElMessage.warning('请先勾选需要移除的图片')
+    return
+  }
+  state.loading = true
+  try {
+    const removeMethod = ensureApiMethod('image_group_remove_files')
+    if (!removeMethod) return
+    const res = await removeMethod({
+      groupId: state.pipeline.groupId,
+      selectedFiles: state.pipeline.selected
+    })
+    if (res?.code === 0) {
+      syncPipelineFiles(res.files || [])
+      state.pipeline.lastProcessed = []
+      ElMessage.success(res.msg || '已移除')
+    } else {
+      ElMessage.error(res?.msg || '移除失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '移除失败')
+  } finally {
+    state.loading = false
+  }
+}
+
+const runPipelineStep = async (methodName, payload, fallbackMessage) => {
+  if (!ensurePyReady() || !ensurePipelineGroupReady()) return
+  if (state.pipeline.scope === 'selected' && !state.pipeline.selected.length) {
+    ElMessage.warning('当前模式为“仅选中图片”，请先在图片组中勾选')
+    return
+  }
+  state.loading = true
+  try {
+    const apiMethod = ensureApiMethod(methodName)
+    if (!apiMethod) return
+    const res = await apiMethod({
+      groupId: state.pipeline.groupId,
+      selectedFiles: state.pipeline.scope === 'selected' ? state.pipeline.selected : [],
+      keepOriginal: state.pipeline.keepOriginal,
+      ...payload
+    })
+    if (res?.code === 0) {
+      state.pipeline.step = res.step || state.pipeline.step
+      syncPipelineFiles(res.files || [])
+      state.pipeline.lastProcessed = normalizePipelineFiles(res.processedFiles || [])
+      state.pipeline.selected = []
+      ElMessage.success(res.msg || fallbackMessage)
+    } else {
+      ElMessage.error(res?.msg || fallbackMessage)
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || fallbackMessage)
+  } finally {
+    state.loading = false
+  }
+}
+
+const runCurrentFormatOnPipeline = async () =>
+  runPipelineStep(
+    'image_group_format_convert',
+    {
+      targetFormat: state.format.targetFormat,
+      quality: state.format.quality,
+      keepName: state.format.keepName
+    },
+    '图片组格式转换失败'
+  )
+
+const runCurrentCompressOnPipeline = async () =>
+  runPipelineStep(
+    'image_group_compress',
+    {
+      mode: state.compress.mode,
+      quality: state.compress.quality,
+      targetSizeKB: state.compress.targetSizeKB
+    },
+    '图片组压缩失败'
+  )
+
+const runCurrentWatermarkOnPipeline = async () => {
+  if (state.watermark.watermarkType === 'text' && !state.watermark.text.trim()) {
+    ElMessage.warning('请输入水印文字')
+    return
+  }
+  if (state.watermark.watermarkType === 'image' && !state.watermark.watermarkImage) {
+    ElMessage.warning('请选择水印图片')
+    return
+  }
+  await runPipelineStep(
+    'image_group_watermark',
+    {
+      watermarkType: state.watermark.watermarkType,
+      text: state.watermark.text,
+      fontSize: state.watermark.fontSize,
+      color: state.watermark.color,
+      opacity: state.watermark.opacity,
+      position: state.watermark.position,
+      tile: state.watermark.tile,
+      tileSpacing: state.watermark.tileSpacing,
+      rotation: state.watermark.rotation,
+      watermarkImage: state.watermark.watermarkImage?.path,
+      scalePercent: state.watermark.scalePercent
+    },
+    '图片组水印失败'
+  )
+}
+
+const runCurrentCropOnPipeline = async () => {
+  await runPipelineStep(
+    'image_group_crop',
+    {
+      mode: state.crop.mode,
+      x: state.crop.x,
+      y: state.crop.y,
+      width: state.crop.width,
+      height: state.crop.height,
+      ratio: state.crop.ratio
+    },
+    '图片组裁剪失败'
+  )
+}
+
+const runCurrentRotateOnPipeline = async () =>
+  runPipelineStep(
+    'image_group_rotate',
+    {
+      operation: state.rotate.operation,
+      angle: state.rotate.angle,
+      flipHorizontal: state.rotate.flipHorizontal,
+      flipVertical: state.rotate.flipVertical
+    },
+    '图片组旋转/翻转失败'
+  )
+
+const runPipelineCompress = async () =>
+  runPipelineStep(
+    'image_group_compress',
+    {
+      mode: state.pipeline.compress.mode,
+      quality: state.pipeline.compress.quality,
+      targetSizeKB: state.pipeline.compress.targetSizeKB
+    },
+    '图片组压缩失败'
+  )
+
+const runPipelineWatermark = async () => {
+  if (state.pipeline.watermark.watermarkType === 'text' && !state.pipeline.watermark.text.trim()) {
+    ElMessage.warning('请输入水印文字')
+    return
+  }
+  if (state.pipeline.watermark.watermarkType === 'image' && !state.pipeline.watermark.watermarkImage) {
+    ElMessage.warning('请选择水印图片')
+    return
+  }
+  await runPipelineStep(
+    'image_group_watermark',
+    {
+      watermarkType: state.pipeline.watermark.watermarkType,
+      text: state.pipeline.watermark.text,
+      fontSize: state.pipeline.watermark.fontSize,
+      color: state.pipeline.watermark.color,
+      opacity: state.pipeline.watermark.opacity,
+      position: state.pipeline.watermark.position,
+      tile: state.pipeline.watermark.tile,
+      tileSpacing: state.pipeline.watermark.tileSpacing,
+      rotation: state.pipeline.watermark.rotation,
+      watermarkImage: state.pipeline.watermark.watermarkImage?.path,
+      scalePercent: state.pipeline.watermark.scalePercent
+    },
+    '图片组水印失败'
+  )
+}
+
+const runPipelineCrop = async () => {
+  if (state.pipeline.crop.mode === 'custom') {
+    if (state.pipeline.crop.width <= 0 || state.pipeline.crop.height <= 0) {
+      ElMessage.warning('裁剪宽高必须大于 0')
+      return
+    }
+  }
+  await runPipelineStep(
+    'image_group_crop',
+    {
+      mode: state.pipeline.crop.mode,
+      x: state.pipeline.crop.x,
+      y: state.pipeline.crop.y,
+      width: state.pipeline.crop.width,
+      height: state.pipeline.crop.height,
+      ratio: state.pipeline.crop.ratio
+    },
+    '图片组裁剪失败'
+  )
+}
+
+const runPipelineFormatConvert = async () =>
+  runPipelineStep(
+    'image_group_format_convert',
+    {
+      targetFormat: state.pipeline.format.targetFormat,
+      quality: state.pipeline.format.quality,
+      keepName: state.pipeline.format.keepName
+    },
+    '图片组格式转换失败'
+  )
+
+const onPipelineSelectionChange = (rows = []) => {
+  state.pipeline.selected = rows.map((item) => item.path)
+}
+
+const selectPipelineExportDir = async () => {
+  if (!ensurePyReady()) return
+  const dir = await window.pywebview.api.system_pySelectDirDialog(state.pipeline.outputDir || '')
+  if (dir) {
+    state.pipeline.outputDir = dir
+  }
+}
+
+const exportPipelineImages = async (onlySelected) => {
+  if (!ensurePyReady() || !ensurePipelineGroupReady()) return
+  if (!state.pipeline.outputDir) {
+    ElMessage.warning('请先选择导出目录')
+    return
+  }
+  if (onlySelected && !state.pipeline.selected.length) {
+    ElMessage.warning('请先勾选需要导出的图片')
+    return
+  }
+  state.loading = true
+  try {
+    const exportMethod = ensureApiMethod('image_group_export')
+    if (!exportMethod) return
+    const res = await exportMethod({
+      groupId: state.pipeline.groupId,
+      outputDir: state.pipeline.outputDir,
+      selectedFiles: onlySelected ? state.pipeline.selected : []
+    })
+    if (res?.code === 0) {
+      state.pipeline.exported = normalizePipelineFiles(res.files || [])
+      ElMessage.success(res.msg || '导出成功')
+    } else {
+      ElMessage.error(res?.msg || '导出失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '导出失败')
+  } finally {
+    state.loading = false
+  }
 }
 
 const selectDir = async (target) => {
@@ -789,6 +1240,10 @@ const openDir = (target) => {
 const removeFile = (target, file) => {
   state[target].files = state[target].files.filter((item) => item !== file)
 }
+
+const removePipelineSourceFile = (file) => {
+  state.pipeline.sourceFiles = state.pipeline.sourceFiles.filter((item) => item !== file)
+}
 </script>
 
 <template>
@@ -808,7 +1263,313 @@ const removeFile = (target, file) => {
       </div>
     </template>
     <div class="image-tool">
+      <section class="panel cache-panel">
+        <header>
+          <h4>图片组缓存</h4>
+          <p>在任意功能页可对“选中图片”或“全部图片”执行处理，结果回写到缓存后继续下一步</p>
+        </header>
+        <FileSelector
+          label="导入图片"
+          description="创建图片组时会复制到临时缓存，不影响原文件"
+          :files="state.pipeline.sourceFiles"
+          :removable="true"
+          @select="selectPipelineSourceImages"
+          @remove="removePipelineSourceFile"
+        />
+        <div class="pipeline-toolbar">
+          <el-button type="primary" :loading="state.loading" @click="createPipelineGroup">创建 / 重建图片组</el-button>
+          <el-button :disabled="!state.pipeline.groupId" :loading="state.loading" @click="refreshPipelineGroup">刷新</el-button>
+          <el-button :disabled="!state.pipeline.groupId || !state.pipeline.selected.length" :loading="state.loading" @click="removePipelineSelected">移除选中</el-button>
+          <el-button :disabled="!state.pipeline.groupId" :loading="state.loading" @click="disposePipelineGroup">释放图片组</el-button>
+          <el-tag v-if="state.pipeline.groupId" type="success" effect="plain">组 ID: {{ state.pipeline.groupId }}</el-tag>
+          <el-tag v-if="state.pipeline.groupId" type="warning" effect="plain">缓存图片: {{ state.pipeline.files.length }} 张</el-tag>
+        </div>
+        <div v-if="state.pipeline.groupId" class="pipeline-toolbar">
+          <el-radio-group v-model="state.pipeline.scope" size="small">
+            <el-radio-button label="selected">仅处理选中图片</el-radio-button>
+            <el-radio-button label="all">处理全部图片</el-radio-button>
+          </el-radio-group>
+          <el-checkbox v-model="state.pipeline.keepOriginal">保留原图（处理结果追加到缓存）</el-checkbox>
+          <el-button text type="primary" @click="clearPipelineSelection">清空选择</el-button>
+          <el-tag type="info" effect="plain">已选 {{ state.pipeline.selected.length }} 张</el-tag>
+        </div>
+        <el-table
+          v-if="state.pipeline.groupId"
+          :data="state.pipeline.files"
+          border
+          size="small"
+          height="220"
+          @selection-change="onPipelineSelectionChange"
+        >
+          <el-table-column type="selection" width="48" />
+          <el-table-column prop="name" label="文件名" min-width="200" show-overflow-tooltip />
+          <el-table-column prop="path" label="缓存路径" min-width="360" show-overflow-tooltip />
+          <el-table-column prop="sizeText" label="大小" width="110" />
+        </el-table>
+        <el-form v-if="state.pipeline.groupId" label-width="110px" class="form-block">
+          <el-form-item label="导出目录">
+            <div class="field-row">
+              <el-input v-model="state.pipeline.outputDir" placeholder="请选择导出目录" readonly />
+              <el-button @click="selectPipelineExportDir">选目录</el-button>
+            </div>
+          </el-form-item>
+          <el-form-item>
+            <div class="field-row field-row--wrap">
+              <el-button type="primary" :loading="state.loading" @click="exportPipelineImages(true)">导出选中</el-button>
+              <el-button :loading="state.loading" @click="exportPipelineImages(false)">导出全部</el-button>
+              <el-button v-if="state.pipeline.outputDir" text type="primary" @click="openPath(state.pipeline.outputDir)">打开导出目录</el-button>
+            </div>
+          </el-form-item>
+        </el-form>
+        <ResultTable
+          v-if="state.pipeline.lastProcessed.length"
+          title="最近一次处理结果"
+          :items="state.pipeline.lastProcessed"
+          :columns="[
+            { label: '文件名', prop: 'name', width: 260 },
+            { label: '路径', prop: 'path' },
+            { label: '大小', prop: 'sizeText', width: 110 }
+          ]"
+        />
+      </section>
+
       <el-tabs v-model="state.activeTab" class="image-tabs">
+        <el-tab-pane label="图片组流水线" name="pipeline">
+          <section class="panel">
+            <header>
+              <h4>图片组联动处理</h4>
+              <p>在同一图片组中串联压缩、水印、裁剪、格式转换，最后统一导出</p>
+            </header>
+            <FileSelector
+              label="初始图片"
+              description="这些图片会复制到临时图片组中，后续步骤会持续覆盖组内当前结果"
+              :files="state.pipeline.sourceFiles"
+              :removable="true"
+              @select="selectPipelineSourceImages"
+              @remove="removePipelineSourceFile"
+            />
+            <div class="pipeline-toolbar">
+              <el-button type="primary" :loading="state.loading" @click="createPipelineGroup">创建 / 重建图片组</el-button>
+              <el-button :disabled="!state.pipeline.groupId" :loading="state.loading" @click="disposePipelineGroup">释放图片组</el-button>
+              <el-tag v-if="state.pipeline.groupId" type="success" effect="plain">
+                组 ID: {{ state.pipeline.groupId }}
+              </el-tag>
+              <el-tag v-if="state.pipeline.groupId" type="info" effect="plain">
+                当前步骤: {{ state.pipeline.step }}
+              </el-tag>
+              <el-tag v-if="state.pipeline.groupId" type="warning" effect="plain">
+                当前图片: {{ state.pipeline.files.length }} 张
+              </el-tag>
+            </div>
+
+            <div v-if="state.pipeline.groupId" class="pipeline-grid">
+              <div class="pipeline-card">
+                <h5>1. 批量压缩</h5>
+                <el-form :model="state.pipeline.compress" label-width="90px">
+                  <el-form-item label="模式">
+                    <el-radio-group v-model="state.pipeline.compress.mode">
+                      <el-radio-button label="quality">按质量</el-radio-button>
+                      <el-radio-button label="size">按体积</el-radio-button>
+                    </el-radio-group>
+                  </el-form-item>
+                  <el-form-item v-if="state.pipeline.compress.mode === 'quality'" label="质量">
+                    <el-slider v-model="state.pipeline.compress.quality" :min="40" :max="95" show-input />
+                  </el-form-item>
+                  <el-form-item v-else label="目标 KB">
+                    <el-input-number v-model="state.pipeline.compress.targetSizeKB" :min="32" :max="8192" />
+                  </el-form-item>
+                  <el-form-item>
+                    <el-button type="primary" :loading="state.loading" @click="runPipelineCompress">应用到图片组</el-button>
+                  </el-form-item>
+                </el-form>
+              </div>
+
+              <div class="pipeline-card">
+                <h5>2. 批量水印</h5>
+                <el-form :model="state.pipeline.watermark" label-width="90px">
+                  <el-form-item label="类型">
+                    <el-radio-group v-model="state.pipeline.watermark.watermarkType">
+                      <el-radio-button label="text">文字</el-radio-button>
+                      <el-radio-button label="image">图片</el-radio-button>
+                    </el-radio-group>
+                  </el-form-item>
+                  <template v-if="state.pipeline.watermark.watermarkType === 'text'">
+                    <el-form-item label="文字">
+                      <el-input v-model="state.pipeline.watermark.text" type="textarea" :rows="2" />
+                    </el-form-item>
+                    <el-form-item label="字号">
+                      <el-input-number v-model="state.pipeline.watermark.fontSize" :min="8" :max="200" />
+                    </el-form-item>
+                  </template>
+                  <template v-else>
+                    <el-form-item label="图片">
+                      <div class="field-row">
+                        <el-input :model-value="state.pipeline.watermark.watermarkImage?.path || ''" readonly />
+                        <el-button @click="selectPipelineWatermarkImage">选择</el-button>
+                        <el-button text type="danger" @click="clearPipelineWatermarkImage">清除</el-button>
+                      </div>
+                    </el-form-item>
+                    <el-form-item label="比例 %">
+                      <el-slider v-model="state.pipeline.watermark.scalePercent" :min="5" :max="80" show-input />
+                    </el-form-item>
+                  </template>
+                  <el-form-item label="透明度">
+                    <el-slider v-model="state.pipeline.watermark.opacity" :min="5" :max="100" show-input />
+                  </el-form-item>
+                  <el-form-item label="位置">
+                    <el-select v-model="state.pipeline.watermark.position" style="width: 180px">
+                      <el-option label="左上" value="top-left" />
+                      <el-option label="右上" value="top-right" />
+                      <el-option label="居中" value="center" />
+                      <el-option label="左下" value="bottom-left" />
+                      <el-option label="右下" value="bottom-right" />
+                    </el-select>
+                  </el-form-item>
+                  <el-form-item label="平铺">
+                    <div class="field-row field-row--wrap">
+                      <el-switch v-model="state.pipeline.watermark.tile" />
+                      <el-input-number
+                        v-model="state.pipeline.watermark.tileSpacing"
+                        :min="20"
+                        :max="600"
+                        :step="10"
+                        :disabled="!state.pipeline.watermark.tile"
+                      />
+                    </div>
+                  </el-form-item>
+                  <el-form-item label="旋转">
+                    <el-slider v-model="state.pipeline.watermark.rotation" :min="-90" :max="90" :step="1" show-input />
+                  </el-form-item>
+                  <el-form-item>
+                    <el-button type="primary" :loading="state.loading" @click="runPipelineWatermark">应用到图片组</el-button>
+                  </el-form-item>
+                </el-form>
+              </div>
+
+              <div class="pipeline-card">
+                <h5>3. 批量裁剪</h5>
+                <el-form :model="state.pipeline.crop" label-width="90px">
+                  <el-form-item label="模式">
+                    <el-radio-group v-model="state.pipeline.crop.mode">
+                      <el-radio-button label="custom">自定义</el-radio-button>
+                      <el-radio-button label="ratio">按比例</el-radio-button>
+                    </el-radio-group>
+                  </el-form-item>
+                  <template v-if="state.pipeline.crop.mode === 'custom'">
+                    <el-form-item label="X / Y">
+                      <div class="field-row field-row--wrap">
+                        <el-input-number v-model="state.pipeline.crop.x" :min="0" />
+                        <el-input-number v-model="state.pipeline.crop.y" :min="0" />
+                      </div>
+                    </el-form-item>
+                    <el-form-item label="宽 / 高">
+                      <div class="field-row field-row--wrap">
+                        <el-input-number v-model="state.pipeline.crop.width" :min="10" />
+                        <el-input-number v-model="state.pipeline.crop.height" :min="10" />
+                      </div>
+                    </el-form-item>
+                  </template>
+                  <el-form-item v-else label="比例">
+                    <el-select v-model="state.pipeline.crop.ratio" style="width: 180px">
+                      <el-option label="1:1" value="1:1" />
+                      <el-option label="4:3" value="4:3" />
+                      <el-option label="3:2" value="3:2" />
+                      <el-option label="16:9" value="16:9" />
+                    </el-select>
+                  </el-form-item>
+                  <el-form-item>
+                    <el-button type="primary" :loading="state.loading" @click="runPipelineCrop">应用到图片组</el-button>
+                  </el-form-item>
+                </el-form>
+              </div>
+
+              <div class="pipeline-card">
+                <h5>4. 批量格式转换</h5>
+                <el-form :model="state.pipeline.format" label-width="90px">
+                  <el-form-item label="目标格式">
+                    <el-select v-model="state.pipeline.format.targetFormat" style="width: 160px">
+                      <el-option label="PNG" value="png" />
+                      <el-option label="JPG" value="jpg" />
+                      <el-option label="WEBP" value="webp" />
+                      <el-option label="TIFF" value="tiff" />
+                      <el-option label="BMP" value="bmp" />
+                    </el-select>
+                  </el-form-item>
+                  <el-form-item label="质量">
+                    <el-slider v-model="state.pipeline.format.quality" :min="40" :max="100" show-input />
+                  </el-form-item>
+                  <el-form-item>
+                    <el-checkbox v-model="state.pipeline.format.keepName">保留原文件名</el-checkbox>
+                  </el-form-item>
+                  <el-form-item>
+                    <el-button type="primary" :loading="state.loading" @click="runPipelineFormatConvert">应用到图片组</el-button>
+                  </el-form-item>
+                </el-form>
+              </div>
+            </div>
+
+            <div v-if="state.pipeline.groupId" class="pipeline-preview">
+              <el-image
+                v-if="pipelinePreviewUrl"
+                :src="pipelinePreviewUrl"
+                fit="contain"
+                class="pipeline-preview-image"
+                :preview-src-list="[pipelinePreviewUrl]"
+                preview-teleported
+              />
+              <p class="crop-preview-hint">当前组首张预览（用于快速确认处理效果）</p>
+            </div>
+
+            <el-divider v-if="state.pipeline.groupId" />
+
+            <el-form v-if="state.pipeline.groupId" label-width="110px" class="form-block">
+              <el-form-item label="导出目录">
+                <div class="field-row">
+                  <el-input v-model="state.pipeline.outputDir" placeholder="请选择导出目录" readonly />
+                  <el-button @click="selectPipelineExportDir">选目录</el-button>
+                </div>
+              </el-form-item>
+              <el-form-item>
+                <div class="field-row field-row--wrap">
+                  <el-button type="primary" :loading="state.loading" @click="exportPipelineImages(true)">导出选中图片</el-button>
+                  <el-button :loading="state.loading" @click="exportPipelineImages(false)">导出整组图片</el-button>
+                  <el-button v-if="state.pipeline.outputDir" text type="primary" @click="openPath(state.pipeline.outputDir)">打开导出目录</el-button>
+                </div>
+              </el-form-item>
+            </el-form>
+
+            <el-table
+              v-if="state.pipeline.groupId"
+              :data="state.pipeline.files"
+              border
+              size="small"
+              height="260"
+              @selection-change="onPipelineSelectionChange"
+            >
+              <el-table-column type="selection" width="48" />
+              <el-table-column prop="name" label="文件名" min-width="220" show-overflow-tooltip />
+              <el-table-column prop="path" label="路径" min-width="360" show-overflow-tooltip />
+              <el-table-column prop="sizeText" label="大小" width="120" />
+              <el-table-column label="操作" width="90">
+                <template #default="{ row }">
+                  <el-button text type="primary" @click="openPath(row.path)">打开</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+
+            <ResultTable
+              v-if="state.pipeline.exported.length"
+              title="导出结果"
+              :items="state.pipeline.exported"
+              :columns="[
+                { label: '文件名', prop: 'name', width: 260 },
+                { label: '路径', prop: 'path' },
+                { label: '大小', prop: 'sizeText', width: 120 }
+              ]"
+            />
+          </section>
+        </el-tab-pane>
+
         <el-tab-pane label="格式转换" name="convert">
           <section class="panel">
             <header>
@@ -846,7 +1607,16 @@ const removeFile = (target, file) => {
                 <el-checkbox v-model="state.format.keepName">保留原文件名</el-checkbox>
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" :loading="state.loading" @click="runFormatConvert">开始转换</el-button>
+                <div class="field-row field-row--wrap">
+                  <el-button type="primary" :loading="state.loading" @click="runFormatConvert">开始转换</el-button>
+                  <el-button
+                    v-if="state.pipeline.groupId"
+                    :loading="state.loading"
+                    @click="runCurrentFormatOnPipeline"
+                  >
+                    处理图片组
+                  </el-button>
+                </div>
               </el-form-item>
             </el-form>
             <ResultTable
@@ -897,7 +1667,16 @@ const removeFile = (target, file) => {
                 </div>
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" :loading="state.loading" @click="runCompress">开始压缩</el-button>
+                <div class="field-row field-row--wrap">
+                  <el-button type="primary" :loading="state.loading" @click="runCompress">开始压缩</el-button>
+                  <el-button
+                    v-if="state.pipeline.groupId"
+                    :loading="state.loading"
+                    @click="runCurrentCompressOnPipeline"
+                  >
+                    处理图片组
+                  </el-button>
+                </div>
               </el-form-item>
             </el-form>
             <ResultTable
@@ -1015,7 +1794,16 @@ const removeFile = (target, file) => {
                 </div>
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" :loading="state.loading" @click="runWatermark">开始处理</el-button>
+                <div class="field-row field-row--wrap">
+                  <el-button type="primary" :loading="state.loading" @click="runWatermark">开始处理</el-button>
+                  <el-button
+                    v-if="state.pipeline.groupId"
+                    :loading="state.loading"
+                    @click="runCurrentWatermarkOnPipeline"
+                  >
+                    处理图片组
+                  </el-button>
+                </div>
               </el-form-item>
             </el-form>
             <ResultTable
@@ -1140,7 +1928,16 @@ const removeFile = (target, file) => {
                 </div>
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" :loading="state.loading" @click="runCrop">开始裁剪</el-button>
+                <div class="field-row field-row--wrap">
+                  <el-button type="primary" :loading="state.loading" @click="runCrop">开始裁剪</el-button>
+                  <el-button
+                    v-if="state.pipeline.groupId"
+                    :loading="state.loading"
+                    @click="runCurrentCropOnPipeline"
+                  >
+                    处理图片组
+                  </el-button>
+                </div>
               </el-form-item>
             </el-form>
             <el-alert
@@ -1195,7 +1992,16 @@ const removeFile = (target, file) => {
                 </div>
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" :loading="state.loading" @click="runRotate">开始处理</el-button>
+                <div class="field-row field-row--wrap">
+                  <el-button type="primary" :loading="state.loading" @click="runRotate">开始处理</el-button>
+                  <el-button
+                    v-if="state.pipeline.groupId"
+                    :loading="state.loading"
+                    @click="runCurrentRotateOnPipeline"
+                  >
+                    处理图片组
+                  </el-button>
+                </div>
               </el-form-item>
             </el-form>
             <ResultTable
@@ -1601,5 +2407,49 @@ const removeFile = (target, file) => {
 .advanced-card:hover {
   border-color: var(--ppx-glass-border-hover);
   background: var(--ppx-glass-bg-hover);
+}
+
+.cache-panel {
+  margin-bottom: 14px;
+}
+
+.pipeline-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+  align-items: center;
+}
+
+.pipeline-grid {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.pipeline-card {
+  border: 1px solid var(--ppx-glass-border);
+  border-radius: var(--ppx-radius-lg);
+  padding: 14px;
+  background: var(--ppx-glass-bg);
+}
+
+.pipeline-card h5 {
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+
+.pipeline-preview {
+  margin-top: 14px;
+}
+
+.pipeline-preview-image {
+  width: 100%;
+  max-width: 360px;
+  height: 200px;
+  border-radius: var(--ppx-radius-sm);
+  border: 1px solid var(--ppx-glass-border);
+  background: var(--ppx-bg-ink);
 }
 </style>
