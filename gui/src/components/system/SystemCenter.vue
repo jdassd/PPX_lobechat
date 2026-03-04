@@ -309,6 +309,75 @@
         </div>
       </el-tab-pane>
 
+      <el-tab-pane label="C盘专清" name="cDriveClean">
+        <el-alert v-if="!isWindows" type="info" show-icon :closable="false" class="helper-hint">
+          C盘专清仅支持 Windows 系统
+        </el-alert>
+        <template v-else>
+          <el-alert type="info" show-icon :closable="false" class="helper-hint">
+            已收集系统临时文件、更新缓存、日志、微信/QQ 接收文件、NPM/PNPM/Yarn/PIP 缓存等可清理项。高风险项请谨慎勾选。
+          </el-alert>
+          <div class="toolbar">
+            <el-button type="primary" :loading="cDriveCleanState.scanning" @click="scanCDriveClean">
+              <template #icon><el-icon><Search /></el-icon></template>
+              扫描 C盘可清理项
+            </el-button>
+            <el-button
+              type="danger"
+              :loading="cDriveCleanState.cleaning"
+              :disabled="!cDriveCleanState.selectedCategories.length"
+              @click="cleanCDriveClean"
+            >
+              <template #icon><el-icon><Delete /></el-icon></template>
+              清理选中项 ({{ cDriveCleanState.selectedCategories.length }})
+            </el-button>
+            <div class="toolbar-info" v-if="cDriveCleanState.totalSizeText">
+              <span>总计可清理: <strong>{{ cDriveCleanState.totalSizeText }}</strong></span>
+            </div>
+          </div>
+
+          <el-table
+            :data="cDriveCleanState.items"
+            v-loading="cDriveCleanState.scanning"
+            border
+            size="small"
+            max-height="360"
+            empty-text="点击“扫描 C盘可清理项”开始扫描"
+            @selection-change="onCDriveCleanSelectionChange"
+          >
+            <el-table-column type="selection" width="50" />
+            <el-table-column prop="name" label="类别" min-width="140" />
+            <el-table-column label="风险" width="90">
+              <template #default="{ row }">
+                <el-tag v-if="row.risk === 'high'" size="small" type="danger">高</el-tag>
+                <el-tag v-else-if="row.risk === 'medium'" size="small" type="warning">中</el-tag>
+                <el-tag v-else size="small" type="success">低</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="description" label="说明" min-width="220" show-overflow-tooltip />
+            <el-table-column prop="fileCount" label="文件数" width="90" />
+            <el-table-column prop="sizeText" label="大小" width="120" />
+            <el-table-column prop="path" label="路径" min-width="220" show-overflow-tooltip />
+          </el-table>
+
+          <div v-if="cDriveCleanState.cleanResult" class="clean-result">
+            <el-alert
+              :type="cDriveCleanState.cleanResult.errors?.length ? 'warning' : 'success'"
+              show-icon
+              :closable="false"
+            >
+              <template #title>
+                已清理 {{ cDriveCleanState.cleanResult.clearedCount }} 个项目，释放
+                {{ cDriveCleanState.cleanResult.clearedSizeText }}
+              </template>
+              <template #default v-if="cDriveCleanState.cleanResult.errors?.length">
+                <div v-for="err in cDriveCleanState.cleanResult.errors" :key="err">{{ err }}</div>
+              </template>
+            </el-alert>
+          </div>
+        </template>
+      </el-tab-pane>
+
       <el-tab-pane label="注册表清理" name="registry">
         <el-alert v-if="!isWindows" type="info" show-icon :closable="false" class="helper-hint">
           注册表清理仅支持 Windows 系统
@@ -863,6 +932,80 @@ const cleanJunk = async () => {
     ElMessage.error(error?.message || '清理失败')
   } finally {
     junkState.cleaning = false
+  }
+}
+
+// ==================== C盘专清 ====================
+
+const cDriveCleanState = reactive({
+  scanning: false,
+  cleaning: false,
+  items: [],
+  selectedCategories: [],
+  totalSizeText: '',
+  cleanResult: null
+})
+
+const onCDriveCleanSelectionChange = (selection) => {
+  cDriveCleanState.selectedCategories = selection.map(item => item.category)
+}
+
+const scanCDriveClean = async () => {
+  if (!apiReady.value || !window.pywebview?.api?.system_scanCDriveClean) {
+    ElMessage.warning('当前环境不支持 C盘专清功能')
+    return
+  }
+  cDriveCleanState.scanning = true
+  cDriveCleanState.cleanResult = null
+  try {
+    const res = await window.pywebview.api.system_scanCDriveClean()
+    if (res?.success) {
+      cDriveCleanState.items = res.items || []
+      cDriveCleanState.totalSizeText = res.totalSizeText || ''
+    } else {
+      ElMessage.error(res?.message || '扫描失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '扫描失败')
+  } finally {
+    cDriveCleanState.scanning = false
+  }
+}
+
+const cleanCDriveClean = async () => {
+  if (!cDriveCleanState.selectedCategories.length) {
+    ElMessage.warning('请先选择要清理的类别')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `确定要清理选中的 ${cDriveCleanState.selectedCategories.length} 个类别吗？此操作不可撤销。`,
+      '确认清理',
+      {
+        confirmButtonText: '清理',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+  } catch {
+    return
+  }
+  cDriveCleanState.cleaning = true
+  try {
+    const res = await window.pywebview.api.system_cleanCDriveClean({
+      categories: cDriveCleanState.selectedCategories
+    })
+    if (res?.success) {
+      cDriveCleanState.cleanResult = res
+      ElMessage.success(`已清理 ${res.clearedCount} 个项目，释放 ${res.clearedSizeText}`)
+      await scanCDriveClean()
+    } else {
+      ElMessage.error(res?.message || '清理失败')
+    }
+  } catch (error) {
+    ElMessage.error(error?.message || '清理失败')
+  } finally {
+    cDriveCleanState.cleaning = false
   }
 }
 
