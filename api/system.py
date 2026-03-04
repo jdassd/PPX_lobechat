@@ -22,7 +22,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import webview
 from webview.window import FixPoint
@@ -34,6 +34,11 @@ try:
     import psutil
 except ImportError:
     psutil = None
+
+try:
+    from send2trash import send2trash
+except ImportError:
+    send2trash = None
 
 
 from api.utils import format_bytes
@@ -89,6 +94,43 @@ class System():
         base_dir = Path(Config.appDataDir or Config.staticDir)
         base_dir.mkdir(parents=True, exist_ok=True)
         return base_dir / 'process_rules.json'
+
+    def _c_drive_clean_state_file(self) -> Path:
+        base_dir = Path(Config.appDataDir or Config.staticDir)
+        base_dir.mkdir(parents=True, exist_ok=True)
+        return base_dir / 'c_drive_clean_state.json'
+
+    def _load_c_drive_clean_state(self) -> Dict[str, Any]:
+        path = self._c_drive_clean_state_file()
+        default_state = {
+            'whitelist': [],
+            'customRules': []
+        }
+        if not path.exists():
+            return default_state
+        try:
+            with path.open('r', encoding='utf-8') as handler:
+                data = json.load(handler)
+            if not isinstance(data, dict):
+                return default_state
+            whitelist = data.get('whitelist') if isinstance(data.get('whitelist'), list) else []
+            custom_rules = data.get('customRules') if isinstance(data.get('customRules'), list) else []
+            return {
+                'whitelist': [str(item) for item in whitelist if item],
+                'customRules': custom_rules
+            }
+        except Exception:
+            return default_state
+
+    def _save_c_drive_clean_state(self, state: Dict[str, Any]):
+        path = self._c_drive_clean_state_file()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            'whitelist': state.get('whitelist', []),
+            'customRules': state.get('customRules', [])
+        }
+        with path.open('w', encoding='utf-8') as handler:
+            json.dump(payload, handler, ensure_ascii=False, indent=2)
 
     def _load_startup_rules(self) -> List[Dict]:
         path = self._startup_rules_file()
@@ -1370,12 +1412,17 @@ class System():
 
             if target.is_file():
                 if any(fnmatch.fnmatch(target.name, pattern) for pattern in patterns):
-                    size = target.stat().st_size
+                    stat = target.stat()
+                    size = stat.st_size
+                    modified_at = datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
                     files.append({
                         'path': str(target),
                         'name': target.name,
                         'size': size,
-                        'sizeText': format_bytes(size)
+                        'sizeText': format_bytes(size),
+                        'ext': target.suffix.lower(),
+                        'modifiedAt': stat.st_mtime,
+                        'modifiedAtText': modified_at
                     })
                     total_size += size
                 return files, total_size
@@ -1392,12 +1439,17 @@ class System():
                     seen.add(key)
                     try:
                         if item.is_file():
-                            size = item.stat().st_size
+                            stat = item.stat()
+                            size = stat.st_size
+                            modified_at = datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
                             files.append({
                                 'path': str(item),
                                 'name': item.name,
                                 'size': size,
-                                'sizeText': format_bytes(size)
+                                'sizeText': format_bytes(size),
+                                'ext': item.suffix.lower(),
+                                'modifiedAt': stat.st_mtime,
+                                'modifiedAtText': modified_at
                             })
                             total_size += size
                     except (PermissionError, OSError):
@@ -1461,10 +1513,37 @@ class System():
         total_size = 0
         remaining = max_files
 
+        min_size_bytes = int(location.get('minSizeBytes', 0) or 0)
+        older_than_days = int(location.get('olderThanDays', 0) or 0)
+        ext_filters = location.get('extFilters', []) if isinstance(location.get('extFilters'), list) else []
+        ext_filters = [str(ext).lower() for ext in ext_filters if str(ext).strip()]
+
+        now_ts = time.time()
+
         for target in self._resolve_location_paths(location):
             if remaining <= 0:
                 break
             current_files, current_size = self._scan_directory(target, patterns, remaining)
+
+            if min_size_bytes > 0 or older_than_days > 0 or ext_filters:
+                filtered_files = []
+                filtered_size = 0
+                for item in current_files:
+                    size = int(item.get('size') or 0)
+                    if min_size_bytes > 0 and size < min_size_bytes:
+                        continue
+                    ext = str(item.get('ext') or '').lower()
+                    if ext_filters and ext not in ext_filters:
+                        continue
+                    modified_at = float(item.get('modifiedAt') or 0)
+                    if older_than_days > 0 and modified_at > 0:
+                        age_days = (now_ts - modified_at) / 86400
+                        if age_days < older_than_days:
+                            continue
+                    filtered_files.append(item)
+                    filtered_size += size
+                current_files, current_size = filtered_files, filtered_size
+
             files.extend(current_files)
             total_size += current_size
             remaining = max_files - len(files)
@@ -1474,6 +1553,8 @@ class System():
         selected = self._normalize_categories(categories)
         items = []
         total_size = 0
+        state = self._load_c_drive_clean_state()
+        whitelist = {str(item).lower() for item in state.get('whitelist', []) if item}
 
         for location in locations:
             category = location.get('category')
@@ -1481,6 +1562,12 @@ class System():
                 continue
 
             files, size = self._scan_location(location)
+            if whitelist:
+                filtered = [file for file in files if str(file.get('path', '')).lower() not in whitelist]
+                if len(filtered) != len(files):
+                    files = filtered
+                    size = sum(int(file.get('size') or 0) for file in files)
+
             if not include_empty and not files and size <= 0:
                 continue
 
@@ -1491,7 +1578,7 @@ class System():
                 'fileCount': len(files),
                 'size': size,
                 'sizeText': format_bytes(size),
-                'files': files[:100]
+                'files': files[:300]
             }
             if location.get('description'):
                 item['description'] = location.get('description')
@@ -1634,8 +1721,32 @@ class System():
             }
         categories = options.get('categories') if isinstance(options, dict) else None
         locations = self._get_c_drive_clean_locations()
+
+        state = self._load_c_drive_clean_state()
+        custom_rules = state.get('customRules', [])
+        for index, rule in enumerate(custom_rules):
+            if not isinstance(rule, dict):
+                continue
+            path = rule.get('path')
+            if not path:
+                continue
+            loc = {
+                'category': f"custom_{rule.get('id') or index}",
+                'name': rule.get('name') or f'自定义规则 {index + 1}',
+                'description': rule.get('description') or '用户自定义扫描规则',
+                'patterns': rule.get('patterns') or ['*'],
+                'risk': 'medium',
+                'paths': [path],
+                'minSizeBytes': int(rule.get('minSizeBytes') or 0),
+                'olderThanDays': int(rule.get('olderThanDays') or 0),
+                'extFilters': rule.get('extFilters') if isinstance(rule.get('extFilters'), list) else []
+            }
+            loc['path'] = self._location_display_path(loc)
+            locations.append(loc)
+
         result = self._scan_locations(locations, categories=categories, include_empty=True)
         result['catalogCount'] = len(locations)
+        result['whitelistCount'] = len(state.get('whitelist', []))
         return result
 
     def system_cleanCDriveClean(self, options=None):
@@ -1646,7 +1757,170 @@ class System():
                 'message': 'C 盘专清仅支持 Windows 系统'
             }
         categories = options.get('categories') if isinstance(options, dict) else None
+        mode = (options.get('mode') if isinstance(options, dict) else 'permanent') or 'permanent'
+        file_paths = options.get('filePaths') if isinstance(options, dict) else None
+
+        if isinstance(file_paths, list) and file_paths:
+            return self.system_cleanCDriveFiles({'filePaths': file_paths, 'mode': mode})
+
         return self._clean_locations(self._get_c_drive_clean_locations(), categories=categories)
+
+    def system_cleanCDriveFiles(self, payload=None):
+        '''按文件粒度清理 C 盘专清文件'''
+        if platform.system() != 'Windows':
+            return {
+                'success': False,
+                'message': 'C 盘专清仅支持 Windows 系统'
+            }
+
+        file_paths = payload.get('filePaths') if isinstance(payload, dict) else None
+        mode = (payload.get('mode') if isinstance(payload, dict) else 'permanent') or 'permanent'
+        if not isinstance(file_paths, list) or not file_paths:
+            return {'success': False, 'message': '请提供要清理的文件列表'}
+
+        use_recycle = mode == 'recycle'
+        if use_recycle and send2trash is None:
+            return {'success': False, 'message': '当前环境未安装 send2trash，无法移动到回收站'}
+
+        cleared_size = 0
+        cleared_count = 0
+        errors = []
+
+        seen = set()
+        for raw_path in file_paths:
+            path_str = str(raw_path or '').strip()
+            if not path_str:
+                continue
+            key = path_str.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+
+            target = Path(path_str)
+            if not target.exists():
+                continue
+
+            try:
+                size = target.stat().st_size if target.is_file() else self._estimate_path_size(target)
+                if use_recycle:
+                    send2trash(str(target))
+                else:
+                    if target.is_dir():
+                        shutil.rmtree(target)
+                    else:
+                        target.unlink()
+                cleared_size += max(0, int(size or 0))
+                cleared_count += 1
+            except Exception as exc:
+                errors.append(f'{path_str}: {str(exc)}')
+
+        return {
+            'success': True,
+            'clearedSize': cleared_size,
+            'clearedSizeText': format_bytes(cleared_size),
+            'clearedCount': cleared_count,
+            'mode': mode,
+            'errors': errors if errors else None
+        }
+
+    def system_addCDriveWhitelist(self, payload=None):
+        '''将文件路径加入 C 盘专清白名单'''
+        paths = payload.get('paths') if isinstance(payload, dict) else None
+        if not isinstance(paths, list) or not paths:
+            return {'success': False, 'message': '请提供路径列表'}
+
+        state = self._load_c_drive_clean_state()
+        current = {str(item).lower(): str(item) for item in state.get('whitelist', []) if item}
+        for raw in paths:
+            path_str = str(raw or '').strip()
+            if not path_str:
+                continue
+            current[path_str.lower()] = path_str
+        state['whitelist'] = sorted(current.values(), key=lambda x: x.lower())
+        self._save_c_drive_clean_state(state)
+        return {'success': True, 'whitelist': state['whitelist'], 'count': len(state['whitelist'])}
+
+    def system_removeCDriveWhitelist(self, payload=None):
+        '''从 C 盘专清白名单移除路径'''
+        paths = payload.get('paths') if isinstance(payload, dict) else None
+        if not isinstance(paths, list) or not paths:
+            return {'success': False, 'message': '请提供路径列表'}
+
+        remove_set = {str(item).strip().lower() for item in paths if str(item).strip()}
+        state = self._load_c_drive_clean_state()
+        state['whitelist'] = [
+            item for item in state.get('whitelist', [])
+            if str(item).lower() not in remove_set
+        ]
+        self._save_c_drive_clean_state(state)
+        return {'success': True, 'whitelist': state['whitelist'], 'count': len(state['whitelist'])}
+
+    def system_getCDriveWhitelist(self):
+        state = self._load_c_drive_clean_state()
+        return {
+            'success': True,
+            'whitelist': state.get('whitelist', []),
+            'count': len(state.get('whitelist', []))
+        }
+
+    def system_saveCDriveCustomRule(self, payload=None):
+        '''保存 C 盘专清自定义规则'''
+        if not isinstance(payload, dict):
+            return {'success': False, 'message': '参数格式错误'}
+
+        path = str(payload.get('path') or '').strip()
+        if not path:
+            return {'success': False, 'message': '请填写扫描路径'}
+
+        name = str(payload.get('name') or '').strip() or '自定义规则'
+        patterns = payload.get('patterns') if isinstance(payload.get('patterns'), list) else ['*']
+        ext_filters = payload.get('extFilters') if isinstance(payload.get('extFilters'), list) else []
+        min_size_bytes = int(payload.get('minSizeBytes') or 0)
+        older_than_days = int(payload.get('olderThanDays') or 0)
+
+        state = self._load_c_drive_clean_state()
+        rules = state.get('customRules', [])
+        rule_id = str(payload.get('id') or '').strip()
+
+        normalized = {
+            'id': rule_id or uuid.uuid4().hex,
+            'name': name,
+            'path': path,
+            'patterns': [str(item) for item in patterns if str(item).strip()] or ['*'],
+            'extFilters': [str(item).lower() for item in ext_filters if str(item).strip()],
+            'minSizeBytes': max(0, min_size_bytes),
+            'olderThanDays': max(0, older_than_days),
+            'description': str(payload.get('description') or '').strip()
+        }
+
+        updated = False
+        for index, rule in enumerate(rules):
+            if str(rule.get('id')) == normalized['id']:
+                rules[index] = normalized
+                updated = True
+                break
+        if not updated:
+            rules.append(normalized)
+
+        state['customRules'] = rules
+        self._save_c_drive_clean_state(state)
+        return {'success': True, 'rules': rules, 'rule': normalized}
+
+    def system_removeCDriveCustomRule(self, payload=None):
+        rule_id = payload.get('id') if isinstance(payload, dict) else None
+        if not rule_id:
+            return {'success': False, 'message': '请提供规则 ID'}
+        state = self._load_c_drive_clean_state()
+        rules = state.get('customRules', [])
+        new_rules = [rule for rule in rules if str(rule.get('id')) != str(rule_id)]
+        state['customRules'] = new_rules
+        self._save_c_drive_clean_state(state)
+        return {'success': True, 'rules': new_rules}
+
+    def system_listCDriveCustomRules(self):
+        state = self._load_c_drive_clean_state()
+        rules = state.get('customRules', [])
+        return {'success': True, 'rules': rules, 'count': len(rules)}
 
     def _scan_invalid_uninstall_entries(self) -> List[Dict]:
         '''扫描无效的软件卸载信息'''
