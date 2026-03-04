@@ -116,3 +116,42 @@ jobs:
           generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.PPX_GITHUB_TOKEN }}
+
+      - name: 清理超量测试版 Release（最多保留 5 个）
+        if: steps.tag_meta.outputs.prerelease == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PPX_GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner
+            const repo = context.repo.repo
+
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100
+            })
+
+            const prereleases = releases
+              .filter(r => r.prerelease && !r.draft)
+              .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+
+            const keep = 5
+            const overflow = prereleases.length - keep
+
+            if (overflow <= 0) {
+              core.info(`当前测试版 Release 共 ${prereleases.length} 个，无需清理`) 
+              return
+            }
+
+            const toDelete = prereleases.slice(0, overflow)
+            for (const rel of toDelete) {
+              core.info(`删除测试版 Release: ${rel.name || rel.tag_name} (#${rel.id})`)
+              await github.rest.repos.deleteRelease({
+                owner,
+                repo,
+                release_id: rel.id
+              })
+            }
+
+            core.info(`已清理 ${toDelete.length} 个旧测试版 Release，保留最新 ${keep} 个`)
