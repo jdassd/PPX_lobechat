@@ -52,6 +52,20 @@ class System():
     _window = None
 
     @staticmethod
+    def _subprocess_creationflags() -> int:
+        if platform.system() == 'Windows' and hasattr(subprocess, 'CREATE_NO_WINDOW'):
+            return subprocess.CREATE_NO_WINDOW
+        return 0
+
+    def _run_subprocess(self, args, **kwargs):
+        options = dict(kwargs or {})
+        options.setdefault('capture_output', True)
+        options.setdefault('text', True)
+        if platform.system() == 'Windows':
+            options.setdefault('creationflags', self._subprocess_creationflags())
+        return subprocess.run(args, **options)
+
+    @staticmethod
     def _psutil_missing_response():
         return {
             'success': False,
@@ -864,7 +878,7 @@ class System():
         directions = ('out', 'in')
 
         def run_command(command):
-            result = subprocess.run(command, capture_output=True, text=True, shell=False)
+            result = self._run_subprocess(command, shell=False)
             if result.returncode != 0:
                 raise RuntimeError(result.stderr.strip() or 'netsh 执行失败，需管理员权限')
 
@@ -877,7 +891,7 @@ class System():
                         'netsh', 'advfirewall', 'firewall', 'delete', 'rule',
                         f'name="{rule_name}"', f'program="{sanitized}"'
                     ]
-                    subprocess.run(cleanup, capture_output=True, text=True, shell=False)
+                    self._run_subprocess(cleanup, shell=False)
                     cmd = [
                         'netsh', 'advfirewall', 'firewall', 'add', 'rule',
                         f'name="{rule_name}"', f'dir={direction}', 'action=block',
@@ -1480,10 +1494,8 @@ class System():
                 )
                 recycle_path = '$Recycle.Bin'
 
-            result = subprocess.run(
-                ['powershell', '-Command', command],
-                capture_output=True,
-                text=True,
+            result = self._run_subprocess(
+                ['powershell', '-NoProfile', '-Command', command],
                 timeout=30
             )
             if result.returncode == 0 and result.stdout.strip():
@@ -1617,10 +1629,8 @@ class System():
         if drive_letter:
             command = f'Clear-RecycleBin -DriveLetter {drive_letter} -Force -ErrorAction SilentlyContinue'
         try:
-            result = subprocess.run(
-                ['powershell', '-Command', command],
-                capture_output=True,
-                text=True,
+            result = self._run_subprocess(
+                ['powershell', '-NoProfile', '-Command', command],
                 timeout=60
             )
             return result.returncode == 0
