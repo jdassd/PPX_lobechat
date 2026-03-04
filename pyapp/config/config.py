@@ -29,7 +29,8 @@ class Config:
     appDeveloper = "Jdassd"  # 应用开发者
     appBlogs = "https://baidu.com"  # 个人博客
     appPackage = 'ppx.jdassd'    # 应用包名，用于在本地电脑生成 vip.pangao.ppx 唯一文件夹
-    appUpdateUrl = 'https://api.github.com/repos/jdassd/PPX_lobechat/releases/latest'    # 获取程序更新信息 https://api.github.com/repos/pangao1990/ppx/releases/latest
+    appUpdateUrl = 'https://api.github.com/repos/jdassd/PPX_lobechat/releases/latest'    # 获取稳定版更新信息
+    appReleasesUrl = 'https://api.github.com/repos/jdassd/PPX_lobechat/releases'    # 获取 Release 列表（含测试版）
     appISSID = '05027E0B-CD45-DE45-B2BD-30B885810FE5'    # Inno Setup 打包唯一编号。在执行 pnpm run init 之前，请设置为空，程序会自动生成唯一编号，生成后请勿修改！！！
 
     ##

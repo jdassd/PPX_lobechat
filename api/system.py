@@ -163,16 +163,16 @@ class System():
             'appVersion': Config.appVersion  # 应用版本号
         }
 
-    def system_checkNewVersion(self):
+    def system_checkNewVersion(self, payload=None):
         '''检查更新'''
         appUpdate = AppUpdate()    # 程序更新类
-        res = appUpdate.check()
+        res = appUpdate.check(payload)
         return res
 
-    def system_downloadNewVersion(self):
+    def system_downloadNewVersion(self, payload=None):
         '''下载新版本'''
         appUpdate = AppUpdate()    # 程序更新类
-        res = appUpdate.run()
+        res = appUpdate.run(payload)
         return res
 
     def system_cancelDownloadNewVersion(self):

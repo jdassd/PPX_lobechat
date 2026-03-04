@@ -8,6 +8,13 @@
     </el-tooltip>
 
     <el-dialog v-model="state.checkVisible" title="检测更新" top="30vh" draggable destroy-on-close :close-on-click-modal="false" :close-on-press-escape="false" :show-close="false" :center="false" append-to-body>
+      <div class="channel-row">
+        <span>检测通道：</span>
+        <el-radio-group v-model="state.channel" size="small" @change="onChannelChange">
+          <el-radio-button label="stable">稳定版</el-radio-button>
+          <el-radio-button label="beta">测试版</el-radio-button>
+        </el-radio-group>
+      </div>
       <div>
         <SvgIcon v-if="state.code == 1" name="ele-SuccessFilled" :size="18" color="var(--ppx-success)" style="top:4px"></SvgIcon>
         <SvgIcon v-else-if="state.code == 0" name="ele-WarningFilled" :size="18" color="var(--ppx-warning)" style="top:4px"></SvgIcon>
@@ -20,8 +27,8 @@
       <template #footer>
         <span class="dialog-footer">
           <el-link v-if="state.htmlUrl != ''" class="float-l mt10" type="info" @click="onOpenLink">手动更新</el-link>
-          <el-button v-if="state.code == 0" @click="state.checkVisible = false">取消</el-button>
-          <el-button type="primary" @click="onConfirm">确认</el-button>
+          <el-button @click="state.checkVisible = false">取消</el-button>
+          <el-button type="primary" @click="onConfirm" :disabled="state.code !== 0">确认更新</el-button>
         </span>
       </template>
     </el-dialog>
@@ -62,6 +69,7 @@ const state = reactive({
   msg: '',
   htmlUrl: '', // 手动更新网址
   body: [], // 版本介绍
+  channel: 'stable', // stable | beta
   downloadVisible: false,
   downloadSizeShow: '', // 下载过程中大小数值展示
   downloadPercentage: 0, // 下载过程中大小百分比
@@ -98,8 +106,7 @@ const onCheckUpdate = (init = false) => {
     // 第一次打开
     state.btnLoading = true
     if (window.pywebview && window.pywebview.api) {
-      window.pywebview.api.system_checkNewVersion().then((res) => {
-        // console.log(init, res)
+      window.pywebview.api.system_checkNewVersion({ channel: state.channel }).then((res) => {
         // 程序第一次打开，自动检测更新 或 手动点击检测更新
         if (!init || res.code == 0) {
           state.code = res.code
@@ -131,9 +138,13 @@ const onCheckUpdate = (init = false) => {
 
 // 手动更新
 const onOpenLink = () => {
-  // console.log(state.htmlUrl)
   window.pywebview.api.system_pyOpenFile(state.htmlUrl)
   state.checkVisible = false
+}
+
+const onChannelChange = () => {
+  if (!state.checkVisible) return
+  onCheckUpdate(false)
 }
 
 // 确认更新 - 检查更新
@@ -141,8 +152,7 @@ const onConfirm = () => {
   state.checkVisible = false
   if (state.code == 0) {
     state.downloadVisible = true
-    window.pywebview.api.system_downloadNewVersion().then((res) => {
-      // console.log('res', res)
+    window.pywebview.api.system_downloadNewVersion({ channel: state.channel }).then((res) => {
       state.downloadVisible = false
       if (res.code == 0) {
         ElMessage.success('下载完成')
@@ -172,6 +182,15 @@ const onBack = () => {
 </script>
 
 <style scoped>
+.channel-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--ppx-text-secondary);
+}
+
 .update-info {
   margin-left: 20px;
   margin-top: 10px;

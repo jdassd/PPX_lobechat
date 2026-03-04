@@ -24,9 +24,10 @@ class AppUpdate:
 
     cancelDownload = False    # 是否取消下载
 
-    def check(self):
+    def check(self, payload=None):
         '''检查是否有更新：0=>有新版本; -1=>联网失败; 1=>已经是最新版本'''
-        resNewInfo = self.__getNewInfo()
+        channel = self.__resolve_channel(payload)
+        resNewInfo = self.__getNewInfo(channel)
         if not resNewInfo['status']:
             # 联网失败
             return {'code': -1, 'msg': '连接服务器失败，请稍后再试'}
@@ -36,20 +37,28 @@ class AppUpdate:
             ifUpdate = self.__compareVersion(oldVersion, newVersion)    # 判断是否需要更新
             if not ifUpdate:
                 # 已是最新版本
-                return {'code': 1, 'msg': f'{oldVersion}已是最新版本'}
+                return {'code': 1, 'msg': f'{oldVersion}已是最新版本', 'channel': channel}
             else:
-                return {'code': 0, 'msg': f'有新版{newVersion}可供更新，当前版本为{oldVersion}。', 'htmlUrl': resNewInfo['htmlUrl'], 'assets': resNewInfo['assets'], 'body': resNewInfo['body']}
+                return {
+                    'code': 0,
+                    'msg': f'有新版{newVersion}可供更新，当前版本为{oldVersion}。',
+                    'htmlUrl': resNewInfo['htmlUrl'],
+                    'assets': resNewInfo['assets'],
+                    'body': resNewInfo['body'],
+                    'channel': channel,
+                    'version': newVersion
+                }
 
-    def run(self):
+    def run(self, payload=None):
         '''执行更新：0=>下载程序包成功; -1=>联网失败; -2=>下载程序包失败; 1=>已经是最新版本'''
-        resCheck = self.check()
+        resCheck = self.check(payload)
         if resCheck['code'] == 0:
             resApp = self.__getApp(resCheck['assets'])
             if not resApp or not resApp.get('status'):
                 msg = str(resApp.get('msg', '未知错误')) if resApp else '未找到适用的安装包'
-                return {'code': -2, 'msg': '下载程序包失败: ' + msg}
+                return {'code': -2, 'msg': '下载程序包失败: ' + msg, 'channel': resCheck.get('channel')}
             else:
-                return {'code': 0, 'msg': '下载程序包成功', 'downloadPath': resApp['downloadPath']}
+                return {'code': 0, 'msg': '下载程序包成功', 'downloadPath': resApp['downloadPath'], 'channel': resCheck.get('channel')}
         else:
             return resCheck
 
@@ -57,16 +66,52 @@ class AppUpdate:
         '''取消下载'''
         AppUpdate.cancelDownload = True
 
-    def __getNewInfo(self):
+    def __resolve_channel(self, payload=None):
+        if isinstance(payload, dict):
+            value = str(payload.get('channel') or '').strip().lower()
+            if value in ('stable', 'beta'):
+                return value
+        if isinstance(payload, str):
+            value = str(payload).strip().lower()
+            if value in ('stable', 'beta'):
+                return value
+        return 'stable'
+
+    def __getNewInfo(self, channel='stable'):
         '''获取服务端版本信息'''
         try:
             # 15秒后连接超时，15秒后读取超时
+            if channel == 'beta':
+                r = httpx.get(Config.appReleasesUrl, timeout=(15, 15))
+                res_json = r.json()
+                if not isinstance(res_json, list):
+                    return {'status': False, 'msg': '获取测试版信息失败'}
+                # 取最新的预发布版本
+                target = None
+                for item in res_json:
+                    if isinstance(item, dict) and item.get('prerelease') and not item.get('draft'):
+                        target = item
+                        break
+                if not target:
+                    return {'status': False, 'msg': '暂无可用测试版'}
+                version = target.get('tag_name') or target.get('name')
+                html_url = target.get('html_url')
+                assets = target.get('assets') or []
+                body = target.get('body') or ''
+                return {
+                    'status': True,
+                    'version': version,
+                    'htmlUrl': html_url,
+                    'assets': assets,
+                    'body': body
+                }
+
             r = httpx.get(Config.appUpdateUrl, timeout=(15, 15))
             resJson = r.json()
-            version = resJson['name']    # 版本号
-            htmlUrl = resJson['html_url']    # 下载页面
-            assets = resJson['assets']    # 下载资源
-            body = resJson['body']    # 版本介绍
+            version = resJson.get('tag_name') or resJson.get('name')    # 版本号
+            htmlUrl = resJson.get('html_url')    # 下载页面
+            assets = resJson.get('assets') or []    # 下载资源
+            body = resJson.get('body') or ''    # 版本介绍
             return {
                 'status': True,
                 'version': version,
@@ -82,25 +127,39 @@ class AppUpdate:
 
     def __compareVersion(self, oldVersion, newVersion):
         '''判断是否需要更新'''
-        ifUpdate = False    # 判断是否需要更新
-        oldVersionList = oldVersion.lower().replace('v', '').split('.')
-        newVersionList = newVersion.lower().replace('v', '').split('.')
-        # 将版本号转换为整数进行比较，避免字符串比较的问题（如 '9' > '13' 的错误结果）
-        try:
-            oldMajor, oldMinor, oldPatch = int(oldVersionList[0]), int(oldVersionList[1]), int(oldVersionList[2])
-            newMajor, newMinor, newPatch = int(newVersionList[0]), int(newVersionList[1]), int(newVersionList[2])
-        except (ValueError, IndexError):
-            # 如果版本号格式不正确，返回False
+        def parse(version):
+            raw = str(version or '').strip().lower()
+            raw = raw.lstrip('v')
+            # 支持预发布版本: 1.2.3-beta.1
+            if '-' in raw:
+                raw = raw.split('-', 1)[0]
+            parts = raw.split('.')
+            if len(parts) < 3:
+                return None
+            try:
+                return int(parts[0]), int(parts[1]), int(parts[2])
+            except (ValueError, TypeError):
+                return None
+
+        old_parsed = parse(oldVersion)
+        new_parsed = parse(newVersion)
+        if not old_parsed or not new_parsed:
             return False
+
+        oldMajor, oldMinor, oldPatch = old_parsed
+        newMajor, newMinor, newPatch = new_parsed
+
         if newMajor > oldMajor:
-            ifUpdate = True
-        elif newMajor == oldMajor:
-            if newMinor > oldMinor:
-                ifUpdate = True
-            elif newMinor == oldMinor:
-                if newPatch > oldPatch:
-                    ifUpdate = True
-        return ifUpdate
+            return True
+        if newMajor < oldMajor:
+            return False
+
+        if newMinor > oldMinor:
+            return True
+        if newMinor < oldMinor:
+            return False
+
+        return newPatch > oldPatch
 
     def __getApp(self, assetsList):
         '''获取程序包'''
