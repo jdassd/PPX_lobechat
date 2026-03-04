@@ -92,6 +92,14 @@ jobs:
         run: |
           TAG_NAME="${GITHUB_REF#refs/tags/}"
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+
+          # 约定：带预发布后缀的 tag 作为测试版（如 v1.2.3-beta.1 / v1.2.3-rc.1）
+          if [[ "$TAG_NAME" == *-* ]]; then
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
           git tag -l --format='%(contents)' "$TAG_NAME" > release_notes.md
           if [ ! -s release_notes.md ]; then
             git log -1 --pretty=%B > release_notes.md
@@ -104,6 +112,7 @@ jobs:
           files: ${{ steps.artifacts.outputs.files }}
           body_path: ${{ steps.tag_meta.outputs.body_path }}
           tag_name: ${{ steps.tag_meta.outputs.tag_name }}
+          prerelease: ${{ steps.tag_meta.outputs.prerelease == 'true' }}
           generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.PPX_GITHUB_TOKEN }}
