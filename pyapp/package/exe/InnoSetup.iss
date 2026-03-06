@@ -3,7 +3,7 @@
 ; 有关创建 Inno Setup 脚本文件的详细资料请查阅帮助文档！
 
 #define MyAppName "多功能工具箱"
-#define MyAppVersion "1.0.22"
+#define MyAppVersion "1.1.0"
 #define MyAppFolderName "tools"
 #define MyAppPublisher "Jdassd"
 #define MyAppURL "https://baidu.com"
