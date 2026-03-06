@@ -30,7 +30,23 @@ from api.utils import (
 class ImageTool:
     """图片相关功能"""
 
-    _valid_formats = {'png', 'jpg', 'jpeg', 'webp', 'bmp', 'tiff', 'gif', 'svg'}
+    _format_specs = {
+        'png': {'label': 'PNG', 'pil': 'PNG', 'extensions': ('.png', '.apng')},
+        'jpg': {'label': 'JPG', 'pil': 'JPEG', 'extensions': ('.jpg', '.jpeg', '.jpe', '.jfif')},
+        'webp': {'label': 'WEBP', 'pil': 'WEBP', 'extensions': ('.webp',)},
+        'bmp': {'label': 'BMP', 'pil': 'BMP', 'extensions': ('.bmp', '.dib')},
+        'tiff': {'label': 'TIFF', 'pil': 'TIFF', 'extensions': ('.tif', '.tiff')},
+        'gif': {'label': 'GIF', 'pil': 'GIF', 'extensions': ('.gif',)},
+        'svg': {'label': 'SVG', 'pil': None, 'extensions': ('.svg',)},
+        'avif': {'label': 'AVIF', 'pil': 'AVIF', 'extensions': ('.avif', '.avifs')},
+        'ico': {'label': 'ICO', 'pil': 'ICO', 'extensions': ('.ico',)},
+        'icns': {'label': 'ICNS', 'pil': 'ICNS', 'extensions': ('.icns',)},
+        'tga': {'label': 'TGA', 'pil': 'TGA', 'extensions': ('.tga', '.icb', '.vda', '.vst')},
+        'qoi': {'label': 'QOI', 'pil': 'QOI', 'extensions': ('.qoi',)},
+        'ppm': {'label': 'PPM', 'pil': 'PPM', 'extensions': ('.ppm', '.pnm', '.pbm', '.pgm', '.pfm')},
+        'jp2': {'label': 'JP2', 'pil': 'JPEG2000', 'extensions': ('.jp2', '.j2k', '.j2c', '.jpc', '.jpf', '.jpx')},
+    }
+    _format_order = ('png', 'jpg', 'webp', 'bmp', 'tiff', 'gif', 'svg', 'avif', 'ico', 'icns', 'tga', 'qoi', 'ppm', 'jp2')
     _page_sizes = {
         'a4': (2480, 3508),   # 300 DPI
         'a5': (1748, 2480),
@@ -58,24 +74,98 @@ class ImageTool:
         base.mkdir(parents=True, exist_ok=True)
         return base
 
+    def _get_format_spec(self, fmt: str | None) -> Dict | None:
+        normalized = self._normalize_format(fmt)
+        return self._format_specs.get(normalized)
+
+    def _normalize_format(self, fmt: str | None) -> str:
+        value = str(fmt or 'png').lower().lstrip('.')
+        for key, spec in self._format_specs.items():
+            if value == key:
+                return key
+            aliases = {suffix.lstrip('.').lower() for suffix in spec.get('extensions', ())}
+            if value in aliases:
+                return key
+        return value
+
+    def _get_supported_format_keys(self, include_svg: bool = True, save_only: bool = True) -> List[str]:
+        Image.init()
+        registry = Image.SAVE if save_only else Image.OPEN
+        available = set(registry.keys())
+        supported: List[str] = []
+        for key in self._format_order:
+            spec = self._format_specs[key]
+            pil_format = spec.get('pil')
+            if key == 'svg':
+                if include_svg:
+                    supported.append(key)
+                continue
+            if pil_format and pil_format in available:
+                supported.append(key)
+        return supported
+
+    def _is_supported_format(self, fmt: str | None, include_svg: bool = True, save_only: bool = True) -> bool:
+        normalized = self._normalize_format(fmt)
+        return normalized in self._get_supported_format_keys(include_svg=include_svg, save_only=save_only)
+
+    def _get_dialog_extensions(self) -> List[str]:
+        Image.init()
+        available = set(Image.OPEN.keys())
+        suffixes: List[str] = []
+        for key in self._format_order:
+            if key == 'svg':
+                continue
+            spec = self._format_specs[key]
+            pil_format = spec.get('pil')
+            if pil_format and pil_format in available:
+                suffixes.extend(spec.get('extensions', ()))
+        seen = set()
+        deduped: List[str] = []
+        for suffix in suffixes:
+            lowered = suffix.lower()
+            if lowered in seen:
+                continue
+            seen.add(lowered)
+            deduped.append(lowered)
+        return deduped
+
+    def _build_filter_text(self) -> str:
+        suffixes = self._get_dialog_extensions()
+        if not suffixes:
+            suffixes = ['.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tiff']
+        joined = ';'.join(f'*{suffix}' for suffix in suffixes)
+        return f'图片 ({joined})'
+
+    def _build_output_name(self, file_path: Path, fmt: str, keep_name: bool = True) -> str:
+        spec = self._get_format_spec(fmt)
+        suffix = (spec or {}).get('extensions', (f'.{fmt}',))[0]
+        if keep_name:
+            return f'{file_path.stem}{suffix}'
+        return f'{file_path.stem}_converted{suffix}'
+
     def _save_image(self, image: Image.Image, dest: Path, fmt: str, quality: int | None = None):
         """Persist image with reasonable defaults and Pillow-compatible format names."""
         save_kwargs = {}
-        fmt = (fmt or 'png').lower()
+        fmt = self._normalize_format(fmt)
+        spec = self._get_format_spec(fmt)
+        if not spec:
+            raise ValueError(f'不支持的目标格式：{fmt}')
+        pil_format = spec.get('pil')
+        if not pil_format:
+            raise ValueError(f'格式 {fmt} 需要使用专用导出逻辑')
+
         if fmt in {'jpg', 'jpeg'}:
             # JPEG does not support alpha; always save as RGB
             image = image.convert('RGB')
             if quality:
                 save_kwargs['quality'] = max(30, min(quality, 100))
             save_kwargs.setdefault('optimize', True)
+        elif fmt in {'webp', 'avif'} and quality:
+            save_kwargs['quality'] = max(30, min(quality, 100))
+        elif fmt in {'ppm', 'jp2'}:
+            image = image.convert('RGB')
         if fmt == 'png':
             save_kwargs.setdefault('compress_level', 6)
-
-        # Pillow uses 'JPEG' internally; normalize common alias 'jpg'
-        if fmt in {'jpg', 'jpeg'}:
-            pil_format = 'JPEG'
-        else:
-            pil_format = fmt.upper()
 
         image.save(dest, pil_format, **save_kwargs)
 
@@ -522,6 +612,27 @@ class ImageTool:
         except Exception as exc:
             return api_error(f'图片组格式转换失败：{exc}')
 
+    def image_supported_formats(self, options: Dict | None = None):
+        """返回当前运行环境可读写的图片格式能力"""
+        try:
+            convert_formats = [
+                {
+                    'label': self._format_specs[key]['label'],
+                    'value': key,
+                }
+                for key in self._get_supported_format_keys(include_svg=True, save_only=True)
+            ]
+            raster_formats = [item for item in convert_formats if item['value'] != 'svg']
+            return api_success(
+                '已获取图片格式能力',
+                convertFormats=convert_formats,
+                rasterFormats=raster_formats,
+                fileDialogFilter=self._build_filter_text(),
+                inputExtensions=[suffix.lstrip('.') for suffix in self._get_dialog_extensions()],
+            )
+        except Exception as exc:
+            return api_error(f'获取图片格式能力失败：{exc}')
+
     def image_group_rotate(self, options: Dict | None = None):
         """对图片组选中项执行旋转/翻转并回写缓存"""
         try:
@@ -625,8 +736,8 @@ class ImageTool:
         try:
             opts = self._validate(options)
             files = ensure_files_payload(opts)
-            fmt = str(opts.get('targetFormat', 'png')).lower().lstrip('.')
-            if fmt not in self._valid_formats:
+            fmt = self._normalize_format(opts.get('targetFormat', 'png'))
+            if not self._is_supported_format(fmt, include_svg=True, save_only=True):
                 raise ValueError('不支持的目标格式')
             quality = opts.get('quality')
             try:
@@ -639,7 +750,7 @@ class ImageTool:
             rewritten = []
             for file_path in files:
                 with Image.open(file_path) as image:
-                    dest_name = f'{file_path.stem}.{fmt}' if keep_name else f'{file_path.stem}_{fmt}'
+                    dest_name = self._build_output_name(file_path, fmt, keep_name)
                     dest = output_dir / dest_name
                     if fmt == 'svg':
                         # 使用简单矢量包装：将位图嵌入 SVG 作为 base64 PNG，避免额外依赖
@@ -980,8 +1091,8 @@ class ImageTool:
                 layout = 'horizontal'
             spacing = max(0, int(opts.get('spacing') or 0))
             align = str(opts.get('align', 'center')).lower()
-            fmt = str(opts.get('outputFormat') or 'png').lower().lstrip('.')
-            if fmt not in self._valid_formats:
+            fmt = self._normalize_format(opts.get('outputFormat') or 'png')
+            if not self._is_supported_format(fmt, include_svg=False, save_only=True):
                 fmt = 'png'
             quality = None
             if opts.get('quality') is not None:
@@ -1160,5 +1271,3 @@ class ImageTool:
             return api_success('EXIF 读取完成', file=str(file_path), exif=readable, gps=gps_info)
         except Exception as exc:
             return api_error(f'读取 EXIF 失败：{exc}')
-
-

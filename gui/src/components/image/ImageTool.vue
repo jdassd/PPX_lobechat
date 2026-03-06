@@ -19,7 +19,33 @@ const visibleProxy = computed({
   set: (value) => emit('update:modelValue', value)
 })
 
-const imageFilter = ['图片 (*.png;*.jpg;*.jpeg;*.webp;*.bmp;*.tiff)']
+const fallbackConvertFormatOptions = [
+  { label: 'PNG', value: 'png' },
+  { label: 'JPG', value: 'jpg' },
+  { label: 'WEBP', value: 'webp' },
+  { label: 'BMP', value: 'bmp' },
+  { label: 'TIFF', value: 'tiff' },
+  { label: 'GIF', value: 'gif' },
+  { label: 'SVG', value: 'svg' },
+  { label: 'AVIF', value: 'avif' },
+  { label: 'ICO', value: 'ico' },
+  { label: 'ICNS', value: 'icns' },
+  { label: 'TGA', value: 'tga' },
+  { label: 'QOI', value: 'qoi' },
+  { label: 'PPM', value: 'ppm' },
+  { label: 'JP2', value: 'jp2' }
+]
+
+const fallbackRasterFormatOptions = fallbackConvertFormatOptions.filter((item) => item.value !== 'svg')
+const fallbackImageFilter = [
+  '图片 (*.png;*.apng;*.jpg;*.jpeg;*.jpe;*.jfif;*.webp;*.bmp;*.dib;*.tif;*.tiff;*.gif;*.avif;*.avifs;*.ico;*.icns;*.tga;*.icb;*.vda;*.vst;*.qoi;*.ppm;*.pnm;*.pbm;*.pgm;*.pfm;*.jp2;*.j2k;*.j2c;*.jpc;*.jpf;*.jpx)'
+]
+
+const supportedFormats = reactive({
+  convert: [...fallbackConvertFormatOptions],
+  raster: [...fallbackRasterFormatOptions],
+  imageFilter: [...fallbackImageFilter]
+})
 
 const state = reactive({
   loading: false,
@@ -174,6 +200,68 @@ const state = reactive({
     gps: {}
   }
 })
+
+const normalizeFormatOptions = (items = [], fallback = []) => {
+  if (!Array.isArray(items) || !items.length) return [...fallback]
+  const seen = new Set()
+  return items
+    .map((item) => {
+      if (!item) return null
+      if (typeof item === 'string') {
+        return {
+          label: item.toUpperCase(),
+          value: item
+        }
+      }
+      const value = String(item.value || '').trim()
+      if (!value) return null
+      return {
+        label: String(item.label || value).toUpperCase(),
+        value
+      }
+    })
+    .filter((item) => {
+      if (!item || seen.has(item.value)) return false
+      seen.add(item.value)
+      return true
+    })
+}
+
+const ensureSelectedFormat = (section, field, options = []) => {
+  if (!options.length) return
+  const allowed = new Set(options.map((item) => item.value))
+  if (!allowed.has(state[section][field])) {
+    state[section][field] = options[0].value
+  }
+}
+
+const syncSupportedFormats = (payload = {}) => {
+  const convert = normalizeFormatOptions(payload.convertFormats, fallbackConvertFormatOptions)
+  const raster = normalizeFormatOptions(payload.rasterFormats, convert.filter((item) => item.value !== 'svg'))
+  supportedFormats.convert = convert
+  supportedFormats.raster = raster.length ? raster : [...fallbackRasterFormatOptions]
+  supportedFormats.imageFilter =
+    payload.fileDialogFilter && typeof payload.fileDialogFilter === 'string'
+      ? [payload.fileDialogFilter]
+      : [...fallbackImageFilter]
+
+  ensureSelectedFormat('format', 'targetFormat', supportedFormats.convert)
+  ensureSelectedFormat('pipeline', 'format', supportedFormats.convert)
+  ensureSelectedFormat('concat', 'outputFormat', supportedFormats.raster)
+}
+
+const loadSupportedFormats = async () => {
+  const apiMethod = window.pywebview?.api?.image_supported_formats
+  if (typeof apiMethod !== 'function') return
+  try {
+    const res = await apiMethod()
+    if (res?.code === 0) {
+      syncSupportedFormats(res)
+    }
+  } catch {
+    // 保持前端兜底格式，不额外打断用户操作
+  }
+}
 
 const toFileUrl = (path) => {
   if (!path) return ''
@@ -435,6 +523,16 @@ watch(
   }
 )
 
+watch(
+  () => visibleProxy.value,
+  (visible) => {
+    if (visible) {
+      loadSupportedFormats()
+    }
+  },
+  { immediate: true }
+)
+
 const ensurePyReady = () => {
   if (!window.pywebview?.api) {
     ElMessage.warning('该功能需在桌面客户端中使用')
@@ -454,7 +552,7 @@ const ensureApiMethod = (methodName) => {
 
 const selectImages = async (target) => {
   if (!ensurePyReady()) return
-  const files = await window.pywebview.api.system_pyCreateFileDialog(imageFilter)
+  const files = await window.pywebview.api.system_pyCreateFileDialog(supportedFormats.imageFilter)
   if (files?.length) {
     state[target].files = files
   }
@@ -466,7 +564,7 @@ const selectSingleImage = async (target, field = 'file') => {
     return
   }
   if (!ensurePyReady()) return
-  const files = await window.pywebview.api.system_pyCreateFileDialog(imageFilter)
+  const files = await window.pywebview.api.system_pyCreateFileDialog(supportedFormats.imageFilter)
   if (files?.length) {
     const file = files[0]
     state[target][field] = file
@@ -487,7 +585,7 @@ const selectSingleImage = async (target, field = 'file') => {
 
 const selectCropImage = async () => {
   if (!ensurePyReady()) return
-  const files = await window.pywebview.api.system_pyCreateFileDialog(imageFilter)
+  const files = await window.pywebview.api.system_pyCreateFileDialog(supportedFormats.imageFilter)
   if (!files?.length) return
 
   const file = files[0]
@@ -522,7 +620,7 @@ const selectCropImage = async () => {
 
 const selectWatermarkImage = async () => {
   if (!ensurePyReady()) return
-  const files = await window.pywebview.api.system_pyCreateFileDialog(imageFilter)
+  const files = await window.pywebview.api.system_pyCreateFileDialog(supportedFormats.imageFilter)
   if (files?.length) {
     state.watermark.watermarkImage = files[0]
   }
@@ -534,7 +632,7 @@ const clearWatermarkImage = () => {
 
 const selectPipelineSourceImages = async () => {
   if (!ensurePyReady()) return
-  const files = await window.pywebview.api.system_pyCreateFileDialog(imageFilter)
+  const files = await window.pywebview.api.system_pyCreateFileDialog(supportedFormats.imageFilter)
   if (files?.length) {
     state.pipeline.sourceFiles = files
   }
@@ -542,7 +640,7 @@ const selectPipelineSourceImages = async () => {
 
 const selectPipelineWatermarkImage = async () => {
   if (!ensurePyReady()) return
-  const files = await window.pywebview.api.system_pyCreateFileDialog(imageFilter)
+  const files = await window.pywebview.api.system_pyCreateFileDialog(supportedFormats.imageFilter)
   if (files?.length) {
     state.pipeline.watermark.watermarkImage = files[0]
   }
@@ -1488,11 +1586,12 @@ const removePipelineSourceFile = (file) => {
                 <el-form :model="state.pipeline.format" label-width="90px">
                   <el-form-item label="目标格式">
                     <el-select v-model="state.pipeline.format.targetFormat" style="width: 160px">
-                      <el-option label="PNG" value="png" />
-                      <el-option label="JPG" value="jpg" />
-                      <el-option label="WEBP" value="webp" />
-                      <el-option label="TIFF" value="tiff" />
-                      <el-option label="BMP" value="bmp" />
+                      <el-option
+                        v-for="item in supportedFormats.convert"
+                        :key="`pipeline-format-${item.value}`"
+                        :label="item.label"
+                        :value="item.value"
+                      />
                     </el-select>
                   </el-form-item>
                   <el-form-item label="质量">
@@ -1574,7 +1673,7 @@ const removePipelineSourceFile = (file) => {
           <section class="panel">
             <header>
               <h4>批量格式转换</h4>
-              <p>支持 PNG / JPG / WEBP / TIFF / BMP 互转</p>
+              <p>支持更多常见图片格式互转，实际可用格式会随当前环境自动适配</p>
             </header>
             <FileSelector
               label="源文件"
@@ -1586,12 +1685,12 @@ const removePipelineSourceFile = (file) => {
             <el-form :model="state.format" label-width="110px" class="form-block">
               <el-form-item label="目标格式">
                 <el-select v-model="state.format.targetFormat" style="width: 200px">
-                  <el-option label="PNG" value="png" />
-                  <el-option label="JPG" value="jpg" />
-                  <el-option label="GIF" value="gif" />
-                  <el-option label="SVG" value="svg" />
-                  <el-option label="WEBP" value="webp" />
-                  <el-option label="TIFF" value="tiff" />
+                  <el-option
+                    v-for="item in supportedFormats.convert"
+                    :key="`convert-format-${item.value}`"
+                    :label="item.label"
+                    :value="item.value"
+                  />
                 </el-select>
               </el-form-item>
               <el-form-item label="画质 / 质量">
@@ -2126,9 +2225,12 @@ const removePipelineSourceFile = (file) => {
                 <el-form-item label="输出格式">
                   <div class="field-row">
                     <el-select v-model="state.concat.outputFormat" style="width: 120px">
-                      <el-option label="PNG" value="png" />
-                      <el-option label="JPG" value="jpg" />
-                      <el-option label="WEBP" value="webp" />
+                      <el-option
+                        v-for="item in supportedFormats.raster"
+                        :key="`concat-format-${item.value}`"
+                        :label="item.label"
+                        :value="item.value"
+                      />
                     </el-select>
                     <el-input-number v-model="state.concat.quality" :min="30" :max="100" />
                   </div>
