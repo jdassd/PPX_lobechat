@@ -20,10 +20,6 @@
       {{ status.error }}
     </el-alert>
 
-    <el-alert v-if="!isWindows" type="warning" show-icon :closable="false" class="helper-hint">
-      提示：C盘专清仅支持 Windows，当前平台暂不可用。
-    </el-alert>
-
     <el-tabs v-model="activeTab" class="system-tabs">
       <el-tab-pane label="系统概览" name="overview">
         <div class="overview-header">
@@ -313,7 +309,7 @@
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="C盘专清" name="cDriveClean" :disabled="!isWindows">
+      <el-tab-pane label="C盘专清" name="cDriveClean">
         <el-alert v-if="!isWindows" type="info" show-icon :closable="false" class="helper-hint">
           C盘专清仅支持 Windows 系统
         </el-alert>
@@ -1691,4 +1687,3 @@ const analyzeDisk = async () => {
   color: var(--ppx-text-muted);
 }
 </style>
-

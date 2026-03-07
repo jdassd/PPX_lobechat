@@ -48,127 +48,127 @@ const featureCards = [
   {
     id: 'image',
     title: '图片处理',
-    desc: '格式转换 / 压缩 / 水印',
+    desc: '转换、压缩、水印',
     icon: markRaw(PictureFilled),
     color: 'cyan',
     // tags: ['批量操作', '高清输出'],
     // action: '打开面板',
     disabled: false,
     points: [
-      '支持 PNG / JPG / TIFF / WEBP 互转',
-      '支持图片拼接、图片转 PDF 与批量重命名',
-      '体积压缩支持质量或目标大小模式',
-      '新增文字/图片水印、裁剪、旋转'
+      'PNG、JPG、TIFF、WEBP 格式互转',
+      '图片拼接、转 PDF、批量重命名',
+      '按质量或目标大小压缩',
+      '添加水印、裁剪、旋转'
     ]
   },
   {
     id: 'text',
     title: '文本工具',
-    desc: '编码、JSON、正则、去重',
+    desc: '编码转换、格式化',
     icon: markRaw(Edit),
     color: 'purple',
     // tags: ['Base64', 'JSONPath', '正则'],
     // action: '打开面板',
     disabled: false,
     points: [
-      'Base64 / URL / HTML / UTF-8↔GBK',
-      'JSON 美化、压缩、校验与路径查询',
-      '正则工具、CSV↔JSON 转换',
-      '内置 MD5 / SHA 系列哈希'
+      'Base64、URL、HTML、UTF-8/GBK 编码',
+      'JSON 格式化、校验、路径查询',
+      '正则匹配、CSV/JSON 互转',
+      'MD5、SHA 哈希计算'
     ]
   },
   {
     id: 'video',
     title: '视频处理',
-    desc: '格式转换 / 压缩 / 截取',
+    desc: '转换、压缩、剪辑',
     icon: markRaw(VideoPlay),
     color: 'pink',
     // tags: ['FFmpeg', '音频提取'],
     // action: '打开面板',
     disabled: false,
     points: [
-      'MP4、MOV、AVI、MKV 等互转',
-      '三种压缩模式：预设、码率、目标大小',
-      '按时间轴快速截取片段',
-      '一键提取 MP3/WAV、导出帧图'
+      'MP4、MOV、AVI、MKV 格式互转',
+      '预设、码率、目标大小三种压缩',
+      '按时间轴截取片段',
+      '提取音频、导出帧图'
     ]
   },
   {
     id: 'file',
     title: '文件管理',
-    desc: '搜索 / 目录分析 / 批处理',
+    desc: '搜索、批处理、压缩',
     icon: markRaw(FolderOpened),
     color: 'green',
     // tags: ['ZIP/7Z', '批量处理'],
     // action: '打开面板',
     disabled: false,
     points: [
-      '按关键字、扩展名、大小范围搜索',
+      '按名称、类型、大小搜索文件',
       '批量复制、删除、重命名',
-      'ZIP / 7Z 压缩与解压，支持密码'
+      'ZIP、7Z 压缩解压，支持加密'
     ]
   },
     {
     id: 'automation',
     title: '自动化',
-    desc: '录制回放 / 图片识别',
+    desc: '录制回放、图像识别',
     icon: markRaw(Setting),
     color: 'gray',
     // tags: ['宏录制', '图片识别'],
     // action: '打开面板',
     disabled: false,
     points: [
-      '录制鼠标和键盘操作轨迹',
-      '可循环自动回放的设置',
-      '支持图片定位与自动点击',
-      '脚本可导入导出'
+      '录制鼠标键盘操作',
+      '循环自动回放',
+      '图片定位点击',
+      '脚本导入导出'
     ]
   },
   {
     id: 'excel',
     title: 'Excel 工具',
-    desc: '固定结构电子表格批处理',
+    desc: '数据清洗、分组导出',
     icon: markRaw(Document),
     color: 'blue',
     // tags: ['数据标准化', '图表导出'],
     // action: '立即体验',
     disabled: false,
     points: [
-      '自定义字段定义，分隔符快速匹配',
-      '逐行清洗，可插入自定义逻辑',
-      '按任意列分组输出分表',
-      '多分表可先合并再统一处理'
+      '自定义字段，快速匹配分隔符',
+      '逐行清洗，插入自定义逻辑',
+      '按列分组输出多表',
+      '多表合并统一处理'
     ]
   },
   {
     id: 'pdf',
     title: 'PDF 工具',
-    desc: '转换、合并与切割一体化',
+    desc: '转换、合并、拆分',
     icon: markRaw(Files),
     color: 'orange',
     // tags: ['高清转换', '批量任务'],
     // action: '立即体验',
     disabled: false,
     points: [
-      'PDF 转高清图片，保留矢量细节',
-      '一键生成仿真扫描件效果',
-      '多份 PDF 合并为单文件',
-      '按区间或指定页码拆分/切割'
+      'PDF 转高清图片',
+      '生成仿真扫描件',
+      '多文件合并',
+      '按页码拆分切割'
     ]
   },
   {
     id: 'seal',
     title: '公章生成',
-    desc: '内置模板快速生成电子印章',
+    desc: '电子印章快速制作',
     icon: markRaw(Stamp),
     color: 'red',
     // tags: ['模板管理', '透明导出'],
     // action: '立即体验',
     disabled: false,
     points: [
-      '提供常见圆章、椭圆章等基础模板',
-      '可自定义文字、字号、弧度与描边',
-      '导出透明 PNG，方便叠加使用'
+      '圆章、椭圆章等模板',
+      '自定义文字、字号、弧度',
+      '导出透明 PNG'
     ]
   },
 ]
@@ -177,17 +177,17 @@ const financeCards = [
   {
     id: 'finance',
     title: '财务工具',
-    desc: '人民币大写 / 票据规范',
+    desc: '金额大写转换',
     icon: markRaw(Coin),
     color: 'orange',
     // tags: ['人民币', '票据填写'],
     // action: '打开面板',
     disabled: false,
     points: [
-      '输入金额快速生成中文大写',
-      '自动补全人民币前缀与元/角/分',
-      '符合银行票据填写规范',
-      '内置常见示例便于核对'
+      '数字转中文大写',
+      '自动补全元角分',
+      '符合票据填写规范',
+      '内置常见示例'
     ]
   }
 ]
@@ -197,16 +197,16 @@ const systemCards = [
   {
     id: 'system',
     title: '系统管理',
-    desc: '性能监控、温度/电压/风扇、启动项',
+    desc: '性能监控、启动项管理',
     icon: markRaw(Monitor),
     color: 'indigo',
     // tags: ['CPU / GPU', '系统状态'],
     // action: '打开面板',
     disabled: false,
     points: [
-      'CPU / 内存 / 磁盘 / GPU 性能监控',
-      '温度、电压、风扇转速实时展示',
-      '开机启动项管理、系统运行时间'
+      'CPU、内存、磁盘、GPU 监控',
+      '温度、电压、风扇转速',
+      '启动项管理、运行时间'
     ]
   }
 ]
@@ -337,7 +337,9 @@ const onFeatureAction = (feature) => {
             <!-- 卡片内容 -->
             <div class="card-header">
               <div class="icon-wrapper">
-                <component :is="feature.icon" class="feature-icon" />
+                <el-icon class="feature-icon">
+                  <component :is="feature.icon" />
+                </el-icon>
               </div>
               <div class="title-area">
                 <h3>{{ feature.title }}</h3>
@@ -385,7 +387,9 @@ const onFeatureAction = (feature) => {
 
             <div class="card-header">
               <div class="icon-wrapper">
-                <component :is="feature.icon" class="feature-icon" />
+                <el-icon class="feature-icon">
+                  <component :is="feature.icon" />
+                </el-icon>
               </div>
               <div class="title-area">
                 <h3>{{ feature.title }}</h3>
@@ -433,7 +437,9 @@ const onFeatureAction = (feature) => {
 
             <div class="card-header">
               <div class="icon-wrapper">
-                <component :is="feature.icon" class="feature-icon" />
+                <el-icon class="feature-icon">
+                  <component :is="feature.icon" />
+                </el-icon>
               </div>
               <div class="title-area">
                 <h3>{{ feature.title }}</h3>
@@ -867,8 +873,18 @@ const onFeatureAction = (feature) => {
 }
 
 .feature-icon {
+  width: 22px;
+  height: 22px;
   font-size: 22px;
+  line-height: 1;
   color: var(--card-accent);
+  flex-shrink: 0;
+}
+
+.feature-icon :deep(svg) {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .title-area h3 {
@@ -1095,4 +1111,3 @@ const onFeatureAction = (feature) => {
   }
 }
 </style>
-
