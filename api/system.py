@@ -18,6 +18,7 @@ import platform
 import shlex
 import shutil
 import subprocess
+import threading
 import time
 import uuid
 from datetime import datetime, timezone
@@ -50,6 +51,7 @@ class System():
     '''系统类'''
 
     _window = None
+    _close_timer = None
 
     @staticmethod
     def _subprocess_creationflags() -> int:
@@ -2169,16 +2171,41 @@ class System():
         except Exception as e:
             return {'success': False, 'message': str(e)}
 
+    @classmethod
+    def _close_window_async(cls, delay: float | None = None):
+        '''异步关闭窗口，避免在 JS API 回调未返回时直接销毁 WebView 导致卡死'''
+        window = cls._window
+        if not window:
+            return False
+        if cls._close_timer and cls._close_timer.is_alive():
+            return True
+        if delay is None:
+            delay = 0.15 if Config.appIsMacOS else 0.05
+
+        def _close():
+            try:
+                if hasattr(window, 'destroy'):
+                    window.destroy()
+                elif hasattr(window, 'close'):
+                    window.close()
+            except Exception as err:
+                print(f'[Window] 异步关闭失败: {err}')
+            finally:
+                cls._close_timer = None
+
+        timer = threading.Timer(max(0, delay), _close)
+        timer.daemon = True
+        cls._close_timer = timer
+        timer.start()
+        return True
+
     def close_window(self):
         '''关闭窗口'''
         try:
             if System._window:
-                if hasattr(System._window, 'destroy'):
-                    System._window.destroy()
-                elif hasattr(System._window, 'close'):
-                    System._window.close()
-                else:
+                if not (hasattr(System._window, 'destroy') or hasattr(System._window, 'close')):
                     return {'success': False, 'message': '当前窗口不支持关闭'}
+                self._close_window_async()
                 return {'success': True}
             return {'success': False, 'message': '窗口对象未初始化'}
         except Exception as e:
