@@ -51,7 +51,7 @@ class Config:
     devEnv = True    # 是否为开发环境，不需要手动更改，在程序运行的时候自动判断
     ifCoverDB = False    # 是否覆盖电脑上存储的数据库，默认不覆盖。只有在变更数据库密码或者数据库改动非常大，不得已的情况下才建议覆盖数据库
     typeDB = 'json'    # 数据库类型，目前支持: json, sql
-    pwDB = b'fFXM1fxWfEeu7zoLTwS2ccgBPB2z6X6fCC7iB-W2ciM='    # 数据库密码，typeDB=json时有效。若要重置密码，请在执行 pnpm run init 之前，设置为空，程序会自动生成密码，生成后请勿修改！！！
+    pwDB = b''    # 数据库密码占位符（已废弃，请勿在此填写真实密钥）。typeDB=json 时，真实密钥在运行时由 pyapp/db/keymanager.py 从用户数据目录的 .dbkey 文件读取/生成，不再保存于源码中
 
     ##
     # 函数

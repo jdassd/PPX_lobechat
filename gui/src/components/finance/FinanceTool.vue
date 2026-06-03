@@ -1,6 +1,7 @@
 ﻿<script setup>
 import { computed, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
+import { callApi as pyCall, hasPyApi } from '@/utils/pyapi'
 
 const props = defineProps({
   modelValue: {
@@ -32,7 +33,7 @@ const state = reactive({
 })
 
 const ensurePyReady = () => {
-  if (!window.pywebview?.api) {
+  if (!hasPyApi()) {
     ElMessage.warning('该功能需在桌面客户端中使用')
     return false
   }
@@ -47,15 +48,15 @@ const runConvert = async () => {
   }
   state.loading = true
   try {
-    const res = await window.pywebview.api.finance_rmb_uppercase({
+    const { ok, data: res, message } = await pyCall('finance_rmb_uppercase', {
       amount: state.amount
     })
-    if (res?.code === 0) {
+    if (ok) {
       state.result = res.result || ''
       state.normalized = res.amount || ''
-      ElMessage.success(res.msg || '转换完成')
+      ElMessage.success(message || '转换完成')
     } else {
-      ElMessage.error(res?.msg || '转换失败')
+      ElMessage.error(message || '转换失败')
     }
   } catch (error) {
     ElMessage.error(error?.message || '转换失败')

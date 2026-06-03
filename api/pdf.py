@@ -17,6 +17,8 @@ import fitz  # PyMuPDF
 from PyPDF2 import PdfReader, PdfWriter
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
+from api.utils.validators import ensure_output_directory
+
 
 class PDF():
     '''PDF 相关功能'''
@@ -40,12 +42,8 @@ class PDF():
         return path
 
     def _ensure_output_dir(self, source: Path, preferred: str, suffix: str) -> Path:
-        if preferred:
-            out_dir = Path(preferred)
-        else:
-            out_dir = source.parent / f'{source.stem}_{suffix}'
-        out_dir.mkdir(parents=True, exist_ok=True)
-        return out_dir
+        # 复用通用输出目录创建逻辑，保持与其它模块一致
+        return ensure_output_directory(source, preferred, suffix)
 
     def _resolve_output_path(self, source: Path, output_path: str, suffix: str) -> Path:
         if output_path:

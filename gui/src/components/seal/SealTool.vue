@@ -196,6 +196,7 @@
 <script setup>
 import { computed, reactive, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
 const props = defineProps({
   modelValue: {
@@ -266,7 +267,7 @@ watch(
 )
 
 const ensurePyReady = () => {
-  if (!window.pywebview?.api) {
+  if (!hasPyApi()) {
     ElMessage.warning('该功能需在桌面客户端中使用')
     return false
   }
@@ -312,20 +313,20 @@ const callSealApi = async (mode) => {
   if (!ensurePyReady()) return null
   state.loading = true
   try {
-    const res = await window.pywebview.api.seal_generate(buildPayload(mode))
-    if (res?.code === 0) {
+    const { ok, data: res, message } = await pyCall('seal_generate', buildPayload(mode))
+    if (ok) {
       if (res.preview) {
         state.preview = res.preview
       }
       if (res.output) {
         state.resultPath = res.output
       }
-      if (res.msg) {
-        ElMessage.success(res.msg)
+      if (message) {
+        ElMessage.success(message)
       }
       return res
     }
-    ElMessage.error(res?.msg || '生成失败')
+    ElMessage.error(message || '生成失败')
     return null
   } catch (error) {
     ElMessage.error(error?.message || '执行失败')
@@ -351,7 +352,7 @@ const runExport = async () => {
 
 const selectTexture = async () => {
   if (!ensurePyReady()) return
-  const result = await window.pywebview.api.system_pyCreateFileDialog(['图片文件 (*.png;*.jpg;*.jpeg;*.webp)'])
+  const result = await callApiRaw('system_pyCreateFileDialog', ['图片文件 (*.png;*.jpg;*.jpeg;*.webp)'])
   if (result?.length) {
     state.form.texturePath = result[0].path
   }
@@ -363,7 +364,7 @@ const clearTexture = () => {
 
 const selectOutputDir = async () => {
   if (!ensurePyReady()) return
-  const dir = await window.pywebview.api.system_pySelectDirDialog(state.outputDir || '')
+  const dir = await callApiRaw('system_pySelectDirDialog', state.outputDir || '')
   if (dir) {
     state.outputDir = dir
   }
@@ -371,7 +372,7 @@ const selectOutputDir = async () => {
 
 const openOutput = () => {
   if (!state.resultPath || !ensurePyReady()) return
-  window.pywebview.api.system_pyOpenFile(state.resultPath)
+  callApiRaw('system_pyOpenFile', state.resultPath)
 }
 
 const unlockSeal = () => {

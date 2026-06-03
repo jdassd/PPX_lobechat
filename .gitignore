@@ -17,3 +17,21 @@ pyapp/spec/*
 *.sln
 *.sw?
 .ace-tool/
+
+# 用户敏感/生成文件（密钥、本地数据库等，禁止提交）
+.dbkey
+*.key
+*.pem
+.env
+.env.*
+# 本地加密数据库（开发环境位于 static/db 下）
+static/db/
+base.json
+tinydb.json
+
+# Python 缓存与工具产物
+__pycache__/
+*.pyc
+.ruff_cache
+.mypy_cache
+.pytest_cache

@@ -1,0 +1,6 @@
+# 开发期依赖（仅本地代码规范检查/格式化使用）
+# 注意：此文件与 requirements.txt（运行+打包依赖）分离，
+#       不会被 PyInstaller 打包进产物，避免污染发布体积。
+# 安装：见根 package.json 的 init / lint:py / format:py 脚本。
+ruff==0.6.9
+mypy==1.11.2

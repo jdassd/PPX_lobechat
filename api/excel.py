@@ -16,6 +16,8 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from openpyxl import Workbook, load_workbook
 
+from api.utils.validators import ensure_output_directory
+
 
 class Excel():
     '''Excel 相关功能'''
@@ -95,12 +97,8 @@ class Excel():
         return mapped
 
     def _ensure_output_dir(self, source: Path, preferred: str, suffix: str) -> Path:
-        if preferred:
-            output = Path(preferred)
-        else:
-            output = source.parent / f'{source.stem}_{suffix}'
-        output.mkdir(parents=True, exist_ok=True)
-        return output
+        # 复用通用输出目录创建逻辑，保持与其它模块一致
+        return ensure_output_directory(source, preferred, suffix)
 
     def _write_rows(self, schema: Sequence[str], rows: Iterable[Dict[str, Any]], dest: Path):
         wb = Workbook()

@@ -1,0 +1,8 @@
+# 构建产物与依赖
+dist
+node_modules
+public
+
+# unplugin 自动生成的类型声明（无需 lint）
+auto-imports.d.ts
+components.d.ts

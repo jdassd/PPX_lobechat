@@ -18,6 +18,7 @@ from tinydb.storages import MemoryStorage
 
 from api.db.json.models import Models
 from pyapp.config.config import Config
+from pyapp.db.keymanager import getDBKey
 
 
 class DB:
@@ -60,7 +61,7 @@ class SessionDB:
             file_path = os.path.join(dbDir, 'base.json')
         self.file_path = file_path
         self._db = None
-        self.cipher = Fernet(Config.pwDB)    # 密钥
+        self.cipher = Fernet(getDBKey())    # 密钥：运行时从用户数据目录读取/生成，兼容历史硬编码密钥
 
     def _encrypt(self, data):
         return self.cipher.encrypt(json.dumps(data).encode())

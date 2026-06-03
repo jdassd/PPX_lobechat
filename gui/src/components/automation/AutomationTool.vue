@@ -1,6 +1,7 @@
 ﻿<script setup>
 import { computed, reactive, ref, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
 import PreviewPanel from '../shared/PreviewPanel.vue'
 
@@ -59,7 +60,7 @@ const state = reactive({
 })
 
 const ensurePyReady = () => {
-  if (!window.pywebview?.api) {
+  if (!hasPyApi()) {
     ElMessage.warning('该功能需在桌面客户端内使用')
     return false
   }
@@ -69,8 +70,8 @@ const ensurePyReady = () => {
 const refreshRecordStatus = async () => {
   if (!ensurePyReady()) return
   try {
-    const res = await window.pywebview.api.automation_record_status()
-    if (res?.code === 0) {
+    const { ok, data: res } = await pyCall('automation_record_status')
+    if (ok) {
       state.record.active = !!res.active
       state.record.count = res.count || 0
       state.record.duration = res.duration || 0
@@ -84,19 +85,19 @@ const startRecord = async () => {
   if (!ensurePyReady()) return
   state.loading = true
   try {
-    const res = await window.pywebview.api.automation_record_start({
+    const { ok, message } = await pyCall('automation_record_start', {
       recordMouse: state.record.recordMouse,
       recordKeyboard: state.record.recordKeyboard,
       captureMove: state.record.captureMove,
       moveInterval: state.record.moveInterval
     })
-    if (res?.code === 0) {
+    if (ok) {
       state.record.active = true
       state.record.count = 0
       state.record.duration = 0
-      ElMessage.success(res.msg || '已开始录制')
+      ElMessage.success(message || '已开始录制')
     } else {
-      ElMessage.error(res?.msg || '启动录制失败')
+      ElMessage.error(message || '启动录制失败')
     }
   } catch (error) {
     ElMessage.error(error?.message || '启动录制失败')
@@ -109,16 +110,16 @@ const stopRecord = async () => {
   if (!ensurePyReady()) return
   state.loading = true
   try {
-    const res = await window.pywebview.api.automation_record_stop()
-    if (res?.code === 0) {
+    const { ok, data: res, message } = await pyCall('automation_record_stop')
+    if (ok) {
       state.record.active = false
       state.record.count = res.actions?.length || 0
       state.record.duration = res.duration || 0
       state.macro.payload = res.macro || { actions: res.actions || [] }
       state.macro.text = JSON.stringify(state.macro.payload, null, 2)
-      ElMessage.success(res.msg || '录制完成')
+      ElMessage.success(message || '录制完成')
     } else {
-      ElMessage.error(res?.msg || '停止录制失败')
+      ElMessage.error(message || '停止录制失败')
     }
   } catch (error) {
     ElMessage.error(error?.message || '停止录制失败')
@@ -151,7 +152,7 @@ const clearMacro = () => {
 
 const chooseMacroDir = async () => {
   if (!ensurePyReady()) return
-  const dir = await window.pywebview.api.system_pySelectDirDialog(state.macro.outputDir)
+  const dir = await callApiRaw('system_pySelectDirDialog', state.macro.outputDir)
   if (dir) {
     state.macro.outputDir = dir
   }
@@ -172,15 +173,15 @@ const exportMacro = async () => {
   }
   state.loading = true
   try {
-    const res = await window.pywebview.api.automation_save_macro({
+    const { ok, message } = await pyCall('automation_save_macro', {
       outputDir: state.macro.outputDir,
       fileName: state.macro.fileName || 'macro.json',
       macro: state.macro.payload
     })
-    if (res?.code === 0) {
-      ElMessage.success(res.msg || '保存成功')
+    if (ok) {
+      ElMessage.success(message || '保存成功')
     } else {
-      ElMessage.error(res?.msg || '保存失败')
+      ElMessage.error(message || '保存失败')
     }
   } catch (error) {
     ElMessage.error(error?.message || '保存失败')
@@ -191,19 +192,19 @@ const exportMacro = async () => {
 
 const importMacro = async () => {
   if (!ensurePyReady()) return
-  const files = await window.pywebview.api.system_pyCreateFileDialog(['JSON 文件 (*.json)'])
+  const files = await callApiRaw('system_pyCreateFileDialog', ['JSON 文件 (*.json)'])
   if (!files?.length) return
   state.loading = true
   try {
-    const res = await window.pywebview.api.automation_load_macro({
+    const { ok, data: res, message } = await pyCall('automation_load_macro', {
       path: files[0].path
     })
-    if (res?.code === 0) {
+    if (ok) {
       state.macro.payload = res.macro || { actions: res.actions || [] }
       state.macro.text = JSON.stringify(state.macro.payload, null, 2)
-      ElMessage.success(res.msg || '加载完成')
+      ElMessage.success(message || '加载完成')
     } else {
-      ElMessage.error(res?.msg || '加载失败')
+      ElMessage.error(message || '加载失败')
     }
   } catch (error) {
     ElMessage.error(error?.message || '加载失败')
@@ -215,8 +216,8 @@ const importMacro = async () => {
 const fetchPlaybackStatus = async () => {
   if (!ensurePyReady()) return
   try {
-    const res = await window.pywebview.api.automation_playback_status()
-    if (res?.code === 0) {
+    const { ok, data: res } = await pyCall('automation_playback_status')
+    if (ok) {
       state.playback.status = res
       state.playback.running = !!res.active
       if (!res.active && res.error) {
@@ -254,19 +255,19 @@ const startPlayback = async () => {
   }
   state.loading = true
   try {
-    const res = await window.pywebview.api.automation_play_macro({
+    const { ok, message } = await pyCall('automation_play_macro', {
       macro: state.macro.payload,
       loop: state.playback.loop,
       speed: state.playback.speed,
       startDelay: state.playback.startDelay,
       autoScale: state.playback.autoScale
     })
-    if (res?.code === 0) {
+    if (ok) {
       state.playback.running = true
-      ElMessage.success(res.msg || '回放已启动')
+      ElMessage.success(message || '回放已启动')
       startStatusTimer()
     } else {
-      ElMessage.error(res?.msg || '回放启动失败')
+      ElMessage.error(message || '回放启动失败')
     }
   } catch (error) {
     ElMessage.error(error?.message || '回放启动失败')
@@ -279,13 +280,13 @@ const stopPlayback = async () => {
   if (!ensurePyReady()) return
   state.loading = true
   try {
-    const res = await window.pywebview.api.automation_stop_playback()
-    if (res?.code === 0) {
+    const { ok, message } = await pyCall('automation_stop_playback')
+    if (ok) {
       state.playback.running = false
-      ElMessage.success(res.msg || '已停止回放')
+      ElMessage.success(message || '已停止回放')
       stopStatusTimer()
     } else {
-      ElMessage.error(res?.msg || '停止失败')
+      ElMessage.error(message || '停止失败')
     }
   } catch (error) {
     ElMessage.error(error?.message || '停止失败')
@@ -296,7 +297,7 @@ const stopPlayback = async () => {
 
 const selectImage = async () => {
   if (!ensurePyReady()) return
-  const files = await window.pywebview.api.system_pyCreateFileDialog([
+  const files = await callApiRaw('system_pyCreateFileDialog', [
     '图片文件 (*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp)'
   ])
   if (files?.length) {
@@ -312,7 +313,7 @@ const runFindImage = async () => {
   }
   state.loading = true
   try {
-    const res = await window.pywebview.api.automation_find_image({
+    const { ok, data: res, message } = await pyCall('automation_find_image', {
       image: state.image.file.path,
       confidence: state.image.confidence,
       grayscale: state.image.grayscale,
@@ -320,10 +321,10 @@ const runFindImage = async () => {
       interval: state.image.interval
     })
     state.image.lastResult = res
-    if (res?.code === 0) {
-      ElMessage.success(res.msg || '定位成功')
+    if (ok) {
+      ElMessage.success(message || '定位成功')
     } else {
-      ElMessage.error(res?.msg || '定位失败')
+      ElMessage.error(message || '定位失败')
     }
   } catch (error) {
     ElMessage.error(error?.message || '定位失败')
@@ -340,7 +341,7 @@ const runClickImage = async () => {
   }
   state.loading = true
   try {
-    const res = await window.pywebview.api.automation_click_image({
+    const { ok, data: res, message } = await pyCall('automation_click_image', {
       image: state.image.file.path,
       confidence: state.image.confidence,
       grayscale: state.image.grayscale,
@@ -350,10 +351,10 @@ const runClickImage = async () => {
       button: state.image.button
     })
     state.image.lastResult = res
-    if (res?.code === 0) {
-      ElMessage.success(res.msg || '点击成功')
+    if (ok) {
+      ElMessage.success(message || '点击成功')
     } else {
-      ElMessage.error(res?.msg || '点击失败')
+      ElMessage.error(message || '点击失败')
     }
   } catch (error) {
     ElMessage.error(error?.message || '点击失败')

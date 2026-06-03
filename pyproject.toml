@@ -1,0 +1,103 @@
+# Python 代码规范工具配置（Ruff + mypy）
+# 说明：本配置仅用于本地开发期的代码检查/格式化，不参与运行与打包。
+# 目标：先建立"能跑起来、报错可控"的基线，避免一上来海量 error。
+
+# ============================================================
+# Ruff：linter + formatter
+# 文档：https://docs.astral.sh/ruff/
+# ============================================================
+[tool.ruff]
+# 与 CI（.github/workflows/main.yml）保持一致：Python 3.9
+target-version = "py39"
+
+# 放宽行长以匹配现有代码风格（项目含较多中文注释，行偏长）
+line-length = 120
+
+# 排除虚拟环境、打包产物、自动生成代码、前端等无需检查的目录
+exclude = [
+    "pyapp/pyenv",                       # Python 虚拟环境（含 CEF 环境 pyenvCEF）
+    "build",                             # 打包中间产物
+    "dist",                              # 打包输出
+    "pyapp/db/sql/alembic/versions",     # Alembic 自动生成的迁移脚本
+    "node_modules",
+    "gui",                               # 前端（Vue）代码
+    ".git",
+]
+
+[tool.ruff.lint]
+# 务实的规则集：基础质量 + import 排序
+#   E/W = pycodestyle（错误/警告）
+#   F   = pyflakes（未使用导入、未定义名等真实问题）
+#   I   = isort（import 排序）
+#   UP  = pyupgrade（适配 py39 的现代写法建议）
+#   B   = flake8-bugbear（常见陷阱，仅启用，不强求一次清零）
+select = ["E", "W", "F", "I", "UP", "B"]
+
+# 先忽略一批现存高频/争议规则，保证报错可控。
+# TODO: 后续逐步移除以下 ignore 并配合 `ruff check --fix` 分批整改。
+ignore = [
+    "E501",   # 行过长——已放宽 line-length，但仍可能有超长中文行，先忽略
+    "E402",   # 模块级 import 不在文件顶部（部分入口脚本会先改 sys.path）
+    "E722",   # 裸 except——现有错误处理大量使用，待后续收敛
+    "E741",   # 歧义变量名（如 l/I/O）
+    "F401",   # 未使用的 import——部分 __init__.py 做聚合导出，先忽略
+    "F403",   # `from module import *`
+    "F405",   # 可能来自 star import 的未定义名
+    "B008",   # 在参数默认值中调用函数
+    "B904",   # raise ... from err——现有 except 未普遍使用 from
+    "B023",   # 闭包捕获循环变量——现有少量用例，待人工核实
+    "UP015",  # open() 冗余 mode 参数
+    # 以下 pyupgrade 注解相关规则在 py39 下属于风格改写（typing.List -> list 等），
+    # 现有代码大量使用 typing 风格注解（268+ 处）。py39 运行期改写有风险，
+    # 故先整体忽略以控制报错量级。
+    # TODO: 若未来最低版本提升或加上 `from __future__ import annotations`，
+    #       移除以下 ignore 并用 `ruff check --fix` 分批整改。
+    "UP006",  # 使用 list/dict 取代 typing.List/Dict
+    "UP007",  # 使用 X | Y 取代 typing.Optional/Union
+    "UP035",  # 从 typing 导入已弃用别名
+    "UP009",  # 缺少/冗余 utf-8 编码声明
+    "UP039",  # 类定义多余的空括号
+]
+
+# 允许 ruff 自动修复的范围（本次不执行 --fix，仅为后续整改预设安全集）
+fixable = ["I", "UP", "F401"]
+
+[tool.ruff.lint.isort]
+# import 分组时把项目本地包识别为第一方
+known-first-party = ["api", "pyapp"]
+
+[tool.ruff.format]
+# 与现有风格保持一致：默认双引号、空格缩进
+quote-style = "double"
+indent-style = "space"
+
+# ============================================================
+# mypy：宽松档（仅做最基础的类型检查，避免对现状报错过多）
+# 文档：https://mypy.readthedocs.io/
+# 说明：现有代码有大量 typing 注解但从未做过类型检查，
+#       这里采用最宽松配置，先能跑通；后续可逐步收紧。
+# ============================================================
+[tool.mypy]
+python_version = "3.9"
+
+# 第三方库（pywebview/fitz/openpyxl 等）多无类型存根，忽略其缺失导入
+ignore_missing_imports = true
+
+# 不强制全量注解，避免现存未注解函数大面积报错
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = false
+
+# 降噪：保持输出可控
+warn_return_any = false
+warn_unused_ignores = false
+no_implicit_optional = false
+
+# 排除非源码目录（与 ruff exclude 对齐）
+exclude = [
+    "pyapp/pyenv",
+    "build",
+    "dist",
+    "pyapp/db/sql/alembic/versions",
+    "gui",
+]

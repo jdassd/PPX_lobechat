@@ -1,6 +1,8 @@
 <script setup>
 import { computed, reactive, ref, watch, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { callApi as pyCall } from '@/utils/pyapi'
+import { usePyReady } from '@/composables/useApiCall'
 
 const props = defineProps({
   modelValue: {
@@ -58,17 +60,8 @@ const processRows = ref([])
 const loading = ref(false)
 const stats = reactive({ total: 0, hasMore: false })
 const lastError = ref('')
-const apiReady = ref(!!window.pywebview?.api)
-
-if (!apiReady.value) {
-  window.addEventListener(
-    'pywebviewready',
-    () => {
-      apiReady.value = true
-    },
-    { once: true }
-  )
-}
+// 统一就绪状态管理（替代原手写 pywebviewready 监听）
+const { apiReady } = usePyReady()
 
 const normalizePort = (value) => {
   const digits = String(value ?? '').replace(/[^\d]/g, '')
@@ -104,8 +97,8 @@ const fetchProcesses = async () => {
   loading.value = true
   lastError.value = ''
   try {
-    const res = await window.pywebview.api.system_listProcesses(buildPayload())
-    if (res?.success) {
+    const { ok, data: res } = await pyCall('system_listProcesses', buildPayload())
+    if (ok) {
       processRows.value = Array.isArray(res.items) ? res.items : []
       stats.total = typeof res.total === 'number' ? res.total : processRows.value.length
       stats.hasMore = !!res.hasMore
@@ -152,8 +145,8 @@ const killProcess = async (row) => {
     return
   }
   try {
-    const res = await window.pywebview.api.system_killProcess(row.pid)
-    if (res?.success) {
+    const { ok, data: res } = await pyCall('system_killProcess', row.pid)
+    if (ok) {
       ElMessage.success(`已结束 PID ${row.pid}`)
       fetchProcesses()
     } else {
