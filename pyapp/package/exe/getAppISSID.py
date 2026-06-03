@@ -35,7 +35,7 @@ class GetAPPISSID:
             with open(configPath, 'r', encoding='UTF-8') as f:
                 configContent = f.read()
         except OSError as e:
-            print(f'GetAPPISSID Error => 读取配置文件失败: {e}')
+            print(f'GetAPPISSID Error => read config failed: {e}')
             return
 
         # 仅在 appISSID 为空字符串时写入，避免覆盖已生成的编号（生成后请勿修改）。
@@ -49,14 +49,14 @@ class GetAPPISSID:
 
         if count == 0:
             # appISSID 已存在，无需生成，保持幂等
-            print('GetAPPISSID => appISSID 已存在，跳过生成')
+            print('GetAPPISSID => appISSID already exists, skip')
             return
 
         try:
             with open(configPath, 'w', encoding='UTF-8') as f:
                 f.write(newContent)
         except OSError as e:
-            print(f'GetAPPISSID Error => 写入配置文件失败: {e}')
+            print(f'GetAPPISSID Error => write config failed: {e}')
 
 
 if __name__ == '__main__':

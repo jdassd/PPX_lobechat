@@ -26,7 +26,7 @@ class GetKeyDB:
             with open(configPath, 'r', encoding='UTF-8') as f:
                 configContent = f.read()
         except OSError as e:
-            print(f'GetKeyDB Error => 读取配置文件失败: {e}')
+            print(f'GetKeyDB Error => read config failed: {e}')
             return
 
         # 历史版本曾把真实密钥硬编码进源码，这里统一清空为占位空值，避免密钥进入仓库。
@@ -44,7 +44,7 @@ class GetKeyDB:
                 with open(configPath, 'w', encoding='UTF-8') as f:
                     f.write(newContent)
             except OSError as e:
-                print(f'GetKeyDB Error => 写入配置文件失败: {e}')
+                print(f'GetKeyDB Error => write config failed: {e}')
                 return
 
         # 清理开发环境下可能残留、由旧密钥加密的数据库（与历史行为保持一致）
@@ -53,7 +53,7 @@ class GetKeyDB:
             try:
                 dbPath.unlink()
             except OSError as e:
-                print(f'GetKeyDB Error => 删除旧数据库失败: {e}')
+                print(f'GetKeyDB Error => remove old db failed: {e}')
 
 
 if __name__ == '__main__':
