@@ -168,7 +168,10 @@ def WebViewApp(ifDev=False, ifCef=False):
         template = MAIN_DIR    # 设置页面，指向远程
     else:
         # 生产环境
-        MAIN_DIR = os.path.join(".", "web")
+        # 以 Config.codeDir（打包后的真实资源根目录）定位 web，
+        # 与 static 的定位方式保持一致；PyInstaller 6.x 会把数据文件
+        # 放入 _internal/ 子目录，若用相对 CWD 的 "./web" 会找不到而白屏
+        MAIN_DIR = os.path.join(Config.codeDir, "web")
         template = os.path.join(MAIN_DIR, "index.html")    # 设置页面，指向本地
 
         # 修复某些情况下，打包后软件打开白屏的问题
