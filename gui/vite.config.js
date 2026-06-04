@@ -75,6 +75,12 @@ export default defineConfig({
     ElementPlus({ useSource: false }),
     devPortReporter()
   ],
+  server: {
+    // 显式绑定 IPv4，避免新版 Node 将 'localhost' 解析/绑定到 IPv6(::1)
+    // 导致浏览器与 main.py 探测 127.0.0.1 时连不上 dev server
+    host: '127.0.0.1',
+    port: 5173
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
