@@ -94,17 +94,13 @@ export default defineConfig({
     minify: 'esbuild',
     rollupOptions: {
       output: {
-        // 合理分组的分块策略：vue 生态、element-plus、echarts 各自独立，其余三方库归入 vendor
-        // 取代「每个 node_modules 包单独成块」的过碎策略
+        // 分块策略：仅把相对独立的大块 echarts 单独分出；
+        // vue / element-plus 等相互深度依赖的库统一放入 vendor，
+        // 避免将 vue 与 element-plus 拆成不同 chunk 后产生跨 chunk 循环依赖，
+        // 导致打包后出现 "Cannot access 'X' before initialization"(TDZ) 而白屏
         manualChunks(id) {
           if (!id.includes('node_modules')) {
             return
-          }
-          if (id.includes('/vue') || id.includes('@vue') || id.includes('vue-router') || id.includes('pinia')) {
-            return 'vue-vendor'
-          }
-          if (id.includes('element-plus') || id.includes('@element-plus')) {
-            return 'element-plus'
           }
           if (id.includes('echarts') || id.includes('zrender')) {
             return 'echarts'
