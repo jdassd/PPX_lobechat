@@ -34,7 +34,7 @@ if 'generate_logo_icons' in globals() and generate_logo_icons is not None:
 
 
 buildPath = 'build'  # dist directory (relative)
-console = True  # show console window（临时：beta 调试版开启控制台以显示白屏诊断输出；正式版本应改回 False）
+console = False  # show console window
 appName = Config.appName  # project name (display)
 appCollectName = Config.appNameEN  # dist folder name
 version = Config.appVersion  # version string

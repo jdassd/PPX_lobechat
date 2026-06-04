@@ -16,7 +16,6 @@ import os
 import signal
 import subprocess
 import socket
-import sys
 import time
 from contextlib import closing
 
@@ -178,26 +177,6 @@ def WebViewApp(ifDev=False, ifCef=False):
         # 修复某些情况下，打包后软件打开白屏的问题
         mimetypes.add_type('application/javascript', '.js')
 
-        # ===== 临时调试输出（v1.1.4-beta，定位白屏；正式版本应移除）=====
-        print('==================== [PPX Boot Debug] ====================', flush=True)
-        print(f'[Boot] sys.frozen      = {getattr(sys, "frozen", False)}', flush=True)
-        print(f'[Boot] sys._MEIPASS    = {getattr(sys, "_MEIPASS", None)}', flush=True)
-        print(f'[Boot] sys.path[0]     = {sys.path[0]}', flush=True)
-        print(f'[Boot] os.getcwd()     = {os.getcwd()}', flush=True)
-        print(f'[Boot] Config.codeDir  = {Config.codeDir}', flush=True)
-        print(f'[Boot] Config.staticDir= {Config.staticDir}', flush=True)
-        print(f'[Boot] MAIN_DIR(web)   = {MAIN_DIR}', flush=True)
-        print(f'[Boot] template        = {template}', flush=True)
-        print(f'[Boot] web 目录存在?   = {os.path.isdir(MAIN_DIR)}', flush=True)
-        print(f'[Boot] index.html 存在?= {os.path.isfile(template)}', flush=True)
-        try:
-            if os.path.isdir(MAIN_DIR):
-                print(f'[Boot] web 目录内容    = {os.listdir(MAIN_DIR)}', flush=True)
-        except Exception as _e:
-            print(f'[Boot] 列目录失败: {_e}', flush=True)
-        print('==========================================================', flush=True)
-        # ===== 临时调试输出结束 =====
-
     # 系统分辨率
     screens = webview.screens
     screens = screens[0]
@@ -234,8 +213,7 @@ def WebViewApp(ifDev=False, ifCef=False):
     guiCEF = 'cef' if ifCef else None
 
     # 启动窗口
-    # 临时：beta 调试版强制开启 devtools(F12)/web 检查器，便于排查打包白屏；正式版本应改回 debug=Config.devEnv
-    webview.start(debug=True, http_server=True, gui=guiCEF)
+    webview.start(debug=Config.devEnv, http_server=True, gui=guiCEF)
 
 
 if __name__ == "__main__":
