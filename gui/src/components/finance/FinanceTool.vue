@@ -1,21 +1,8 @@
-﻿<script setup>
-import { computed, reactive } from 'vue'
+<script setup>
+import { reactive } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, hasPyApi } from '@/utils/pyapi'
-
-const props = defineProps({
-  modelValue: {
-    type: Boolean,
-    default: false
-  }
-})
-
-const emit = defineEmits(['update:modelValue'])
-
-const visibleProxy = computed({
-  get: () => props.modelValue,
-  set: (value) => emit('update:modelValue', value)
-})
+import { toChineseAmount } from '@/utils/amount'
 
 const examples = [
   { label: '1409.50', note: '中间含 0' },
@@ -32,18 +19,17 @@ const state = reactive({
   normalized: ''
 })
 
-const ensurePyReady = () => {
-  if (!hasPyApi()) {
-    ElMessage.warning('该功能需在桌面客户端中使用')
-    return false
-  }
-  return true
-}
-
 const runConvert = async () => {
-  if (!ensurePyReady()) return
   if (!state.amount.trim()) {
     ElMessage.warning('请输入金额')
+    return
+  }
+  // 桌面端优先走后端（支持 ￥/RMB/千分位规范化）；非桌面环境用本地 amount.js 兜底，便于浏览器预览。
+  if (!hasPyApi()) {
+    const num = String(state.amount).replace(/[^\d.\-]/g, '')
+    state.normalized = num
+    state.result = toChineseAmount(num)
+    if (!state.result) ElMessage.warning('无法识别金额')
     return
   }
   state.loading = true
@@ -78,22 +64,8 @@ const resetAll = () => {
 </script>
 
 <template>
-  <el-drawer
-    v-model="visibleProxy"
-    size="60%"
-    append-to-body
-    custom-class="finance-tool-drawer"
-  >
-    <template #header>
-      <div class="drawer-head">
-        <div>
-          <p class="eyebrow">FINANCE TOOL</p>
-          <h3>人民币大写</h3>
-          <p class="sub">快速生成规范的票据金额大写格式</p>
-        </div>
-      </div>
-    </template>
-    <div class="finance-tool">
+  <div class="tool-scroll">
+    <div class="tool-narrow">
       <section class="panel">
         <header>
           <h4>金额输入</h4>
@@ -101,11 +73,7 @@ const resetAll = () => {
         </header>
         <el-form label-width="120px">
           <el-form-item label="小写金额">
-            <el-input
-              v-model="state.amount"
-              placeholder="如 1680.32 或 ￥1,680.32"
-              clearable
-            />
+            <el-input v-model="state.amount" placeholder="如 1680.32 或 ￥1,680.32" clearable />
           </el-form-item>
           <el-form-item>
             <div class="field-row field-wrap">
@@ -141,13 +109,7 @@ const resetAll = () => {
             <el-input v-model="state.normalized" readonly placeholder="自动规范化后金额" />
           </el-form-item>
         </el-form>
-        <el-input
-          v-model="state.result"
-          type="textarea"
-          :rows="4"
-          readonly
-          placeholder="生成结果将在此显示"
-        />
+        <el-input v-model="state.result" type="textarea" :rows="4" readonly placeholder="生成结果将在此显示" />
       </section>
 
       <section class="panel">
@@ -163,41 +125,41 @@ const resetAll = () => {
         </ul>
       </section>
     </div>
-  </el-drawer>
+  </div>
 </template>
 
 <style scoped>
-.finance-tool {
-  padding: 20px;
+.tool-scroll {
+  height: 100%;
+  overflow-y: auto;
+  padding: 24px;
 }
-
+.tool-narrow {
+  max-width: 760px;
+  margin: 0 auto;
+}
 .example-strip {
   margin-top: 12px;
 }
-
 .example-title {
   display: inline-block;
   font-size: 12px;
   color: var(--ppx-text-muted);
   margin-bottom: 8px;
 }
-
 .example-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
 }
-
 .example-tags .el-tag {
   cursor: pointer;
   transition: all var(--ppx-transition-fast);
 }
-
 .example-tags .el-tag:hover {
-  border-color: rgba(14, 165, 164, 0.4);
-  color: var(--ppx-neon-blue);
+  border-color: rgba(var(--accent-rgb), 0.4);
+  color: var(--accent);
 }
-
 .rule-list {
   margin: 0;
   padding-left: 18px;

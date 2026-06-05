@@ -1,19 +1,5 @@
 ﻿<template>
-  <el-drawer
-    v-model="visibleProxy"
-    size="80%"
-    append-to-body
-    custom-class="seal-tool-drawer"
-  >
-    <template #header>
-      <div class="drawer-head">
-        <div>
-          <p class="eyebrow">SEAL WORKSHOP</p>
-          <h3>公章生成器</h3>
-          <p class="sub">自定义文字、字号、颜色与纹理，输出透明 PNG</p>
-        </div>
-      </div>
-    </template>
+  <div class="tool-scroll">
     <div class="seal-tool">
       <section v-if="state.locked" class="panel lock-panel">
         <header>
@@ -190,27 +176,13 @@
         </el-descriptions>
       </section>
     </div>
-  </el-drawer>
+  </div>
 </template>
 
 <script setup>
-import { computed, reactive, watch } from 'vue'
+import { computed, onMounted, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
-
-const props = defineProps({
-  modelValue: {
-    type: Boolean,
-    default: false
-  }
-})
-
-const emit = defineEmits(['update:modelValue'])
-
-const visibleProxy = computed({
-  get: () => props.modelValue,
-  set: (val) => emit('update:modelValue', val)
-})
 
 const predefinedColors = ['#d4252c', '#c11f26', '#cf1b2c', '#bb1f2c', '#a2192e']
 const SEAL_UNLOCK_PASSWORD = 'Jd_251114'
@@ -257,14 +229,11 @@ const state = reactive({
 
 const canvasSize = computed(() => (state.form.outerRadius + state.form.edge) * 2)
 
-watch(
-  () => props.modelValue,
-  (visible) => {
-    if (visible && !state.locked && !state.preview) {
-      runPreview()
-    }
+onMounted(() => {
+  if (!state.locked && !state.preview) {
+    runPreview()
   }
-)
+})
 
 const ensurePyReady = () => {
   if (!hasPyApi()) {
@@ -384,7 +353,7 @@ const unlockSeal = () => {
   if (state.password === SEAL_UNLOCK_PASSWORD) {
     state.locked = false
     state.passwordError = ''
-    const needPreview = !state.preview && props.modelValue
+    const needPreview = !state.preview
     state.password = ''
     if (needPreview) {
       runPreview()
@@ -399,19 +368,27 @@ const resetDefaults = () => {
   Object.assign(state.form, makeDefaultForm())
   state.preview = ''
   state.resultPath = ''
-  if (props.modelValue && !state.locked) {
+  if (!state.locked) {
     runPreview()
   }
 }
 </script>
 
 <style scoped>
-/* 使用全局深空玻璃主题样式 */
+/* 使用全局主题样式 */
+
+.tool-scroll {
+  height: 100%;
+  overflow-y: auto;
+  padding: 24px;
+}
 
 .seal-tool {
   display: grid;
   grid-template-columns: 1.4fr 0.6fr;
   gap: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 /* 表单区域 */

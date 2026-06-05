@@ -1,6 +1,7 @@
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 
+import ToolWorkspace from '@/components/shared/ToolWorkspace.vue'
 import FormatPanel from './parts/FormatPanel.vue'
 import CompressPanel from './parts/CompressPanel.vue'
 import WatermarkPanel from './parts/WatermarkPanel.vue'
@@ -9,21 +10,17 @@ import RotatePanel from './parts/RotatePanel.vue'
 import PdfPanel from './parts/PdfPanel.vue'
 import AdvancedPanel from './parts/AdvancedPanel.vue'
 
-const props = defineProps({
-  modelValue: {
-    type: Boolean,
-    default: false
-  }
-})
-
-const emit = defineEmits(['update:modelValue'])
-
-const visibleProxy = computed({
-  get: () => props.modelValue,
-  set: (value) => emit('update:modelValue', value)
-})
-
 const activeTab = ref('convert')
+
+const TABS = [
+  { name: 'convert', label: '格式转换' },
+  { name: 'compress', label: '批量压缩' },
+  { name: 'watermark', label: '批量水印' },
+  { name: 'crop', label: '裁剪工具' },
+  { name: 'rotate', label: '旋转 / 翻转' },
+  { name: 'pdf', label: '图片转 PDF' },
+  { name: 'advanced', label: '高级批量' },
+]
 
 const fallbackConvertFormatOptions = [
   { label: 'PNG', value: 'png' },
@@ -103,67 +100,21 @@ const loadSupportedFormats = async () => {
   }
 }
 
-watch(
-  () => visibleProxy.value,
-  (visible) => {
-    if (visible) {
-      loadSupportedFormats()
-    }
-  },
-  { immediate: true }
-)
+onMounted(loadSupportedFormats)
 </script>
 
 <template>
-  <el-drawer
-    v-model="visibleProxy"
-    size="80%"
-    append-to-body
-    custom-class="image-tool-drawer"
-  >
-    <template #header>
-      <div class="drawer-head">
-        <div>
-          <p class="eyebrow">IMAGE TOOLKIT</p>
-          <h3>图片处理工具</h3>
-          <p class="sub">格式转换、压缩、水印及 PDF 合成</p>
-        </div>
-      </div>
-    </template>
-    <div class="image-tool">
-      <el-tabs v-model="activeTab" class="image-tabs">
-        <el-tab-pane label="格式转换" name="convert">
-          <FormatPanel :supported-formats="supportedFormats" />
-        </el-tab-pane>
-
-        <el-tab-pane label="批量压缩" name="compress">
-          <CompressPanel :supported-formats="supportedFormats" />
-        </el-tab-pane>
-
-        <el-tab-pane label="批量水印" name="watermark">
-          <WatermarkPanel :supported-formats="supportedFormats" />
-        </el-tab-pane>
-
-        <el-tab-pane label="裁剪工具" name="crop">
-          <CropPanel :supported-formats="supportedFormats" />
-        </el-tab-pane>
-
-        <el-tab-pane label="旋转 / 翻转" name="rotate">
-          <RotatePanel :supported-formats="supportedFormats" />
-        </el-tab-pane>
-
-        <el-tab-pane label="图片转 PDF" name="pdf">
-          <PdfPanel :supported-formats="supportedFormats" />
-        </el-tab-pane>
-
-        <el-tab-pane label="高级批量" name="advanced">
-          <AdvancedPanel :supported-formats="supportedFormats" />
-        </el-tab-pane>
-      </el-tabs>
-    </div>
-  </el-drawer>
+  <ToolWorkspace v-model="activeTab" :tabs="TABS" accent="#2b6fff">
+    <FormatPanel v-show="activeTab === 'convert'" :supported-formats="supportedFormats" />
+    <CompressPanel v-show="activeTab === 'compress'" :supported-formats="supportedFormats" />
+    <WatermarkPanel v-show="activeTab === 'watermark'" :supported-formats="supportedFormats" />
+    <CropPanel v-show="activeTab === 'crop'" :supported-formats="supportedFormats" />
+    <RotatePanel v-show="activeTab === 'rotate'" :supported-formats="supportedFormats" />
+    <PdfPanel v-show="activeTab === 'pdf'" :supported-formats="supportedFormats" />
+    <AdvancedPanel v-show="activeTab === 'advanced'" :supported-formats="supportedFormats" />
+  </ToolWorkspace>
 </template>
 
 <style scoped>
-/* 使用全局深空玻璃主题样式 */
+/* 使用全局主题样式 */
 </style>

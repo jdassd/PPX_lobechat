@@ -1,94 +1,72 @@
 <template>
-  <el-drawer
-    v-model="visibleProxy"
-    size="80%"
-    append-to-body
-    custom-class="excel-tool-drawer"
-  >
-    <template #header>
-      <div class="drawer-head">
-        <div>
-          <p class="eyebrow">EXCEL WORKSHOP</p>
-          <h3>Excel 工具集</h3>
-          <p class="sub">支持结构定义、按列分组、分表导出与 JSON 图表</p>
-        </div>
-      </div>
-    </template>
-    <div class="excel-tool">
-      <el-tabs v-model="activeTab" class="excel-tabs">
-        <el-tab-pane label="结构定义" name="structure">
-          <StructurePanel
-            :preview="state.preview"
-            :loading="state.loading"
-            :select-excel="selectExcel"
-            :load-preview="loadPreview"
-          />
-        </el-tab-pane>
+  <ToolWorkspace v-model="activeTab" :tabs="TABS" accent="#1f9d55">
+    <StructurePanel
+      v-show="activeTab === 'structure'"
+      :preview="state.preview"
+      :loading="state.loading"
+      :select-excel="selectExcel"
+      :load-preview="loadPreview"
+    />
 
-        <el-tab-pane label="数据处理" name="process">
-          <ProcessPanel
-            :process="state.process"
-            :schema-fields="schemaFields"
-            :loading="state.loading"
-            :select-excel="selectExcel"
-            :select-dir="selectDir"
-            :remove-file="removeFile"
-            :clear-list="clearList"
-            :open-path="openPath"
-            :run-process="runProcess"
-          />
-        </el-tab-pane>
+    <ProcessPanel
+      v-show="activeTab === 'process'"
+      :process="state.process"
+      :schema-fields="schemaFields"
+      :loading="state.loading"
+      :select-excel="selectExcel"
+      :select-dir="selectDir"
+      :remove-file="removeFile"
+      :clear-list="clearList"
+      :open-path="openPath"
+      :run-process="runProcess"
+    />
 
-        <el-tab-pane label="图表制作" name="chart">
-          <ChartPanel
-            :chart="state.chart"
-            :chart-fields="chartFields"
-            :loading="state.loading"
-            :chart-data-sample="chartDataSample"
-            :chart-option-sample="chartOptionSample"
-            :select-excel="selectExcel"
-            :load-chart-preview="loadChartPreview"
-            :run-chart-build="runChartBuild"
-            :set-chart-ref="setChartRef"
-          />
-        </el-tab-pane>
+    <ChartPanel
+      v-show="activeTab === 'chart'"
+      :chart="state.chart"
+      :chart-fields="chartFields"
+      :loading="state.loading"
+      :chart-data-sample="chartDataSample"
+      :chart-option-sample="chartOptionSample"
+      :select-excel="selectExcel"
+      :load-chart-preview="loadChartPreview"
+      :run-chart-build="runChartBuild"
+      :set-chart-ref="setChartRef"
+    />
 
-        <el-tab-pane label="分表合并" name="merge">
-          <MergePanel
-            :merge="state.merge"
-            :loading="state.loading"
-            :select-excel="selectExcel"
-            :select-dir="selectDir"
-            :remove-file="removeFile"
-            :clear-list="clearList"
-            :open-path="openPath"
-            :run-merge-tables="runMergeTables"
-          />
-        </el-tab-pane>
-      </el-tabs>
+    <MergePanel
+      v-show="activeTab === 'merge'"
+      :merge="state.merge"
+      :loading="state.loading"
+      :select-excel="selectExcel"
+      :select-dir="selectDir"
+      :remove-file="removeFile"
+      :clear-list="clearList"
+      :open-path="openPath"
+      :run-merge-tables="runMergeTables"
+    />
 
-      <section class="panel log-panel">
-        <header>
-          <h4>操作日志</h4>
-          <p>展示最近的执行记录与返回信息</p>
-        </header>
-        <el-timeline>
-          <el-timeline-item
-            v-for="item in state.logs"
-            :key="item.id"
-            :type="item.type"
-            :timestamp="item.time"
-            placement="top"
-          >
-            <div class="log-entry">
-              <p>{{ item.message }}</p>
-              <p class="log-sub">{{ item.action }}</p>
-            </div>
-          </el-timeline-item>
-        </el-timeline>
-      </section>
-    </div>
-  </el-drawer>
+    <section class="panel log-panel">
+      <header>
+        <h4>操作日志</h4>
+        <p>展示最近的执行记录与返回信息</p>
+      </header>
+      <el-timeline>
+        <el-timeline-item
+          v-for="item in state.logs"
+          :key="item.id"
+          :type="item.type"
+          :timestamp="item.time"
+          placement="top"
+        >
+          <div class="log-entry">
+            <p>{{ item.message }}</p>
+            <p class="log-sub">{{ item.action }}</p>
+          </div>
+        </el-timeline-item>
+      </el-timeline>
+    </section>
+  </ToolWorkspace>
 </template>
 
 <script setup>
@@ -96,6 +74,7 @@ import { computed, reactive, ref, watch, onMounted, onUnmounted, nextTick, shall
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
+import ToolWorkspace from '@/components/shared/ToolWorkspace.vue'
 import StructurePanel from './parts/StructurePanel.vue'
 import ProcessPanel from './parts/ProcessPanel.vue'
 import ChartPanel from './parts/ChartPanel.vue'
@@ -127,19 +106,12 @@ const chartOptionSample = JSON.stringify(
   2
 )
 
-const props = defineProps({
-  modelValue: {
-    type: Boolean,
-    default: false
-  }
-})
-
-const emit = defineEmits(['update:modelValue'])
-
-const visibleProxy = computed({
-  get: () => props.modelValue,
-  set: (val) => emit('update:modelValue', val)
-})
+const TABS = [
+  { name: 'structure', label: '结构定义' },
+  { name: 'process', label: '数据处理' },
+  { name: 'chart', label: '图表制作' },
+  { name: 'merge', label: '分表合并' },
+]
 
 const activeTab = ref('structure')
 
@@ -299,20 +271,6 @@ watch(
   () => {
     if (activeTab.value === 'chart') {
       renderChart()
-    }
-  }
-)
-
-watch(
-  () => props.modelValue,
-  (val) => {
-    if (!val) {
-      disposeChart()
-      return
-    }
-    if (activeTab.value === 'chart') {
-      renderChart()
-      nextTick(() => resizeChart())
     }
   }
 )

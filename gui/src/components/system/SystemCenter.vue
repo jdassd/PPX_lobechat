@@ -1,66 +1,29 @@
 <template>
-  <el-dialog
-    v-model="visible"
-    class="system-center"
-    :width="dialogWidth"
-    :close-on-click-modal="false"
-    destroy-on-close
-  >
-    <template #title>
-      <div class="dialog-title">
-        <span>系统管理中心</span>
-        <small>性能监控 · 传感器 · 启动项 · 进程 · 清理优化</small>
-      </div>
-    </template>
-
-    <el-alert v-if="!apiReady" type="warning" show-icon class="helper-hint">
+  <ToolWorkspace v-model="activeTab" :tabs="TABS" accent="#3b7de0">
+    <el-alert v-if="!apiReady" type="warning" show-icon class="helper-hint" :closable="false">
       请在桌面客户端内使用，浏览器预览无法访问本地系统信息。
     </el-alert>
-    <el-alert v-else-if="status.error" type="error" show-icon class="helper-hint">
+    <el-alert v-else-if="status.error" type="error" show-icon class="helper-hint" :closable="false">
       {{ status.error }}
     </el-alert>
 
-    <el-tabs v-model="activeTab" class="system-tabs">
-      <el-tab-pane label="系统概览" name="overview">
-        <OverviewPanel :status="status" @refresh="fetchSystemStatus" />
-      </el-tab-pane>
-
-      <el-tab-pane label="传感器" name="sensors">
-        <SensorsPanel :status="status" />
-      </el-tab-pane>
-
-      <el-tab-pane label="开机启动项" name="startup">
-        <StartupPanel :api-ready="apiReady" :visible="visible" />
-      </el-tab-pane>
-
-      <el-tab-pane label="进程管理" name="process">
-        <ProcessPanel :api-ready="apiReady" :visible="visible" />
-      </el-tab-pane>
-
-      <el-tab-pane label="垃圾清理" name="junk">
-        <JunkPanel :api-ready="apiReady" />
-      </el-tab-pane>
-
-      <el-tab-pane label="C盘专清" name="cDriveClean">
-        <CDriveCleanPanel :api-ready="apiReady" :is-windows="isWindows" />
-      </el-tab-pane>
-
-      <el-tab-pane label="注册表清理" name="registry">
-        <RegistryPanel :api-ready="apiReady" :is-windows="isWindows" />
-      </el-tab-pane>
-
-      <el-tab-pane label="磁盘空间分析" name="diskAnalyzer">
-        <DiskAnalyzerPanel :api-ready="apiReady" :status="status" />
-      </el-tab-pane>
-    </el-tabs>
-  </el-dialog>
+    <OverviewPanel v-show="activeTab === 'overview'" :status="status" @refresh="fetchSystemStatus" />
+    <SensorsPanel v-show="activeTab === 'sensors'" :status="status" />
+    <StartupPanel v-show="activeTab === 'startup'" :api-ready="apiReady" :visible="activeTab === 'startup'" />
+    <ProcessPanel v-show="activeTab === 'process'" :api-ready="apiReady" :visible="activeTab === 'process'" />
+    <JunkPanel v-show="activeTab === 'junk'" :api-ready="apiReady" />
+    <CDriveCleanPanel v-show="activeTab === 'cDriveClean'" :api-ready="apiReady" :is-windows="isWindows" />
+    <RegistryPanel v-show="activeTab === 'registry'" :api-ready="apiReady" :is-windows="isWindows" />
+    <DiskAnalyzerPanel v-show="activeTab === 'diskAnalyzer'" :api-ready="apiReady" :status="status" />
+  </ToolWorkspace>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { usePyReady } from '@/composables/useApiCall'
 import { callApi as pyCall } from '@/utils/pyapi'
+import ToolWorkspace from '@/components/shared/ToolWorkspace.vue'
 import OverviewPanel from './parts/OverviewPanel.vue'
 import SensorsPanel from './parts/SensorsPanel.vue'
 import StartupPanel from './parts/StartupPanel.vue'
@@ -72,42 +35,18 @@ import DiskAnalyzerPanel from './parts/DiskAnalyzerPanel.vue'
 
 const isWindows = navigator.platform.toLowerCase().includes('win')
 
-const props = defineProps({
-  modelValue: {
-    type: Boolean,
-    default: false
-  }
-})
-
-const emit = defineEmits(['update:modelValue'])
-
-const visible = computed({
-  get: () => props.modelValue,
-  set: (value) => emit('update:modelValue', value)
-})
+const TABS = [
+  { name: 'overview', label: '系统概览' },
+  { name: 'sensors', label: '传感器' },
+  { name: 'startup', label: '开机启动项' },
+  { name: 'process', label: '进程管理' },
+  { name: 'junk', label: '垃圾清理' },
+  { name: 'cDriveClean', label: 'C盘专清' },
+  { name: 'registry', label: '注册表清理' },
+  { name: 'diskAnalyzer', label: '磁盘空间分析' },
+]
 
 const activeTab = ref('overview')
-const windowSize = reactive({ width: 0, height: 0 })
-const dialogWidth = computed(() => {
-  if (windowSize.width < 480) return '95%'
-  if (windowSize.width < 768) return '92%'
-  if (windowSize.width < 1200) return '880px'
-  return '980px'
-})
-
-const handleResize = () => {
-  windowSize.width = window.innerWidth
-  windowSize.height = window.innerHeight
-}
-
-onMounted(() => {
-  handleResize()
-  window.addEventListener('resize', handleResize)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('resize', handleResize)
-})
 
 // 统一就绪状态管理（替代原手写 pywebviewready 监听）
 const { apiReady } = usePyReady()
@@ -179,43 +118,21 @@ const stopStatusPolling = () => {
   }
 }
 
-watch(
-  () => visible.value,
-  (show) => {
-    if (show && apiReady.value) {
-      startStatusPolling()
-    } else {
-      stopStatusPolling()
-    }
-  }
-)
+onMounted(() => {
+  if (apiReady.value) startStatusPolling()
+})
+
+onUnmounted(stopStatusPolling)
 
 watch(
   () => apiReady.value,
   (ready) => {
-    if (ready && visible.value) {
-      startStatusPolling()
-    }
+    if (ready) startStatusPolling()
   }
 )
 </script>
 
 <style scoped>
-.system-center :deep(.el-dialog__body) {
-  padding-top: 0;
-}
-
-.dialog-title {
-  display: flex;
-  flex-direction: column;
-}
-
-.dialog-title small {
-  color: var(--ppx-text-muted);
-  margin-top: 2px;
-  font-size: 12px;
-}
-
 .helper-hint {
   margin-bottom: 12px;
 }

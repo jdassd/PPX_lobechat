@@ -1,23 +1,15 @@
 ﻿<script setup>
-import { computed, reactive, ref, onUnmounted } from 'vue'
+import { reactive, ref, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
+import ToolWorkspace from '@/components/shared/ToolWorkspace.vue'
 import PreviewPanel from '../shared/PreviewPanel.vue'
 
-const props = defineProps({
-  modelValue: {
-    type: Boolean,
-    default: false
-  }
-})
-
-const emit = defineEmits(['update:modelValue'])
-
-const visibleProxy = computed({
-  get: () => props.modelValue,
-  set: (value) => emit('update:modelValue', value)
-})
+const TABS = [
+  { name: 'record', label: '录制 / 回放' },
+  { name: 'image', label: '图像识别' },
+]
 
 const statusTimer = ref(null)
 
@@ -393,20 +385,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <el-drawer v-model="visibleProxy" size="72%" append-to-body custom-class="automation-drawer">
-    <template #header>
-      <div class="drawer-head">
-        <div>
-          <p class="eyebrow">AUTOMATION</p>
-          <h3>自动化录制与图像识别</h3>
-          <p class="sub">录制鼠标/键盘轨迹，回放脚本，支持图片定位与点击</p>
-        </div>
-      </div>
-    </template>
-
-    <div class="automation-tool">
-      <el-tabs v-model="state.activeTab">
-        <el-tab-pane label="录制 / 回放" name="record">
+  <ToolWorkspace v-model="state.activeTab" :tabs="TABS" accent="#8a8f99">
+    <div v-show="state.activeTab === 'record'">
           <section class="panel">
             <header>
               <h4>录制设置</h4>
@@ -511,9 +491,9 @@ onUnmounted(() => {
               </template>
             </el-alert>
           </section>
-        </el-tab-pane>
+    </div>
 
-        <el-tab-pane label="图像识别" name="image">
+    <div v-show="state.activeTab === 'image'">
           <section class="panel">
             <header>
               <h4>图片定位与点击</h4>
@@ -554,10 +534,8 @@ onUnmounted(() => {
             </el-form>
             <PreviewPanel v-if="state.image.lastResult" title="识别结果" :content="state.image.lastResult" />
           </section>
-        </el-tab-pane>
-      </el-tabs>
     </div>
-  </el-drawer>
+  </ToolWorkspace>
 </template>
 
 <style scoped>

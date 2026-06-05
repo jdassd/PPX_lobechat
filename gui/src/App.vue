@@ -1,253 +1,164 @@
+<!-- ============================================================
+     App.vue —— 重构后的外壳(固定侧边栏 + 工作区, 替代抽屉模式)
+     ============================================================ -->
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watchEffect } from 'vue'
+import { TOOLS } from './config/tools'
 import WindowTitleBar from './components/WindowTitleBar.vue'
 import WindowResizeHandles from './components/WindowResizeHandles.vue'
 import BtnUpdate from './components/BtnUpdate.vue'
+import Sidebar from './components/Sidebar.vue'
+import CommandPalette from './components/CommandPalette.vue'
 import HomeLauncher from './components/home/HomeLauncher.vue'
+
+// 各工具视图(已去抽屉化, 内容直接渲染进工作区)
+import ImageTool from './components/image/ImageTool.vue'
 import PdfTool from './components/pdf/PdfTool.vue'
 import ExcelTool from './components/excel/ExcelTool.vue'
-import SealTool from './components/seal/SealTool.vue'
-import SystemCenter from './components/system/SystemCenter.vue'
-import ImageTool from './components/image/ImageTool.vue'
 import TextTool from './components/text/TextTool.vue'
 import VideoTool from './components/video/VideoTool.vue'
 import FileTool from './components/file/FileTool.vue'
-import FinanceTool from './components/finance/FinanceTool.vue'
 import AutomationTool from './components/automation/AutomationTool.vue'
+import SealTool from './components/seal/SealTool.vue'
+import FinanceTool from './components/finance/FinanceTool.vue'
+import SystemCenter from './components/system/SystemCenter.vue'
 
-const isLoaded = ref(false)
+const VIEWS = {
+  image: ImageTool,
+  pdf: PdfTool,
+  excel: ExcelTool,
+  text: TextTool,
+  video: VideoTool,
+  file: FileTool,
+  automation: AutomationTool,
+  seal: SealTool,
+  finance: FinanceTool,
+  system: SystemCenter,
+}
 
-onMounted(() => {
-  setTimeout(() => {
-    isLoaded.value = true
-  }, 100)
+const active = ref('home') // 'home' | 工具 id
+const collapsed = ref(localStorage.getItem('ppx-sidebar-collapsed') === '1')
+const cmdOpen = ref(false)
+const theme = ref(localStorage.getItem('ppx-theme') || 'light')
+const density = ref(localStorage.getItem('ppx-density') || 'regular')
+
+const activeTool = computed(() => TOOLS.find((t) => t.id === active.value))
+const activeView = computed(() => VIEWS[active.value])
+
+watchEffect(() => {
+  const el = document.documentElement
+  el.dataset.theme = theme.value
+  el.dataset.density = density.value
+  el.classList.toggle('dark', theme.value === 'dark') // Element Plus 内部暗色变量
+  localStorage.setItem('ppx-theme', theme.value)
+  localStorage.setItem('ppx-density', density.value)
 })
 
-const pdfToolVisible = ref(false)
-const excelToolVisible = ref(false)
-const sealToolVisible = ref(false)
-const systemToolVisible = ref(false)
-const imageToolVisible = ref(false)
-const textToolVisible = ref(false)
-const videoToolVisible = ref(false)
-const fileToolVisible = ref(false)
-const financeToolVisible = ref(false)
-const automationToolVisible = ref(false)
+watchEffect(() => {
+  localStorage.setItem('ppx-sidebar-collapsed', collapsed.value ? '1' : '0')
+})
 
-const onOpenTool = (toolId) => {
-  const visibilityMap = {
-    excel: excelToolVisible,
-    pdf: pdfToolVisible,
-    seal: sealToolVisible,
-    system: systemToolVisible,
-    image: imageToolVisible,
-    text: textToolVisible,
-    video: videoToolVisible,
-    file: fileToolVisible,
-    finance: financeToolVisible,
-    automation: automationToolVisible
-  }
-
-  if (visibilityMap[toolId]) {
-    visibilityMap[toolId].value = true
+const onKey = (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault()
+    cmdOpen.value = !cmdOpen.value
   }
 }
+onMounted(() => window.addEventListener('keydown', onKey))
+onUnmounted(() => window.removeEventListener('keydown', onKey))
+
+const go = (id) => { active.value = id }
+const toggleTheme = () => { theme.value = theme.value === 'dark' ? 'light' : 'dark' }
 </script>
 
 <template>
-  <div class="app-container" :class="{ loaded: isLoaded }">
-    <!-- 自定义窗口控制顶栏（融合原有顶栏内容） -->
+  <div class="app-shell">
     <WindowTitleBar>
-      <!-- 左侧：Logo 和标题 -->
       <template #left>
         <div class="logo-area">
-          <div class="logo-icon">
-            <img class="logo-image" src="/logo.png" alt="PPX Logo" />
-          </div>
-          <span class="logo-label">工具箱</span>
+          <img class="logo-image" src="/logo.png" alt="" />
+          <span class="logo-label">多功能工具箱</span>
         </div>
       </template>
-
-      <!-- 右侧：更新按钮 -->
       <template #right>
+        <el-button text circle title="搜索 (Ctrl/⌘ + K)" @click="cmdOpen = true">
+          <el-icon :size="18"><Search /></el-icon>
+        </el-button>
+        <el-button text circle title="切换主题" @click="toggleTheme">
+          <el-icon :size="18"><component :is="theme === 'dark' ? 'Sunny' : 'Moon'" /></el-icon>
+        </el-button>
         <BtnUpdate />
       </template>
     </WindowTitleBar>
 
     <WindowResizeHandles />
 
-    <!-- 背景装饰 -->
-    <div class="bg-decorations">
-      <div class="orb orb-1"></div>
-      <div class="orb orb-2"></div>
-      <div class="orb orb-3"></div>
-      <div class="grid-pattern"></div>
-      <div class="grain"></div>
+    <div class="app-body">
+      <Sidebar :active="active" :collapsed="collapsed" @select="go" @toggle="collapsed = !collapsed" />
+
+      <main class="workspace">
+        <header v-if="active !== 'home' && activeTool" class="tool-bar">
+          <span class="tool-ico" :style="{ background: activeTool.hue + '1f', color: activeTool.hue }">
+            <el-icon :size="19"><component :is="activeTool.icon" /></el-icon>
+          </span>
+          <div class="tool-meta">
+            <div class="tool-name">{{ activeTool.name }}</div>
+            <div class="tool-desc">{{ activeTool.desc }}</div>
+          </div>
+          <span class="flex1" />
+          <el-button text @click="go('home')">
+            <el-icon><HomeFilled /></el-icon>&nbsp;返回首页
+          </el-button>
+        </header>
+
+        <div class="tool-content">
+          <HomeLauncher v-if="active === 'home'" @open="go" />
+          <component :is="activeView" v-else />
+        </div>
+      </main>
     </div>
 
-    <!-- 主内容区 -->
-    <div class="main-wrapper">
-      <HomeLauncher @open="onOpenTool" />
-    </div>
+    <CommandPalette v-model="cmdOpen" @select="go" />
   </div>
-
-  <!-- 工具弹窗 -->
-  <ImageTool v-model="imageToolVisible" />
-  <TextTool v-model="textToolVisible" />
-  <VideoTool v-model="videoToolVisible" />
-  <FileTool v-model="fileToolVisible" />
-  <AutomationTool v-model="automationToolVisible" />
-  <PdfTool v-model="pdfToolVisible" />
-  <ExcelTool v-model="excelToolVisible" />
-  <SealTool v-model="sealToolVisible" />
-  <SystemCenter v-model="systemToolVisible" />
-  <FinanceTool v-model="financeToolVisible" />
 </template>
 
 <style scoped>
-/* =============================
-   Atelier Paper UI Shell
-   ============================= */
-
-.app-container {
-  width: 100%;
-  height: 100%;
-  background: var(--ppx-bg-deep);
-  position: relative;
-  overflow: hidden;
-  --titlebar-height: 35px;
-}
-
-.app-container::before {
-  content: '';
-  position: absolute;
-  inset: -20% -10% -10% -10%;
-  background:
-    radial-gradient(55% 55% at 10% 10%, rgba(249, 115, 22, 0.18) 0%, transparent 60%),
-    radial-gradient(40% 40% at 90% 0%, rgba(14, 165, 164, 0.2) 0%, transparent 65%),
-    radial-gradient(45% 45% at 60% 100%, rgba(132, 204, 22, 0.16) 0%, transparent 60%);
-  z-index: 0;
-  pointer-events: none;
-}
-
-.bg-decorations {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(70px);
-  opacity: 0.5;
-  animation: float 18s ease-in-out infinite;
-}
-
-.orb-1 {
-  width: 420px;
-  height: 420px;
-  background: radial-gradient(circle, rgba(249, 115, 22, 0.25) 0%, transparent 70%);
-  top: -140px;
-  left: -120px;
-  animation-delay: 0s;
-}
-
-.orb-2 {
-  width: 360px;
-  height: 360px;
-  background: radial-gradient(circle, rgba(14, 165, 164, 0.28) 0%, transparent 70%);
-  top: 40%;
-  right: -120px;
-  animation-delay: -6s;
-}
-
-.orb-3 {
-  width: 320px;
-  height: 320px;
-  background: radial-gradient(circle, rgba(132, 204, 22, 0.24) 0%, transparent 70%);
-  bottom: -120px;
-  left: 35%;
-  animation-delay: -12s;
-}
-
-.grid-pattern {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(44, 36, 29, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(44, 36, 29, 0.05) 1px, transparent 1px);
-  background-size: 80px 80px;
-  mask-image: radial-gradient(ellipse at center, black 0%, transparent 70%);
-  opacity: 0.4;
-}
-
-.grain {
-  position: absolute;
-  inset: 0;
-  background-image:
-    repeating-linear-gradient(0deg, rgba(44, 36, 29, 0.03), rgba(44, 36, 29, 0.03) 1px, transparent 1px, transparent 4px),
-    repeating-linear-gradient(90deg, rgba(44, 36, 29, 0.02), rgba(44, 36, 29, 0.02) 1px, transparent 1px, transparent 3px);
-  opacity: 0.4;
-  mix-blend-mode: multiply;
-}
-
-@keyframes float {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  25% { transform: translate(30px, -20px) scale(1.05); }
-  50% { transform: translate(-20px, 10px) scale(0.95); }
-  75% { transform: translate(10px, 30px) scale(1.02); }
-}
-
-.main-wrapper {
-  width: 100%;
-  height: calc(100% - var(--titlebar-height, 35px)); /* 减去顶栏高度 */
+.app-shell {
   display: flex;
   flex-direction: column;
-  position: relative;
-  z-index: 1;
-  margin-top: var(--titlebar-height, 35px); /* 为融合后的自定义窗口控制顶栏留出空间 */
+  height: 100%;
+  padding-top: var(--titlebar-height, 35px);
+  box-sizing: border-box;
+  background: var(--ppx-bg-deep);
+  --titlebar-height: 35px;
 }
-
-/* Logo 区域样式（现在在 WindowTitleBar 中） */
-.logo-area {
+.app-body { flex: 1; display: flex; min-height: 0; }
+.workspace { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.tool-bar {
+  height: 56px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--ppx-glass-border);
+  background: var(--ppx-bg-elevated);
 }
-
-.logo-icon {
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
+.tool-ico {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: var(--ppx-shadow-sm);
-  position: relative;
-  overflow: hidden;
+  flex-shrink: 0;
 }
-
-.logo-image {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
-}
-
-.logo-label {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ppx-text-primary);
-  letter-spacing: 0.5px;
-}
-
-/* ??? */
-@media (max-width: 600px) {
-  .app-container {
-    --titlebar-height: 48px;
-  }
-}
+.tool-meta { min-width: 0; }
+.tool-name { font-size: 15px; font-weight: 700; line-height: 1.1; color: var(--ppx-text-primary); }
+.tool-desc { font-size: 11.5px; color: var(--ppx-text-muted); }
+.tool-content { flex: 1; min-height: 0; overflow: hidden; }
+.flex1 { flex: 1; }
+.logo-area { display: flex; align-items: center; gap: 9px; }
+.logo-image { width: 18px; height: 18px; object-fit: contain; }
+.logo-label { font-size: 13px; font-weight: 600; color: var(--ppx-text-secondary); }
 </style>
