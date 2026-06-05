@@ -3,6 +3,7 @@
      ============================================================ -->
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watchEffect } from 'vue'
+import { Sunny, Moon } from '@element-plus/icons-vue'
 import { TOOLS } from './config/tools'
 import { pushRecent } from './utils/recent'
 import WindowTitleBar from './components/WindowTitleBar.vue'
@@ -91,7 +92,7 @@ const toggleTheme = () => {
           <el-icon :size="18"><Search /></el-icon>
         </el-button>
         <el-button text circle title="切换主题" @click="toggleTheme">
-          <el-icon :size="18"><component :is="theme === 'dark' ? 'Sunny' : 'Moon'" /></el-icon>
+          <el-icon :size="18"><component :is="theme === 'dark' ? Sunny : Moon" /></el-icon>
         </el-button>
         <BtnUpdate />
       </template>
