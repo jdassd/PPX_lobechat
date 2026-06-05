@@ -12,24 +12,37 @@
 :root {
   /* ?? */
   --ppx-font-display: 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-  --ppx-font-body: 'Noto Serif SC', 'Source Han Serif SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', serif;
+  --ppx-font-body: var(--ppx-font-display);
   --ppx-font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
 
+  /* 强调色(默认蓝, 取自 logo) */
+  --accent: #2b6fff;
+  --accent-rgb: 43, 111, 255;
+  --accent-ink: #ffffff;
+
+  /* 密度(默认 regular) */
+  --ppx-gap: 16px;
+  --ppx-pad: 18px;
+  --ppx-row-h: 40px;
+
   /* ???? - Atelier Paper */
-  --ppx-bg-deep: #f4efe7;
-  --ppx-bg-base: #f8f2e8;
-  --ppx-bg-elevated: #fff7ee;
+  --ppx-bg-deep: #f4f5f7;
+  --ppx-bg-base: #f7f8fa;
+  --ppx-bg-elevated: #ffffff;
   --ppx-bg-surface: #ffffff;
   --ppx-bg-ink: #17130f;
+  --ppx-bg-inset: #f1f2f5;
+  --ppx-bg-hover: rgba(0, 0, 0, 0.04);
+  --ppx-bg-active: rgba(var(--accent-rgb), 0.10);
 
   /* ???? */
-  --ppx-glass-bg: rgba(255, 255, 255, 0.7);
-  --ppx-glass-bg-hover: rgba(255, 255, 255, 0.9);
-  --ppx-glass-border: rgba(40, 30, 20, 0.12);
-  --ppx-glass-border-hover: rgba(40, 30, 20, 0.2);
+  --ppx-glass-bg: var(--ppx-bg-surface);
+  --ppx-glass-bg-hover: var(--ppx-bg-base);
+  --ppx-glass-border: rgba(17, 20, 24, 0.09);
+  --ppx-glass-border-hover: rgba(17, 20, 24, 0.16);
 
   /* ??? */
-  --ppx-neon-blue: #0ea5a4;
+  --ppx-neon-blue: var(--accent);
   --ppx-neon-purple: #f97316;
   --ppx-neon-pink: #f59e0b;
   --ppx-neon-cyan: #22c1dc;
@@ -37,15 +50,15 @@
   --ppx-neon-orange: #ea580c;
 
   /* ??? */
-  --ppx-gradient-primary: linear-gradient(135deg, #f97316 0%, #0ea5a4 55%, #84cc16 100%);
+  --ppx-gradient-primary: linear-gradient(135deg, var(--accent) 0%, rgba(var(--accent-rgb), 0.82) 100%);
   --ppx-gradient-subtle: linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(14, 165, 164, 0.12) 100%);
   --ppx-gradient-glow: radial-gradient(ellipse at center, rgba(249, 115, 22, 0.18) 0%, transparent 70%);
 
   /* ??? */
-  --ppx-text-primary: #2c241d;
-  --ppx-text-secondary: #4c433a;
-  --ppx-text-muted: #7b6f63;
-  --ppx-text-disabled: #a19384;
+  --ppx-text-primary: #1a1d21;
+  --ppx-text-secondary: #4a4f57;
+  --ppx-text-muted: #868b94;
+  --ppx-text-disabled: #aab0b8;
 
   /* ??? */
   --ppx-success: #16a34a;
@@ -54,16 +67,17 @@
   --ppx-info: #0ea5a4;
 
   /* ?? */
-  --ppx-shadow-sm: 0 4px 10px rgba(44, 36, 29, 0.08);
-  --ppx-shadow-md: 0 12px 30px rgba(44, 36, 29, 0.12);
-  --ppx-shadow-lg: 0 28px 60px rgba(44, 36, 29, 0.18);
+  --ppx-shadow-sm: 0 1px 2px rgba(17, 20, 24, 0.05), 0 1px 3px rgba(17, 20, 24, 0.05);
+  --ppx-shadow-md: 0 4px 14px rgba(17, 20, 24, 0.08);
+  --ppx-shadow-lg: 0 18px 48px rgba(17, 20, 24, 0.16);
   --ppx-shadow-glow: 0 0 40px rgba(249, 115, 22, 0.2);
 
   /* ?? */
+  --ppx-radius-xs: 8px;
   --ppx-radius-sm: 10px;
-  --ppx-radius-md: 16px;
-  --ppx-radius-lg: 22px;
-  --ppx-radius-xl: 32px;
+  --ppx-radius-md: 14px;
+  --ppx-radius-lg: 18px;
+  --ppx-radius-xl: 24px;
 
   /* ?? */
   --ppx-transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
@@ -75,7 +89,49 @@
   --ppx-blur-sm: blur(6px);
   --ppx-blur-md: blur(14px);
   --ppx-blur-lg: blur(24px);
-  --ppx-ring: 0 0 0 3px rgba(14, 165, 164, 0.18);
+  --ppx-ring: 0 0 0 3px rgba(var(--accent-rgb), 0.18);
+
+  --ppx-success: #16a34a;
+  --ppx-warning: #d97706;
+  --ppx-danger: #dc2626;
+  --ppx-info: var(--accent);
+}
+
+/* ---------- 密度 ---------- */
+[data-density='compact'] { --ppx-gap: 11px; --ppx-pad: 13px; --ppx-row-h: 34px; }
+[data-density='regular'] { --ppx-gap: 16px; --ppx-pad: 18px; --ppx-row-h: 40px; }
+[data-density='comfy']   { --ppx-gap: 22px; --ppx-pad: 24px; --ppx-row-h: 46px; }
+
+/* ---------- 深色主题 ---------- */
+[data-theme='dark'] {
+  --ppx-bg-deep: #0d0e11;
+  --ppx-bg-base: #1c1f25;
+  --ppx-bg-elevated: #131418;
+  --ppx-bg-surface: #17191e;
+  --ppx-bg-inset: #202329;
+
+  --ppx-bg-hover: rgba(255, 255, 255, 0.05);
+  --ppx-bg-active: rgba(var(--accent-rgb), 0.18);
+
+  --ppx-glass-bg: var(--ppx-bg-surface);
+  --ppx-glass-bg-hover: var(--ppx-bg-base);
+  --ppx-glass-border: rgba(255, 255, 255, 0.08);
+  --ppx-glass-border-hover: rgba(255, 255, 255, 0.15);
+
+  --ppx-text-primary: #f2f4f7;
+  --ppx-text-secondary: #b6bcc6;
+  --ppx-text-muted: #7d838e;
+  --ppx-text-disabled: #5a606a;
+
+  --ppx-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --ppx-shadow-md: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --ppx-shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.6);
+
+  --ppx-success: #4ade80;
+  --ppx-warning: #fbbf24;
+  --ppx-danger: #f87171;
+
+  color-scheme: dark;
 }
 
 
@@ -114,19 +170,19 @@
 
   /* ??? */
   --el-border-color: var(--ppx-glass-border);
-  --el-border-color-light: rgba(44, 36, 29, 0.08);
-  --el-border-color-lighter: rgba(44, 36, 29, 0.06);
-  --el-border-color-extra-light: rgba(44, 36, 29, 0.04);
-  --el-border-color-dark: rgba(44, 36, 29, 0.16);
-  --el-border-color-darker: rgba(44, 36, 29, 0.24);
+  --el-border-color-light: var(--ppx-glass-border);
+  --el-border-color-lighter: var(--ppx-glass-border);
+  --el-border-color-extra-light: var(--ppx-glass-border);
+  --el-border-color-dark: var(--ppx-glass-border-hover);
+  --el-border-color-darker: var(--ppx-glass-border-hover);
 
   /* ??? */
-  --el-fill-color: rgba(255, 255, 255, 0.7);
-  --el-fill-color-light: rgba(255, 255, 255, 0.5);
-  --el-fill-color-lighter: rgba(255, 255, 255, 0.3);
-  --el-fill-color-extra-light: rgba(255, 255, 255, 0.2);
-  --el-fill-color-dark: rgba(44, 36, 29, 0.04);
-  --el-fill-color-darker: rgba(44, 36, 29, 0.08);
+  --el-fill-color: var(--ppx-bg-inset);
+  --el-fill-color-light: var(--ppx-bg-base);
+  --el-fill-color-lighter: var(--ppx-bg-base);
+  --el-fill-color-extra-light: var(--ppx-bg-base);
+  --el-fill-color-dark: var(--ppx-bg-inset);
+  --el-fill-color-darker: var(--ppx-bg-inset);
   --el-fill-color-blank: var(--ppx-bg-surface);
 
   /* ?? */
@@ -189,13 +245,13 @@ body,
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(44, 36, 29, 0.2);
+  background: var(--ppx-glass-border-hover);
   border-radius: 3px;
   transition: background var(--ppx-transition-fast);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(44, 36, 29, 0.35);
+  background: var(--ppx-text-muted);
 }
 
 ::-webkit-scrollbar-corner {
