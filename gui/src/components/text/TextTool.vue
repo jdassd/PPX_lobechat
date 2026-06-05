@@ -25,7 +25,7 @@ const TABS = [
   { name: 'replace', label: '批量替换' },
   { name: 'timestamp', label: '时间戳转换' },
   { name: 'unicode', label: 'Unicode 工具' },
-  { name: 'hash', label: '哈希计算' },
+  { name: 'hash', label: '哈希计算' }
 ]
 </script>
 

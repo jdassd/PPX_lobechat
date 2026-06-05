@@ -20,15 +20,7 @@ const toolsOf = (g) => TOOLS.filter((t) => t.group === g)
       <div v-for="g in GROUPS" :key="g.id" class="group">
         <div v-if="!collapsed" class="group-label">{{ g.label }}</div>
         <div v-else class="divider" />
-        <button
-          v-for="t in toolsOf(g.id)"
-          :key="t.id"
-          class="nav"
-          :class="{ on: active === t.id }"
-          :style="{ '--hue': t.hue }"
-          @click="emit('select', t.id)"
-          :title="collapsed ? t.name : ''"
-        >
+        <button v-for="t in toolsOf(g.id)" :key="t.id" class="nav" :class="{ on: active === t.id }" :style="{ '--hue': t.hue }" @click="emit('select', t.id)" :title="collapsed ? t.name : ''">
           <span v-if="active === t.id && !collapsed" class="rail" />
           <el-icon :size="18"><component :is="t.icon" /></el-icon>
           <span v-if="!collapsed">{{ t.name }}</span>
@@ -54,12 +46,25 @@ const toolsOf = (g) => TOOLS.filter((t) => t.group === g)
   transition: width var(--ppx-transition-normal);
   overflow: hidden;
 }
-.sidebar.collapsed { width: 64px; }
-.top { padding: 12px; }
-.groups { flex: 1; overflow-y: auto; padding: 0 12px; }
+.sidebar.collapsed {
+  width: 64px;
+}
+.top {
+  padding: 12px;
+}
+.groups {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 12px;
+}
 .sidebar.collapsed .groups,
-.sidebar.collapsed .top { padding-left: 8px; padding-right: 8px; }
-.group { margin-bottom: 14px; }
+.sidebar.collapsed .top {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+.group {
+  margin-bottom: 14px;
+}
 .group-label {
   font-size: 11px;
   font-weight: 700;
@@ -68,7 +73,11 @@ const toolsOf = (g) => TOOLS.filter((t) => t.group === g)
   letter-spacing: 0.06em;
   padding: 6px 11px 5px;
 }
-.divider { height: 1px; background: var(--ppx-glass-border); margin: 8px 6px; }
+.divider {
+  height: 1px;
+  background: var(--ppx-glass-border);
+  margin: 8px 6px;
+}
 .nav {
   position: relative;
   display: flex;
@@ -87,10 +96,22 @@ const toolsOf = (g) => TOOLS.filter((t) => t.group === g)
   transition: all var(--ppx-transition-fast);
   text-align: left;
 }
-.sidebar.collapsed .nav { justify-content: center; padding: 10px; }
-.nav:hover { background: var(--ppx-bg-hover); color: var(--ppx-text-primary); }
-.nav.on { background: var(--ppx-bg-active); color: var(--hue, var(--accent)); font-weight: 600; }
-.nav.home.on { color: var(--accent); }
+.sidebar.collapsed .nav {
+  justify-content: center;
+  padding: 10px;
+}
+.nav:hover {
+  background: var(--ppx-bg-hover);
+  color: var(--ppx-text-primary);
+}
+.nav.on {
+  background: var(--ppx-bg-active);
+  color: var(--hue, var(--accent));
+  font-weight: 600;
+}
+.nav.home.on {
+  color: var(--accent);
+}
 .rail {
   position: absolute;
   left: 0;
@@ -109,5 +130,7 @@ const toolsOf = (g) => TOOLS.filter((t) => t.group === g)
   padding: 14px 12px;
   color: var(--ppx-text-muted);
 }
-.muted { color: var(--ppx-text-muted); }
+.muted {
+  color: var(--ppx-text-muted);
+}
 </style>

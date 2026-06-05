@@ -1,542 +1,343 @@
+<!-- gui/src/components/home/HomeLauncher.vue —— 首页 Dashboard
+     问候(按时段) + 搜索框(⌘K 提示) + 最近活动 + 全部工具网格 -->
 <script setup>
-import { markRaw, ref, onMounted, onUnmounted } from 'vue'
-import { Document, Files, Monitor, Setting, Stamp, PictureFilled, Edit, VideoPlay, FolderOpened, Coin } from '@element-plus/icons-vue'
-import ToolCard from './ToolCard.vue'
+import { computed, ref } from 'vue'
+import { TOOLS, toolById } from '@/config/tools'
+import { getRecents, relativeTime } from '@/utils/recent'
 
 const emit = defineEmits(['open'])
 
-const isScrolled = ref(false)
-const contentAreaRef = ref(null)
+const hour = new Date().getHours()
+const greet = hour < 6 ? '夜深了' : hour < 12 ? '上午好' : hour < 18 ? '下午好' : '晚上好'
 
-// 滚动监听处理
-const handleScroll = () => {
-  if (contentAreaRef.value) {
-    isScrolled.value = contentAreaRef.value.scrollTop > 30
-  }
-}
-
-onMounted(() => {
-  // 添加滚动监听
-  if (contentAreaRef.value) {
-    contentAreaRef.value.addEventListener('scroll', handleScroll)
-  }
+const q = ref('')
+const filtered = computed(() => {
+  const k = q.value.trim().toLowerCase()
+  if (!k) return TOOLS
+  return TOOLS.filter((t) => (t.name + t.desc + t.points.join('')).toLowerCase().includes(k))
 })
 
-onUnmounted(() => {
-  // 移除滚动监听
-  if (contentAreaRef.value) {
-    contentAreaRef.value.removeEventListener('scroll', handleScroll)
-  }
-})
+const recents = computed(() =>
+  getRecents()
+    .map((r) => ({ ...r, tool: toolById(r.tool) }))
+    .filter((r) => r.tool)
+)
 
-const featureCards = [
-  {
-    id: 'image',
-    title: '图片处理',
-    desc: '转换、压缩、水印',
-    icon: markRaw(PictureFilled),
-    color: 'cyan',
-    // tags: ['批量操作', '高清输出'],
-    // action: '打开面板',
-    disabled: false,
-    points: [
-      'PNG、JPG、TIFF、WEBP 格式互转',
-      '图片拼接、转 PDF、批量重命名',
-      '按质量或目标大小压缩',
-      '添加水印、裁剪、旋转'
-    ]
-  },
-  {
-    id: 'text',
-    title: '文本工具',
-    desc: '编码转换、格式化',
-    icon: markRaw(Edit),
-    color: 'purple',
-    // tags: ['Base64', 'JSONPath', '正则'],
-    // action: '打开面板',
-    disabled: false,
-    points: [
-      'Base64、URL、HTML、UTF-8/GBK 编码',
-      'JSON 格式化、校验、路径查询',
-      '正则匹配、CSV/JSON 互转',
-      'MD5、SHA 哈希计算'
-    ]
-  },
-  {
-    id: 'video',
-    title: '视频处理',
-    desc: '转换、压缩、剪辑',
-    icon: markRaw(VideoPlay),
-    color: 'pink',
-    // tags: ['FFmpeg', '音频提取'],
-    // action: '打开面板',
-    disabled: false,
-    points: [
-      'MP4、MOV、AVI、MKV 格式互转',
-      '预设、码率、目标大小三种压缩',
-      '按时间轴截取片段',
-      '提取音频、导出帧图'
-    ]
-  },
-  {
-    id: 'file',
-    title: '文件管理',
-    desc: '搜索、批处理、压缩',
-    icon: markRaw(FolderOpened),
-    color: 'green',
-    // tags: ['ZIP/7Z', '批量处理'],
-    // action: '打开面板',
-    disabled: false,
-    points: [
-      '按名称、类型、大小搜索文件',
-      '批量复制、删除、重命名',
-      'ZIP、7Z 压缩解压，支持加密'
-    ]
-  },
-    {
-    id: 'automation',
-    title: '自动化',
-    desc: '录制回放、图像识别',
-    icon: markRaw(Setting),
-    color: 'gray',
-    // tags: ['宏录制', '图片识别'],
-    // action: '打开面板',
-    disabled: false,
-    points: [
-      '录制鼠标键盘操作',
-      '循环自动回放',
-      '图片定位点击',
-      '脚本导入导出'
-    ]
-  },
-  {
-    id: 'excel',
-    title: 'Excel 工具',
-    desc: '数据清洗、分组导出',
-    icon: markRaw(Document),
-    color: 'blue',
-    // tags: ['数据标准化', '图表导出'],
-    // action: '立即体验',
-    disabled: false,
-    points: [
-      '自定义字段，快速匹配分隔符',
-      '逐行清洗，插入自定义逻辑',
-      '按列分组输出多表',
-      '多表合并统一处理'
-    ]
-  },
-  {
-    id: 'pdf',
-    title: 'PDF 工具',
-    desc: '转换、合并、拆分',
-    icon: markRaw(Files),
-    color: 'orange',
-    // tags: ['高清转换', '批量任务'],
-    // action: '立即体验',
-    disabled: false,
-    points: [
-      'PDF 转高清图片',
-      '生成仿真扫描件',
-      '多文件合并',
-      '按页码拆分切割'
-    ]
-  },
-  {
-    id: 'seal',
-    title: '公章生成',
-    desc: '电子印章快速制作',
-    icon: markRaw(Stamp),
-    color: 'red',
-    // tags: ['模板管理', '透明导出'],
-    // action: '立即体验',
-    disabled: false,
-    points: [
-      '圆章、椭圆章等模板',
-      '自定义文字、字号、弧度',
-      '导出透明 PNG'
-    ]
-  },
-]
-
-const financeCards = [
-  {
-    id: 'finance',
-    title: '财务工具',
-    desc: '金额大写转换',
-    icon: markRaw(Coin),
-    color: 'orange',
-    // tags: ['人民币', '票据填写'],
-    // action: '打开面板',
-    disabled: false,
-    points: [
-      '数字转中文大写',
-      '自动补全元角分',
-      '符合票据填写规范',
-      '内置常见示例'
-    ]
-  }
-]
-
-
-const systemCards = [
-  {
-    id: 'system',
-    title: '系统管理',
-    desc: '性能监控、启动项管理',
-    icon: markRaw(Monitor),
-    color: 'indigo',
-    // tags: ['CPU / GPU', '系统状态'],
-    // action: '打开面板',
-    disabled: false,
-    points: [
-      'CPU、内存、磁盘、GPU 监控',
-      '温度、电压、风扇转速',
-      '启动项管理、运行时间'
-    ]
-  }
-]
-
-const checklist = [
-  {
-    title: '检查更新',
-    icon: '🆕',
-    detail: '点击上方地球图标检测更新，下载后打开安装即可。如下载失败，请检查网络代理'
-  },
-  {
-    title: '通知公告',
-    icon: '📢',
-    // detail: '一次付费永久更新，无广告。问题反馈请发邮件至：dassdj@yandex.com'
-    detail: '问题反馈请发邮件至：dassdj@yandex.com'
-  },
-  {
-    title: '图片/视频功能配置',
-    icon: '🎬',
-    parts: [
-      '部分功能需安装 FFMPEG，',
-      {
-        text: '点击查看教程',
-        url: 'https://blog.csdn.net/weixin_43914278/article/details/131722929'
-      }
-    ]
-  }
-]
-
-const onFeatureAction = (featureId) => {
-  emit('open', featureId)
-}
+const open = (id) => emit('open', id)
 </script>
 
 <template>
-  <!-- 工具卡片网格 -->
-  <main ref="contentAreaRef" class="content-area">
-    <!-- Hero 区域 -->
-    <section class="hero-section" :class="{ collapsed: isScrolled }">
-      <div class="hero-content">
-        <h1 class="hero-title">
-          <span class="title-gradient">多功能</span>工具箱
-        </h1>
-        <p class="hero-subtitle" :class="{ hidden: isScrolled }">
-          Excel / PDF / 图片 / 文本 / 视频 / 文件 / 自动化 —— 数据安全不离开本机
-        </p>
+  <div class="home-scroll">
+    <div class="home-inner">
+      <!-- hero -->
+      <div class="hero">
+        <div class="eyebrow">
+          <el-icon :size="14"><Lock /></el-icon>
+          全部本地处理 · 数据不离开本机
+        </div>
+        <h1 class="greet">{{ greet }}，<span class="accent">欢迎使用工具箱</span></h1>
+        <p class="subtitle">10 个离线工具，覆盖图片、PDF、表格、文本、视频、文件与系统维护。</p>
       </div>
-    </section>
 
-    <div class="section-header">
-      <div class="section-title">
-        <span class="section-badge">常用工具</span>
+      <!-- search -->
+      <div class="search-wrap">
+        <el-icon class="search-ico" :size="18"><Search /></el-icon>
+        <input v-model="q" class="search-input" placeholder="搜索工具或功能，例如「压缩」「合并 PDF」" />
+        <kbd>⌘K</kbd>
       </div>
-    </div>
 
-    <div class="feature-grid">
-      <ToolCard
-        v-for="(feature, index) in featureCards"
-        :key="feature.id"
-        :feature="feature"
-        :style="{ '--delay': `${index * 0.05}s` }"
-        @open="onFeatureAction"
-      />
-    </div>
-
-    <div class="section-header">
-      <div class="section-title">
-        <span class="section-badge">财务工具</span>
-      </div>
-    </div>
-
-    <div class="feature-grid">
-      <ToolCard
-        v-for="(feature, index) in financeCards"
-        :key="feature.id"
-        :feature="feature"
-        :style="{ '--delay': `${index * 0.05}s` }"
-        @open="onFeatureAction"
-      />
-    </div>
-
-    <div class="section-header">
-      <div class="section-title">
-        <span class="section-badge">系统管理工具</span>
-      </div>
-    </div>
-
-    <div class="feature-grid">
-      <ToolCard
-        v-for="(feature, index) in systemCards"
-        :key="feature.id"
-        :feature="feature"
-        :style="{ '--delay': `${index * 0.05}s` }"
-        @open="onFeatureAction"
-      />
-    </div>
-
-    <!-- 提示信息 -->
-    <section class="tips-section">
-      <div class="tips-header">
-        <span class="tips-badge">使用提示</span>
-      </div>
-      <div class="tips-grid">
-        <div v-for="item in checklist" :key="item.title" class="tip-card">
-          <div class="tip-icon">{{ item.icon }}</div>
-          <div class="tip-content">
-            <h4>{{ item.title }}</h4>
-            <p v-if="item.detail">{{ item.detail }}</p>
-            <p v-else class="tip-with-link">
-              <template v-for="(part, idx) in item.parts" :key="idx">
-                <span v-if="typeof part === 'string'">{{ part }}</span>
-                <a v-else :href="part.url" target="_blank" rel="noopener noreferrer" class="tip-link">
-                  {{ part.text }}
-                </a>
-              </template>
-            </p>
-          </div>
+      <!-- recent -->
+      <div v-if="!q && recents.length" class="section">
+        <div class="section-label">
+          <el-icon :size="16"><Clock /></el-icon><span>最近活动</span>
+        </div>
+        <div class="recent-grid">
+          <button v-for="r in recents" :key="r.tool.id" class="recent-card" @click="open(r.tool.id)">
+            <span class="ricon" :style="{ background: r.tool.hue + '1f', color: r.tool.hue }">
+              <el-icon :size="19"><component :is="r.tool.icon" /></el-icon>
+            </span>
+            <div class="rmeta">
+              <div class="rname">{{ r.tool.name }}</div>
+              <div class="rtime">{{ relativeTime(r.ts) }}</div>
+            </div>
+          </button>
         </div>
       </div>
-    </section>
-  </main>
+
+      <!-- all tools -->
+      <div class="section">
+        <div class="section-label">
+          <el-icon :size="16"><Grid /></el-icon>
+          <span>{{ q ? `搜索结果 · ${filtered.length}` : '全部工具' }}</span>
+        </div>
+        <el-empty v-if="!filtered.length" description="没有匹配的工具" />
+        <div v-else class="tools-grid">
+          <button v-for="t in filtered" :key="t.id" class="tcard" :style="{ '--hue': t.hue }" @click="open(t.id)">
+            <span class="tcard-rail" />
+            <div class="tcard-head">
+              <span class="ticon" :style="{ background: t.hue + '1a', color: t.hue }"
+                ><el-icon :size="23"><component :is="t.icon" /></el-icon
+              ></span>
+              <div class="ttitle">
+                <div class="tname">{{ t.name }}</div>
+                <div class="tdesc">{{ t.desc }}</div>
+              </div>
+              <el-icon class="tarrow" :size="17"><ArrowRight /></el-icon>
+            </div>
+            <div class="tpoints">
+              <div v-for="p in t.points.slice(0, 3)" :key="p" class="tpoint">
+                <span class="dot" />
+                <span>{{ p }}</span>
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
-/* Hero ?? */
-.hero-section {
-  padding: 30px 28px 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  transition: padding 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.hero-section.collapsed {
-  padding: 14px 28px 10px;
-}
-
-.hero-content {
-  flex: 1;
-}
-
-.hero-title {
-  font-size: 34px;
-  font-weight: 700;
-  font-family: var(--ppx-font-display);
-  color: var(--ppx-text-primary);
-  margin: 0 0 10px;
-  letter-spacing: 0.5px;
-  opacity: 0;
-  transform: translateY(20px);
-  animation: slideUp 0.6s ease forwards;
-  animation-delay: 0.1s;
-  transition: margin 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.hero-section.collapsed .hero-title {
-  margin-bottom: 0;
-}
-
-.title-gradient {
-  background: var(--ppx-gradient-primary);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.hero-subtitle {
-  font-size: 14px;
-  color: var(--ppx-text-secondary);
-  margin: 0;
-  opacity: 0;
-  transform: translateY(20px);
-  animation: slideUp 0.6s ease forwards;
-  animation-delay: 0.2s;
-  max-height: 30px;
-  overflow: hidden;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.hero-subtitle.hidden {
-  max-height: 0;
-  opacity: 0 !important;
-  margin-top: -5px;
-  transform: translateY(-10px);
-}
-
-@keyframes slideUp {
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* ??? */
-.content-area {
-  flex: 1;
+.home-scroll {
+  height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
 }
-
-.section-header {
-  margin: 18px 28px 18px;
+.home-inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: clamp(24px, 4vw, 44px) clamp(20px, 4vw, 40px) 48px;
 }
 
-.section-title {
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ppx-text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+.greet {
+  margin: 0;
+  font-size: clamp(28px, 4vw, 38px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ppx-text-primary);
+}
+.greet .accent {
+  color: var(--accent);
+}
+.subtitle {
+  margin: 10px 0 0;
+  font-size: 15px;
+  color: var(--ppx-text-muted);
+}
+
+.search-wrap {
+  position: relative;
+  max-width: 560px;
+  margin: 28px 0;
+}
+.search-ico {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ppx-text-muted);
+}
+.search-input {
+  width: 100%;
+  height: 50px;
+  box-sizing: border-box;
+  padding: 0 46px;
+  font-size: 14.5px;
+  border-radius: var(--ppx-radius-md);
+  border: 1px solid var(--ppx-glass-border);
+  background: var(--ppx-bg-surface);
+  color: var(--ppx-text-primary);
+  outline: none;
+  box-shadow: var(--ppx-shadow-sm);
+  transition: border var(--ppx-transition-fast);
+  font-family: var(--ppx-font-body);
+}
+.search-input:focus {
+  border-color: var(--accent);
+}
+.search-input::placeholder {
+  color: var(--ppx-text-disabled);
+}
+.search-wrap kbd {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ppx-text-muted);
+  background: var(--ppx-bg-inset);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-family: var(--ppx-font-mono);
+}
+
+.section {
+  margin-bottom: 34px;
+}
+.section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  color: var(--ppx-text-secondary);
+}
+.section-label span {
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.recent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+  gap: var(--ppx-gap);
+}
+.recent-card {
+  text-align: left;
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.section-badge {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--ppx-neon-blue);
-  text-transform: uppercase;
-  letter-spacing: 1.6px;
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: rgba(14, 165, 164, 0.12);
-  border: 1px solid rgba(14, 165, 164, 0.25);
-  font-family: var(--ppx-font-display);
-}
-
-.section-title h2 {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--ppx-text-primary);
-}
-
-/* ???? */
-.feature-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 18px;
-  margin: 0 28px 28px;
-  padding: 0;
-}
-
-/* ???? */
-.tips-section {
-  margin: 8px 28px 28px;
-  padding-bottom: 24px;
-}
-
-.tips-header {
-  margin-bottom: 14px;
-}
-
-.tips-badge {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--ppx-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.tips-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
-}
-
-.tip-card {
-  display: flex;
-  gap: 12px;
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.78);
+  padding: 14px;
+  border-radius: var(--ppx-radius-md);
   border: 1px solid var(--ppx-glass-border);
-  border-radius: 16px;
+  background: var(--ppx-bg-surface);
+  cursor: pointer;
   transition: all var(--ppx-transition-fast);
+}
+.recent-card:hover {
+  border-color: var(--ppx-glass-border-hover);
+  transform: translateY(-2px);
   box-shadow: var(--ppx-shadow-sm);
 }
-
-.tip-card:hover {
-  border-color: var(--ppx-glass-border-hover);
-  box-shadow: var(--ppx-shadow-md);
-}
-
-.tip-icon {
-  font-size: 20px;
+.ricon {
+  width: 38px;
+  height: 38px;
   flex-shrink: 0;
-  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', 'Segoe UI Symbol', sans-serif;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-
-.tip-content h4 {
-  margin: 0 0 6px;
-  font-size: 14px;
+.rmeta {
+  min-width: 0;
+}
+.rname {
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--ppx-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-
-.tip-content p {
-  margin: 0;
-  font-size: 12px;
+.rtime {
+  font-size: 11.5px;
   color: var(--ppx-text-muted);
-  line-height: 1.6;
+  margin-top: 2px;
 }
 
-.tip-link {
-  color: var(--ppx-neon-blue);
-  text-decoration: none;
-  font-weight: 600;
-  transition: color 0.2s;
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--ppx-gap);
 }
-
-.tip-link:hover {
-  color: #0f766e;
-  text-decoration: underline;
+.tcard {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  padding: calc(var(--ppx-pad) + 2px);
+  border-radius: var(--ppx-radius-lg);
+  border: 1px solid var(--ppx-glass-border);
+  background: var(--ppx-bg-surface);
+  box-shadow: var(--ppx-shadow-sm);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: all var(--ppx-transition-normal);
 }
-
-/* ??? */
-@media (max-width: 1200px) {
-  .hero-section {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 20px;
-  }
+.tcard:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--ppx-shadow-md);
+  border-color: var(--hue);
 }
-
-@media (max-width: 900px) {
-  .hero-title {
-    font-size: 28px;
-  }
+.tcard-rail {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--hue);
+  opacity: 0;
+  transition: opacity var(--ppx-transition-normal);
 }
-
-@media (max-width: 600px) {
-  .hero-section {
-    padding: 20px 16px;
-  }
-
-  .section-header {
-    margin: 18px 16px 18px;
-  }
-
-  .feature-grid {
-    margin: 0 16px 28px;
-  }
-
-  .tips-section {
-    margin: 8px 16px 28px;
-  }
-
-  .hero-title {
-    font-size: 24px;
-  }
+.tcard:hover .tcard-rail {
+  opacity: 1;
+}
+.tcard-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  margin-bottom: 13px;
+}
+.ticon {
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ttitle {
+  flex: 1;
+  min-width: 0;
+}
+.tname {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ppx-text-primary);
+}
+.tdesc {
+  font-size: 12.5px;
+  color: var(--ppx-text-muted);
+  margin-top: 2px;
+}
+.tarrow {
+  color: var(--hue);
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: all var(--ppx-transition-normal);
+}
+.tcard:hover .tarrow {
+  opacity: 1;
+  transform: none;
+}
+.tpoints {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tpoint {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 12.5px;
+  color: var(--ppx-text-secondary);
+}
+.tpoint .dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 99px;
+  background: var(--hue);
+  margin-top: 6.5px;
+  flex-shrink: 0;
 }
 </style>

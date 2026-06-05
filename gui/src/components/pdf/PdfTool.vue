@@ -19,19 +19,11 @@
         <p>保留最近 8 条，便于定位输出目录</p>
       </header>
       <el-timeline v-if="shared.logs.length">
-        <el-timeline-item
-          v-for="item in shared.logs"
-          :key="item.id"
-          :timestamp="item.time"
-          :type="item.type"
-          size="large"
-        >
+        <el-timeline-item v-for="item in shared.logs" :key="item.id" :timestamp="item.time" :type="item.type" size="large">
           <div class="log-entry">
             <strong>{{ item.message }}</strong>
             <p class="log-sub">{{ item.action }}</p>
-            <el-link v-if="item.detail?.output" type="primary" @click="openPath(item.detail.output)">
-              打开输出
-            </el-link>
+            <el-link v-if="item.detail?.output" type="primary" @click="openPath(item.detail.output)"> 打开输出 </el-link>
           </div>
         </el-timeline-item>
       </el-timeline>
@@ -69,7 +61,7 @@ const TABS = [
   { name: 'toc', label: '生成目录' },
   { name: 'word', label: 'PDF 转 Word' },
   { name: 'images', label: '提取图片' },
-  { name: 'imagePdf', label: '图片转 PDF' },
+  { name: 'imagePdf', label: '图片转 PDF' }
 ]
 
 const activeTab = ref('image')
@@ -77,7 +69,7 @@ const activeTab = ref('image')
 // 全局共享：loading 为唯一开关，logs 显示在底部统一日志面板，需跨所有子面板共享。
 const shared = reactive({
   loading: false,
-  logs: [],
+  logs: []
 })
 
 // 共享的 PDF 调用层（封装 callApi / 文件目录选择 / 打开文件等），下沉给各子面板复用。

@@ -23,7 +23,7 @@ const TABS = [
   { name: 'dedup', label: '文件去重' },
   { name: 'analyze', label: '目录分析' },
   { name: 'compare', label: '文件对比' },
-  { name: 'archive', label: '压缩 / 解压' },
+  { name: 'archive', label: '压缩 / 解压' }
 ]
 </script>
 

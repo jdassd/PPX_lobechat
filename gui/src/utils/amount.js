@@ -15,14 +15,26 @@ export function toChineseAmount(num) {
   if (intPart > 0) {
     const groups = []
     let x = intPart
-    while (x > 0) { groups.push(x % 10000); x = Math.floor(x / 10000) }
+    while (x > 0) {
+      groups.push(x % 10000)
+      x = Math.floor(x / 10000)
+    }
     for (let g = groups.length - 1; g >= 0; g--) {
-      let gv = groups[g], gs = '', zero = false
+      let gv = groups[g],
+        gs = '',
+        zero = false
       const ds = []
-      for (let i = 0; i < 4; i++) { ds.push(gv % 10); gv = Math.floor(gv / 10) }
+      for (let i = 0; i < 4; i++) {
+        ds.push(gv % 10)
+        gv = Math.floor(gv / 10)
+      }
       for (let i = 3; i >= 0; i--) {
         if (ds[i] === 0) zero = true
-        else { if (zero && gs) gs += '零'; zero = false; gs += dig[ds[i]] + unit[i] }
+        else {
+          if (zero && gs) gs += '零'
+          zero = false
+          gs += dig[ds[i]] + unit[i]
+        }
       }
       if (gs) s += gs + big[g]
       else if (s && !s.endsWith('零') && g < groups.length - 1) s += '零'

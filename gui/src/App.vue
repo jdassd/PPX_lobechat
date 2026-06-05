@@ -4,6 +4,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watchEffect } from 'vue'
 import { TOOLS } from './config/tools'
+import { pushRecent } from './utils/recent'
 import WindowTitleBar from './components/WindowTitleBar.vue'
 import WindowResizeHandles from './components/WindowResizeHandles.vue'
 import BtnUpdate from './components/BtnUpdate.vue'
@@ -33,7 +34,7 @@ const VIEWS = {
   automation: AutomationTool,
   seal: SealTool,
   finance: FinanceTool,
-  system: SystemCenter,
+  system: SystemCenter
 }
 
 const active = ref('home') // 'home' | 工具 id
@@ -67,8 +68,13 @@ const onKey = (e) => {
 onMounted(() => window.addEventListener('keydown', onKey))
 onUnmounted(() => window.removeEventListener('keydown', onKey))
 
-const go = (id) => { active.value = id }
-const toggleTheme = () => { theme.value = theme.value === 'dark' ? 'light' : 'dark' }
+const go = (id) => {
+  active.value = id
+  pushRecent(id)
+}
+const toggleTheme = () => {
+  theme.value = theme.value === 'dark' ? 'light' : 'dark'
+}
 </script>
 
 <template>
@@ -132,8 +138,17 @@ const toggleTheme = () => { theme.value = theme.value === 'dark' ? 'light' : 'da
   background: var(--ppx-bg-deep);
   --titlebar-height: 35px;
 }
-.app-body { flex: 1; display: flex; min-height: 0; }
-.workspace { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.app-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.workspace {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
 .tool-bar {
   height: 56px;
   flex-shrink: 0;
@@ -153,12 +168,40 @@ const toggleTheme = () => { theme.value = theme.value === 'dark' ? 'light' : 'da
   justify-content: center;
   flex-shrink: 0;
 }
-.tool-meta { min-width: 0; }
-.tool-name { font-size: 15px; font-weight: 700; line-height: 1.1; color: var(--ppx-text-primary); }
-.tool-desc { font-size: 11.5px; color: var(--ppx-text-muted); }
-.tool-content { flex: 1; min-height: 0; overflow: hidden; }
-.flex1 { flex: 1; }
-.logo-area { display: flex; align-items: center; gap: 9px; }
-.logo-image { width: 18px; height: 18px; object-fit: contain; }
-.logo-label { font-size: 13px; font-weight: 600; color: var(--ppx-text-secondary); }
+.tool-meta {
+  min-width: 0;
+}
+.tool-name {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--ppx-text-primary);
+}
+.tool-desc {
+  font-size: 11.5px;
+  color: var(--ppx-text-muted);
+}
+.tool-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.flex1 {
+  flex: 1;
+}
+.logo-area {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.logo-image {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+.logo-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ppx-text-secondary);
+}
 </style>

@@ -7,11 +7,11 @@ export function encodeDecode(algo, dir, input) {
     if (algo === 'b64') return enc ? btoa(unescape(encodeURIComponent(input))) : decodeURIComponent(escape(atob(input)))
     if (algo === 'url') return enc ? encodeURIComponent(input) : decodeURIComponent(input)
     if (algo === 'html') {
-      return enc
-        ? input.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
-        : input.replace(/&(amp|lt|gt|quot|#39);/g, (m, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" }[e]))
+      return enc ? input.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]) : input.replace(/&(amp|lt|gt|quot|#39);/g, (m, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" })[e])
     }
-  } catch (e) { return '⚠ 处理失败：' + e.message }
+  } catch (e) {
+    return '⚠ 处理失败：' + e.message
+  }
   return input
 }
 
@@ -21,7 +21,9 @@ export function jsonTool(action, input, indent = 2) {
     if (action === 'min') return JSON.stringify(obj)
     if (action === 'valid') return '✓ JSON 合法 · ' + (Array.isArray(obj) ? obj.length + ' 项' : Object.keys(obj).length + ' 个键')
     return JSON.stringify(obj, null, indent)
-  } catch (e) { return '⚠ JSON 解析失败：' + e.message }
+  } catch (e) {
+    return '⚠ JSON 解析失败：' + e.message
+  }
 }
 
 export function regexMatch(pattern, flags, input) {
@@ -29,7 +31,9 @@ export function regexMatch(pattern, flags, input) {
     const re = new RegExp(pattern || '.', flags || 'g')
     const m = input.match(re) || []
     return m.length ? m.map((x, i) => `[${i + 1}] ${x}`).join('\n') : '（无匹配）'
-  } catch (e) { return '⚠ 正则错误：' + e.message }
+  } catch (e) {
+    return '⚠ 正则错误：' + e.message
+  }
 }
 
 // 真实哈希用 Web Crypto; MD5 浏览器原生不支持, 建议交给后端 api/text.py。

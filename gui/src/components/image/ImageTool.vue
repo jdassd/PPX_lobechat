@@ -19,7 +19,7 @@ const TABS = [
   { name: 'crop', label: '裁剪工具' },
   { name: 'rotate', label: '旋转 / 翻转' },
   { name: 'pdf', label: '图片转 PDF' },
-  { name: 'advanced', label: '高级批量' },
+  { name: 'advanced', label: '高级批量' }
 ]
 
 const fallbackConvertFormatOptions = [
@@ -40,9 +40,7 @@ const fallbackConvertFormatOptions = [
 ]
 
 const fallbackRasterFormatOptions = fallbackConvertFormatOptions.filter((item) => item.value !== 'svg')
-const fallbackImageFilter = [
-  '图片 (*.png;*.apng;*.jpg;*.jpeg;*.jpe;*.jfif;*.webp;*.bmp;*.dib;*.tif;*.tiff;*.gif;*.avif;*.avifs;*.ico;*.icns;*.tga;*.icb;*.vda;*.vst;*.qoi;*.ppm;*.pnm;*.pbm;*.pgm;*.pfm;*.jp2;*.j2k;*.j2c;*.jpc;*.jpf;*.jpx)'
-]
+const fallbackImageFilter = ['图片 (*.png;*.apng;*.jpg;*.jpeg;*.jpe;*.jfif;*.webp;*.bmp;*.dib;*.tif;*.tiff;*.gif;*.avif;*.avifs;*.ico;*.icns;*.tga;*.icb;*.vda;*.vst;*.qoi;*.ppm;*.pnm;*.pbm;*.pgm;*.pfm;*.jp2;*.j2k;*.j2c;*.jpc;*.jpf;*.jpx)']
 
 const supportedFormats = reactive({
   convert: [...fallbackConvertFormatOptions],
@@ -78,13 +76,13 @@ const normalizeFormatOptions = (items = [], fallback = []) => {
 
 const syncSupportedFormats = (payload = {}) => {
   const convert = normalizeFormatOptions(payload.convertFormats, fallbackConvertFormatOptions)
-  const raster = normalizeFormatOptions(payload.rasterFormats, convert.filter((item) => item.value !== 'svg'))
+  const raster = normalizeFormatOptions(
+    payload.rasterFormats,
+    convert.filter((item) => item.value !== 'svg')
+  )
   supportedFormats.convert = convert
   supportedFormats.raster = raster.length ? raster : [...fallbackRasterFormatOptions]
-  supportedFormats.imageFilter =
-    payload.fileDialogFilter && typeof payload.fileDialogFilter === 'string'
-      ? [payload.fileDialogFilter]
-      : [...fallbackImageFilter]
+  supportedFormats.imageFilter = payload.fileDialogFilter && typeof payload.fileDialogFilter === 'string' ? [payload.fileDialogFilter] : [...fallbackImageFilter]
 }
 
 const loadSupportedFormats = async () => {

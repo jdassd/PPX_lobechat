@@ -19,7 +19,7 @@ const TABS = [
   { name: 'audio', label: '音频提取' },
   { name: 'frames', label: '帧图导出' },
   { name: 'concat', label: '视频合成' },
-  { name: 'info', label: '视频信息' },
+  { name: 'info', label: '视频信息' }
 ]
 </script>
 
