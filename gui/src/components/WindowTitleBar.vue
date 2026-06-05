@@ -76,16 +76,14 @@ const handleClose = () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(255, 255, 255, 0.7);
+  background: var(--ppx-bg-elevated);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid var(--ppx-glass-border);
   z-index: 99999;
   user-select: none;
   -webkit-user-select: none;
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.02),
-    0 0 0 1px rgba(255, 255, 255, 0.4) inset;
+  box-shadow: var(--ppx-shadow-sm);
 }
 
 .titlebar-drag-region {
@@ -146,7 +144,7 @@ const handleClose = () => {
   background: transparent;
   border-radius: 6px;
   cursor: pointer;
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--ppx-text-secondary);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
@@ -156,7 +154,7 @@ const handleClose = () => {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--ppx-bg-hover);
   border-radius: 6px;
   opacity: 0;
   transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -171,11 +169,11 @@ const handleClose = () => {
 }
 
 .minimize-btn:hover {
-  color: rgba(0, 0, 0, 0.85);
+  color: var(--ppx-text-primary);
 }
 
 .minimize-btn:hover::before {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--ppx-bg-hover);
 }
 
 .close-btn:hover {
@@ -206,32 +204,7 @@ const handleClose = () => {
   transform: rotate(90deg);
 }
 
-/* 深色模式适配 */
-@media (prefers-color-scheme: dark) {
-  .window-titlebar {
-    background: rgba(30, 30, 30, 0.75);
-    border-bottom-color: rgba(255, 255, 255, 0.08);
-    box-shadow:
-      0 1px 2px rgba(0, 0, 0, 0.3),
-      0 0 0 1px rgba(255, 255, 255, 0.05) inset;
-  }
-
-  .titlebar-btn {
-    color: rgba(255, 255, 255, 0.7);
-  }
-
-  .titlebar-btn::before {
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  .minimize-btn:hover {
-    color: rgba(255, 255, 255, 0.95);
-  }
-
-  .minimize-btn:hover::before {
-    background: rgba(255, 255, 255, 0.12);
-  }
-}
+/* 深色模式由根元素 data-theme 驱动，标题栏配色已使用 --ppx-* 变量自动适配 */
 
 /* 响应式调整 */
 @media (max-width: 600px) {

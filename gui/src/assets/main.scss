@@ -799,9 +799,9 @@ body,
 
 /* 面板样式 */
 .panel {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.75));
+  background: var(--ppx-bg-surface);
   border: 1px solid var(--ppx-glass-border);
-  border-radius: var(--ppx-radius-lg);
+  border-radius: var(--ppx-radius-md);
   padding: 24px;
   margin-bottom: 20px;
   box-shadow: var(--ppx-shadow-sm);

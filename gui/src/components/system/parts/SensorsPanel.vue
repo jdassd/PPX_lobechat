@@ -61,7 +61,7 @@ defineProps({
 }
 
 .sensor-panel {
-  background: linear-gradient(180deg, var(--ppx-glass-bg), rgba(255, 255, 255, 0.9));
+  background: var(--ppx-bg-surface);
   border: 1px solid var(--ppx-glass-border);
   border-radius: 16px;
   padding: 16px;

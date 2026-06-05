@@ -26,7 +26,7 @@ const runConvert = async () => {
   }
   // 桌面端优先走后端（支持 ￥/RMB/千分位规范化）；非桌面环境用本地 amount.js 兜底，便于浏览器预览。
   if (!hasPyApi()) {
-    const num = String(state.amount).replace(/[^\d.\-]/g, '')
+    const num = String(state.amount).replace(/[^\d.-]/g, '')
     state.normalized = num
     state.result = toChineseAmount(num)
     if (!state.result) ElMessage.warning('无法识别金额')
@@ -34,7 +34,11 @@ const runConvert = async () => {
   }
   state.loading = true
   try {
-    const { ok, data: res, message } = await pyCall('finance_rmb_uppercase', {
+    const {
+      ok,
+      data: res,
+      message
+    } = await pyCall('finance_rmb_uppercase', {
       amount: state.amount
     })
     if (ok) {
@@ -86,15 +90,7 @@ const resetAll = () => {
         <div class="example-strip">
           <span class="example-title">常见示例</span>
           <div class="example-tags">
-            <el-tag
-              v-for="item in examples"
-              :key="item.label"
-              effect="plain"
-              type="info"
-              @click="applyExample(item.label)"
-            >
-              {{ item.label }} · {{ item.note }}
-            </el-tag>
+            <el-tag v-for="item in examples" :key="item.label" effect="plain" type="info" @click="applyExample(item.label)"> {{ item.label }} · {{ item.note }} </el-tag>
           </div>
         </div>
       </section>

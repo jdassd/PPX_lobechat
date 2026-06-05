@@ -85,8 +85,8 @@ const resolveLabel = (file) => {
 .file-selector {
   padding: 12px 16px;
   border: 1px dashed var(--ppx-glass-border);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.7);
+  border-radius: var(--ppx-radius-md);
+  background: var(--ppx-bg-base);
   box-shadow: var(--ppx-shadow-sm);
 }
 
