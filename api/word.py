@@ -3,23 +3,38 @@
 '''
 Author: Codex
 Date: 2026-06-07
-Description: Word(.docx) 工具相关 API —— 切割与合并
+Description: Word(.docx) 工具相关 API —— 拆分(多文件)、切割(保留指定页)、合并
+
+“按页码”相关能力说明：
+  .docx 没有原生的“页”概念（页由排版引擎实时计算）。本模块通过调用本机
+  LibreOffice 将文档转换为 PDF，得到与 Word 基本一致的真实分页，再用 PyMuPDF
+  解析每个内容块所落的页码，建立“内容块 → 页码”映射。真正的拆分/切割始终在
+  原始文档上以“复制后删除多余元素”的方式完成，因此 100% 保留原文档格式。
 '''
 
+import re
 import shutil
+import subprocess
+import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterable, List
+from shutil import which
+from typing import Dict, Iterable, List, Tuple
 
+import fitz  # PyMuPDF
 from docx import Document
+from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docxcompose.composer import Composer
 
 from api.utils.validators import ensure_output_directory
 
+_MARKER_RE = re.compile(r'PPXMK(\d+)Z')
+
 
 class WordTool():
-    '''Word(.docx) 相关功能：切割、合并'''
+    '''Word(.docx) 相关功能：拆分、切割、合并'''
 
     def _ensure_word_file(self, file_path: str) -> Path:
         if not file_path:
@@ -51,6 +66,37 @@ class WordTool():
         else:
             dest = source.parent / f'{source.stem}_{suffix}_{self._timestamp()}.docx'
         return dest
+
+    def _parse_page_spec(self, spec: str, total: int) -> List[int]:
+        '''解析 "1-3,5,8" 形式的页码表达式，返回去重后的有序页码列表。'''
+        pages: List[int] = []
+        if not spec:
+            return pages
+        for chunk in str(spec).replace('，', ',').split(','):
+            chunk = chunk.strip()
+            if not chunk:
+                continue
+            try:
+                if '-' in chunk:
+                    start_str, end_str = chunk.split('-', 1)
+                    start, end = int(start_str.strip()), int(end_str.strip())
+                    if start > end:
+                        start, end = end, start
+                    for page in range(start, end + 1):
+                        if 1 <= page <= total:
+                            pages.append(page)
+                else:
+                    page = int(chunk)
+                    if 1 <= page <= total:
+                        pages.append(page)
+            except (ValueError, TypeError):
+                continue
+        seen, unique = set(), []
+        for page in pages:
+            if page not in seen:
+                seen.add(page)
+                unique.append(page)
+        return unique
 
     # --- 文档结构辅助 -------------------------------------------------
 
@@ -127,33 +173,160 @@ class WordTool():
                 body.remove(block)
         doc.save(str(dest))
 
+    # --- 真实分页(LibreOffice + PyMuPDF) ------------------------------
+
+    def _locate_soffice(self) -> str:
+        '''定位本机 LibreOffice 可执行文件。'''
+        candidates: List[str] = []
+        if sys.platform == 'darwin':
+            candidates.append('/Applications/LibreOffice.app/Contents/MacOS/soffice')
+        elif sys.platform.startswith('win'):
+            candidates += [
+                r'C:\Program Files\LibreOffice\program\soffice.exe',
+                r'C:\Program Files (x86)\LibreOffice\program\soffice.exe',
+            ]
+        for name in ('soffice', 'libreoffice'):
+            found = which(name)
+            if found:
+                candidates.append(found)
+        for candidate in candidates:
+            if candidate and Path(candidate).exists():
+                return candidate
+        raise RuntimeError('未检测到 LibreOffice，按页码功能需要先安装 LibreOffice')
+
+    def _insert_marker(self, block, index: int) -> None:
+        '''在内容块起始处插入一个 1pt 的唯一标记 run，仅用于分页定位。'''
+        if block.tag == qn('w:p'):
+            target_p = block
+        elif block.tag == qn('w:tbl'):
+            target_p = block.find('.//' + qn('w:p'))
+            if target_p is None:
+                return
+        else:
+            return
+        token = f'PPXMK{index:05d}Z'
+        run = OxmlElement('w:r')
+        rPr = OxmlElement('w:rPr')
+        for tag in ('w:sz', 'w:szCs'):
+            el = OxmlElement(tag)
+            el.set(qn('w:val'), '2')  # 半磅，2 => 1pt，尽量减少对排版的扰动
+            rPr.append(el)
+        run.append(rPr)
+        text = OxmlElement('w:t')
+        text.set(qn('xml:space'), 'preserve')
+        text.text = token
+        run.append(text)
+        pPr = target_p.find(qn('w:pPr'))
+        if pPr is not None:
+            pPr.addnext(run)
+        else:
+            target_p.insert(0, run)
+
+    def _convert_to_pdf(self, soffice: str, src_docx: Path, out_dir: Path) -> Path:
+        profile = out_dir / 'lo_profile'
+        cmd = [
+            soffice, '--headless', '--norestore', '--invisible', '--nologo',
+            f'-env:UserInstallation={profile.as_uri()}',
+            '--convert-to', 'pdf', '--outdir', str(out_dir), str(src_docx)
+        ]
+        try:
+            subprocess.run(cmd, check=True, capture_output=True, timeout=180)
+        except subprocess.TimeoutExpired:
+            raise RuntimeError('LibreOffice 转换超时')
+        except subprocess.CalledProcessError as exc:
+            detail = (exc.stderr or b'').decode('utf-8', 'ignore').strip()
+            raise RuntimeError(f'LibreOffice 转换失败：{detail or exc.returncode}')
+        pdf = out_dir / f'{src_docx.stem}.pdf'
+        if not pdf.exists():
+            raise RuntimeError('LibreOffice 未生成 PDF')
+        return pdf
+
+    def _paginate(self, source: Path) -> Tuple[List[int], int]:
+        '''计算每个内容块所落页码。返回 (page_of_block, total_pages)，下标与 _content_blocks 对齐。'''
+        soffice = self._locate_soffice()
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            marked = tmp / 'marked.docx'
+            shutil.copyfile(source, marked)
+            doc = Document(str(marked))
+            blocks = self._content_blocks(doc)
+            block_count = len(blocks)
+            for index, block in enumerate(blocks):
+                self._insert_marker(block, index)
+            doc.save(str(marked))
+
+            pdf = self._convert_to_pdf(soffice, marked, tmp)
+            token_page: Dict[int, int] = {}
+            with fitz.open(str(pdf)) as pdoc:
+                total_pages = pdoc.page_count
+                for pno in range(total_pages):
+                    text = pdoc.load_page(pno).get_text('text')
+                    for match in _MARKER_RE.finditer(text):
+                        idx = int(match.group(1))
+                        if idx not in token_page:
+                            token_page[idx] = pno + 1
+
+        # 标记未命中的块（如文本框内/空块）按文档顺序沿用上一个已知页码
+        page_of_block: List[int] = []
+        last = 1
+        for index in range(block_count):
+            if index in token_page:
+                last = token_page[index]
+            page_of_block.append(last)
+        return page_of_block, max(total_pages, 1)
+
     # --- 对外 API ----------------------------------------------------
 
-    def word_split(self, options: Dict = None):
-        '''Word 文档切割为多个 .docx
+    def word_page_count(self, options: Dict = None):
+        '''返回文档的真实页数（供前端按页码功能展示/校验）。'''
+        try:
+            opts = options if isinstance(options, dict) else {}
+            source = self._ensure_word_file(opts.get('filePath', ''))
+            _, total_pages = self._paginate(source)
+            return {'code': 0, 'msg': f'共 {total_pages} 页', 'pages': total_pages}
+        except Exception as exc:
+            return {'code': -1, 'msg': f'页数计算失败：{exc}'}
 
-        支持三种模式（mode）：
-          - paragraphs : 每 N 个内容块（段落/表格）切一个文件（默认）
-          - pagebreak  : 在手动分页符 / 分节符处切割
-          - heading    : 在指定级别的标题处切割
+    def word_split(self, options: Dict = None):
+        '''Word 文档拆分为多个 .docx（保留格式）
+
+        支持的模式（mode）：
+          - pages      : 按真实页码，每 N 页一个文件（依赖 LibreOffice）
+          - paragraphs : 每 N 个内容块（段落/表格）一个文件
+          - pagebreak  : 在手动分页符 / 分节符处拆分
+          - heading    : 在指定级别的标题处拆分
         '''
         try:
             opts = options if isinstance(options, dict) else {}
             source = self._ensure_word_file(opts.get('filePath', ''))
-            mode = str(opts.get('mode') or 'paragraphs').lower()
+            mode = str(opts.get('mode') or 'pages').lower()
             per_file = int(opts.get('paragraphsPerFile') or 10)
+            pages_per_file = max(1, int(opts.get('pagesPerFile') or 1))
             heading_level = int(opts.get('headingLevel') or 1)
 
-            output_dir_opt = opts.get('outputDir', '')
-            out_dir = ensure_output_directory(source, output_dir_opt, 'split')
+            out_dir = ensure_output_directory(source, opts.get('outputDir', ''), 'split')
 
             doc = Document(str(source))
             blocks = self._content_blocks(doc)
             total = len(blocks)
             if total == 0:
-                raise ValueError('文档没有可切割的内容')
+                raise ValueError('文档没有可拆分的内容')
 
-            if mode == 'paragraphs':
+            extra_msg = ''
+            if mode == 'pages':
+                page_of_block, total_pages = self._paginate(source)
+                segments = []
+                start_page = 1
+                while start_page <= total_pages:
+                    end_page = min(start_page + pages_per_file - 1, total_pages)
+                    idxs = [i for i, pg in enumerate(page_of_block) if start_page <= pg <= end_page]
+                    if idxs:
+                        segments.append(idxs)
+                    start_page = end_page + 1
+                if not segments:
+                    raise ValueError('未能按页码拆分')
+                extra_msg = f'（共 {total_pages} 页）'
+            elif mode == 'paragraphs':
                 segments = self._segments_by_count(total, per_file)
             elif mode == 'pagebreak':
                 boundaries: List[int] = []
@@ -166,9 +339,8 @@ class WordTool():
                         boundaries.append(index + 1)
                 segments = self._segments_by_boundaries(total, boundaries)
                 if len(segments) <= 1:
-                    raise ValueError('未检测到分页符/分节符，无法按分页切割')
+                    raise ValueError('未检测到分页符/分节符，无法按分页拆分')
             elif mode == 'heading':
-                id_to_name = {}
                 try:
                     id_to_name = {s.style_id: s.name for s in doc.styles}
                 except Exception:
@@ -179,12 +351,12 @@ class WordTool():
                 ]
                 segments = self._segments_by_boundaries(total, boundaries)
                 if len(segments) <= 1:
-                    raise ValueError(f'未检测到 {heading_level} 级标题，无法按标题切割')
+                    raise ValueError(f'未检测到 {heading_level} 级标题，无法按标题拆分')
             else:
-                raise ValueError('未知的切割模式')
+                raise ValueError('未知的拆分模式')
 
             if len(segments) > 500:
-                raise ValueError('切割份数过多（>500），请调整参数')
+                raise ValueError('拆分份数过多（>500），请调整参数')
 
             base_name = opts.get('outputName') or source.stem
             if base_name.lower().endswith('.docx'):
@@ -198,15 +370,62 @@ class WordTool():
 
             return {
                 'code': 0,
-                'msg': f'切割完成，共 {len(exported)} 个文件',
+                'msg': f'拆分完成，共 {len(exported)} 个文件{extra_msg}',
                 'files': exported,
                 'outputDir': str(out_dir)
+            }
+        except Exception as exc:
+            return {'code': -1, 'msg': f'拆分失败：{exc}'}
+
+    def word_cut(self, options: Dict = None):
+        '''Word 按真实页码切割：仅保留指定页码范围的内容，剔除其余，输出单个文件（保留格式）。
+
+        模式（mode）：
+          - range  : 保留 startPage~endPage
+          - custom : 保留 pageSpec 表达式（如 "1-3,5,8"）所列页码
+        '''
+        try:
+            opts = options if isinstance(options, dict) else {}
+            source = self._ensure_word_file(opts.get('filePath', ''))
+            mode = str(opts.get('mode') or 'range').lower()
+
+            page_of_block, total_pages = self._paginate(source)
+
+            if mode == 'range':
+                start = max(1, int(opts.get('startPage') or 1))
+                end = min(total_pages, int(opts.get('endPage') or start))
+                if start > end:
+                    raise ValueError('开始页不能大于结束页')
+                target_pages = set(range(start, end + 1))
+                suffix = 'range'
+            else:
+                pages = self._parse_page_spec(str(opts.get('pageSpec') or ''), total_pages)
+                if not pages:
+                    raise ValueError('请设置有效的页码')
+                target_pages = set(pages)
+                suffix = 'custom'
+
+            keep = [i for i, pg in enumerate(page_of_block) if pg in target_pages]
+            if not keep:
+                raise ValueError('指定页码范围内没有内容')
+
+            output_path = opts.get('outputPath') or self._compose_output_path(
+                opts.get('outputDir', ''), opts.get('outputName', '')
+            )
+            dest = self._resolve_output_path(source, output_path, suffix)
+            self._write_segment(source, dest, keep)
+
+            return {
+                'code': 0,
+                'msg': f'已保留 {len(target_pages)} 页内容（原文档共 {total_pages} 页）',
+                'output': str(dest),
+                'totalPages': total_pages
             }
         except Exception as exc:
             return {'code': -1, 'msg': f'切割失败：{exc}'}
 
     def word_merge(self, options: Dict = None):
-        '''多个 Word(.docx) 合并为一个文档'''
+        '''多个 Word(.docx) 按指定顺序合并为一个文档（保留各文档格式）。'''
         try:
             opts = options if isinstance(options, dict) else {}
             files = opts.get('files', [])

@@ -1,6 +1,7 @@
 <template>
   <ToolWorkspace v-model="activeTab" :tabs="TABS" accent="#2b579a">
     <SplitPanel v-show="activeTab === 'split'" />
+    <CutPanel v-show="activeTab === 'cut'" />
     <MergePanel v-show="activeTab === 'merge'" />
 
     <section class="log-panel">
@@ -27,10 +28,12 @@ import { provide, reactive, ref } from 'vue'
 import ToolWorkspace from '@/components/shared/ToolWorkspace.vue'
 import { useWordApi } from './parts/useWordApi'
 import SplitPanel from './parts/SplitPanel.vue'
+import CutPanel from './parts/CutPanel.vue'
 import MergePanel from './parts/MergePanel.vue'
 
 const TABS = [
-  { name: 'split', label: '切割 Word' },
+  { name: 'split', label: '拆分 Word（多文件）' },
+  { name: 'cut', label: '切割 Word（留范围）' },
   { name: 'merge', label: '合并 Word' }
 ]
 
