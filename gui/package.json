@@ -1,7 +1,7 @@
 {
   "name": "vue3",
   "private": true,
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "基于 Vue3 + Element-Plus 的前端应用",
   "author": "潘高 <pangao1990@qq.com>",
   "scripts": {
