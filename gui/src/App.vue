@@ -16,6 +16,7 @@ import HomeLauncher from './components/home/HomeLauncher.vue'
 // 各工具视图(已去抽屉化, 内容直接渲染进工作区)
 import ImageTool from './components/image/ImageTool.vue'
 import PdfTool from './components/pdf/PdfTool.vue'
+import WordTool from './components/word/WordTool.vue'
 import ExcelTool from './components/excel/ExcelTool.vue'
 import TextTool from './components/text/TextTool.vue'
 import VideoTool from './components/video/VideoTool.vue'
@@ -28,6 +29,7 @@ import SystemCenter from './components/system/SystemCenter.vue'
 const VIEWS = {
   image: ImageTool,
   pdf: PdfTool,
+  word: WordTool,
   excel: ExcelTool,
   text: TextTool,
   video: VideoTool,

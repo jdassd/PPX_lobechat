@@ -12,6 +12,7 @@ usage: 在Javascript中调用window.pywebview.api.<methodname>(<parameters>)
 from api.storage import Storage
 from api.system import System
 from api.pdf import PDF
+from api.word import WordTool
 from api.excel import Excel
 from api.seal import Seal
 from api.image import ImageTool
@@ -22,7 +23,7 @@ from api.finance import FinanceTool
 from api.automation import AutomationTool
 
 
-class API(System, Storage, PDF, Excel, Seal, ImageTool, TextTool, VideoTool, FileTool, FinanceTool, AutomationTool):
+class API(System, Storage, PDF, WordTool, Excel, Seal, ImageTool, TextTool, VideoTool, FileTool, FinanceTool, AutomationTool):
     '''业务层API，供前端JS调用'''
 
     def setWindow(self, window):
