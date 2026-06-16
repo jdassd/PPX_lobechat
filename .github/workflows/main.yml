@@ -48,6 +48,16 @@ jobs:
           python-version: "3.9"
           cache: "pip"
 
+      - name: 安装 LibreOffice（Word 按页码功能运行时依赖）
+        shell: bash
+        continue-on-error: true
+        run: |
+          case "$RUNNER_OS" in
+            Linux)   sudo apt-get update && sudo apt-get install -y libreoffice-writer ;;
+            macOS)   brew install --cask libreoffice ;;
+            Windows) choco install libreoffice-fresh -y --no-progress ;;
+          esac
+
       - name: 初始化打包环境
         run: pnpm run init
 
