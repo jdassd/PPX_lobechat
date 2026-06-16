@@ -77,14 +77,58 @@ const env = reactive({
   ready: false, // playwright 依赖是否已安装
   installing: false, // 是否正在下载
   progress: 0, // 下载进度 0-100，-1=不确定
-  installError: '' // 下载错误
+  installError: '', // 下载错误
+  sources: [], // 后端返回的下载源列表
+  source: 'npmmirror', // 当前选中的下载源 id（默认国内镜像）
+  customHost: '' // 自定义下载地址
 })
+
+// 下载源兜底列表（与后端保持一致；后端不可用时使用）
+const FALLBACK_SOURCES = [
+  { id: 'npmmirror', name: '国内镜像 · npmmirror（淘宝，推荐国内用户）', host: 'https://cdn.npmmirror.com/binaries/playwright', region: 'cn' },
+  { id: 'default', name: '官方默认（海外节点，自动选择）', host: '', region: 'global' },
+  { id: 'azure', name: '海外官方 · Azure CDN', host: 'https://playwright.azureedge.net', region: 'global' },
+  { id: 'akamai', name: '海外官方 · Akamai 节点', host: 'https://playwright-akamai.azureedge.net', region: 'global' },
+  { id: 'verizon', name: '海外官方 · Verizon 节点', host: 'https://playwright-verizon.azureedge.net', region: 'global' }
+]
+// 自定义来源（始终追加在末尾，让用户可手填任意镜像）
+const CUSTOM_SOURCE = { id: 'custom', name: '自定义地址…', host: '', region: 'custom' }
+
+// 下拉可选项 = 后端源（或兜底）+ 自定义
+const displaySources = computed(() => {
+  const base = env.sources.length ? env.sources : FALLBACK_SOURCES
+  return [...base, CUSTOM_SOURCE]
+})
+
+// 解析当前选中的实际下载地址（空串=官方默认）
+const resolvedHost = computed(() => {
+  if (env.source === 'custom') return env.customHost.trim()
+  const s = displaySources.value.find((x) => x.id === env.source)
+  return s ? s.host || '' : ''
+})
+
+// 拉取后端下载源列表（失败则用前端兜底）
+const loadSources = async () => {
+  try {
+    const { ok, data } = await pyCall('webauto_download_sources')
+    if (ok && data && Array.isArray(data.sources) && data.sources.length) {
+      env.sources = data.sources
+      // 当前选中项不在列表中时回退到第一项
+      if (env.source !== 'custom' && !data.sources.some((s) => s.id === env.source)) {
+        env.source = data.sources[0].id
+      }
+    }
+  } catch (e) {
+    /* 忽略：使用前端兜底列表 */
+  }
+}
 
 // 检测后端状态
 const checkEnv = async () => {
   if (!ensurePyReady()) return
   env.loading = true
   try {
+    await loadSources()
     const { ok, data, message } = await pyCall('webauto_status')
     if (ok && data) {
       env.installed = !!data.installed
@@ -105,11 +149,18 @@ const checkEnv = async () => {
 // 开始下载浏览器内核
 const startInstall = async () => {
   if (!ensurePyReady()) return
+  if (env.source === 'custom' && !env.customHost.trim()) {
+    ElMessage.warning('请填写自定义下载地址')
+    return
+  }
   env.installError = ''
   env.installing = true
   env.progress = -1
   try {
-    const { ok, message } = await pyCall('webauto_install_browser')
+    const { ok, message } = await pyCall('webauto_install_browser', {
+      host: resolvedHost.value,
+      source: env.source
+    })
     if (!ok) {
       env.installing = false
       ElMessage.error(message || '无法开始下载')
@@ -539,6 +590,25 @@ checkEnv()
                 <h4>首次使用需要下载浏览器内核</h4>
                 <p class="muted">大约 150MB，只需下载这一次，以后就不用再下了。</p>
               </div>
+            </div>
+
+            <!-- 下载来源（国内/海外多地址，避免下载失败） -->
+            <div class="wa-source">
+              <div class="wa-source-row">
+                <span class="wa-source-label">下载来源</span>
+                <el-select v-model="env.source" :disabled="env.installing" class="wa-source-select">
+                  <el-option v-for="s in displaySources" :key="s.id" :label="s.name" :value="s.id" />
+                </el-select>
+              </div>
+              <el-input
+                v-if="env.source === 'custom'"
+                v-model="env.customHost"
+                class="mt8"
+                placeholder="镜像地址，如 https://cdn.npmmirror.com/binaries/playwright"
+                :disabled="env.installing"
+                clearable
+              />
+              <p class="muted hint mt8">国内用户建议选「npmmirror」镜像；若某个来源下载失败，换一个再试即可。</p>
             </div>
 
             <template v-if="env.installing || env.progress >= 0">
@@ -987,6 +1057,31 @@ checkEnv()
 /* 间距工具类 */
 .mt {
   margin-top: 14px;
+}
+.mt8 {
+  margin-top: 8px;
+}
+
+/* 下载来源选择 */
+.wa-source {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: var(--ppx-bg-hover);
+  border-radius: var(--ppx-radius-md, 8px);
+}
+.wa-source-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.wa-source-label {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ppx-text-secondary);
+}
+.wa-source-select {
+  flex: 1;
 }
 
 /* 操作区 */

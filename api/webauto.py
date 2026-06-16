@@ -430,6 +430,44 @@ class WebAutoTool:
     _wa_lock: Optional[threading.Lock] = None
 
     # ------------------------------------------------------------------ #
+    # 浏览器内核下载源（国内 / 海外多地址，避免单一地址下载失败）
+    # host 为空表示使用 playwright 内置默认 CDN；非空时通过
+    # PLAYWRIGHT_DOWNLOAD_HOST 覆盖，下载路径仍为 builds/chromium/<rev>/...
+    # ------------------------------------------------------------------ #
+    _WA_DOWNLOAD_SOURCES: List[Dict[str, str]] = [
+        {
+            'id': 'npmmirror',
+            'name': '国内镜像 · npmmirror（淘宝，推荐国内用户）',
+            'host': 'https://cdn.npmmirror.com/binaries/playwright',
+            'region': 'cn',
+        },
+        {
+            'id': 'default',
+            'name': '官方默认（海外节点，自动选择）',
+            'host': '',
+            'region': 'global',
+        },
+        {
+            'id': 'azure',
+            'name': '海外官方 · Azure CDN',
+            'host': 'https://playwright.azureedge.net',
+            'region': 'global',
+        },
+        {
+            'id': 'akamai',
+            'name': '海外官方 · Akamai 节点',
+            'host': 'https://playwright-akamai.azureedge.net',
+            'region': 'global',
+        },
+        {
+            'id': 'verizon',
+            'name': '海外官方 · Verizon 节点',
+            'host': 'https://playwright-verizon.azureedge.net',
+            'region': 'global',
+        },
+    ]
+
+    # ------------------------------------------------------------------ #
     # 内部：共享状态初始化与访问
     # ------------------------------------------------------------------ #
     def _wa_ensure(self) -> None:
@@ -448,7 +486,7 @@ class WebAutoTool:
         # 浏览器内核下载状态
         self._wa_install: Dict[str, Any] = {
             'installing': False, 'done': False, 'success': False,
-            'progress': -1, 'error': '',
+            'progress': -1, 'error': '', 'host': '',
         }
         self._wa_install_thread: Optional[threading.Thread] = None
 
@@ -527,39 +565,89 @@ class WebAutoTool:
             return api_error(f'获取状态失败：{exc}')
 
     # ------------------------------------------------------------------ #
-    # 2. 安装浏览器内核
+    # 2. 浏览器内核下载源 / 安装
     # ------------------------------------------------------------------ #
-    def webauto_install_browser(self):
-        """启动后台线程下载 chromium 内核。"""
+    def webauto_download_sources(self):
+        """返回可选的浏览器内核下载源（国内 / 海外多地址）。
+
+        前端据此渲染「下载来源」下拉，并把所选 source / host 回传给
+        webauto_install_browser，避免单一地址下载失败。
+        """
+        try:
+            return api_success(sources=[dict(s) for s in self._WA_DOWNLOAD_SOURCES])
+        except Exception as exc:
+            return api_error(f'获取下载源失败：{exc}')
+
+    @classmethod
+    def _wa_resolve_source_host(cls, source_id: str) -> str:
+        """按预设下载源 id 解析对应的 host。"""
+        for s in cls._WA_DOWNLOAD_SOURCES:
+            if s['id'] == source_id:
+                return s['host']
+        return ''
+
+    @classmethod
+    def _wa_resolve_download_host(cls, options: Dict | None) -> str:
+        """从前端 options 解析最终下载地址（PLAYWRIGHT_DOWNLOAD_HOST）。
+
+        优先级：显式 host > 预设 source id。空字符串表示用官方默认 CDN。
+        """
+        options = options or {}
+        host = str(options.get('host') or '').strip()
+        if not host:
+            src_id = str(options.get('source') or '').strip()
+            if src_id and src_id != 'custom':
+                host = cls._wa_resolve_source_host(src_id)
+        host = host.strip().rstrip('/')
+        if host and not re.match(r'^https?://', host, re.I):
+            host = 'https://' + host
+        return host
+
+    def webauto_install_browser(self, options: Dict | None = None):
+        """启动后台线程下载 chromium 内核。
+
+        options 可选：
+          - host:   直接指定下载地址（优先级最高，支持自定义镜像）
+          - source: 预设下载源 id（见 webauto_download_sources）
+        """
         try:
             self._wa_ensure()
             if not self._wa_playwright_ready():
                 return api_error('未检测到 playwright 依赖，请先运行 pnpm run init 安装环境')
             if self._wa_chromium_installed():
                 return api_success('浏览器内核已就绪', installed=True)
+            host = self._wa_resolve_download_host(options)
             with self._wa_lock:
                 if self._wa_install['installing']:
                     return api_success('已开始下载浏览器内核')
                 self._wa_install = {
                     'installing': True, 'done': False, 'success': False,
-                    'progress': 0, 'error': '',
+                    'progress': 0, 'error': '', 'host': host,
                 }
             self._wa_install_thread = threading.Thread(
-                target=self._wa_install_worker, daemon=True,
+                target=self._wa_install_worker, args=(host,), daemon=True,
             )
             self._wa_install_thread.start()
             return api_success('已开始下载浏览器内核')
         except Exception as exc:
             return api_error(f'启动下载失败：{exc}')
 
-    def _wa_install_worker(self) -> None:
-        """后台线程：执行 playwright install chromium，实时解析进度。"""
+    def _wa_install_worker(self, host: str = '') -> None:
+        """后台线程：执行 playwright install chromium，实时解析进度。
+
+        host 非空时通过 PLAYWRIGHT_DOWNLOAD_HOST 指定下载源（国内 / 海外镜像）。
+        """
         try:
+            env = {**os.environ}
+            if host:
+                env['PLAYWRIGHT_DOWNLOAD_HOST'] = host
+            # 放宽下载连接超时，弱网环境下减少因超时导致的失败
+            env.setdefault('PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT', '120000')
             proc = subprocess.Popen(
                 [sys.executable, '-m', 'playwright', 'install', 'chromium'],
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 text=True, encoding='utf-8', errors='replace',
-                env={**os.environ},
+                env=env,
             )
             pct_re = re.compile(r'(\d{1,3})\s*%')
             for line in iter(proc.stdout.readline, ''):
@@ -588,7 +676,7 @@ class WebAutoTool:
                 self._wa_install['success'] = success
                 self._wa_install['progress'] = 100 if success else self._wa_install['progress']
                 if not success:
-                    self._wa_install['error'] = '内核下载失败，请检查网络后重试'
+                    self._wa_install['error'] = '内核下载失败，可切换其他下载来源后重试'
         except Exception as exc:
             with self._wa_lock:
                 self._wa_install['installing'] = False
