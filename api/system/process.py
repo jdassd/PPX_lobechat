@@ -5,12 +5,10 @@ Author: 潘高
 LastEditors: 潘高
 Date: 2023-03-26 20:48:26
 LastEditTime: 2025-02-10 14:25:13
-Description: 系统类 - 进程管理 Mixin（进程列表、性能指标、结束进程、网络访问控制）
+Description: 系统类 - 进程管理 Mixin（进程列表、性能指标、结束进程）
 usage: 调用window.pywebview.api.<methodname>(<parameters>)从Javascript执行
 '''
 
-import hashlib
-import shutil
 from datetime import datetime, timezone
 
 try:
@@ -20,7 +18,6 @@ except ImportError:
 
 from api.utils import format_bytes
 from api.utils.error_handler import api_success, api_error
-from pyapp.config.config import Config
 
 
 class ProcessMixin():
@@ -246,60 +243,3 @@ class ProcessMixin():
         if overall_success:
             return api_success(results=results)
         return api_error('部分进程结束失败', results=results)
-
-    def system_toggleProcessNetwork(self, payload=None):
-        '''禁用或恢复进程网络访问（仅 Windows）'''
-        if psutil is None:
-            return self._psutil_missing_response()
-        block = True
-        pid = None
-        if isinstance(payload, dict):
-            pid = payload.get('pid')
-            block = bool(payload.get('block', True))
-        else:
-            pid = payload
-        if not pid:
-            return api_error('请提供 PID')
-        if Config.appSystem != 'Windows':
-            return api_error('当前仅支持 Windows 平台')
-        if not shutil.which('netsh'):
-            return api_error('未检测到 netsh，无法修改防火墙规则')
-        try:
-            proc = psutil.Process(int(pid))
-            exe_path = proc.exe()
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            return api_error('无法访问指定进程')
-        if not exe_path:
-            return api_error('无法获取进程可执行文件路径')
-        rule_hash = hashlib.md5(exe_path.encode('utf-8', errors='ignore')).hexdigest()[:8]
-        directions = ('out', 'in')
-
-        def run_command(command):
-            result = self._run_subprocess(command, shell=False)
-            if result.returncode != 0:
-                raise RuntimeError(result.stderr.strip() or 'netsh 执行失败，需管理员权限')
-
-        try:
-            sanitized = exe_path.replace('"', '')
-            for direction in directions:
-                rule_name = f'PPX_{rule_hash}_{direction.upper()}'
-                if block:
-                    cleanup = [
-                        'netsh', 'advfirewall', 'firewall', 'delete', 'rule',
-                        f'name="{rule_name}"', f'program="{sanitized}"'
-                    ]
-                    self._run_subprocess(cleanup, shell=False)
-                    cmd = [
-                        'netsh', 'advfirewall', 'firewall', 'add', 'rule',
-                        f'name="{rule_name}"', f'dir={direction}', 'action=block',
-                        f'program="{sanitized}"', 'enable=yes'
-                    ]
-                else:
-                    cmd = [
-                        'netsh', 'advfirewall', 'firewall', 'delete', 'rule',
-                        f'name="{rule_name}"', f'program="{sanitized}"'
-                    ]
-                run_command(cmd)
-            return api_success(pid=proc.pid, program=exe_path, blocked=block)
-        except Exception as exc:
-            return api_error(str(exc))

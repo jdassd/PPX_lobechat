@@ -1,7 +1,7 @@
 name: build
 on:
   push:
-    branches: [pc_tools2]
+    branches: [pc_tools3]
     tags:
       - "v*"
       - "V*"

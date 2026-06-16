@@ -14,7 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple
 
-from PIL import Image, ImageColor, ImageDraw, ImageEnhance, ImageFont, ImageOps, ExifTags
+from PIL import Image, ImageColor, ImageDraw, ImageEnhance, ImageFont, ImageOps
 
 from api.utils import (
     ensure_files_payload,
@@ -255,16 +255,6 @@ class ImageTool:
         if mode in {'end', 'bottom', 'right'}:
             return max(0, container - item)
         return max(0, (container - item) // 2)
-
-    def _stringify_exif_value(self, value):
-        if isinstance(value, bytes):
-            try:
-                return value.decode('utf-8', errors='ignore').strip('\x00')
-            except Exception:
-                return value.hex()
-        if isinstance(value, (list, tuple)):
-            return ', '.join(self._stringify_exif_value(item) for item in value)
-        return str(value)
 
     def image_supported_formats(self, options: Dict | None = None):
         """返回当前运行环境可读写的图片格式能力"""
@@ -802,30 +792,3 @@ class ImageTool:
             return api_success(message, **payload)
         except Exception as exc:
             return api_error(f'批量重命名失败：{exc}')
-
-    def image_get_exif(self, options: Dict | None = None):
-        """获取 EXIF 信息"""
-        try:
-            opts = self._validate(options)
-            file_path = self._ensure_single_file(opts)
-            with Image.open(file_path) as image:
-                exif = image.getexif()
-                if not exif:
-                    return api_success('未检测到 EXIF 信息', exif=[], gps={}, file=str(file_path))
-                readable = []
-                gps_info = {}
-                for tag_id, value in exif.items():
-                    tag_name = ExifTags.TAGS.get(tag_id, f'Tag {tag_id}')
-                    if tag_name == 'GPSInfo' and isinstance(value, dict):
-                        gps_info = {
-                            ExifTags.GPSTAGS.get(key, str(key)): self._stringify_exif_value(val)
-                            for key, val in value.items()
-                        }
-                        continue
-                    readable.append({
-                        'tag': tag_name,
-                        'value': self._stringify_exif_value(value),
-                    })
-            return api_success('EXIF 读取完成', file=str(file_path), exif=readable, gps=gps_info)
-        except Exception as exc:
-            return api_error(f'读取 EXIF 失败：{exc}')

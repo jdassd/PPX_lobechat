@@ -41,12 +41,6 @@ const rename = reactive({
   skipped: []
 })
 
-const exif = reactive({
-  file: null,
-  data: [],
-  gps: {}
-})
-
 const ensurePyReady = () => {
   if (!hasPyApi()) {
     ElMessage.warning('该功能需在桌面客户端中使用')
@@ -60,14 +54,6 @@ const selectImages = async (target) => {
   const files = await callApiRaw('system_pyCreateFileDialog', props.supportedFormats.imageFilter)
   if (files?.length) {
     sections[target].files = files
-  }
-}
-
-const selectSingleImage = async (target, field = 'file') => {
-  if (!ensurePyReady()) return
-  const files = await callApiRaw('system_pyCreateFileDialog', props.supportedFormats.imageFilter)
-  if (files?.length) {
-    sections[target][field] = files[0]
   }
 }
 
@@ -86,7 +72,7 @@ const openPath = (path) => {
 
 const pickPaths = (files = []) => files.map((item) => item?.path || item)
 
-const sections = { concat, rename, exif }
+const sections = { concat, rename }
 
 const runConcat = async () => {
   if (!ensurePyReady()) return
@@ -155,31 +141,6 @@ const runRename = async () => {
     }
   } catch (error) {
     ElMessage.error(error?.message || '重命名失败')
-  } finally {
-    loading.value = false
-  }
-}
-
-const runExif = async () => {
-  if (!ensurePyReady()) return
-  if (!exif.file) {
-    ElMessage.warning('请先选择文件')
-    return
-  }
-  loading.value = true
-  try {
-    const { ok, data: res, message } = await pyCall('image_get_exif', {
-      file: exif.file.path
-    })
-    if (ok) {
-      exif.data = res.exif || []
-      exif.gps = res.gps || {}
-      ElMessage.success(message || '读取完成')
-    } else {
-      ElMessage.error(message || '读取失败')
-    }
-  } catch (error) {
-    ElMessage.error(error?.message || '读取失败')
   } finally {
     loading.value = false
   }
@@ -341,49 +302,6 @@ watch(
           </el-table>
         </div>
       </div>
-    </section>
-    <section class="panel">
-      <header>
-        <h4>EXIF 信息查看</h4>
-        <p>读取拍摄时间、相机型号、GPS 信息等元数据</p>
-      </header>
-      <el-form :model="exif" label-width="110px">
-        <el-form-item label="图片文件">
-          <div class="field-row">
-            <el-button @click="selectSingleImage('exif')">选择图片</el-button>
-            <el-tag v-if="exif.file" effect="plain" type="info">
-              {{ exif.file.filename }}
-            </el-tag>
-            <el-tag v-else effect="plain" type="warning">尚未选择</el-tag>
-          </div>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" :loading="loading" @click="runExif">
-            读取 EXIF
-          </el-button>
-        </el-form-item>
-      </el-form>
-      <el-table
-        v-if="exif.data.length"
-        :data="exif.data"
-        border
-        height="240"
-        size="small"
-      >
-        <el-table-column prop="tag" label="属性" width="200" />
-        <el-table-column prop="value" label="内容" show-overflow-tooltip />
-      </el-table>
-      <el-descriptions
-        v-if="Object.keys(exif.gps).length"
-        title="GPS 信息"
-        size="small"
-        border
-        :column="2"
-      >
-        <el-descriptions-item v-for="(value, key) in exif.gps" :key="key" :label="key">
-          {{ value }}
-        </el-descriptions-item>
-      </el-descriptions>
     </section>
   </div>
 </template>

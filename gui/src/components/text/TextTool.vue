@@ -10,7 +10,6 @@ import TransformPanel from './parts/TransformPanel.vue'
 import DedupPanel from './parts/DedupPanel.vue'
 import ReplacePanel from './parts/ReplacePanel.vue'
 import TimestampPanel from './parts/TimestampPanel.vue'
-import UnicodePanel from './parts/UnicodePanel.vue'
 import HashPanel from './parts/HashPanel.vue'
 
 const activeTab = ref('codec')
@@ -24,7 +23,6 @@ const TABS = [
   { name: 'dedup', label: '去重 / 排序' },
   { name: 'replace', label: '批量替换' },
   { name: 'timestamp', label: '时间戳转换' },
-  { name: 'unicode', label: 'Unicode 工具' },
   { name: 'hash', label: '哈希计算' }
 ]
 </script>
@@ -39,7 +37,6 @@ const TABS = [
     <DedupPanel v-show="activeTab === 'dedup'" />
     <ReplacePanel v-show="activeTab === 'replace'" />
     <TimestampPanel v-show="activeTab === 'timestamp'" />
-    <UnicodePanel v-show="activeTab === 'unicode'" />
     <HashPanel v-show="activeTab === 'hash'" />
   </ToolWorkspace>
 </template>

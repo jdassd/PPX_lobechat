@@ -29,6 +29,9 @@ static/db/
 base.json
 tinydb.json
 
+# 开发期生成的 Vite 端口文件
+.ppx-dev-port
+
 # Python 缓存与工具产物
 __pycache__/
 *.pyc

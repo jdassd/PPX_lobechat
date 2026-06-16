@@ -20,9 +20,8 @@ import ExcelTool from './components/excel/ExcelTool.vue'
 import TextTool from './components/text/TextTool.vue'
 import VideoTool from './components/video/VideoTool.vue'
 import FileTool from './components/file/FileTool.vue'
-import AutomationTool from './components/automation/AutomationTool.vue'
+import WebAutoTool from './components/webauto/WebAutoTool.vue'
 import SealTool from './components/seal/SealTool.vue'
-import FinanceTool from './components/finance/FinanceTool.vue'
 import SystemCenter from './components/system/SystemCenter.vue'
 
 const VIEWS = {
@@ -32,9 +31,8 @@ const VIEWS = {
   text: TextTool,
   video: VideoTool,
   file: FileTool,
-  automation: AutomationTool,
+  webauto: WebAutoTool,
   seal: SealTool,
-  finance: FinanceTool,
   system: SystemCenter
 }
 

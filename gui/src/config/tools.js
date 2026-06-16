@@ -4,7 +4,7 @@
 // 图标名沿用 @element-plus/icons-vue 组件名。
 // ============================================================
 import { markRaw } from 'vue'
-import { HomeFilled, PictureFilled, Files, Document, Edit, VideoPlay, FolderOpened, Setting, Stamp, Coin, Monitor } from '@element-plus/icons-vue'
+import { HomeFilled, PictureFilled, Files, Document, Edit, VideoPlay, FolderOpened, Cpu, Stamp, Monitor } from '@element-plus/icons-vue'
 
 export const TOOLS = [
   { id: 'image', name: '图片处理', desc: '格式转换 · 压缩 · 水印', icon: markRaw(PictureFilled), group: 'media', hue: '#2b6fff', points: ['14 种格式互转', '按质量/目标大小压缩', '批量水印 · 裁剪 · 旋转', '图片合成 PDF'] },
@@ -13,15 +13,13 @@ export const TOOLS = [
   { id: 'text', name: '文本工具', desc: '编码 · 格式化 · 哈希', icon: markRaw(Edit), group: 'media', hue: '#7c5cff', points: ['Base64 / URL / HTML 编码', 'JSON 格式化 · 校验 · 查询', '正则匹配 · CSV/JSON 互转', 'MD5 / SHA 哈希'] },
   { id: 'video', name: '视频处理', desc: '转换 · 压缩 · 剪辑', icon: markRaw(VideoPlay), group: 'media', hue: '#d6447a', points: ['MP4/MOV/AVI/MKV 互转', '预设/码率/目标大小压缩', '按时间轴截取片段', '提取音频 · 导出帧'] },
   { id: 'file', name: '文件管理', desc: '搜索 · 批处理 · 压缩', icon: markRaw(FolderOpened), group: 'media', hue: '#0c9c8f', points: ['按名称/类型/大小搜索', '批量复制 · 删除 · 重命名', 'ZIP / 7Z 压缩解压(加密)'] },
-  { id: 'automation', name: '自动化', desc: '录制回放 · 图像识别', icon: markRaw(Setting), group: 'media', hue: '#8a8f99', points: ['录制鼠标键盘操作', '循环自动回放', '图片定位点击', '脚本导入导出'] },
+  { id: 'webauto', name: '网页自动化', desc: '点选采集 · 自动翻页 · 导出', icon: markRaw(Cpu), group: 'media', hue: '#0a8f6b', points: ['可视化点选要采集的内容', '自动翻页 · 进入帖子详情', '批量提取网页信息', '一键导出 Word / Excel'] },
   { id: 'seal', name: '公章生成', desc: '电子印章制作', icon: markRaw(Stamp), group: 'media', hue: '#d6342f', points: ['圆章 / 椭圆章模板', '自定义文字 · 字号 · 弧度', '导出透明 PNG'] },
-  { id: 'finance', name: '财务工具', desc: '金额大写转换', icon: markRaw(Coin), group: 'finance', hue: '#c47d1a', points: ['数字转中文大写', '自动补全元角分', '符合票据规范'] },
   { id: 'system', name: '系统管理', desc: '性能监控 · 启动项', icon: markRaw(Monitor), group: 'system', hue: '#3b7de0', points: ['CPU/内存/磁盘/GPU 监控', '温度 · 电压 · 风扇', '启动项 · 运行时长'] }
 ]
 
 export const GROUPS = [
   { id: 'media', label: '常用工具' },
-  { id: 'finance', label: '财务' },
   { id: 'system', label: '系统' }
 ]
 
