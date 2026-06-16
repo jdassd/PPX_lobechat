@@ -5,10 +5,7 @@ import ToolWorkspace from '@/components/shared/ToolWorkspace.vue'
 import FormatPanel from './parts/FormatPanel.vue'
 import CompressPanel from './parts/CompressPanel.vue'
 import WatermarkPanel from './parts/WatermarkPanel.vue'
-import CropPanel from './parts/CropPanel.vue'
-import RotatePanel from './parts/RotatePanel.vue'
 import PdfPanel from './parts/PdfPanel.vue'
-import AdvancedPanel from './parts/AdvancedPanel.vue'
 
 const activeTab = ref('convert')
 
@@ -16,10 +13,7 @@ const TABS = [
   { name: 'convert', label: '格式转换' },
   { name: 'compress', label: '批量压缩' },
   { name: 'watermark', label: '批量水印' },
-  { name: 'crop', label: '裁剪工具' },
-  { name: 'rotate', label: '旋转 / 翻转' },
-  { name: 'pdf', label: '图片转 PDF' },
-  { name: 'advanced', label: '高级批量' }
+  { name: 'pdf', label: '图片转 PDF' }
 ]
 
 const fallbackConvertFormatOptions = [
@@ -106,10 +100,7 @@ onMounted(loadSupportedFormats)
     <FormatPanel v-show="activeTab === 'convert'" :supported-formats="supportedFormats" />
     <CompressPanel v-show="activeTab === 'compress'" :supported-formats="supportedFormats" />
     <WatermarkPanel v-show="activeTab === 'watermark'" :supported-formats="supportedFormats" />
-    <CropPanel v-show="activeTab === 'crop'" :supported-formats="supportedFormats" />
-    <RotatePanel v-show="activeTab === 'rotate'" :supported-formats="supportedFormats" />
     <PdfPanel v-show="activeTab === 'pdf'" :supported-formats="supportedFormats" />
-    <AdvancedPanel v-show="activeTab === 'advanced'" :supported-formats="supportedFormats" />
   </ToolWorkspace>
 </template>
 

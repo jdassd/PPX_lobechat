@@ -137,7 +137,14 @@ class SystemInfoMixin():
             '--format=csv,noheader,nounits'
         ]
         try:
-            output = subprocess.check_output(command, text=True, encoding='utf-8', errors='ignore')
+            # creationflags 携带 Windows 下的 CREATE_NO_WINDOW，避免弹出命令行窗口
+            output = subprocess.check_output(
+                command,
+                text=True,
+                encoding='utf-8',
+                errors='ignore',
+                creationflags=self._subprocess_creationflags()
+            )
         except Exception:
             return []
         gpus = []
