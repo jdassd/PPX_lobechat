@@ -297,24 +297,6 @@ class FileTool:
         largest = largest[:10]
         return total_size, file_count, dir_count, ext_counter, largest
 
-    def file_directory_analyze(self, options: Dict | None = None):
-        """目录分析"""
-        try:
-            opts = self._validate(options)
-            directory = ensure_directory(opts.get('directory'), auto_create=False)
-            total_size, file_count, dir_count, counter, largest = self._collect_directory_stats(directory)
-            top_ext = counter.most_common(6)
-            stats = {
-                'totalSize': format_bytes(total_size),
-                'fileCount': file_count,
-                'dirCount': dir_count,
-                'topExtensions': [{'ext': ext or '(无扩展名)', 'count': count} for ext, count in top_ext],
-                'largestFiles': [{'name': item['name'], 'path': item['path'], 'size': format_bytes(item['size'])} for item in largest],
-            }
-            return api_success('分析完成', stats=stats)
-        except Exception as exc:
-            return api_error(f'目录分析失败：{exc}')
-
     def _iter_archive_entries(self, path: Path) -> Iterable[Tuple[Path, Path]]:
         if path.is_file():
             yield path, Path(path.name)
@@ -721,77 +703,3 @@ class FileTool:
             return api_success(message, **payload)
         except Exception as exc:
             return api_error(f'文件分类失败：{exc}')
-
-    def file_compare(self, options: Dict | None = None):
-        """比较两个文件差异"""
-        try:
-            opts = self._validate(options)
-            left = ensure_file_path(opts.get('fileA') or opts.get('left') or opts.get('leftFile'))
-            right = ensure_file_path(opts.get('fileB') or opts.get('right') or opts.get('rightFile'))
-            stat_left = left.stat()
-            stat_right = right.stat()
-            mode = str(opts.get('mode', 'auto')).lower()
-            encoding = opts.get('encoding')
-            ignore_case = bool(opts.get('ignoreCase', False))
-            context_lines = max(0, int(opts.get('contextLines') or 3))
-            max_diff_lines = max(10, int(opts.get('maxDiffLines') or 400))
-            max_preview_bytes = int(opts.get('maxPreviewBytes') or 2 * 1024 * 1024)
-
-            as_text = mode == 'text'
-            if mode == 'auto':
-                as_text = stat_left.st_size <= max_preview_bytes and stat_right.st_size <= max_preview_bytes
-
-            diff_lines: List[str] = []
-            encoding_used = {'left': '', 'right': ''}
-            equal = False
-
-            if as_text:
-                try:
-                    left_text, enc_left = self._read_text_file(left, encoding)
-                    right_text, enc_right = self._read_text_file(right, encoding)
-                    encoding_used = {'left': enc_left, 'right': enc_right}
-                    cmp_left = left_text.lower() if ignore_case else left_text
-                    cmp_right = right_text.lower() if ignore_case else right_text
-                    equal = cmp_left == cmp_right
-                    if not equal:
-                        diff_iter = difflib.unified_diff(
-                            left_text.splitlines(),
-                            right_text.splitlines(),
-                            fromfile=left.name,
-                            tofile=right.name,
-                            n=context_lines,
-                        )
-                        for idx, line in enumerate(diff_iter):
-                            if idx >= max_diff_lines:
-                                diff_lines.append('...diff truncated...')
-                                break
-                            diff_lines.append(line)
-                except ValueError:
-                    as_text = False
-
-            hash_left = self._hash_file(left)
-            hash_right = self._hash_file(right)
-            if not as_text:
-                equal = hash_left == hash_right
-
-            payload = {
-                'equal': equal,
-                'mode': 'text' if as_text else 'binary',
-                'size': {
-                    'left': stat_left.st_size,
-                    'right': stat_right.st_size,
-                    'leftText': format_bytes(stat_left.st_size),
-                    'rightText': format_bytes(stat_right.st_size),
-                },
-                'hash': {
-                    'left': hash_left,
-                    'right': hash_right,
-                },
-            }
-            if as_text:
-                payload['diff'] = diff_lines
-                payload['encoding'] = encoding_used
-
-            return api_success('文件对比完成', **payload)
-        except Exception as exc:
-            return api_error(f'文件对比失败：{exc}')

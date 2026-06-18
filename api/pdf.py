@@ -24,12 +24,6 @@ class PDF():
     '''PDF 相关功能'''
 
     _image_formats = ('png', 'jpg', 'jpeg', 'tiff', 'bmp', 'webp', 'gif', 'svg')
-    _page_sizes = {
-        'a4': (2480, 3508),
-        'a5': (1748, 2480),
-        'letter': (2550, 3300),
-        'square': (2480, 2480)
-    }
 
     def _ensure_pdf_file(self, file_path: str) -> Path:
         if not file_path:
@@ -195,42 +189,6 @@ class PDF():
         if not isinstance(options, dict):
             raise ValueError('参数格式错误')
         return options
-
-    def _ensure_image_files(self, payload) -> List[Path]:
-        if not payload:
-            raise ValueError('请至少选择一张图片')
-        files: List[Path] = []
-        if isinstance(payload, (list, tuple)):
-            candidates = payload
-        else:
-            candidates = [payload]
-        for item in candidates:
-            if isinstance(item, dict):
-                path = item.get('path', '')
-            else:
-                path = str(item)
-            if not path:
-                continue
-            target = Path(path)
-            if not target.exists():
-                raise FileNotFoundError(f'文件不存在：{target}')
-            if not target.is_file():
-                continue
-            files.append(target)
-        if not files:
-            raise ValueError('请至少选择一张图片')
-        return files
-
-    def _resolve_canvas_size(self, options: Dict) -> tuple[int, int]:
-        label = str(options.get('pageSize', 'a4')).lower()
-        if label == 'custom':
-            width = int(options.get('customWidth') or 2480)
-            height = int(options.get('customHeight') or 3508)
-            return max(600, width), max(600, height)
-        return self._page_sizes.get(label, self._page_sizes['a4'])
-
-    def _chunk_list(self, items: List[Path], size: int) -> List[List[Path]]:
-        return [list(items[idx: idx + size]) for idx in range(0, len(items), size)]
 
     def _guess_page_title(self, page, page_no: int) -> str:
         """
@@ -658,40 +616,6 @@ class PDF():
         except Exception as exc:
             return {'code': -1, 'msg': f'压缩失败：{exc}'}
 
-    def pdf_reorder_pages(self, options: Dict = None):
-        '''重新排序 PDF 页面'''
-        try:
-            opts = self._validate_payload(options)
-            source = self._ensure_pdf_file(opts.get('filePath', ''))
-            raw_order = opts.get('order') or opts.get('newOrder') or []
-            if not isinstance(raw_order, Iterable):
-                raise ValueError('请提供新的页码顺序')
-            reader = PdfReader(str(source))
-            total = len(reader.pages)
-            order: List[int] = []
-            for item in raw_order:
-                try:
-                    page = int(item)
-                except (TypeError, ValueError):
-                    continue
-                if 1 <= page <= total:
-                    order.append(page)
-            if not order:
-                raise ValueError('请提供有效的页码顺序')
-            if opts.get('appendRemaining', True):
-                seen = set(order)
-                order.extend(page for page in range(1, total + 1) if page not in seen)
-            writer = PdfWriter()
-            for page in order:
-                writer.add_page(reader.pages[page - 1])
-            output_path = opts.get('outputPath') or self._compose_output_path(opts.get('outputDir', ''), opts.get('outputName', ''))
-            dest = self._resolve_output_path(source, output_path, 'reorder')
-            with dest.open('wb') as fp:
-                writer.write(fp)
-            return {'code': 0, 'msg': '页面顺序已调整', 'output': str(dest), 'pages': len(order)}
-        except Exception as exc:
-            return {'code': -1, 'msg': f'页面重排失败：{exc}'}
-
     def pdf_extract_text(self, options: Dict = None):
         '''提取 PDF 文本'''
         try:
@@ -848,128 +772,3 @@ class PDF():
             }
         except Exception as exc:
             return {'code': -1, 'msg': f'提取图片失败：{exc}'}
-
-    def pdf_images_to_pdf(self, options: Dict = None):
-        '''将多张图片合成为 PDF'''
-        try:
-            opts = self._validate_payload(options)
-            files = self._ensure_image_files(opts.get('images') or opts.get('files'))
-            per_page = int(opts.get('perPage') or 1)
-            per_page = per_page if per_page in {1, 2, 4} else 1
-            margin = int(opts.get('margin') or 40)
-            page_width, page_height = self._resolve_canvas_size(opts)
-            layout_map = {1: (1, 1), 2: (1, 2), 4: (2, 2)}
-            columns, rows = layout_map.get(per_page, (1, 1))
-            output_dir = self._ensure_output_dir(files[0], opts.get('outputDir', ''), 'img2pdf')
-            pages: List[Image.Image] = []
-            for chunk in self._chunk_list(files, per_page):
-                canvas = Image.new('RGB', (page_width, page_height), 'white')
-                cell_w = page_width // columns
-                cell_h = page_height // rows
-                for idx, image_path in enumerate(chunk):
-                    row = idx // columns
-                    col = idx % columns
-                    region = (
-                        col * cell_w + margin,
-                        row * cell_h + margin,
-                        (col + 1) * cell_w - margin,
-                        (row + 1) * cell_h - margin,
-                    )
-                    max_w = max(10, region[2] - region[0])
-                    max_h = max(10, region[3] - region[1])
-                    with Image.open(image_path) as img:
-                        prepared = img.convert('RGB')
-                        fitted = ImageOps.contain(prepared, (max_w, max_h))
-                    offset_x = region[0] + max(0, (max_w - fitted.width) // 2)
-                    offset_y = region[1] + max(0, (max_h - fitted.height) // 2)
-                    canvas.paste(fitted, (offset_x, offset_y))
-                pages.append(canvas)
-            filename = opts.get('outputName') or f'{files[0].stem}_images.pdf'
-            if not filename.lower().endswith('.pdf'):
-                filename = f'{filename}.pdf'
-            dest = output_dir / filename
-            first, rest = pages[0], pages[1:]
-            try:
-                first.save(dest, 'PDF', save_all=bool(rest), append_images=rest)
-            finally:
-                for canvas in pages:
-                    try:
-                        canvas.close()
-                    except Exception:
-                        continue
-            return {
-                'code': 0,
-                'msg': f'已生成 {len(pages)} 页 PDF',
-                'output': str(dest),
-                'pages': len(pages),
-                'outputDir': str(output_dir)
-            }
-        except Exception as exc:
-            return {'code': -1, 'msg': f'图片转 PDF 失败：{exc}'}
-
-    def pdf_generate_toc(self, options: Dict = None):
-        '''自动为 PDF 生成目录（书签）并输出一份带目录的新 PDF，同时返回目录预览文本'''
-        try:
-            opts = self._validate_payload(options)
-            source = self._ensure_pdf_file(opts.get('filePath', ''))
-            output_path = opts.get('outputPath') or self._compose_output_path(
-                opts.get('outputDir', ''), opts.get('outputName', '')
-            )
-
-            entries: List[Dict] = []
-            with fitz.open(source) as doc:
-                total = doc.page_count
-                if total == 0:
-                    raise ValueError('PDF 内无页面')
-
-                for index in range(total):
-                    page = doc.load_page(index)
-                    title = self._guess_page_title(page, index + 1)
-                    if title:
-                        entries.append({'page': index + 1, 'title': title})
-
-                # 若未能识别任何标题，则退化为“按页生成目录项”
-                if not entries:
-                    entries = [{'page': i + 1, 'title': f'第 {i + 1} 页'} for i in range(total)]
-
-                # 设置书签目录：一级目录，指向各页
-                toc = [[1, entry['title'], entry['page']] for entry in entries]
-                doc.set_toc(toc)
-
-                dest = self._resolve_output_path(source, output_path, 'toc')
-                doc.save(str(dest))
-
-            # 生成目录预览文本
-            lines: List[str] = []
-            for idx, entry in enumerate(entries, start=1):
-                title = str(entry.get('title') or '').strip()
-                if len(title) > 80:
-                    title = f'{title[:77]}...'
-                lines.append(f'{idx}. 第 {entry["page"]} 页：{title}')
-            toc_text = '\n'.join(lines)
-
-            # 可选：导出为独立 .txt 文件
-            text_output = ''
-            if opts.get('saveText'):
-                text_dir_opt = opts.get('textOutputDir') or opts.get('outputDir', '')
-                text_dir = self._ensure_output_dir(source, text_dir_opt, 'toc')
-                filename = opts.get('textOutputName') or f'{source.stem}_toc.txt'
-                if not filename.lower().endswith('.txt'):
-                    filename = f'{filename}.txt'
-                text_dest = text_dir / filename
-                text_dest.write_text(toc_text, encoding='utf-8')
-                text_output = str(text_dest)
-
-            return {
-                'code': 0,
-                'msg': '目录生成完成',
-                'output': str(dest),
-                'pages': len(entries),
-                'tocText': toc_text[:2000],
-                'entries': entries[: min(len(entries), 200)],
-                'textOutput': text_output
-            }
-        except Exception as exc:
-            return {'code': -1, 'msg': f'目录生成失败：{exc}'}
-
-

@@ -6,9 +6,7 @@ import ConvertPanel from './parts/ConvertPanel.vue'
 import CompressPanel from './parts/CompressPanel.vue'
 import CutPanel from './parts/CutPanel.vue'
 import AudioPanel from './parts/AudioPanel.vue'
-import FramesPanel from './parts/FramesPanel.vue'
 import ConcatPanel from './parts/ConcatPanel.vue'
-import InfoPanel from './parts/InfoPanel.vue'
 
 const activeTab = ref('convert')
 
@@ -17,9 +15,7 @@ const TABS = [
   { name: 'compress', label: '视频压缩' },
   { name: 'cut', label: '视频截取' },
   { name: 'audio', label: '音频提取' },
-  { name: 'frames', label: '帧图导出' },
-  { name: 'concat', label: '视频合成' },
-  { name: 'info', label: '视频信息' }
+  { name: 'concat', label: '视频合成' }
 ]
 </script>
 
@@ -29,9 +25,7 @@ const TABS = [
     <CompressPanel v-show="activeTab === 'compress'" />
     <CutPanel v-show="activeTab === 'cut'" />
     <AudioPanel v-show="activeTab === 'audio'" />
-    <FramesPanel v-show="activeTab === 'frames'" />
     <ConcatPanel v-show="activeTab === 'concat'" />
-    <InfoPanel v-show="activeTab === 'info'" />
   </ToolWorkspace>
 </template>
 

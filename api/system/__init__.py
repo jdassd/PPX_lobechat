@@ -16,7 +16,6 @@ from api.system.base import SystemBaseMixin
 from api.system.info import SystemInfoMixin
 from api.system.process import ProcessMixin
 from api.system.startup import StartupMixin
-from api.system.cleanup import CleanupMixin
 from api.system.window import WindowMixin
 
 
@@ -24,7 +23,6 @@ class System(
     SystemInfoMixin,
     ProcessMixin,
     StartupMixin,
-    CleanupMixin,
     WindowMixin,
     SystemBaseMixin
 ):
@@ -35,7 +33,6 @@ class System(
       - SystemInfoMixin : 应用信息、文件对话框、系统状态、磁盘分析
       - ProcessMixin    : 进程管理
       - StartupMixin    : 开机启动项
-      - CleanupMixin    : 垃圾/ C 盘/注册表清理
       - WindowMixin     : 窗口控制
       - SystemBaseMixin : 公共辅助、_window 类属性、状态文件读写
     '''

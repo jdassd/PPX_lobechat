@@ -6,12 +6,9 @@
     <MergePanel v-show="activeTab === 'merge'" />
     <SplitPanel v-show="activeTab === 'split'" />
     <CutPanel v-show="activeTab === 'cut'" />
-    <ReorderPanel v-show="activeTab === 'reorder'" />
     <ExtractTextPanel v-show="activeTab === 'text'" />
-    <TocPanel v-show="activeTab === 'toc'" />
     <WordPanel v-show="activeTab === 'word'" />
     <ExtractImagesPanel v-show="activeTab === 'images'" />
-    <ImagePdfPanel v-show="activeTab === 'imagePdf'" />
 
     <section class="log-panel">
       <header>
@@ -42,12 +39,9 @@ import CompressPanel from './parts/CompressPanel.vue'
 import MergePanel from './parts/MergePanel.vue'
 import SplitPanel from './parts/SplitPanel.vue'
 import CutPanel from './parts/CutPanel.vue'
-import ReorderPanel from './parts/ReorderPanel.vue'
 import ExtractTextPanel from './parts/ExtractTextPanel.vue'
-import TocPanel from './parts/TocPanel.vue'
 import WordPanel from './parts/WordPanel.vue'
 import ExtractImagesPanel from './parts/ExtractImagesPanel.vue'
-import ImagePdfPanel from './parts/ImagePdfPanel.vue'
 
 const TABS = [
   { name: 'image', label: 'PDF 转高清图片' },
@@ -56,12 +50,9 @@ const TABS = [
   { name: 'merge', label: '合并 PDF' },
   { name: 'split', label: '拆分 PDF' },
   { name: 'cut', label: '页码切割' },
-  { name: 'reorder', label: '页面重排' },
   { name: 'text', label: '提取文本' },
-  { name: 'toc', label: '生成目录' },
   { name: 'word', label: 'PDF 转 Word' },
-  { name: 'images', label: '提取图片' },
-  { name: 'imagePdf', label: '图片转 PDF' }
+  { name: 'images', label: '提取图片' }
 ]
 
 const activeTab = ref('image')

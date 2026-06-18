@@ -21,19 +21,6 @@
       :run-process="runProcess"
     />
 
-    <ChartPanel
-      v-show="activeTab === 'chart'"
-      :chart="state.chart"
-      :chart-fields="chartFields"
-      :loading="state.loading"
-      :chart-data-sample="chartDataSample"
-      :chart-option-sample="chartOptionSample"
-      :select-excel="selectExcel"
-      :load-chart-preview="loadChartPreview"
-      :run-chart-build="runChartBuild"
-      :set-chart-ref="setChartRef"
-    />
-
     <MergePanel
       v-show="activeTab === 'merge'"
       :merge="state.merge"
@@ -70,46 +57,19 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch, onMounted, onUnmounted, nextTick, shallowRef } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import * as echarts from 'echarts'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
 import ToolWorkspace from '@/components/shared/ToolWorkspace.vue'
 import StructurePanel from './parts/StructurePanel.vue'
 import ProcessPanel from './parts/ProcessPanel.vue'
-import ChartPanel from './parts/ChartPanel.vue'
 import MergePanel from './parts/MergePanel.vue'
 
 const excelFilter = ['Excel 文件 (*.xlsx;*.xlsm;*.xltx;*.xltm)']
-const chartDataSample = JSON.stringify(
-  {
-    dimension: '地区',
-    metric: '销量',
-    aggregate: 'sum',
-    rows: [
-      { name: '华北', value: 120 },
-      { name: '华东', value: 98 },
-      { name: '华南', value: 76 }
-    ]
-  },
-  null,
-  2
-)
-const chartOptionSample = JSON.stringify(
-  {
-    tooltip: { trigger: 'axis' },
-    xAxis: { type: 'category', data: ['华北', '华东', '华南'] },
-    yAxis: { type: 'value' },
-    series: [{ type: 'bar', data: [120, 98, 76] }]
-  },
-  null,
-  2
-)
 
 const TABS = [
   { name: 'structure', label: '结构定义' },
   { name: 'process', label: '数据处理' },
-  { name: 'chart', label: '图表制作' },
   { name: 'merge', label: '分表合并' },
 ]
 
@@ -142,22 +102,6 @@ const state = reactive({
     combinedPath: '',
     mergeFiles: []
   },
-  chart: {
-    file: null,
-    sheet: '',
-    sheets: [],
-    delimiter: '|',
-    schemaText: '',
-    schema: [],
-    chartType: 'bar',
-    dimension: '',
-    metric: '',
-    aggregate: 'sum',
-    data: null,
-    option: null,
-    dataJson: '',
-    optionJson: ''
-  },
   merge: {
     tables: [],
     outputDir: '',
@@ -168,10 +112,8 @@ const state = reactive({
 })
 
 const schemaFields = computed(() => state.preview.schema)
-const chartFields = computed(() => state.chart.schema)
 
 let suppressSheetReload = false
-let suppressChartReload = false
 
 watch(
   () => state.preview.sheet,
@@ -180,97 +122,6 @@ watch(
     if (val === oldVal) return
     if (state.preview.file) {
       loadPreview(true)
-    }
-  }
-)
-
-watch(
-  () => state.chart.sheet,
-  (val, oldVal) => {
-    if (suppressChartReload) return
-    if (val === oldVal) return
-    if (state.chart.file) {
-      loadChartPreview(true)
-    }
-  }
-)
-
-watch(
-  () => state.chart.aggregate,
-  (val) => {
-    if (val === 'count') {
-      state.chart.metric = ''
-    }
-  }
-)
-
-watch(
-  () => state.chart.schema,
-  (schema) => {
-    if (!schema.includes(state.chart.dimension)) {
-      state.chart.dimension = ''
-    }
-    if (!schema.includes(state.chart.metric)) {
-      state.chart.metric = ''
-    }
-  },
-  { deep: true }
-)
-
-const chartRef = ref(null)
-const chartInstance = shallowRef(null)
-
-// 由 ChartPanel 通过函数 ref 回传画布 DOM，使壳继续统一管理 echarts 生命周期
-const setChartRef = (el) => {
-  chartRef.value = el
-}
-
-const renderChart = async () => {
-  if (!chartRef.value || !state.chart.option) return
-  await nextTick()
-  if (!chartInstance.value) {
-    chartInstance.value = echarts.init(chartRef.value)
-  }
-  chartInstance.value.setOption(state.chart.option, true)
-}
-
-const resizeChart = () => {
-  if (chartInstance.value) {
-    chartInstance.value.resize()
-  }
-}
-
-const disposeChart = () => {
-  if (chartInstance.value) {
-    chartInstance.value.dispose()
-    chartInstance.value = null
-  }
-}
-
-onMounted(() => {
-  window.addEventListener('resize', resizeChart)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('resize', resizeChart)
-  disposeChart()
-})
-
-watch(
-  () => activeTab.value,
-  (val) => {
-    if (val === 'chart') {
-      renderChart()
-      nextTick(() => resizeChart())
-    }
-  }
-)
-
-watch(
-  () => state.chart.option,
-  () => {
-    if (activeTab.value === 'chart') {
-      renderChart()
     }
   }
 )
@@ -334,12 +185,6 @@ const selectExcel = async (target, multiple = false) => {
     await loadPreview(true)
     return
   }
-  if (target === 'chart') {
-    state.chart.file = result[0]
-    resetChartData()
-    await loadChartPreview(true)
-    return
-  }
   const files = multiple ? result : [result[0]]
   const mapped = files.map((item) => ({
     ...item,
@@ -369,21 +214,6 @@ const resetPreviewData = () => {
   state.process.groupFiles = []
   state.process.jsonPath = ''
   state.process.combinedPath = ''
-}
-
-const resetChartData = () => {
-  suppressChartReload = true
-  state.chart.sheet = ''
-  suppressChartReload = false
-  state.chart.sheets = []
-  state.chart.schema = []
-  state.chart.schemaText = ''
-  state.chart.dimension = ''
-  state.chart.metric = ''
-  state.chart.data = null
-  state.chart.option = null
-  state.chart.dataJson = ''
-  state.chart.optionJson = ''
 }
 
 const selectDir = async (target) => {
@@ -449,31 +279,6 @@ const loadPreview = async (silent = false) => {
   }
 }
 
-const loadChartPreview = async (silent = false) => {
-  if (!state.chart.file) {
-    if (!silent) {
-      ElMessage.warning('请选择 Excel 文件')
-    }
-    return
-  }
-  const res = await callApi('excel_preview', {
-    filePath: state.chart.file.path,
-    sheetName: state.chart.sheet,
-    delimiter: state.chart.delimiter || '|',
-    schemaText: state.chart.schemaText
-  })
-  if (!res) return
-  state.chart.schema = res.schema || []
-  state.chart.delimiter = res.delimiter || state.chart.delimiter || '|'
-  state.chart.schemaText = res.schemaText || state.chart.schema.join(state.chart.delimiter || '|')
-  state.chart.sheets = res.sheets || []
-  if (!state.chart.sheet && res.sheet) {
-    suppressChartReload = true
-    state.chart.sheet = res.sheet
-    suppressChartReload = false
-  }
-}
-
 const runProcess = async () => {
   if (!state.preview.file) {
     ElMessage.warning('请先完成结构定义')
@@ -506,38 +311,6 @@ const runProcess = async () => {
   if (res.schema) {
     state.preview.schema = res.schema
   }
-}
-
-const runChartBuild = async () => {
-  if (!state.chart.file) {
-    ElMessage.warning('请先选择 Excel 文件')
-    return
-  }
-  if (!state.chart.dimension) {
-    ElMessage.warning('请选择维度列')
-    return
-  }
-  if (state.chart.aggregate !== 'count' && !state.chart.metric) {
-    ElMessage.warning('请选择数值列')
-    return
-  }
-  const payload = {
-    filePath: state.chart.file.path,
-    sheetName: state.chart.sheet,
-    delimiter: state.chart.delimiter || '|',
-    schemaText: state.chart.schemaText,
-    chartType: state.chart.chartType,
-    dimension: state.chart.dimension,
-    metric: state.chart.metric,
-    aggregate: state.chart.aggregate
-  }
-  const res = await callApi('excel_chart_build', payload)
-  if (!res) return
-  state.chart.data = res.data || null
-  state.chart.option = res.option || null
-  state.chart.dataJson = res.data ? JSON.stringify(res.data, null, 2) : ''
-  state.chart.optionJson = res.option ? JSON.stringify(res.option, null, 2) : ''
-  renderChart()
 }
 
 const runMergeTables = async () => {

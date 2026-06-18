@@ -126,41 +126,6 @@ class TextTool:
             return value.get('path')
         return value
 
-    def text_encode_decode(self, options: Dict | None = None):
-        """编码/解码"""
-        try:
-            opts = self._validate(options)
-            codec = str(opts.get('codecType', 'base64')).lower()
-            operation = str(opts.get('operation', 'encode')).lower()
-            content = opts.get('content', '') or ''
-            if codec == 'base64':
-                if operation == 'encode':
-                    result = base64.b64encode(content.encode('utf-8')).decode('utf-8')
-                else:
-                    result = base64.b64decode(content.encode('utf-8')).decode('utf-8')
-            elif codec == 'url':
-                if operation == 'encode':
-                    result = urllib.parse.quote(content, safe='')
-                else:
-                    result = urllib.parse.unquote(content)
-            elif codec == 'html':
-                result = html.escape(content) if operation == 'encode' else html.unescape(content)
-            elif codec == 'charset':
-                direction = opts.get('direction', 'utf8_to_gbk')
-                encoding_map = {
-                    'utf8_to_gbk': ('utf-8', 'gbk'),
-                    'gbk_to_utf8': ('gbk', 'utf-8'),
-                }
-                if direction not in encoding_map:
-                    raise ValueError('不支持的字符集方向')
-                src_enc, dst_enc = encoding_map[direction]
-                result = content.encode(src_enc).decode(dst_enc)
-            else:
-                raise ValueError('未知的编码类型')
-            return api_success('转换成功', result=result)
-        except Exception as exc:
-            return api_error(f'转换失败：{exc}')
-
     def _load_json(self, raw: str):
         if isinstance(raw, str):
             return json.loads(raw)
@@ -208,81 +173,6 @@ class TextTool:
             return api_error(f'JSON 处理失败：{exc}')
         except Exception:
             return api_error('JSON 处理失败')
-
-    def text_regex_match(self, options: Dict | None = None):
-        """正则搜索 / 替换 / 提取"""
-        try:
-            opts = self._validate(options)
-            pattern = opts.get('pattern')
-            if not pattern:
-                raise ValueError('请输入正则表达式')
-            content = opts.get('content', '') or ''
-            operation = str(opts.get('operation', 'search')).lower()
-            regex = self._compile_regex(pattern, opts.get('flags'))
-
-            if operation == 'replace':
-                replacement = opts.get('replacement', '')
-                result, count = regex.subn(replacement, content)
-                return api_success('替换完成', result=result, count=count)
-
-            matches = []
-            for match in regex.finditer(content):
-                matches.append({
-                    'match': match.group(0),
-                    'start': match.start(),
-                    'end': match.end(),
-                    'groups': list(match.groups()),
-                })
-            if operation == 'extract':
-                extracted = [item['match'] for item in matches]
-                return api_success('提取完成', matches=matches, extracted=extracted, count=len(matches))
-            return api_success('匹配完成', matches=matches, count=len(matches))
-        except Exception as exc:
-            return api_error(f'正则处理失败：{exc}')
-
-    def text_convert_csv_json(self, options: Dict | None = None):
-        """CSV 与 JSON 互转"""
-        try:
-            opts = self._validate(options)
-            direction = str(opts.get('direction', 'csv_to_json')).lower()
-            source_path = self._resolve_file_arg(opts.get('file') or opts.get('filePath') or opts.get('sourceFile'))
-            path = ensure_file_path(source_path)
-            delimiter = str(opts.get('delimiter') or ',')
-            output_dir = Path(opts.get('outputDir') or path.parent)
-            output_dir.mkdir(parents=True, exist_ok=True)
-            base_name = opts.get('outputName') or f'{path.stem}_converted'
-
-            if direction == 'csv_to_json':
-                with path.open('r', encoding=opts.get('encoding') or 'utf-8-sig', newline='') as handler:
-                    reader = csv.DictReader(handler, delimiter=delimiter)
-                    rows = list(reader)
-                dest = output_dir / f'{base_name}.json'
-                with dest.open('w', encoding='utf-8') as handler:
-                    json.dump(rows, handler, ensure_ascii=False, indent=2)
-                return api_success('已转换为 JSON', file=str(dest), count=len(rows))
-
-            with path.open('r', encoding=opts.get('encoding') or 'utf-8') as handler:
-                data = json.load(handler)
-            if isinstance(data, dict):
-                rows = [data]
-            elif isinstance(data, list):
-                rows = data
-            else:
-                raise ValueError('JSON 必须为对象或对象列表')
-            if not rows:
-                raise ValueError('JSON 内容为空')
-            if not isinstance(rows[0], dict):
-                raise ValueError('JSON 列表元素必须为对象')
-
-            fieldnames = sorted({key for row in rows for key in row.keys()})
-            dest = output_dir / f'{base_name}.csv'
-            with dest.open('w', encoding='utf-8-sig', newline='') as handler:
-                writer = csv.DictWriter(handler, fieldnames=fieldnames, delimiter=delimiter)
-                writer.writeheader()
-                writer.writerows(rows)
-            return api_success('已转换为 CSV', file=str(dest), columns=len(fieldnames), rows=len(rows))
-        except Exception as exc:
-            return api_error(f'CSV/JSON 转换失败：{exc}')
 
     def text_case_transform(self, options: Dict | None = None):
         """大小写转换"""
@@ -356,57 +246,6 @@ class TextTool:
             return api_success('处理完成', result='\n'.join(result_lines), stats=stats)
         except Exception as exc:
             return api_error(f'文本处理失败：{exc}')
-
-    def text_timestamp_convert(self, options: Dict | None = None):
-        """时间戳与日期互转"""
-        try:
-            opts = self._validate(options)
-            direction = str(opts.get('direction', 'ts_to_date')).lower()
-            tz = self._resolve_timezone(opts.get('timezone'))
-            unit = str(opts.get('unit', 's')).lower()
-            if direction in {'ts_to_date', 'timestamp_to_datetime'}:
-                raw = opts.get('timestamp') or opts.get('value') or 0
-                timestamp = float(raw)
-                if unit in {'ms', 'millisecond', 'milliseconds'}:
-                    timestamp /= 1000.0
-                dt = datetime.fromtimestamp(timestamp, tz=timezone.utc).astimezone(tz)
-                return api_success('转换完成', datetime=dt.isoformat(), display=dt.strftime('%Y-%m-%d %H:%M:%S'), timestamp=int(timestamp), timestampMs=int(timestamp * 1000))
-            raw = opts.get('datetime') or opts.get('value') or ''
-            if not raw:
-                raise ValueError('请输入日期时间')
-            dt = self._parse_datetime(raw, tz)
-            timestamp = dt.astimezone(timezone.utc).timestamp()
-            result = {
-                'timestamp': int(timestamp),
-                'timestampMs': int(timestamp * 1000),
-                'datetime': dt.isoformat(),
-            }
-            return api_success('转换完成', **result)
-        except Exception as exc:
-            return api_error(f'时间转换失败：{exc}')
-
-    def text_hash_calculate(self, options: Dict | None = None):
-        """哈希计算"""
-        try:
-            opts = self._validate(options)
-            source_type = opts.get('sourceType', 'text')
-            algorithm = str(opts.get('hashType', 'md5')).lower()
-            if algorithm not in self._hash_algorithms:
-                raise ValueError('不支持的哈希算法')
-            hasher = self._hash_algorithms[algorithm]()
-            if source_type == 'file':
-                file_info = opts.get('file')
-                file_path = self._resolve_file_arg(file_info)
-                path = ensure_file_path(file_path)
-                with path.open('rb') as handler:
-                    for chunk in iter(lambda: handler.read(8192), b''):
-                        hasher.update(chunk)
-            else:
-                content = opts.get('content', '') or ''
-                hasher.update(content.encode('utf-8'))
-            return api_success('哈希计算完成', result=hasher.hexdigest())
-        except Exception as exc:
-            return api_error(f'哈希计算失败：{exc}')
 
     def text_batch_replace(self, options: Dict | None = None):
         """批量替换"""

@@ -8,8 +8,6 @@ import CopyPanel from './parts/CopyPanel.vue'
 import DeletePanel from './parts/DeletePanel.vue'
 import RenamePanel from './parts/RenamePanel.vue'
 import DedupPanel from './parts/DedupPanel.vue'
-import AnalyzePanel from './parts/AnalyzePanel.vue'
-import ComparePanel from './parts/ComparePanel.vue'
 import ArchivePanel from './parts/ArchivePanel.vue'
 
 const activeTab = ref('search')
@@ -21,8 +19,6 @@ const TABS = [
   { name: 'delete', label: '批量删除' },
   { name: 'rename', label: '批量改名' },
   { name: 'dedup', label: '文件去重' },
-  { name: 'analyze', label: '目录分析' },
-  { name: 'compare', label: '文件对比' },
   { name: 'archive', label: '压缩 / 解压' }
 ]
 </script>
@@ -35,8 +31,6 @@ const TABS = [
     <DeletePanel v-show="activeTab === 'delete'" />
     <RenamePanel v-show="activeTab === 'rename'" />
     <DedupPanel v-show="activeTab === 'dedup'" />
-    <AnalyzePanel v-show="activeTab === 'analyze'" />
-    <ComparePanel v-show="activeTab === 'compare'" />
     <ArchivePanel v-show="activeTab === 'archive'" />
   </ToolWorkspace>
 </template>
