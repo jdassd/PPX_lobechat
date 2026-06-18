@@ -39,12 +39,25 @@ from api.utils import api_error, api_success
 # ============================================================================
 _PICK_SCRIPT = r"""
 (function () {
-  if (window.__ppxPickerInstalled) {
-    // 已安装则只刷新工具条（导航后会重新调用）
-    if (window.__ppxRenderToolbar) { try { window.__ppxRenderToolbar(); } catch (e) {} }
-    return;
+  function plog(m){ try { console.log('[PPXBAR] ' + m); } catch (e) {} }
+
+  // 安装入口：document-start 注入时文档根节点可能尚未生成（documentElement 为 null），
+  // 此时挂载会抛 null.appendChild。boot() 先做就绪判断，未就绪则定时自重试，直到能安全
+  // 挂载为止——避免“某次注入时机太早 → 之后再无注入”导致页面跳转 / CF 验证等场景下工具条
+  // 装不上或消失。只有真正进入 install() 才置 installed 标志。
+  function boot() {
+    plog('boot: installed=' + !!window.__ppxPickerInstalled + ' readyState=' + document.readyState + ' hasBody=' + !!document.body + ' hasDocEl=' + !!document.documentElement + ' url=' + location.href);
+    if (window.__ppxPickerInstalled) {
+      if (window.__ppxRenderToolbar) { try { window.__ppxRenderToolbar(); } catch (e) {} }
+      return;
+    }
+    if (!document.documentElement) { plog('no documentElement yet -> retry in 50ms'); setTimeout(boot, 50); return; }
+    install();
   }
-  window.__ppxPickerInstalled = true;
+
+  function install() {
+    window.__ppxPickerInstalled = true;
+    plog('installing at readyState=' + document.readyState + ' hasBody=' + !!document.body);
 
   // ----- 共享状态 -----
   var state = {
@@ -261,7 +274,47 @@ _PICK_SCRIPT = r"""
   // ----- 工具条 UI -----
   var bar = document.createElement('div');
   bar.id = '__ppx_bar';
-  document.documentElement.appendChild(bar);
+  // 关键容器样式用 CSSOM 内联写死：el.style 走 CSSOM，不受目标站点 CSP style-src 限制，
+  // 而上面注入的 <style> 标签在严格 CSP 站点可能被拦截，导致工具条丢失定位/背景而“看不见”。
+  bar.style.cssText = [
+    'position:fixed','top:12px','right:12px','z-index:2147483647','width:300px',
+    'max-height:88vh','overflow:auto','background:#1f2329','color:#e6e6e6',
+    'font-size:12px','line-height:1.5','border-radius:10px',
+    'box-shadow:0 8px 30px rgba(0,0,0,.45)','padding:10px',
+    'font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Microsoft YaHei,sans-serif'
+  ].join(';') + ';';
+
+  // 确保工具条 / 样式始终挂在当前文档上：
+  // 1) 注入脚本在 document-start 执行时 body 尚不存在，先挂 documentElement，
+  //    待 body 就绪后由定时器自动迁移过去；
+  // 2) SPA 框架渲染时可能整体替换 DOM 把工具条移除，检测到脱离后复用同一节点
+  //    重新挂回（节点复用，render/事件闭包不失效）。
+  function ensureBar() {
+    try {
+      if (!style.isConnected) (document.head || document.documentElement).appendChild(style);
+      var host = document.body || document.documentElement;
+      if (!bar.isConnected || bar.parentNode !== host) {
+        host.appendChild(bar);
+        plog('ensureBar: (re)mounted under ' + (host.tagName || '?'));
+      }
+    } catch (e) { plog('ensureBar error: ' + e); }
+  }
+  ensureBar();
+  window.__ppxEnsureBar = ensureBar;
+  setInterval(ensureBar, 1000);
+  plog('bar created: styleConnected=' + style.isConnected + ' barConnected=' + bar.isConnected);
+  // 延迟一拍报告工具条的真实可见性，便于判断是“没挂上”“被 CSP 去样式”还是“被遮挡”
+  setTimeout(function () {
+    try {
+      ensureBar();
+      var r = bar.getBoundingClientRect();
+      var cs = getComputedStyle(bar);
+      plog('visibility check: connected=' + bar.isConnected + ' parent=' + (bar.parentNode && bar.parentNode.tagName)
+        + ' rect=' + Math.round(r.left) + ',' + Math.round(r.top) + ',' + Math.round(r.width) + 'x' + Math.round(r.height)
+        + ' pos=' + cs.position + ' display=' + cs.display + ' visibility=' + cs.visibility
+        + ' opacity=' + cs.opacity + ' zIndex=' + cs.zIndex);
+    } catch (e) { plog('visibility check error: ' + e); }
+  }, 800);
 
   var MODE_LABELS = {
     container: '①选列表块',
@@ -271,7 +324,8 @@ _PICK_SCRIPT = r"""
   };
 
   function render() {
-    var html = '<h4>PPX 网页采集 <span style="font-weight:400;color:#9aa4b2;">点选模式</span></h4>';
+    ensureBar();
+    var html = '<h4>采集选取 <span style="font-weight:400;color:#9aa4b2;">点选模式</span></h4>';
     html += '<div class="__ppx_btns">';
     ['container', 'field', 'pagination', 'detailField'].forEach(function (m) {
       html += '<button data-mode="' + m + '" class="' + (state.mode === m ? '__ppx_on' : '') + '">' + MODE_LABELS[m] + '</button>';
@@ -328,8 +382,9 @@ _PICK_SCRIPT = r"""
       emit({ type: 'done' });
       var tip = document.createElement('div');
       tip.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#2e7d32;color:#fff;text-align:center;padding:8px;z-index:2147483647;font-size:14px;';
-      tip.textContent = '已提交选取，可关闭此窗口';
+      tip.textContent = '已记录选择，请勿关闭此窗口；回到 PPX 点「开始采集」即可在本页采集';
       document.documentElement.appendChild(tip);
+      setTimeout(function () { try { tip.remove(); } catch (e) {} }, 4000);
       return;
     }
     if (t.dataset && t.dataset.del) {
@@ -419,6 +474,43 @@ _PICK_SCRIPT = r"""
   }, true);
 
   render();
+  } // end install()
+
+  boot();
+})();
+"""
+
+
+# 浏览器反自动化检测（best-effort）：降低被 Cloudflare 等基础人机校验拦截的概率。
+# 注意：对开启了「Managed Challenge / 强校验」的站点（如 linux.do）不保证有效，
+# 那类站点通常还需配合真实指纹/住宅代理等更重的手段。
+_WA_LAUNCH_ARGS = [
+    '--disable-blink-features=AutomationControlled',
+    '--disable-features=AutomationControlled',
+]
+# 统一一个真实的桌面 Chrome UA（Playwright 1.48 内核为 Chromium 130），
+# 同时避免无头模式 UA 里出现 HeadlessChrome 这一明显特征。
+_WA_USER_AGENT = (
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+    '(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
+)
+# 注入到页面最前面的反检测脚本（抹掉常见自动化特征）。
+_STEALTH_INIT = r"""
+(() => {
+  try { Object.defineProperty(navigator, 'webdriver', { get: () => undefined }); } catch (e) {}
+  try { window.chrome = window.chrome || { runtime: {} }; } catch (e) {}
+  try { Object.defineProperty(navigator, 'languages', { get: () => ['zh-CN', 'zh', 'en'] }); } catch (e) {}
+  try { Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] }); } catch (e) {}
+  try {
+    var q = navigator.permissions && navigator.permissions.query;
+    if (q) {
+      navigator.permissions.query = function (p) {
+        return (p && p.name === 'notifications')
+          ? Promise.resolve({ state: Notification.permission })
+          : q(p);
+      };
+    }
+  } catch (e) {}
 })();
 """
 
@@ -483,6 +575,9 @@ class WebAutoTool:
         self._wa_run: Dict[str, Any] = self._wa_blank_run()
         self._wa_run_thread: Optional[threading.Thread] = None
         self._wa_run_stop = threading.Event()
+        # 同一浏览器会话内的采集请求（None=空闲）：由前端置入，点选线程取走执行，
+        # 从而复用用户已通过 CF/登录的会话，彻底规避反爬检测。
+        self._wa_collect_req: Optional[Dict[str, Any]] = None
         # 浏览器内核下载状态
         self._wa_install: Dict[str, Any] = {
             'installing': False, 'done': False, 'success': False,
@@ -533,17 +628,50 @@ class WebAutoTool:
             return Path.home() / 'Library' / 'Caches' / 'ms-playwright'
         return Path.home() / '.cache' / 'ms-playwright'
 
+    @staticmethod
+    def _wa_expected_chromium_dirs() -> List[str]:
+        """读取当前 playwright 包要求的 chromium 内核目录名（含修订号）。
+
+        从 playwright 自带的 browsers.json 解析期望修订号，确保检测到的内核
+        与已安装的 playwright 版本严格匹配；否则残留的旧/新修订号内核会被误判
+        为「已就绪」，导致实际 launch 时报「请运行 playwright install」版本不符。
+        返回空列表表示无法确定（调用方回退到宽松匹配）。
+        """
+        try:
+            import importlib.util
+            spec = importlib.util.find_spec('playwright')
+            if not spec or not spec.origin:
+                return []
+            json_path = Path(spec.origin).parent / 'driver' / 'package' / 'browsers.json'
+            data = json.loads(json_path.read_text(encoding='utf-8'))
+        except Exception:
+            return []
+        dirs: List[str] = []
+        for browser in data.get('browsers', []):
+            name = browser.get('name', '')
+            revision = browser.get('revision')
+            # 仅关注默认安装的 chromium 主内核（排除 tip-of-tree 等非默认项）
+            if (not revision or not name.startswith('chromium')
+                    or name == 'chromium-tip-of-tree'
+                    or not browser.get('installByDefault', False)):
+                continue
+            dirs.append(f"{name.replace('-', '_')}-{revision}")
+        return dirs
+
     @classmethod
     def _wa_chromium_installed(cls) -> bool:
-        """检测 chromium 内核是否已下载。"""
+        """检测与当前 playwright 版本匹配的 chromium 内核是否已下载。"""
         base = cls._wa_browsers_dir()
         if not base.exists():
             return False
+        expected = cls._wa_expected_chromium_dirs()
+        if expected:
+            # 严格校验：必须存在与当前 playwright 版本匹配的内核目录，
+            # 避免残留的不匹配修订号被误判为已就绪。
+            return all((base / dirname).exists() for dirname in expected)
+        # 回退：无法读取期望修订号时，宽松匹配任意 chromium 目录
         patterns = [str(base / 'chromium-*'), str(base / 'chromium_headless_shell-*')]
-        for pattern in patterns:
-            if glob.glob(pattern):
-                return True
-        return False
+        return any(glob.glob(pattern) for pattern in patterns)
 
     # ------------------------------------------------------------------ #
     # 1. 状态查询
@@ -752,9 +880,25 @@ class WebAutoTool:
                 return True
 
             playwright = sync_playwright().start()
-            browser = playwright.chromium.launch(headless=False)
-            context = browser.new_context()
+            browser = playwright.chromium.launch(headless=False, args=_WA_LAUNCH_ARGS)
+            context = browser.new_context(locale='zh-CN', user_agent=_WA_USER_AGENT)
+            context.add_init_script(_STEALTH_INIT)
             page = context.new_page()
+
+            # 诊断：把浏览器控制台 [PPXBAR] 日志与页面 JS 错误转发到后端终端，
+            # 便于排查工具条不显示的问题（只透传我们自己的日志与 error，避免刷屏）。
+            def _on_console(msg):
+                try:
+                    text = msg.text
+                    mtype = msg.type
+                except Exception:
+                    text, mtype = str(msg), ''
+                if 'PPXBAR' in text or mtype == 'error':
+                    print(f'[webauto:console:{mtype}] {text}', flush=True)
+
+            page.on('console', _on_console)
+            page.on('pageerror', lambda err: print(f'[webauto:pageerror] {err}', flush=True))
+
             # 暴露回调 + 注入脚本（init_script 保证后续导航也注入）
             page.expose_binding('__ppxEvent', on_event)
             page.add_init_script(_PICK_SCRIPT)
@@ -762,8 +906,8 @@ class WebAutoTool:
             def reinject(_frame=None):
                 try:
                     page.evaluate(_PICK_SCRIPT)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    print(f'[webauto:reinject-error] {exc}', flush=True)
 
             page.on('framenavigated', reinject)
 
@@ -774,13 +918,19 @@ class WebAutoTool:
                 pass
             reinject()
 
-            # 主循环：等待用户完成、取消，或手动关闭窗口
+            # 主循环：在【同一浏览器/同一会话】里待命，处理采集请求，直到用户关闭会话或手动关窗。
+            # 注意：点选「完成」(done) 不再关闭浏览器——保持打开以便在已通过 CF/登录的会话内直接采集。
             while not self._wa_pick_stop.is_set():
+                # 1) 取采集请求并就地执行（线程亲和：采集与点选共用同一线程/页面）
+                req = None
                 with self._wa_lock:
-                    done = self._wa_pick.get('done')
-                if done:
-                    break
-                # 检测窗口是否被用户手动关闭
+                    if self._wa_collect_req is not None:
+                        req = self._wa_collect_req
+                        self._wa_collect_req = None
+                if req is not None:
+                    self._wa_collect_in_session(page, context, req)
+                    continue
+                # 2) 检测窗口是否被用户手动关闭
                 try:
                     if page.is_closed():
                         with self._wa_lock:
@@ -790,7 +940,7 @@ class WebAutoTool:
                     with self._wa_lock:
                         self._wa_pick['done'] = True
                     break
-                time.sleep(0.3)
+                time.sleep(0.2)
         except Exception as exc:
             with self._wa_lock:
                 self._wa_pick['error'] = f'点选会话异常：{exc}'
@@ -899,104 +1049,147 @@ class WebAutoTool:
             return api_error(f'获取点选状态失败：{exc}')
 
     # ------------------------------------------------------------------ #
-    # 6. 取消点选
+    # 6. 关闭会话（取消点选 / 结束整个任务，关闭浏览器）
     # ------------------------------------------------------------------ #
     def webauto_pick_cancel(self):
-        """取消点选会话、关闭浏览器、清空状态。"""
+        """关闭浏览器会话、停止采集、清空状态。"""
         try:
             self._wa_ensure()
+            # 同时停止可能正在进行的会话内采集
+            self._wa_run_stop.set()
             self._wa_pick_stop.set()
             thread = self._wa_pick_thread
             if thread is not None:
                 thread.join(timeout=8)
             with self._wa_lock:
                 self._wa_pick = self._wa_blank_pick()
-            return api_success('已取消点选')
+                self._wa_collect_req = None
+            return api_success('已关闭浏览器')
         except Exception as exc:
-            return api_error(f'取消点选失败：{exc}')
+            return api_error(f'关闭失败：{exc}')
+
+    # webauto_session_close 是 webauto_pick_cancel 的语义别名（结束整个任务）
+    def webauto_session_close(self):
+        """结束整个采集任务并关闭浏览器（与取消点选同义）。"""
+        return self.webauto_pick_cancel()
 
     # ------------------------------------------------------------------ #
-    # 7. 完成点选
+    # 7. 完成点选（不关闭浏览器：保持会话以便在同一浏览器内采集）
     # ------------------------------------------------------------------ #
     def webauto_pick_finish(self):
-        """结束点选、关闭浏览器，返回组装好的采集配置。"""
+        """标记点选阶段完成并返回当前配置快照；浏览器保持打开以便就地采集。"""
         try:
             self._wa_ensure()
-            # 快照当前配置
             with self._wa_lock:
                 st = self._wa_pick
+                st['done'] = True
                 config = {
                     'url': st['url'],
                     'container': st['container'],
                     'fields': [
-                        {'name': f['name'], 'selector': f['selector'], 'attr': f['attr']}
+                        {'id': f['id'], 'name': f['name'], 'selector': f['selector'], 'attr': f['attr']}
                         for f in st['fields']
                     ],
                     'pagination': st['pagination'],
                     'detailEnabled': bool(st['detailFields']),
                     'detailLinkField': st['detailLinkField'],
                     'detailFields': [
-                        {'name': f['name'], 'selector': f['selector'], 'attr': f['attr']}
+                        {'id': f['id'], 'name': f['name'], 'selector': f['selector'], 'attr': f['attr']}
                         for f in st['detailFields']
                     ],
                 }
-            # 关闭点选线程/浏览器
-            self._wa_pick_stop.set()
-            thread = self._wa_pick_thread
-            if thread is not None:
-                thread.join(timeout=8)
-            with self._wa_lock:
-                self._wa_pick = self._wa_blank_pick()
             return api_success('已完成选取', config=config)
         except Exception as exc:
             return api_error(f'完成选取失败：{exc}')
 
     # ------------------------------------------------------------------ #
-    # 8. 启动采集
+    # 8. 启动采集（在点选用的同一浏览器/同一会话内执行，复用已通过 CF/登录的页面）
     # ------------------------------------------------------------------ #
-    def webauto_run(self, config: Dict | None = None):
-        """启动采集任务（后台线程）。"""
+    def webauto_collect_start(self, options: Dict | None = None):
+        """在当前点选会话的浏览器里就地采集。
+
+        选择器（container / 各字段 / 翻页 / 详情字段）一律取自服务端点选状态，
+        前端只需传可编辑项：字段名 / 类型、翻页与详情开关、条数上限、导出格式。
+        """
         try:
             self._wa_ensure()
-            config = config or {}
-            url = str(config.get('url') or '').strip()
-            if not url:
-                return api_error('采集配置缺少网页地址')
-            if not re.match(r'^https?://', url, re.I):
-                url = 'http://' + url
-                config = dict(config)
-                config['url'] = url
-            if not self._wa_playwright_ready():
-                return api_error('未检测到 playwright 依赖，请先运行 pnpm run init 安装环境')
-            if not self._wa_chromium_installed():
-                return api_error('浏览器内核尚未安装，请先点击「下载浏览器内核」')
+            options = options or {}
             with self._wa_lock:
+                if not self._wa_pick.get('active'):
+                    return api_error('浏览器会话未打开，请先点击「打开浏览器开始点选」')
                 if self._wa_run.get('running'):
                     return api_error('已有采集任务在进行中')
-                if self._wa_pick.get('active'):
-                    return api_error('正在点选中，无法同时采集')
+                if self._wa_collect_req is not None:
+                    return api_error('采集正在排队启动，请稍候')
+                config = self._wa_build_collect_config(options)
+                if not config['fields']:
+                    return api_error('请先在浏览器里点选至少一个字段')
                 self._wa_run = self._wa_blank_run()
                 self._wa_run['running'] = True
-            self._wa_run_stop.clear()
-            self._wa_run_thread = threading.Thread(
-                target=self._wa_run_worker, args=(dict(config),), daemon=True,
-            )
-            self._wa_run_thread.start()
+                self._wa_run['columns'] = self._wa_compute_columns(config)
+                # 交给点选线程执行（线程亲和）
+                self._wa_run_stop.clear()
+                self._wa_collect_req = config
             return api_success('采集已开始')
         except Exception as exc:
             return api_error(f'启动采集失败：{exc}')
 
-    def _wa_run_worker(self, config: Dict[str, Any]) -> None:
-        """后台线程：执行完整采集流程（线程亲和的 playwright 全在此线程内）。"""
-        playwright = browser = None
+    def _wa_build_collect_config(self, options: Dict[str, Any]) -> Dict[str, Any]:
+        """合并：服务端点选状态里的选择器 + 前端传入的可编辑项，组装采集配置。
+
+        必须在持有 self._wa_lock 的上下文中调用（读取 self._wa_pick）。
+        """
+        st = self._wa_pick
+        # 字段名/类型覆盖：按 id 对应（前端 options.fields=[{id,name,attr}]）
+        name_by_id = {}
+        attr_by_id = {}
+        for f in (options.get('fields') or []):
+            fid = str(f.get('id', ''))
+            if fid:
+                name_by_id[fid] = f.get('name', '')
+                attr_by_id[fid] = f.get('attr', '')
+        fields = []
+        for f in st['fields']:
+            fid = str(f.get('id', ''))
+            fields.append({
+                'name': name_by_id.get(fid) or f.get('name', ''),
+                'selector': f.get('selector', ''),
+                'attr': attr_by_id.get(fid, f.get('attr', '')),
+            })
+        detail_fields = [
+            {'name': f.get('name', ''), 'selector': f.get('selector', ''), 'attr': f.get('attr', '')}
+            for f in st['detailFields']
+        ]
+        pg_opt = options.get('pagination') or {}
+        detail_opt = options.get('detail') or {}
+        return {
+            'container': st['container'],
+            'fields': fields,
+            'pagination': {
+                'enabled': bool(pg_opt.get('enabled')) and bool(st['pagination']),
+                'selector': st['pagination'],
+                'maxPages': int(pg_opt.get('maxPages') or 1),
+                'waitMs': int(pg_opt.get('waitMs') or 1000),
+            },
+            'detail': {
+                'enabled': bool(detail_opt.get('enabled')) and bool(detail_fields),
+                'linkField': detail_opt.get('linkField') or st['detailLinkField'],
+                'fields': detail_fields,
+            },
+            'limit': int(options.get('limit') or 0),
+            'export': options.get('export') or {},
+        }
+
+    def _wa_collect_in_session(self, page, context, config: Dict[str, Any]) -> None:
+        """在当前会话页面上执行采集（不开浏览器、不导航、不关闭）。结果写入 self._wa_run。
+
+        天然复用用户已在该浏览器中通过 CF / 登录 / 导航后的页面，彻底规避反爬。
+        """
         rows: List[Dict[str, Any]] = []
         columns = self._wa_compute_columns(config)
         with self._wa_lock:
             self._wa_run['columns'] = list(columns)
         try:
-            from playwright.sync_api import sync_playwright
-
-            url = config['url']
             container = (config.get('container') or '').strip()
             fields = config.get('fields') or []
             pagination = config.get('pagination') or {}
@@ -1012,13 +1205,6 @@ class WebAutoTool:
             detail_enabled = bool(detail.get('enabled'))
             detail_link_field = detail.get('linkField') or ''
             detail_fields = detail.get('fields') or []
-
-            playwright = sync_playwright().start()
-            browser = playwright.chromium.launch(headless=True)
-            context = browser.new_context()
-            page = context.new_page()
-
-            page.goto(url, wait_until='domcontentloaded', timeout=60000)
 
             current_page = 0
             while not self._wa_run_stop.is_set():
@@ -1098,17 +1284,6 @@ class WebAutoTool:
                 self._wa_run['done'] = True
                 self._wa_run['success'] = False
                 self._wa_run['error'] = f'采集异常：{exc}'
-        finally:
-            try:
-                if browser is not None:
-                    browser.close()
-            except Exception:
-                pass
-            try:
-                if playwright is not None:
-                    playwright.stop()
-            except Exception:
-                pass
 
     # ------------------------------------------------------------------ #
     # 采集辅助方法

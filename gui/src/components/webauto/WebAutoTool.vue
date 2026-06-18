@@ -65,7 +65,17 @@ const clearTimer = (key) => {
 const clearAllTimers = () => {
   Object.keys(timers).forEach(clearTimer)
 }
-onUnmounted(clearAllTimers)
+// 离开本工具时，关闭可能仍开着的浏览器会话，避免残留进程
+onUnmounted(() => {
+  clearAllTimers()
+  if (hasPyApi()) {
+    try {
+      pyCall('webauto_pick_cancel')
+    } catch (e) {
+      /* 忽略：卸载阶段的清理失败无影响 */
+    }
+  }
+})
 
 /* ============================================================
  * 步骤 0 —— 环境准备
@@ -290,8 +300,9 @@ const finishPick = async () => {
       return
     }
     applyConfig(data.config)
-    pick.active = false
-    ElMessage.success('已记住你选择的内容')
+    // 浏览器会话保持打开：采集将在这个已通过 CF/登录的同一浏览器里就地进行
+    pick.active = true
+    ElMessage.success('已记住你选择的内容，浏览器先别关')
     activeStep.value = STEP.FIELDS
   } catch (e) {
     ElMessage.error(e?.message || '完成选取失败')
@@ -330,6 +341,7 @@ const applyConfig = (cfg) => {
   config.url = cfg.url || pick.url || ''
   config.container = cfg.container || ''
   config.fields = (cfg.fields || []).map((f) => ({
+    id: f.id || '',
     name: f.name || '',
     selector: f.selector || '',
     attr: f.attr || ''
@@ -365,15 +377,16 @@ const linkFieldOptions = computed(() =>
 )
 
 // 校验字段配置
+// 注意：列表块（container）是可选的——后端无容器时会把整页当作 1 条记录采集，
+// 点选工具条也提示“未选（整页当 1 条）”，故此处不强制要求 container。
 const fieldsValid = computed(() => {
-  if (!config.container) return false
   if (!config.fields.length) return false
   return config.fields.every((f) => f.name.trim())
 })
 
 const goExport = () => {
   if (!fieldsValid.value) {
-    ElMessage.warning('请确保已选好列表块，且每个字段都填了名称')
+    ElMessage.warning('请至少选择一个字段，并给每个字段填写名称')
     return
   }
   if (config.detail.enabled && !config.detail.linkField) {
@@ -428,21 +441,18 @@ const run = reactive({
   error: ''
 })
 
-// 组装符合后端契约的 config
-const buildRunConfig = () => ({
-  url: config.url,
-  container: config.container,
-  fields: config.fields.map((f) => ({ name: f.name.trim(), selector: f.selector, attr: f.attr })),
+// 组装采集选项：只传可编辑项（字段名/类型、翻页与详情开关、上限、导出）。
+// 选择器全部由后端从同一浏览器会话的点选状态里取，无需前端来回传递。
+const buildCollectOptions = () => ({
+  fields: config.fields.map((f) => ({ id: f.id, name: f.name.trim(), attr: f.attr })),
   pagination: {
     enabled: config.pagination.enabled,
-    selector: config.pagination.selector,
     maxPages: config.pagination.maxPages,
     waitMs: config.pagination.waitMs
   },
   detail: {
     enabled: config.detail.enabled,
-    linkField: config.detail.linkField,
-    fields: config.detail.fields.map((f) => ({ name: f.name.trim(), selector: f.selector, attr: f.attr }))
+    linkField: config.detail.linkField
   },
   limit: config.limit,
   export: {
@@ -464,7 +474,7 @@ const startRun = async () => {
   run.rows = []
   run.outputPath = ''
   try {
-    const { ok, message } = await pyCall('webauto_run', buildRunConfig())
+    const { ok, message } = await pyCall('webauto_collect_start', buildCollectOptions())
     if (!ok) {
       ElMessage.error(message || '启动采集失败')
       return
@@ -524,6 +534,23 @@ const openOutput = () => {
   if (!run.outputPath) return
   if (!ensurePyReady()) return
   callApiRaw('system_pyOpenFile', run.outputPath)
+}
+
+// 结束整个任务：关闭采集浏览器会话
+const closeSession = async () => {
+  clearTimer('pick')
+  clearTimer('run')
+  if (!hasPyApi()) {
+    pick.active = false
+    return
+  }
+  try {
+    await pyCall('webauto_pick_cancel')
+    pick.active = false
+    ElMessage.success('已关闭采集浏览器')
+  } catch (e) {
+    ElMessage.error(e?.message || '关闭失败')
+  }
 }
 
 /* ============================================================
@@ -728,7 +755,17 @@ checkEnv()
 
       <!-- ============ 步骤 2：配置字段与翻页 ============ -->
       <section v-show="activeStep === STEP.FIELDS" class="wa-step">
+        <!-- 列表块（每条记录的范围，可选） -->
         <div class="wa-card">
+          <div class="wa-card-head between">
+            <h4>列表块（每条记录的范围）</h4>
+            <el-button v-if="config.container" type="danger" link size="small" @click="config.container = ''">清除</el-button>
+          </div>
+          <p v-if="config.container" class="mono muted">{{ config.container }}</p>
+          <p v-else class="muted">未选列表块 —— 将把整页当作 1 条记录采集。如需逐条采集列表，请点“上一步”先点选“①列表块”。</p>
+        </div>
+
+        <div class="wa-card mt">
           <h4>第二步：核对要采集的内容</h4>
           <p class="muted">字段名可以改成你看得懂的叫法。类型决定取“文字”还是“链接/图片地址”。</p>
 
@@ -948,8 +985,11 @@ checkEnv()
           </div>
         </div>
 
-        <div class="wa-actions end">
+        <div class="wa-actions between">
           <el-button @click="goStep(STEP.EXPORT)">上一步</el-button>
+          <el-button v-if="pick.active" type="warning" plain :icon="CircleClose" @click="closeSession">
+            完成并关闭浏览器
+          </el-button>
         </div>
       </section>
     </div>

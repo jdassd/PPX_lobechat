@@ -10,6 +10,9 @@
    设计系统 - Design Tokens
    ======================================== */
 :root {
+  /* 自定义窗口标题栏高度（全局，供 body 层的 el-message/el-notification 避让） */
+  --titlebar-height: 35px;
+
   /* ?? */
   --ppx-font-display: 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   --ppx-font-body: var(--ppx-font-display);
@@ -502,6 +505,10 @@ body,
 
 /* 消息提示 */
 .el-message {
+  /* 顶部有 35px 自定义标题栏（z-index 极高），消息默认 top:16px 会被它遮住，
+     只露下半截。用 margin-top 把整条消息下移到标题栏下方；ElMessage 通过递增
+     inline top 实现多条堆叠，margin-top 会统一下移而不破坏堆叠间距。 */
+  margin-top: var(--titlebar-height, 35px);
   background: var(--ppx-bg-surface);
   border: 1px solid var(--ppx-glass-border);
   border-radius: var(--ppx-radius-md);
@@ -1165,6 +1172,8 @@ body,
 
 /* 通知 */
 .el-notification {
+  /* 同 .el-message：顶部通知避开 35px 自定义标题栏的遮挡 */
+  margin-top: var(--titlebar-height, 35px);
   background: var(--ppx-bg-surface);
   border: 1px solid var(--ppx-glass-border);
   border-radius: var(--ppx-radius-md);
