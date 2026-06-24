@@ -7,6 +7,8 @@
   "scripts": {
     "initComments": "清空缓存，配置环境",
     "init": "pnpm run clean && pnpm install && pnpm run initInstall",
+    "initCiComments": "CI 专用精简初始化：跳过 clean 与 LibreOffice，默认 PyPI 源，复用 venv 缓存",
+    "init:ci": "node ./pyapp/package/initCi.js",
     "clean": "pnpm add -D shx && shx rm -rf build gui/dist gui/node_modules gui/pnpm-lock.yaml pyapp/pyenv pyapp/spec/macos* pyapp/spec/windows* && pnpm prune",
     "initInstall": "run-script-os",
     "initInstall:linux": "pnpm run initInstallLinuxPre && pnpm -C ./gui install && python3 -m venv pyapp/pyenv && ./pyapp/pyenv/bin/python -m pip install --upgrade pip -i https://mirrors.aliyun.com/pypi/simple/ && ./pyapp/pyenv/bin/pip install -i https://mirrors.aliyun.com/pypi/simple/ -r ./pyapp/requirements.txt && ./pyapp/pyenv/bin/pip install -i https://mirrors.aliyun.com/pypi/simple/ -r ./pyapp/requirements-dev.txt && ./pyapp/pyenv/bin/python ./pyapp/package/exe/getAppISSID.py && ./pyapp/pyenv/bin/python ./pyapp/db/json/getKeyDB.py && pnpm run ensureOffice",

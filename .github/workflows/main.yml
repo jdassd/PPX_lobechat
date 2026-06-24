@@ -7,10 +7,15 @@ on:
       - "V*"
 permissions:
   contents: write
+# 同一 ref 上的旧 run 被新 push 自动取消，避免连续提交叠加排队
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
     steps:
@@ -48,18 +53,18 @@ jobs:
           python-version: "3.9"
           cache: "pip"
 
-      - name: 安装 LibreOffice（Word 按页码功能运行时依赖）
-        shell: bash
-        continue-on-error: true
-        run: |
-          case "$RUNNER_OS" in
-            Linux)   sudo apt-get update && sudo apt-get install -y libreoffice-writer ;;
-            macOS)   brew install --cask libreoffice ;;
-            Windows) choco install libreoffice-fresh -y --no-progress ;;
-          esac
+      # 缓存整个 Python 虚拟环境，requirements 未变时直接复用，跳过 pip 安装
+      - name: 缓存 Python 虚拟环境
+        uses: actions/cache@v4
+        with:
+          path: pyapp/pyenv
+          key: ${{ runner.os }}-venv-${{ hashFiles('pyapp/requirements.txt', 'pyapp/requirements-dev.txt') }}
+
+      - name: 安装根依赖
+        run: pnpm install
 
       - name: 初始化打包环境
-        run: pnpm run init
+        run: pnpm run init:ci
 
       - name: 开始打包
         run: pnpm run build

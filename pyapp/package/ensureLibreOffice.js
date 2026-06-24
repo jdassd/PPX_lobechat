@@ -104,6 +104,10 @@ function installLinux() {
 }
 
 function main() {
+  if (process.env.CI) {
+    log('CI 环境，跳过 LibreOffice 安装（仅最终用户运行时可选依赖，不参与构建打包）。')
+    return
+  }
   if (alreadyInstalled()) {
     log('已检测到 LibreOffice，跳过安装。')
     return
