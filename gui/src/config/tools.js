@@ -4,7 +4,7 @@
 // 图标名沿用 @element-plus/icons-vue 组件名。
 // ============================================================
 import { markRaw } from 'vue'
-import { HomeFilled, PictureFilled, Files, Document, Tickets, Edit, VideoPlay, FolderOpened, Cpu, Stamp, Monitor } from '@element-plus/icons-vue'
+import { HomeFilled, PictureFilled, Files, Document, Tickets, Edit, VideoPlay, FolderOpened, Cpu, Stamp, Monitor, Delete } from '@element-plus/icons-vue'
 
 export const TOOLS = [
   { id: 'image', name: '图片处理', desc: '格式转换 · 压缩 · 水印', icon: markRaw(PictureFilled), group: 'media', hue: '#2b6fff', points: ['14 种格式互转', '按质量/目标大小压缩', '批量水印 · 裁剪 · 旋转', '图片合成 PDF'] },
@@ -16,7 +16,8 @@ export const TOOLS = [
   { id: 'file', name: '文件管理', desc: '搜索 · 批处理 · 压缩', icon: markRaw(FolderOpened), group: 'media', hue: '#0c9c8f', points: ['按名称/类型/大小搜索', '批量复制 · 删除 · 重命名', 'ZIP / 7Z 压缩解压(加密)'] },
   { id: 'webauto', name: '网页自动化', desc: '点选采集 · 自动翻页 · 导出', icon: markRaw(Cpu), group: 'media', hue: '#0a8f6b', points: ['可视化点选要采集的内容', '自动翻页 · 进入帖子详情', '批量提取网页信息', '一键导出 Word / Excel'] },
   { id: 'seal', name: '公章生成', desc: '电子印章制作', icon: markRaw(Stamp), group: 'media', hue: '#d6342f', points: ['圆章 / 椭圆章模板', '自定义文字 · 字号 · 弧度', '导出透明 PNG'] },
-  { id: 'system', name: '系统管理', desc: '进程管理 · 启动项', icon: markRaw(Monitor), group: 'system', hue: '#3b7de0', points: ['查看 / 结束运行中的进程', '查看进程内存占用', '管理开机启动项'] }
+  { id: 'system', name: '系统管理', desc: '进程管理 · 启动项', icon: markRaw(Monitor), group: 'system', hue: '#3b7de0', points: ['查看 / 结束运行中的进程', '查看进程内存占用', '管理开机启动项'] },
+  { id: 'cleanup', name: '软件管理', desc: '强力卸载 · 粉碎残留', icon: markRaw(Delete), group: 'system', hue: '#e0533d', points: ['扫描已安装软件', '调用自带卸载程序', '打开安装目录', '强力粉碎安装目录'] }
 ]
 
 export const GROUPS = [

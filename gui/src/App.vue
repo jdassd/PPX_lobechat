@@ -24,6 +24,7 @@ import FileTool from './components/file/FileTool.vue'
 import WebAutoTool from './components/webauto/WebAutoTool.vue'
 import SealTool from './components/seal/SealTool.vue'
 import SystemCenter from './components/system/SystemCenter.vue'
+import SoftwareManager from './components/cleanup/SoftwareManager.vue'
 
 const VIEWS = {
   image: ImageTool,
@@ -35,7 +36,8 @@ const VIEWS = {
   file: FileTool,
   webauto: WebAutoTool,
   seal: SealTool,
-  system: SystemCenter
+  system: SystemCenter,
+  cleanup: SoftwareManager
 }
 
 const active = ref('home') // 'home' | 工具 id
