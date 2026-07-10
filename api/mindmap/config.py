@@ -1,26 +1,20 @@
-from __future__ import annotations
+import os
 
-from pydantic import BaseModel
+from pydantic_settings import BaseSettings
 
-
-class AppConfig(BaseModel):
-    port: int = 8323
-    database: str = "./data/mindmap.db"
-    jwt_secret: str = "CHANGE-ME-IN-PRODUCTION"
-    access_token_expire_minutes: int = 30
-    refresh_token_expire_days: int = 30
+DATA_DIR = os.environ.get("DATA_DIR", "/app/data")
 
 
-_config = AppConfig()
+class Settings(BaseSettings):
+    DATABASE_URL: str = f"sqlite+aiosqlite:///{DATA_DIR}/mindmap.db"
+    JWT_SECRET: str = "change-me-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    DATA_DIR: str = DATA_DIR
+
+    class Config:
+        env_file = ".env"
 
 
-def configure(**kwargs) -> AppConfig:
-    """由宿主（工具箱）在启动服务前注入运行配置。"""
-    global _config
-    _config = AppConfig(**{**_config.model_dump(), **kwargs})
-    return _config
-
-
-def load_config(path: str = "") -> AppConfig:
-    """兼容原独立部署的调用签名；配置由 configure() 注入，path 参数被忽略。"""
-    return _config
+settings = Settings()

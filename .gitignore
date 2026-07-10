@@ -1,5 +1,8 @@
 build
 dist
+# 例外：思维导图前端构建产物需随仓库提交并打包（其上级 dist 目录名恰好命中上面的通配规则）
+!static/mindmap/dist
+!static/mindmap/dist/**
 gui/dist
 gui/node_modules
 gui/pnpm-lock.yaml
@@ -38,8 +41,3 @@ __pycache__/
 .ruff_cache
 .mypy_cache
 .pytest_cache
-
-# 思维导图子应用（gui-mindmap）
-gui-mindmap/node_modules
-gui-mindmap/package-lock.json
-gui-mindmap/pnpm-lock.yaml

@@ -15,7 +15,7 @@ export const TOOLS = [
   { id: 'video', name: '视频处理', desc: '转换 · 压缩 · 剪辑', icon: markRaw(VideoPlay), group: 'media', hue: '#d6447a', points: ['MP4/MOV/AVI/MKV 互转', '预设/码率/目标大小压缩', '按时间轴截取片段', '提取音频 · 视频合成'] },
   { id: 'file', name: '文件管理', desc: '搜索 · 批处理 · 压缩', icon: markRaw(FolderOpened), group: 'media', hue: '#0c9c8f', points: ['按名称/类型/大小搜索', '批量复制 · 删除 · 重命名', 'ZIP / 7Z 压缩解压(加密)'] },
   { id: 'webauto', name: '网页自动化', desc: '点选采集 · 自动翻页 · 导出', icon: markRaw(Cpu), group: 'media', hue: '#0a8f6b', points: ['可视化点选要采集的内容', '自动翻页 · 进入帖子详情', '批量提取网页信息', '一键导出 Word / Excel'] },
-  { id: 'mindmap', name: '思维导图', desc: '团队协作 · 实时同步', icon: markRaw(Share), group: 'media', hue: '#8a5cf5', points: ['支持 20000+ 节点流畅编辑', '多人实时协同 · 节点编辑锁', '完整历史记录 · 一键回滚', '导出 Word / Excel / XMind'] },
+  { id: 'mindmap', name: '思维导图', desc: '团队协作 · 主题 · 多结构', icon: markRaw(Share), group: 'media', hue: '#8a5cf5', points: ['逻辑图 / 组织架构 / 时间轴 / 鱼骨图', '多主题 · 富文本 · 图片图标公式', '团队协作 · 节点编辑锁 · 实时同步', '导出 PNG / SVG / PDF / XMind / Markdown'] },
   { id: 'seal', name: '公章生成', desc: '电子印章制作', icon: markRaw(Stamp), group: 'media', hue: '#d6342f', points: ['圆章 / 椭圆章模板', '自定义文字 · 字号 · 弧度', '导出透明 PNG'] },
   { id: 'system', name: '系统管理', desc: '进程管理 · 启动项', icon: markRaw(Monitor), group: 'system', hue: '#3b7de0', points: ['查看 / 结束运行中的进程', '查看进程内存占用', '管理开机启动项'] },
   { id: 'cleanup', name: '软件管理', desc: '强力卸载 · 粉碎残留', icon: markRaw(Delete), group: 'system', hue: '#e0533d', points: ['扫描已安装软件', '调用自带卸载程序', '打开安装目录', '强力粉碎安装目录'] }

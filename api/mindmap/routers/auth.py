@@ -1,108 +1,62 @@
-from __future__ import annotations
-
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.mindmap.auth import create_access_token, create_refresh_token, get_current_user
-from api.mindmap.services import auth_service
+from api.mindmap.database import get_db
+from api.mindmap.middleware.auth import get_current_user
+from api.mindmap.models.user import User
+from api.mindmap.schemas.auth import LoginRequest, RefreshRequest, RegisterRequest, TokenResponse, UserResponse
+from api.mindmap.services.auth import (
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    hash_password,
+    verify_password,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
-class RegisterRequest(BaseModel):
-    username: str
-    email: str
-    password: str
-    display_name: str = ""
-
-
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-
-class RefreshRequest(BaseModel):
-    refresh_token: str
-
-
-class LogoutRequest(BaseModel):
-    refresh_token: str
-
-
-@router.post("/register", status_code=201)
-async def register(req: RegisterRequest):
-    if len(req.username) < 2:
-        raise HTTPException(status_code=400, detail="Username must be at least 2 characters")
-    if len(req.password) < 6:
-        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
-
-    result = await auth_service.register_user(
-        username=req.username,
-        email=req.email,
-        password=req.password,
-        display_name=req.display_name,
-    )
-    if "error" in result:
-        raise HTTPException(status_code=409, detail=result["error"])
-
-    # Auto-login after registration
-    access_token = create_access_token(result["id"], result["username"])
-    refresh_token, refresh_expires = create_refresh_token(result["id"])
-    await auth_service.store_refresh_token(result["id"], refresh_token, refresh_expires)
-
-    return {
-        "user": result,
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-    }
-
-
-@router.post("/login")
-async def login(req: LoginRequest):
-    user = await auth_service.authenticate_user(req.username, req.password)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid username or password")
-
-    access_token = create_access_token(user["id"], user["username"])
-    refresh_token, refresh_expires = create_refresh_token(user["id"])
-    await auth_service.store_refresh_token(user["id"], refresh_token, refresh_expires)
-
-    return {
-        "user": user,
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer",
-    }
-
-
-@router.post("/refresh")
-async def refresh(req: RefreshRequest):
-    token_info = await auth_service.validate_refresh_token(req.refresh_token)
-    if not token_info:
-        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
-
-    # Revoke old refresh token (rotation)
-    await auth_service.revoke_refresh_token(req.refresh_token)
-
-    # Issue new tokens
-    access_token = create_access_token(token_info["user_id"], token_info["username"])
-    new_refresh_token, refresh_expires = create_refresh_token(token_info["user_id"])
-    await auth_service.store_refresh_token(token_info["user_id"], new_refresh_token, refresh_expires)
-
-    return {
-        "access_token": access_token,
-        "refresh_token": new_refresh_token,
-        "token_type": "bearer",
-    }
-
-
-@router.get("/me")
-async def me(user: dict = Depends(get_current_user)):
+@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+    existing = await db.execute(select(User).where(User.email == body.email))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Email already registered")
+    user = User(email=body.email, password_hash=hash_password(body.password), display_name=body.display_name)
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
     return user
 
 
-@router.post("/logout")
-async def logout(req: LogoutRequest, user: dict = Depends(get_current_user)):
-    await auth_service.revoke_refresh_token(req.refresh_token)
-    return {"message": "Logged out"}
+@router.post("/login", response_model=TokenResponse)
+async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.email == body.email))
+    user = result.scalar_one_or_none()
+    if not user or not verify_password(body.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    return TokenResponse(
+        access_token=create_access_token(str(user.id)),
+        refresh_token=create_refresh_token(str(user.id)),
+    )
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
+    payload = decode_token(body.refresh_token)
+    if payload is None or payload.get("type") != "refresh":
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+    user_id = payload.get("sub")
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    return TokenResponse(
+        access_token=create_access_token(str(user.id)),
+        refresh_token=create_refresh_token(str(user.id)),
+    )
+
+
+@router.get("/me", response_model=UserResponse)
+async def me(current_user: User = Depends(get_current_user)):
+    return current_user

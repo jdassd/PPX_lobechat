@@ -4,7 +4,10 @@
 思维导图（团队协作）API
 
 将原独立部署的 FastAPI 思维导图服务内嵌为工具箱内的本地服务：
-  - lazy import：模块顶层不导入 fastapi/uvicorn，依赖缺失时返回友好错误。
+  - lazy import：模块顶层不导入 fastapi/uvicorn/sqlalchemy，依赖缺失时返回友好错误。
+  - 配置注入：api.mindmap 服务端在 import 时读取环境变量（DATA_DIR/DATABASE_URL/
+    JWT_SECRET/MINDMAP_STATIC_DIR），因此必须先设置环境变量再导入服务端模块。
+    同进程内第二次启动会复用首次 import 的配置——各值按安装目录稳定，无影响。
   - 线程模型：uvicorn.Server 运行在后台 daemon 线程，主线程只做启停与状态查询。
   - 端口策略：固定首选端口（保证浏览器 localStorage 登录态跨重启保留），
     被占用时向后顺延扫描。
@@ -23,6 +26,8 @@ from api.utils import api_error, api_success
 DEFAULT_PORT = 8323
 PORT_SCAN_RANGE = 16
 START_TIMEOUT = 15  # 秒
+HEALTH_TIMEOUT = 2  # 单次健康检查超时（秒）
+HEALTH_RETRIES = 10
 
 
 class MindMapTool:
@@ -74,6 +79,15 @@ class MindMapTool:
             pass
         return secret
 
+    def _mm_prepare_env(self) -> None:
+        """在导入 api.mindmap 服务端模块之前注入配置环境变量。"""
+        data_dir = self._mm_data_dir()
+        os.environ['DATA_DIR'] = data_dir
+        # 注意：数据库文件名为 smm.db——旧集成遗留的 mindmap.db 表结构不兼容，不能复用
+        os.environ['DATABASE_URL'] = f"sqlite+aiosqlite:///{data_dir.replace(os.sep, '/')}/smm.db"
+        os.environ['JWT_SECRET'] = self._mm_jwt_secret()
+        os.environ['MINDMAP_STATIC_DIR'] = self._mm_static_dir()
+
     @staticmethod
     def _mm_port_free(host: str, port: int) -> bool:
         try:
@@ -111,6 +125,21 @@ class MindMapTool:
                 pass
         # 保序去重
         return list(dict.fromkeys(ips))
+
+    @staticmethod
+    def _mm_health_ok(port: int) -> bool:
+        """轮询健康检查端点，确认 HTTP 栈真正就绪。"""
+        import urllib.request
+        url = f'http://127.0.0.1:{port}/api/health'
+        for _ in range(HEALTH_RETRIES):
+            try:
+                with urllib.request.urlopen(url, timeout=HEALTH_TIMEOUT) as resp:
+                    if resp.status == 200:
+                        return True
+            except Exception:
+                pass
+            time.sleep(0.2)
+        return False
 
     def _mm_running(self) -> bool:
         return (
@@ -158,11 +187,12 @@ class MindMapTool:
         """启动（或复用）本地思维导图服务；lan=True 时绑定 0.0.0.0 供局域网协作"""
         lan = bool(lan)
         try:
+            # 服务端模块在 import 时读取环境变量，必须先注入配置再导入
+            self._mm_prepare_env()
             try:
                 import uvicorn
 
-                from api.mindmap import config as mm_config
-                from api.mindmap.app import create_app
+                from api.mindmap.main import app
             except ImportError as exc:
                 return api_error(f'思维导图组件依赖缺失，请重新运行 pnpm run init 安装依赖（{exc}）')
 
@@ -175,13 +205,18 @@ class MindMapTool:
 
                 host = '0.0.0.0' if lan else '127.0.0.1'
                 port = self._mm_pick_port(host)
-                mm_config.configure(
+                # 显式固定事件循环与协议实现，保证 PyInstaller 依赖图确定
+                # （不引入 websockets/uvloop/httptools）
+                uv_config = uvicorn.Config(
+                    app,
+                    host=host,
                     port=port,
-                    database=os.path.join(self._mm_data_dir(), 'mindmap.db'),
-                    jwt_secret=self._mm_jwt_secret(),
+                    log_config=None,
+                    log_level='warning',
+                    loop='asyncio',
+                    http='h11',
+                    ws='none',
                 )
-                app = create_app(static_dir=self._mm_static_dir())
-                uv_config = uvicorn.Config(app, host=host, port=port, log_config=None, log_level='warning')
                 server = uvicorn.Server(uv_config)
                 thread = threading.Thread(target=server.run, name='mindmap-server', daemon=True)
                 thread.start()
@@ -196,6 +231,10 @@ class MindMapTool:
                 else:
                     server.should_exit = True
                     return api_error('思维导图服务启动超时')
+
+                if not self._mm_health_ok(port):
+                    server.should_exit = True
+                    return api_error('思维导图服务健康检查未通过')
 
                 type(self)._mm_server = server
                 type(self)._mm_thread = thread

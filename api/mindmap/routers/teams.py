@@ -1,139 +1,214 @@
-from __future__ import annotations
+from datetime import datetime, timezone
 
-from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from api.mindmap.database import get_db
+from api.mindmap.middleware.auth import get_current_user
+from api.mindmap.models.invitation import TeamInvitation
+from api.mindmap.models.mind_map import MindMap
+from api.mindmap.models.team import Team, TeamMember
+from api.mindmap.models.user import User
+from api.mindmap.schemas.mind_map import MindMapCreate, MindMapListItem, MindMapResponse
+from api.mindmap.schemas.team import (
+    InviteRequest,
+    TeamCreate,
+    TeamDetailResponse,
+    TeamMemberResponse,
+    TeamResponse,
+    TeamUpdate,
+    UpdateMemberRoleRequest,
+)
+from api.mindmap.services.mind_map import get_team_mindmaps
+from api.mindmap.services.team import get_member_role, get_user_teams, require_role
 
-from api.mindmap.auth import get_current_user
-from api.mindmap.services import permission_service, team_service
-
-router = APIRouter(prefix="/api", tags=["teams"])
-
-
-class CreateTeamRequest(BaseModel):
-    name: str
-
-
-class UpdateTeamRequest(BaseModel):
-    name: str
-
-
-class AddMemberRequest(BaseModel):
-    email: str
-    role: str = "viewer"
-
-
-class UpdateMemberRequest(BaseModel):
-    role: str
+router = APIRouter(prefix="/api/teams", tags=["teams"])
 
 
-class InviteRequest(BaseModel):
-    email: str
-    role: str = "viewer"
+@router.get("", response_model=list[TeamResponse])
+async def list_teams(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    teams_data = await get_user_teams(db, current_user.id)
+    return [t["team"] for t in teams_data]
 
 
-# --- Team CRUD ---
-
-@router.post("/teams", status_code=201)
-async def create_team(req: CreateTeamRequest, user: dict = Depends(get_current_user)):
-    return await team_service.create_team(req.name, user["id"])
-
-
-@router.get("/teams")
-async def list_teams(user: dict = Depends(get_current_user)):
-    return await team_service.list_user_teams(user["id"])
-
-
-@router.get("/teams/{team_id}")
-async def get_team(team_id: str, user: dict = Depends(get_current_user)):
-    if not await permission_service.check_team_access(user["id"], team_id, "view"):
-        raise HTTPException(status_code=403, detail="Access denied")
-    team = await team_service.get_team(team_id)
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
+@router.post("", response_model=TeamResponse, status_code=status.HTTP_201_CREATED)
+async def create_team(
+    body: TeamCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    team = Team(name=body.name, description=body.description, owner_id=current_user.id)
+    db.add(team)
+    await db.flush()
+    member = TeamMember(team_id=team.id, user_id=current_user.id, role="owner")
+    db.add(member)
+    await db.commit()
+    await db.refresh(team)
     return team
 
 
-@router.put("/teams/{team_id}")
-async def update_team(team_id: str, req: UpdateTeamRequest, user: dict = Depends(get_current_user)):
-    if not await permission_service.check_team_access(user["id"], team_id, "admin"):
-        raise HTTPException(status_code=403, detail="Access denied")
-    result = await team_service.update_team(team_id, req.name)
-    if not result:
+@router.get("/{team_id}", response_model=TeamDetailResponse)
+async def get_team(
+    team_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    role = await get_member_role(db, team_id, current_user.id)
+    if role is None:
+        raise HTTPException(status_code=403, detail="Not a member")
+    result = await db.execute(select(Team).where(Team.id == team_id))
+    team = result.scalar_one_or_none()
+    if not team:
         raise HTTPException(status_code=404, detail="Team not found")
-    return result
+    members_result = await db.execute(
+        select(TeamMember, User)
+        .join(User, TeamMember.user_id == User.id)
+        .where(TeamMember.team_id == team_id)
+    )
+    members = [
+        TeamMemberResponse(
+            id=tm.id, user_id=tm.user_id, email=u.email,
+            display_name=u.display_name, role=tm.role, joined_at=tm.joined_at,
+        )
+        for tm, u in members_result.all()
+    ]
+    return TeamDetailResponse(**{c.name: getattr(team, c.name) for c in team.__table__.columns}, members=members)
 
 
-@router.delete("/teams/{team_id}", status_code=204)
-async def delete_team(team_id: str, user: dict = Depends(get_current_user)):
-    if not await permission_service.check_team_access(user["id"], team_id, "owner"):
+@router.put("/{team_id}", response_model=TeamResponse)
+async def update_team(
+    team_id: str,
+    body: TeamUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not await require_role(db, team_id, current_user.id, "owner"):
+        raise HTTPException(status_code=403, detail="Only the owner can update the team")
+    result = await db.execute(select(Team).where(Team.id == team_id))
+    team = result.scalar_one_or_none()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    for key, value in body.model_dump(exclude_unset=True).items():
+        setattr(team, key, value)
+    await db.commit()
+    await db.refresh(team)
+    return team
+
+
+@router.delete("/{team_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_team(
+    team_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not await require_role(db, team_id, current_user.id, "owner"):
         raise HTTPException(status_code=403, detail="Only the owner can delete the team")
-    deleted = await team_service.delete_team(team_id)
-    if not deleted:
+    result = await db.execute(select(Team).where(Team.id == team_id))
+    team = result.scalar_one_or_none()
+    if not team:
         raise HTTPException(status_code=404, detail="Team not found")
+    await db.delete(team)
+    await db.commit()
 
 
-# --- Members ---
+@router.post("/{team_id}/invite", status_code=status.HTTP_201_CREATED)
+async def invite_member(
+    team_id: str,
+    body: InviteRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not await require_role(db, team_id, current_user.id, "owner"):
+        raise HTTPException(status_code=403, detail="Only the owner can invite members")
+    if body.role not in ("editor", "viewer"):
+        raise HTTPException(status_code=400, detail="Role must be editor or viewer")
+    invitation = TeamInvitation(
+        team_id=team_id, inviter_id=current_user.id,
+        invitee_email=body.email, role=body.role,
+    )
+    db.add(invitation)
+    await db.commit()
+    await db.refresh(invitation)
+    return {"id": invitation.id, "status": "pending"}
 
-@router.get("/teams/{team_id}/members")
-async def list_members(team_id: str, user: dict = Depends(get_current_user)):
-    if not await permission_service.check_team_access(user["id"], team_id, "view"):
-        raise HTTPException(status_code=403, detail="Access denied")
-    return await team_service.list_team_members(team_id)
 
-
-@router.post("/teams/{team_id}/members", status_code=201)
-async def invite_member(team_id: str, req: InviteRequest, user: dict = Depends(get_current_user)):
-    if not await permission_service.check_team_access(user["id"], team_id, "admin"):
-        raise HTTPException(status_code=403, detail="Only admins and above can invite members")
-    if req.role not in ("admin", "editor", "viewer"):
-        raise HTTPException(status_code=400, detail="Invalid role")
-    result = await team_service.create_invitation(team_id, user["id"], req.email, req.role)
-    if "error" in result:
-        raise HTTPException(status_code=409, detail=result["error"])
-    return result
-
-
-@router.put("/teams/{team_id}/members/{member_id}")
-async def update_member(team_id: str, member_id: str, req: UpdateMemberRequest, user: dict = Depends(get_current_user)):
-    if not await permission_service.check_team_access(user["id"], team_id, "admin"):
-        raise HTTPException(status_code=403, detail="Access denied")
-    if req.role not in ("admin", "editor", "viewer"):
-        raise HTTPException(status_code=400, detail="Invalid role. Cannot set to owner.")
-    updated = await team_service.update_member_role(team_id, member_id, req.role)
-    if not updated:
+@router.put("/{team_id}/members/{user_id}")
+async def update_member_role(
+    team_id: str,
+    user_id: str,
+    body: UpdateMemberRoleRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not await require_role(db, team_id, current_user.id, "owner"):
+        raise HTTPException(status_code=403, detail="Only the owner can change roles")
+    if body.role not in ("editor", "viewer"):
+        raise HTTPException(status_code=400, detail="Role must be editor or viewer")
+    result = await db.execute(
+        select(TeamMember).where(TeamMember.team_id == team_id, TeamMember.user_id == user_id)
+    )
+    member = result.scalar_one_or_none()
+    if not member:
         raise HTTPException(status_code=404, detail="Member not found")
-    return {"team_id": team_id, "user_id": member_id, "role": req.role}
+    if member.role == "owner":
+        raise HTTPException(status_code=400, detail="Cannot change owner role")
+    member.role = body.role
+    await db.commit()
+    return {"status": "ok"}
 
 
-@router.delete("/teams/{team_id}/members/{member_id}", status_code=204)
-async def remove_member(team_id: str, member_id: str, user: dict = Depends(get_current_user)):
-    if not await permission_service.check_team_access(user["id"], team_id, "admin"):
-        raise HTTPException(status_code=403, detail="Access denied")
-    removed = await team_service.remove_team_member(team_id, member_id)
-    if not removed:
-        raise HTTPException(status_code=400, detail="Cannot remove member (may be the owner)")
+@router.delete("/{team_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_member(
+    team_id: str,
+    user_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if current_user.id != user_id:
+        if not await require_role(db, team_id, current_user.id, "owner"):
+            raise HTTPException(status_code=403, detail="Only the owner can remove members")
+    result = await db.execute(
+        select(TeamMember).where(TeamMember.team_id == team_id, TeamMember.user_id == user_id)
+    )
+    member = result.scalar_one_or_none()
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+    if member.role == "owner":
+        raise HTTPException(status_code=400, detail="Cannot remove the owner")
+    await db.delete(member)
+    await db.commit()
 
 
-# --- Invitations ---
-
-@router.get("/invitations")
-async def list_invitations(user: dict = Depends(get_current_user)):
-    return await team_service.list_user_invitations(user["email"])
-
-
-@router.post("/invitations/{invitation_id}/accept")
-async def accept_invitation(invitation_id: str, user: dict = Depends(get_current_user)):
-    result = await team_service.accept_invitation(invitation_id, user["id"])
-    if not result:
-        raise HTTPException(status_code=404, detail="Invitation not found or already processed")
-    return result
+@router.get("/{team_id}/mindmaps", response_model=list[MindMapListItem])
+async def list_team_mindmaps(
+    team_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    role = await get_member_role(db, team_id, current_user.id)
+    if role is None:
+        raise HTTPException(status_code=403, detail="Not a member")
+    return await get_team_mindmaps(db, team_id)
 
 
-@router.post("/invitations/{invitation_id}/decline")
-async def decline_invitation(invitation_id: str, user: dict = Depends(get_current_user)):
-    result = await team_service.decline_invitation(invitation_id, user["id"])
-    if not result:
-        raise HTTPException(status_code=404, detail="Invitation not found or already processed")
-    return result
+@router.post("/{team_id}/mindmaps", response_model=MindMapResponse, status_code=status.HTTP_201_CREATED)
+async def create_team_mindmap(
+    team_id: str,
+    body: MindMapCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not await require_role(db, team_id, current_user.id, "editor"):
+        raise HTTPException(status_code=403, detail="Viewers cannot create mind maps")
+    mindmap = MindMap(
+        owner_id=current_user.id, title=body.title,
+        data=body.data, config=body.config, team_id=team_id,
+    )
+    db.add(mindmap)
+    await db.commit()
+    await db.refresh(mindmap)
+    return mindmap

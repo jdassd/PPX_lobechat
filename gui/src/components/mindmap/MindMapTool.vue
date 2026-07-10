@@ -178,7 +178,7 @@ onMounted(async () => {
     </div>
 
     <div class="mm-stage">
-      <iframe v-if="frameSrc" :key="frameKey" class="mm-frame" :src="frameSrc" allow="clipboard-read; clipboard-write" />
+      <iframe v-if="frameSrc" :key="frameKey" class="mm-frame" :src="frameSrc" allow="fullscreen; clipboard-read; clipboard-write" allowfullscreen />
       <div v-else class="mm-empty">
         <el-icon :size="42" class="mm-empty-ico"><Connection /></el-icon>
         <div v-if="errMsg" class="mm-empty-text">{{ errMsg }}</div>
