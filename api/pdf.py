@@ -24,6 +24,15 @@ class PDF():
     '''PDF 相关功能'''
 
     _image_formats = ('png', 'jpg', 'jpeg', 'tiff', 'bmp', 'webp', 'gif', 'svg')
+    _raster_image_formats = {
+        'png': 'PNG',
+        'jpg': 'JPEG',
+        'jpeg': 'JPEG',
+        'tiff': 'TIFF',
+        'bmp': 'BMP',
+        'webp': 'WEBP',
+        'gif': 'GIF',
+    }
 
     def _ensure_pdf_file(self, file_path: str) -> Path:
         if not file_path:
@@ -62,6 +71,19 @@ class PDF():
         if pixmap.alpha:
             pixmap = fitz.Pixmap(fitz.csRGB, pixmap)
         return Image.frombytes('RGB', [pixmap.width, pixmap.height], pixmap.samples)
+
+    def _validate_image_export_format(self, value) -> str:
+        fmt = str(value or 'png').strip().lower().lstrip('.')
+        if fmt not in self._image_formats:
+            raise ValueError(f'不支持的图片格式：{fmt}')
+        if fmt == 'svg':
+            return fmt
+
+        Image.init()
+        pil_format = self._raster_image_formats.get(fmt)
+        if not pil_format or pil_format not in Image.SAVE:
+            raise ValueError(f'当前环境不支持导出 {fmt.upper()} 图片')
+        return fmt
 
     def _apply_scan_effect(self, image: Image.Image, noise_level: float, tilt: bool, texture: bool) -> Image.Image:
         img = image.convert('RGB')
@@ -266,9 +288,7 @@ class PDF():
             file_path = opts.get('filePath', '')
             output_dir = opts.get('outputDir', '')
             dpi = int(opts.get('dpi') or 320)
-            fmt = str(opts.get('format') or 'png').lower()
-            if fmt not in self._image_formats:
-                fmt = 'png'
+            fmt = self._validate_image_export_format(opts.get('format') or 'png')
             max_pages = int(opts.get('maxPages') or 0)
 
             source = self._ensure_pdf_file(file_path)
@@ -290,7 +310,9 @@ class PDF():
                         dest.write_text(svg_text, encoding='utf-8')
                     else:
                         pix = page.get_pixmap(matrix=matrix, alpha=False)
-                        pix.save(dest)
+                        image = self._pil_from_pixmap(pix)
+                        save_kwargs = {'quality': 95} if fmt in ('jpg', 'jpeg', 'webp') else {}
+                        image.save(dest, format=self._raster_image_formats[fmt], **save_kwargs)
                     exported.append(str(dest))
 
             return {

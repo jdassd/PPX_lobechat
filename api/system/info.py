@@ -71,18 +71,49 @@ class SystemInfoMixin():
 
     def system_pyOpenFile(self, path):
         '''用电脑默认软件打开本地文件或URL'''
+        if not isinstance(path, (str, os.PathLike)):
+            return api_error('请指定要打开的文件或链接')
+
+        target = os.fspath(path).strip()
+        if not target:
+            return api_error('请指定要打开的文件或链接')
+
         # 判断是否为URL
-        if path.startswith('http://') or path.startswith('https://'):
-            # 打开URL
-            import webbrowser
-            webbrowser.open(path)
-        else:
-            # 使用 pathlib 进行跨平台路径处理
-            file_path = Path(path).resolve()
-            if Config.appIsMacOS:
-                subprocess.call(["open", str(file_path)])
+        if target.lower().startswith(('http://', 'https://')):
+            try:
+                import webbrowser
+                if not webbrowser.open(target):
+                    return api_error('无法使用默认浏览器打开链接', path=target)
+                return api_success('已打开链接', path=target)
+            except Exception as exc:
+                return api_error(f'打开链接失败：{exc}', path=target)
+
+        try:
+            # 使用 pathlib 进行跨平台路径处理，并在调起系统程序前给出清晰错误。
+            file_path = Path(target).expanduser()
+            if not file_path.exists():
+                return api_error('文件或目录不存在', path=str(file_path))
+            file_path = file_path.resolve()
+
+            if Config.appSystem == 'Windows':
+                # os.startfile 仅在 Windows 可用；getattr 可避免异常环境中泄漏 AttributeError。
+                startfile = getattr(os, 'startfile', None)
+                if startfile is None:
+                    return api_error('当前 Windows 环境不支持打开文件', path=str(file_path))
+                startfile(str(file_path))
+            elif Config.appSystem == 'Darwin':
+                subprocess.run(['open', str(file_path)], check=True)
+            elif Config.appSystem == 'Linux':
+                # 参数列表而非 shell 命令，兼容空格路径并避免命令注入。
+                subprocess.run(['xdg-open', str(file_path)], check=True)
             else:
-                os.startfile(str(file_path))
+                return api_error(f'不支持在 {Config.appSystem or "未知系统"} 上打开文件', path=str(file_path))
+        except (OSError, subprocess.SubprocessError) as exc:
+            return api_error(f'打开文件失败：{exc}', path=target)
+        except Exception as exc:
+            return api_error(f'打开文件失败：{exc}', path=target)
+
+        return api_success('已打开文件', path=str(file_path))
 
     def system_pyCreateFileDialog(self, fileTypes=None, directory=''):
         '''打开文件对话框'''

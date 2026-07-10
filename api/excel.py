@@ -9,6 +9,7 @@ Description: Excel 工具相关 API
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -23,6 +24,7 @@ class Excel():
     '''Excel 相关功能'''
 
     _supported_suffix = ('.xlsx', '.xlsm', '.xltx', '.xltm')
+    _unsafe_filename_chars = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
     # -------- helpers --------
 
@@ -110,13 +112,37 @@ class Excel():
         wb.save(dest)
         wb.close()
 
+    def _safe_filename_part(self, value: Any, fallback: str) -> str:
+        safe_value = self._unsafe_filename_chars.sub('_', self._normalize_cell(value))
+        safe_value = safe_value.strip().rstrip('. ')
+        if safe_value in {'', '.', '..'}:
+            return fallback
+        return safe_value[:120].rstrip('. ') or fallback
+
     def _write_groups(self, schema: Sequence[str], grouped: Dict[str, List[Dict[str, Any]]], base_dir: Path, stem: str) -> List[str]:
+        base_dir.mkdir(parents=True, exist_ok=True)
+        base_dir = base_dir.resolve()
+        safe_stem = self._safe_filename_part(stem, '导出')
+        used_filenames = set()
         exports: List[str] = []
         for key, rows in grouped.items():
-            safe_key = key or '未分组'
-            filename = f'{stem}_{safe_key}.xlsx'
-            dest = base_dir / filename
+            safe_key = self._safe_filename_part(key, '未分组')
+            duplicate_index = 1
+            while True:
+                duplicate_suffix = '' if duplicate_index == 1 else f'_{duplicate_index}'
+                unique_key = f'{safe_key[:max(1, 120 - len(duplicate_suffix))]}{duplicate_suffix}'
+                filename = f'{safe_stem}_{unique_key}.xlsx'
+                if filename.casefold() not in used_filenames:
+                    break
+                duplicate_index += 1
+
+            dest = (base_dir / filename).resolve()
+            try:
+                dest.relative_to(base_dir)
+            except ValueError as exc:
+                raise ValueError('分组导出路径无效') from exc
             self._write_rows(schema, rows, dest)
+            used_filenames.add(filename.casefold())
             exports.append(str(dest))
         return exports
 

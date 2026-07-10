@@ -332,7 +332,7 @@ const config = reactive({
   container: '',
   fields: [], // [{name, selector, attr}]
   pagination: { enabled: false, selector: '', maxPages: 5, waitMs: 800 },
-  detail: { enabled: false, linkField: '', fields: [] }, // detail.fields: [{name, selector, attr}]
+  detail: { enabled: false, linkField: '', fields: [] }, // detail.fields: [{id, name, selector, attr}]
   limit: 0
 })
 
@@ -346,7 +346,10 @@ const applyConfig = (cfg) => {
     selector: f.selector || '',
     attr: f.attr || ''
   }))
-  const pg = cfg.pagination || {}
+  const pg =
+    typeof cfg.pagination === 'string'
+      ? { enabled: !!cfg.pagination, selector: cfg.pagination }
+      : cfg.pagination || {}
   config.pagination = {
     enabled: !!pg.enabled,
     selector: pg.selector || '',
@@ -357,6 +360,7 @@ const applyConfig = (cfg) => {
     enabled: !!cfg.detailEnabled,
     linkField: cfg.detailLinkField || '',
     fields: (cfg.detailFields || []).map((f) => ({
+      id: f.id || '',
       name: f.name || '',
       selector: f.selector || '',
       attr: f.attr || ''
@@ -431,6 +435,7 @@ const goRun = () => {
 const run = reactive({
   starting: false,
   running: false,
+  stopping: false,
   done: false,
   success: false,
   page: 0,
@@ -452,7 +457,8 @@ const buildCollectOptions = () => ({
   },
   detail: {
     enabled: config.detail.enabled,
-    linkField: config.detail.linkField
+    linkField: config.detail.linkField,
+    fields: config.detail.fields.map((f) => ({ id: f.id, name: f.name.trim(), attr: f.attr }))
   },
   limit: config.limit,
   export: {
@@ -464,7 +470,9 @@ const buildCollectOptions = () => ({
 
 const startRun = async () => {
   if (!ensurePyReady()) return
+  if (run.starting || run.running || run.stopping) return
   run.starting = true
+  run.stopping = false
   run.done = false
   run.success = false
   run.error = ''
@@ -480,6 +488,7 @@ const startRun = async () => {
       return
     }
     run.running = true
+    run.stopping = false
     pollRun()
   } catch (e) {
     ElMessage.error(e?.message || '启动采集失败')
@@ -495,22 +504,28 @@ const pollRun = () => {
       const { ok, data } = await pyCall('webauto_run_status')
       if (!ok || !data) return
       run.running = !!data.running
+      const isStopping = !!data.stopping
       run.page = data.page || 0
       run.total = data.total || 0
       if (Array.isArray(data.columns)) run.columns = data.columns
       if (Array.isArray(data.rows)) run.rows = data.rows
       if (data.error) run.error = data.error
       if (data.done) {
+        const wasStopping = run.stopping || isStopping
         clearTimer('run')
         run.running = false
+        run.stopping = false
         run.done = true
         run.success = !!data.success
         run.outputPath = data.outputPath || ''
         if (run.success) {
-          ElMessage.success('采集完成！')
+          ElMessage.success(wasStopping ? '采集已停止，已导出当前结果' : '采集完成！')
         } else {
           ElMessage.error(run.error || '采集失败')
         }
+      } else {
+        // 停止请求发出后保持该状态，避免较早发出的轮询响应把按钮重新打开。
+        run.stopping = run.stopping || isStopping
       }
     } catch (e) {
       /* 轮询偶发异常忽略 */
@@ -519,12 +534,17 @@ const pollRun = () => {
 }
 
 const stopRun = async () => {
-  if (!hasPyApi()) return
+  if (!hasPyApi() || run.stopping || !run.running) return
   try {
-    await pyCall('webauto_stop')
-    clearTimer('run')
-    run.running = false
-    ElMessage.info('已停止采集')
+    const { ok, message } = await pyCall('webauto_stop')
+    if (!ok) {
+      ElMessage.error(message || '停止失败')
+      return
+    }
+    // 后端会先完成当前结果的导出并写入 done/outputPath；保持轮询直到收到最终状态。
+    run.stopping = true
+    if (!timers.run) pollRun()
+    ElMessage.info('正在停止采集，完成当前结果导出后结束')
   } catch (e) {
     ElMessage.error(e?.message || '停止失败')
   }
@@ -918,7 +938,7 @@ checkEnv()
             <h4>第四步：开始采集</h4>
             <div>
               <el-button
-                v-if="!run.running"
+                v-if="!run.running && !run.stopping"
                 type="primary"
                 :icon="VideoPlay"
                 :loading="run.starting"
@@ -926,14 +946,23 @@ checkEnv()
               >
                 {{ run.done ? '重新采集' : '开始采集' }}
               </el-button>
-              <el-button v-else type="danger" :icon="CircleClose" @click="stopRun">停止</el-button>
+              <el-button
+                v-else
+                type="danger"
+                :icon="CircleClose"
+                :loading="run.stopping"
+                :disabled="run.stopping"
+                @click="stopRun"
+              >
+                {{ run.stopping ? '正在停止' : '停止' }}
+              </el-button>
             </div>
           </div>
 
           <!-- 进度 -->
-          <div v-if="run.running || run.done || run.total" class="run-stat">
-            <el-tag v-if="run.running" type="primary" effect="light">
-              <el-icon class="spin"><Loading /></el-icon>&nbsp;采集中
+          <div v-if="run.running || run.stopping || run.done || run.total" class="run-stat">
+            <el-tag v-if="run.running || run.stopping" :type="run.stopping ? 'warning' : 'primary'" effect="light">
+              <el-icon class="spin"><Loading /></el-icon>&nbsp;{{ run.stopping ? '正在停止并导出当前结果' : '采集中' }}
             </el-tag>
             <el-tag v-else-if="run.done && run.success" type="success" effect="light">已完成</el-tag>
             <el-tag v-else-if="run.done" type="danger" effect="light">已结束</el-tag>

@@ -173,7 +173,7 @@ const runWatermark = async () => {
             <el-input-number v-model="form.fontSize" :min="8" :max="200" />
           </el-form-item>
           <el-form-item label="颜色">
-            <el-color-picker v-model="form.color" show-alpha />
+            <el-color-picker v-model="form.color" />
           </el-form-item>
           <el-form-item label="透明度 (%)">
             <el-slider v-model="form.opacity" :min="5" :max="100" show-input />

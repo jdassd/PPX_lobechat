@@ -12,6 +12,7 @@ usage: 运行前，请确保本机已经搭建Python3开发环境，且已经安
 '''
 
 import os
+import shlex
 import subprocess
 
 import httpx
@@ -163,16 +164,36 @@ class AppUpdate:
 
     def __getApp(self, assetsList):
         '''获取程序包'''
-        # 判断更新哪个系统版本
-        appExt = '.exe'
-        if Config.appIsMacOS:
-            appExt = '.dmg'
+        # 判断更新哪个系统版本。Linux 仅为 Debian/Ubuntu 系选择 .deb 包。
+        system_extensions = {
+            'Windows': '.exe',
+            'Darwin': '.dmg'
+        }
+        if Config.appSystem == 'Linux':
+            if not self.__isDebianOrUbuntu():
+                return {
+                    'status': False,
+                    'msg': '当前 Linux 发行版不支持自动更新；自动更新仅支持 Debian/Ubuntu 系的 .deb 安装包，请前往发布页面下载适合当前发行版的安装包并手动安装。'
+                }
+            appExt = '.deb'
+        else:
+            appExt = system_extensions.get(Config.appSystem)
+        if appExt is None:
+            return {
+                'status': False,
+                'msg': f'当前系统 {Config.appSystem or "未知系统"} 不支持自动更新（仅支持 Windows、macOS 和 Linux）'
+            }
+
         for assets in assetsList:
-            name = assets['name']
-            ext = os.path.splitext(name)[-1]
+            if not isinstance(assets, dict):
+                continue
+            name = str(assets.get('name') or '')
+            ext = os.path.splitext(name)[-1].lower()
             if ext == appExt:
-                size = assets['size']
-                url = assets['browser_download_url']
+                size = assets.get('size')
+                url = assets.get('browser_download_url')
+                if not url:
+                    return {'status': False, 'msg': f'安装包 {name} 缺少下载地址'}
                 # 确保下载目录存在
                 if not os.path.exists(Config.downloadDir):
                     try:
@@ -192,6 +213,31 @@ class AppUpdate:
                 return {'status': False, 'msg': '连接超时，请稍后重试'}
         # 未找到匹配的安装包
         return {'status': False, 'msg': f'未找到适用于当前系统的安装包（需要 {appExt} 文件）'}
+
+    @staticmethod
+    def __isDebianOrUbuntu():
+        '''仅识别可使用 .deb 安装包的 Debian/Ubuntu 系发行版。'''
+        release = {}
+        try:
+            with open('/etc/os-release', encoding='utf-8') as file:
+                for line in file:
+                    line = line.strip()
+                    if not line or line.startswith('#') or '=' not in line:
+                        continue
+                    key, value = line.split('=', 1)
+                    if key not in ('ID', 'ID_LIKE'):
+                        continue
+                    try:
+                        value = ' '.join(shlex.split(value, comments=False, posix=True))
+                    except ValueError:
+                        value = value.strip().strip('\"\'')
+                    release[key] = value.lower()
+        except (OSError, UnicodeError):
+            return False
+
+        identifiers = set(release.get('ID_LIKE', '').split())
+        identifiers.add(release.get('ID', ''))
+        return bool(identifiers.intersection({'debian', 'ubuntu'}))
 
     def __download(self, url, downloadPath, size):
         '''下载大文件'''

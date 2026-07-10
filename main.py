@@ -32,6 +32,13 @@ api = API()    # 本地接口
 
 cfg.init()
 
+# 创建窗口前不能读取 webview.screens：pywebview 会据此初始化默认 GUI，
+# 使 --cef 之后的 gui='cef' 失效。先使用稳定的初始尺寸，窗口显示后再适配屏幕。
+INITIAL_WINDOW_WIDTH = 1280
+INITIAL_WINDOW_HEIGHT = 800
+MIN_WINDOW_WIDTH = 640
+MIN_WINDOW_HEIGHT = 400
+
 
 def on_shown():
     # print('程序启动')
@@ -114,6 +121,27 @@ def _read_dev_port_hint():
         return None
 
 
+def _resize_window_for_primary_screen(window):
+    '''GUI 初始化完成后，按主屏幕尺寸恢复原有的窗口比例。'''
+    try:
+        screens = webview.screens
+        if not screens:
+            return
+        screen = screens[0]
+        width = int(screen.width * 2 / 3)
+        height = int(screen.height * 4 / 5)
+        if width > 0 and height > 0:
+            window.resize(width, height)
+    except Exception as err:
+        # 屏幕查询或后端不支持 resize 时保留稳定的初始尺寸即可。
+        print(f'[Window] 未能按屏幕调整窗口尺寸: {err}')
+
+
+def _on_window_shown(window):
+    _resize_window_for_primary_screen(window)
+    on_shown()
+
+
 def _wait_dev_port_hint(timeout: float = 12.0):
     deadline = time.time() + max(0.5, timeout)
     while time.time() < deadline:
@@ -154,6 +182,9 @@ def _resolve_dev_server(base_port: int, timeout: float = 25.0, span: int = 16):
 
 def WebViewApp(ifDev=False, ifCef=False):
 
+    # 在任何 pywebview GUI 相关访问前确定后端，尤其不能让 --cef 被默认 GUI 抢先初始化。
+    guiCEF = 'cef' if ifCef else None
+
     # 是否为开发环境
     Config.devEnv = ifDev
 
@@ -177,25 +208,14 @@ def WebViewApp(ifDev=False, ifCef=False):
         # 修复某些情况下，打包后软件打开白屏的问题
         mimetypes.add_type('application/javascript', '.js')
 
-    # 系统分辨率
-    screens = webview.screens
-    screens = screens[0]
-    width = screens.width
-    height = screens.height
-    # 程序窗口大小
-    initWidth = int(width * 2 / 3)
-    initHeight = int(height * 4 / 5)
-    minWidth = int(initWidth / 2)
-    minHeight = int(initHeight / 2)
-
     # 创建窗口
     window = webview.create_window(
         title=Config.appName,
         url=template,
         js_api=api,
-        width=initWidth,
-        height=initHeight,
-        min_size=(minWidth, minHeight),
+        width=INITIAL_WINDOW_WIDTH,
+        height=INITIAL_WINDOW_HEIGHT,
+        min_size=(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT),
         frameless=True,  # 禁用系统默认窗口装饰，使用自定义顶栏
         resizable=True,
         easy_drag=False
@@ -205,12 +225,9 @@ def WebViewApp(ifDev=False, ifCef=False):
     api.setWindow(window)
 
     # 绑定事件
-    window.events.shown += on_shown
+    window.events.shown += lambda: _on_window_shown(window)
     window.events.loaded += on_loaded
     window.events.closing += on_closing
-
-    # CEF模式
-    guiCEF = 'cef' if ifCef else None
 
     # 启动窗口
     webview.start(debug=Config.devEnv, http_server=True, gui=guiCEF)

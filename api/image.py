@@ -334,6 +334,7 @@ class ImageTool:
                 target_kb = max(16, int(target_kb))
 
             results = []
+            reserved_destinations = set()
             for file_path in files:
                 with Image.open(file_path) as image:
                     buffer = io.BytesIO()
@@ -350,8 +351,17 @@ class ImageTool:
                     else:
                         save_bytes = None
                         save_image = image
-                    dest_suffix = file_path.suffix if file_path.suffix.lower() in {'.jpg', '.jpeg', '.png', '.webp'} else '.jpg'
+                    # Size-target compression is always encoded as JPEG, so its
+                    # filename must not retain the source image's extension.
+                    dest_suffix = '.jpg' if mode == 'size' and target_kb else (
+                        file_path.suffix if file_path.suffix.lower() in {'.jpg', '.jpeg', '.png', '.webp'} else '.jpg'
+                    )
                     dest = output_dir / f'{file_path.stem}_compress{dest_suffix}'
+                    index = 2
+                    while dest.exists() or dest.is_symlink() or dest in reserved_destinations:
+                        dest = output_dir / f'{file_path.stem}_compress_{index}{dest_suffix}'
+                        index += 1
+                    reserved_destinations.add(dest)
                     if mode == 'size' and target_kb:
                         with dest.open('wb') as handler:
                             handler.write(save_bytes if save_bytes is not None else buffer.getvalue())

@@ -598,7 +598,7 @@ class WebAutoTool:
     @staticmethod
     def _wa_blank_run() -> Dict[str, Any]:
         return {
-            'running': False, 'done': False, 'success': False,
+            'running': False, 'stopping': False, 'done': False, 'success': False,
             'page': 0, 'total': 0, 'columns': [], 'rows': [],
             'outputPath': '', 'error': '',
         }
@@ -1156,12 +1156,30 @@ class WebAutoTool:
                 'selector': f.get('selector', ''),
                 'attr': attr_by_id.get(fid, f.get('attr', '')),
             })
-        detail_fields = [
-            {'name': f.get('name', ''), 'selector': f.get('selector', ''), 'attr': f.get('attr', '')}
-            for f in st['detailFields']
-        ]
         pg_opt = options.get('pagination') or {}
-        detail_opt = options.get('detail') or {}
+        raw_detail_opt = options.get('detail') or {}
+        detail_opt = raw_detail_opt if isinstance(raw_detail_opt, dict) else {}
+        # 详情字段和普通字段一样：只接受按 id 修改的名称/属性，选择器始终以
+        # 服务端点选状态为准，避免前端传入的任意选择器影响当前浏览器会话。
+        detail_name_by_id = {}
+        detail_attr_by_id = {}
+        detail_options = detail_opt.get('fields') if isinstance(detail_opt, dict) else []
+        if isinstance(detail_options, list):
+            for f in detail_options:
+                if not isinstance(f, dict):
+                    continue
+                fid = str(f.get('id', ''))
+                if fid:
+                    detail_name_by_id[fid] = f.get('name', '')
+                    detail_attr_by_id[fid] = f.get('attr', '')
+        detail_fields = []
+        for f in st['detailFields']:
+            fid = str(f.get('id', ''))
+            detail_fields.append({
+                'name': detail_name_by_id.get(fid) or f.get('name', ''),
+                'selector': f.get('selector', ''),
+                'attr': detail_attr_by_id.get(fid, f.get('attr', '')),
+            })
         return {
             'container': st['container'],
             'fields': fields,
@@ -1273,6 +1291,7 @@ class WebAutoTool:
 
             with self._wa_lock:
                 self._wa_run['running'] = False
+                self._wa_run['stopping'] = False
                 self._wa_run['done'] = True
                 self._wa_run['success'] = True
                 self._wa_run['total'] = len(rows)
@@ -1281,6 +1300,7 @@ class WebAutoTool:
         except Exception as exc:
             with self._wa_lock:
                 self._wa_run['running'] = False
+                self._wa_run['stopping'] = False
                 self._wa_run['done'] = True
                 self._wa_run['success'] = False
                 self._wa_run['error'] = f'采集异常：{exc}'
@@ -1467,6 +1487,7 @@ class WebAutoTool:
                 st = self._wa_run
                 return api_success(
                     running=bool(st['running']),
+                    stopping=bool(st['stopping']),
                     done=bool(st['done']),
                     success=bool(st['success']),
                     page=int(st['page']),
@@ -1483,10 +1504,14 @@ class WebAutoTool:
     # 10. 停止采集
     # ------------------------------------------------------------------ #
     def webauto_stop(self):
-        """给采集线程发送停止信号。"""
+        """请求停止采集；采集线程会先导出当前已收集的结果。"""
         try:
             self._wa_ensure()
-            self._wa_run_stop.set()
-            return api_success('已发送停止信号')
+            with self._wa_lock:
+                if self._wa_run.get('running') and not self._wa_run.get('done'):
+                    self._wa_run['stopping'] = True
+                    self._wa_run_stop.set()
+                    return api_success('正在停止采集，完成当前结果导出后结束')
+            return api_success('采集已结束')
         except Exception as exc:
             return api_error(f'停止采集失败：{exc}')

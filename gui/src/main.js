@@ -12,6 +12,9 @@ import 'element-plus/theme-chalk/dark/css-vars.css' // 暗黑模式
 // 图标库 ElementPlus
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+  // 页面模板直接使用 <Search />、<ArrowRight /> 等 PascalCase 图标名。
+  app.component(key, component)
+  // 保留 SvgIcon 通过 ele-* 名称动态渲染图标的现有兼容性。
   app.component(`ele-${key}`, component)
 }
 // 自定义图标库
