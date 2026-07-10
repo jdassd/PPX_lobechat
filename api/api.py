@@ -9,20 +9,21 @@ Description: 业务层API，供前端JS调用
 usage: 在Javascript中调用window.pywebview.api.<methodname>(<parameters>)
 '''
 
+from api.excel import Excel
+from api.file import FileTool
+from api.image import ImageTool
+from api.mindmap.tool import MindMapTool
+from api.pdf import PDF
+from api.seal import Seal
 from api.storage import Storage
 from api.system import System
-from api.pdf import PDF
-from api.word import WordTool
-from api.excel import Excel
-from api.seal import Seal
-from api.image import ImageTool
 from api.text import TextTool
 from api.video import VideoTool
-from api.file import FileTool
 from api.webauto import WebAutoTool
+from api.word import WordTool
 
 
-class API(System, Storage, PDF, WordTool, Excel, Seal, ImageTool, TextTool, VideoTool, FileTool, WebAutoTool):
+class API(System, Storage, PDF, WordTool, Excel, Seal, ImageTool, TextTool, VideoTool, FileTool, WebAutoTool, MindMapTool):
     '''业务层API，供前端JS调用'''
 
     def setWindow(self, window):

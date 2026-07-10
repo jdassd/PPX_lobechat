@@ -44,6 +44,16 @@ logoExt = 'icns' if ifMac else 'png' if ifLinux else 'ico'
 addDll = ''
 addModules = "('../../gui/dist', 'web'), ('../../static', 'static')"
 
+# Hidden imports (uvicorn/passlib 等使用动态导入，PyInstaller 静态分析发现不了)
+hiddenImports = (
+    "'uvicorn', 'uvicorn.logging', 'uvicorn.loops', 'uvicorn.loops.auto', "
+    "'uvicorn.protocols', 'uvicorn.protocols.http', 'uvicorn.protocols.http.auto', "
+    "'uvicorn.protocols.http.h11_impl', 'uvicorn.protocols.websockets', "
+    "'uvicorn.protocols.websockets.auto', 'uvicorn.protocols.websockets.websockets_impl', "
+    "'uvicorn.lifespan', 'uvicorn.lifespan.on', "
+    "'passlib.handlers.bcrypt', 'aiosqlite', 'websockets'"
+)
+
 
 # Common first part of .spec content
 def specFirstPart():
@@ -76,7 +86,7 @@ a = Analysis(['../../main.py'],
             pathex=[],
             binaries=[{addDll}],
             datas=[{addModules}],
-            hiddenimports=[],
+            hiddenimports=[{hiddenImports}],
             hookspath=[],
             hooksconfig={{}},
             runtime_hooks=[],

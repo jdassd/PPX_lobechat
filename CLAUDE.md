@@ -28,7 +28,11 @@ PPX 是一个跨平台桌面工具箱应用，基于 **Vue 3 + Python + Pywebvie
 │   ├── image.py          # 图像工具
 │   ├── text.py           # 文本工具
 │   ├── video.py          # 视频工具
-│   └── file.py           # 文件工具
+│   ├── file.py           # 文件工具
+│   └── mindmap/          # 思维导图（内嵌 FastAPI 协作服务，见下文）
+├── gui-mindmap/           # 思维导图前端子应用（Vue 3 + TS，构建产物输出到 static/mindmap）
+├── static/
+│   └── mindmap/          # 思维导图前端构建产物（已提交，随打包携带）
 ├── pyapp/                # Python 应用配置和打包
 │   ├── config/           # 配置文件（Config 类）
 │   ├── db/               # 数据库层（支持 JSON/SQLite）
@@ -46,6 +50,21 @@ PPX 是一个跨平台桌面工具箱应用，基于 **Vue 3 + Python + Pywebvie
   ```
 - 前端通过 `window.pywebview.api.<methodname>()` 调用 Python 方法
 - API 类在 `main.py` 中实例化并注入到 Pywebview 窗口
+
+### 思维导图模块（api/mindmap + gui-mindmap）
+- 由独立项目 xmind_jdassd 集成而来：FastAPI + SQLite（aiosqlite）+ JWT 认证的团队协作思维导图，
+  支持多人实时协同（REST 轮询 + 节点编辑锁）、编辑历史/回滚、团队与权限、导出 Word/Excel/XMind
+- 运行方式：`api/mindmap/tool.py` 的 `MindMapTool` 混入 `API` 类，
+  `mindmap_start()` 在后台 daemon 线程启动 uvicorn（首选端口 8323，占用则顺延），
+  工具页 `gui/src/components/mindmap/MindMapTool.vue` 用 iframe 加载该服务
+- 原项目的 Redis 节点锁已替换为进程内存锁（`api/mindmap/locks.py`）；配置经
+  `api/mindmap/config.py` 的 `configure()` 注入（数据库位于 `Config.appDataDir/mindmap/`，
+  JWT 密钥首次生成后持久化在同目录 jwt.secret）
+- 局域网协作：`mindmap_start(lan=True)` 绑定 0.0.0.0，队友用浏览器访问本机局域网地址；
+  工具页也支持“远程服务器”模式直连他人服务
+- 前端子应用：`gui-mindmap/`（Vue 3 + TS + Pinia + Canvas 2D），构建产物提交在 `static/mindmap/`，
+  改动后需运行 `pnpm run build:mindmap` 重新构建（开发调试用 `pnpm run dev:mindmap`，
+  代理指向 127.0.0.1:8323）
 
 ### 配置系统
 - `pyapp/config/config.py` 中的 `Config` 类管理所有配置

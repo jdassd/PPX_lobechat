@@ -1,7 +1,7 @@
 {
   "name": "tools",
   "private": true,
-  "version": "1.5.5",
+  "version": "1.6.0",
   "description": "多功能工具箱的目标是采用简洁美观现代的界面，提供常用的一些工具，一次付费，终身使用，无广告，包更新",
   "author": "jdassd <jdassd@163.com>",
   "scripts": {
@@ -23,6 +23,9 @@
     "start": "run-p --race dev startos:once",
     "devComments": "开发环境-前端",
     "dev": "pnpm -C ./gui run dev",
+    "mindmapComments": "思维导图子应用：构建产物输出到 static/mindmap（已随仓库提交，改动 gui-mindmap 后需重新构建）",
+    "build:mindmap": "pnpm -C ./gui-mindmap install && pnpm -C ./gui-mindmap run build",
+    "dev:mindmap": "pnpm -C ./gui-mindmap run dev",
     "startosComments": "开发环境-客户端",
     "startos": "run-script-os",
     "startos:linux": "nodemon --config ./pyapp/nodemon.json --exec ./pyapp/pyenv/bin/python ./main.py --dev",

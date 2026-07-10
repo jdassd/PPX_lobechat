@@ -7,7 +7,8 @@
 # 文档：https://docs.astral.sh/ruff/
 # ============================================================
 [tool.ruff]
-# 与 CI（.github/workflows/main.yml）保持一致：Python 3.9
+# lint 基线保持 py39（CI 打包与本地 Windows 开发均为 Python 3.10，
+# 见 .github/workflows/main.yml 与 package.json initInstall:windows）
 target-version = "py39"
 
 # 放宽行长以匹配现有代码风格（项目含较多中文注释，行偏长）
@@ -54,6 +55,7 @@ ignore = [
     #       移除以下 ignore 并用 `ruff check --fix` 分批整改。
     "UP006",  # 使用 list/dict 取代 typing.List/Dict
     "UP007",  # 使用 X | Y 取代 typing.Optional/Union
+    "UP045",  # 同 UP007（api/mindmap 等含 future annotations 的文件保留 Optional 写法）
     "UP035",  # 从 typing 导入已弃用别名
     "UP009",  # 缺少/冗余 utf-8 编码声明
     "UP039",  # 类定义多余的空括号

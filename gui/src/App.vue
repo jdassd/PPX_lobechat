@@ -22,6 +22,7 @@ import TextTool from './components/text/TextTool.vue'
 import VideoTool from './components/video/VideoTool.vue'
 import FileTool from './components/file/FileTool.vue'
 import WebAutoTool from './components/webauto/WebAutoTool.vue'
+import MindMapTool from './components/mindmap/MindMapTool.vue'
 import SealTool from './components/seal/SealTool.vue'
 import SystemCenter from './components/system/SystemCenter.vue'
 import SoftwareManager from './components/cleanup/SoftwareManager.vue'
@@ -35,6 +36,7 @@ const VIEWS = {
   video: VideoTool,
   file: FileTool,
   webauto: WebAutoTool,
+  mindmap: MindMapTool,
   seal: SealTool,
   system: SystemCenter,
   cleanup: SoftwareManager

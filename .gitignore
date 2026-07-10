@@ -38,3 +38,8 @@ __pycache__/
 .ruff_cache
 .mypy_cache
 .pytest_cache
+
+# 思维导图子应用（gui-mindmap）
+gui-mindmap/node_modules
+gui-mindmap/package-lock.json
+gui-mindmap/pnpm-lock.yaml
