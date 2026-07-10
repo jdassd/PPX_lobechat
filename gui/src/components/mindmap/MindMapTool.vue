@@ -43,8 +43,9 @@ const startServer = async (useLan) => {
   try {
     await whenPyReady()
     const res = await pyCall('mindmap_start', !!useLan)
+    // callApi 归一化后业务字段在 res.data（running/port/localUrl/lanUrls）
     if (res.ok) {
-      applyState(res)
+      applyState(res.data || {})
       frameKey.value++
     } else {
       errMsg.value = res.message || '服务启动失败'
@@ -117,8 +118,8 @@ onMounted(async () => {
   if (mode.value === 'local') {
     // 查询现状，未运行则启动（服务常驻，切走再回来不中断协作）
     const res = await pyCall('mindmap_status')
-    if (res.ok && res.running) {
-      applyState(res)
+    if (res.ok && res.data && res.data.running) {
+      applyState(res.data)
     } else {
       await startServer(lan.value)
     }
