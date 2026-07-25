@@ -1,7 +1,7 @@
 {
   "name": "tools",
   "private": true,
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "多功能工具箱的目标是采用简洁美观现代的界面，提供常用的一些工具，一次付费，终身使用，无广告，包更新",
   "author": "jdassd <jdassd@163.com>",
   "scripts": {
@@ -9,7 +9,7 @@
     "init": "pnpm run clean && pnpm install && pnpm run initInstall",
     "initCiComments": "CI 专用精简初始化：跳过 clean 与 LibreOffice，默认 PyPI 源，复用 venv 缓存",
     "init:ci": "node ./pyapp/package/initCi.js",
-    "clean": "pnpm add -D shx && shx rm -rf build gui/dist gui/node_modules gui/pnpm-lock.yaml pyapp/pyenv pyapp/spec/macos* pyapp/spec/windows* && pnpm prune",
+    "clean": "node ./pyapp/package/clean.js",
     "initInstall": "run-script-os",
     "initInstall:linux": "pnpm run initInstallLinuxPre && pnpm -C ./gui install && python3 -m venv pyapp/pyenv && ./pyapp/pyenv/bin/python -m pip install --upgrade pip -i https://mirrors.aliyun.com/pypi/simple/ && ./pyapp/pyenv/bin/pip install -i https://mirrors.aliyun.com/pypi/simple/ -r ./pyapp/requirements.txt && ./pyapp/pyenv/bin/pip install -i https://mirrors.aliyun.com/pypi/simple/ -r ./pyapp/requirements-dev.txt && ./pyapp/pyenv/bin/python ./pyapp/package/exe/getAppISSID.py && ./pyapp/pyenv/bin/python ./pyapp/db/json/getKeyDB.py && pnpm run ensureOffice",
     "initInstall:macos": "pnpm -C ./gui install && python3 -m venv pyapp/pyenv && ./pyapp/pyenv/bin/python -m pip install --upgrade pip -i https://mirrors.aliyun.com/pypi/simple/ && ./pyapp/pyenv/bin/pip install -i https://mirrors.aliyun.com/pypi/simple/ -r ./pyapp/requirements.txt && ./pyapp/pyenv/bin/pip install -i https://mirrors.aliyun.com/pypi/simple/ -r ./pyapp/requirements-dev.txt && ./pyapp/pyenv/bin/python ./pyapp/package/exe/getAppISSID.py && ./pyapp/pyenv/bin/python ./pyapp/db/json/getKeyDB.py && pnpm run ensureOffice",
@@ -69,6 +69,7 @@
     "alembic:macos": "cd ./pyapp/db/ && ../pyenv/bin/alembic revision --autogenerate -m \"${m}\" && ../pyenv/bin/alembic upgrade head && ../pyenv/bin/alembic upgrade head --sql > ../../static/db/migration.sql && ../pyenv/bin/alembic current > ../../static/db/version",
     "alembic:windows": "cd ./pyapp/db/ && ..\\pyenv\\pyenv\\Scripts\\alembic.exe revision --autogenerate -m \"${m}\" && ..\\pyenv\\pyenv\\Scripts\\alembic.exe upgrade head && ..\\pyenv\\pyenv\\Scripts\\alembic.exe upgrade head --sql > ..\\..\\static\\db\\migration.sql && ..\\pyenv\\pyenv\\Scripts\\alembic.exe current > ..\\..\\static\\db\\version",
     "lintpyComments": "Python 代码检查（Ruff，仅检查不修改；规则见 pyproject.toml）",
+    "lint": "pnpm -C ./gui run lint && pnpm run lint:py",
     "lint:py": "run-script-os",
     "lint:py:linux": "./pyapp/pyenv/bin/ruff check .",
     "lint:py:macos": "./pyapp/pyenv/bin/ruff check .",
@@ -77,7 +78,11 @@
     "format:py": "run-script-os",
     "format:py:linux": "./pyapp/pyenv/bin/ruff format .",
     "format:py:macos": "./pyapp/pyenv/bin/ruff format .",
-    "format:py:windows": ".\\pyapp\\pyenv\\pyenv\\Scripts\\ruff format ."
+    "format:py:windows": ".\\pyapp\\pyenv\\pyenv\\Scripts\\ruff format .",
+    "test": "run-script-os",
+    "test:linux": "./pyapp/pyenv/bin/python -m unittest discover -s tests -v",
+    "test:macos": "./pyapp/pyenv/bin/python -m unittest discover -s tests -v",
+    "test:windows": ".\\pyapp\\pyenv\\pyenv\\Scripts\\python -m unittest discover -s tests -v"
   },
   "devDependencies": {
     "nodemon": "^2.0.20",

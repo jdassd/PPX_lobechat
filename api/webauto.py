@@ -31,7 +31,6 @@ from typing import Any, Dict, List, Optional
 
 from api.utils import api_error, api_success
 
-
 # ============================================================================
 # 注入到页面的点选脚本（纯 JS）。
 # 该脚本会在右上角渲染一个浮层工具条，让用户用鼠标点选：列表块/字段/翻页/详情字段。

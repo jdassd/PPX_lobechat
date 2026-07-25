@@ -51,6 +51,7 @@ pyappDir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 sys.path.append(pyappDir)
 
 from config.config import Config
+
 try:
     # 统一从项目根目录 logo.png 生成 macOS 使用的 .icns 图标
     from icon.generate_icons import generate_logo_icons

@@ -333,7 +333,7 @@ class FileTool:
                     # 使用 7-Zip 创建带密码的 ZIP（ZipCrypto），兼容常见解压工具
                     seven_zip = shutil.which('7z') or shutil.which('7za') or shutil.which('7zz')
                     if not seven_zip:
-                        raise EnvironmentError('未检测到 7-Zip，暂不支持 ZIP 密码压缩，请改用 7Z 格式或安装 7-Zip')
+                        raise OSError('未检测到 7-Zip，暂不支持 ZIP 密码压缩，请改用 7Z 格式或安装 7-Zip')
                     common_root = os.path.commonpath([str(path.parent) for path in items])
                     rel_paths = [os.path.relpath(str(path), common_root) for path in items]
                     cmd = [

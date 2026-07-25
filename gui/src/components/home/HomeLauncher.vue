@@ -1,9 +1,10 @@
 <!-- gui/src/components/home/HomeLauncher.vue —— 首页 Dashboard
      问候(按时段) + 搜索框(⌘K 提示) + 最近活动 + 全部工具网格 -->
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { TOOLS, toolById } from '@/config/tools'
-import { getRecents, relativeTime } from '@/utils/recent'
+import { getFavorites, toggleFavorite as persistFavorite } from '@/utils/favorites'
+import { clearRecents, getRecents, relativeTime } from '@/utils/recent'
 
 const emit = defineEmits(['open'])
 
@@ -11,19 +12,44 @@ const hour = new Date().getHours()
 const greet = hour < 6 ? '夜深了' : hour < 12 ? '上午好' : hour < 18 ? '下午好' : '晚上好'
 
 const q = ref('')
+const favoriteIds = ref(getFavorites())
+const recentRevision = ref(0)
+const now = ref(Date.now())
+let clockTimer = null
+
+const isFavorite = (id) => favoriteIds.value.includes(id)
 const filtered = computed(() => {
   const k = q.value.trim().toLowerCase()
-  if (!k) return TOOLS
-  return TOOLS.filter((t) => (t.name + t.desc + t.points.join('')).toLowerCase().includes(k))
+  const matches = k ? TOOLS.filter((t) => (t.name + t.desc + t.points.join('')).toLowerCase().includes(k)) : [...TOOLS]
+  return matches.sort((a, b) => Number(isFavorite(b.id)) - Number(isFavorite(a.id)))
 })
 
-const recents = computed(() =>
-  getRecents()
+const recents = computed(() => {
+  recentRevision.value
+  const currentTime = now.value
+  return getRecents()
     .map((r) => ({ ...r, tool: toolById(r.tool) }))
     .filter((r) => r.tool)
-)
+    .map((r) => ({ ...r, timeLabel: relativeTime(r.ts, currentTime) }))
+})
 
 const open = (id) => emit('open', id)
+const toggleFavorite = (id) => {
+  favoriteIds.value = persistFavorite(id)
+}
+const clearRecentActivity = () => {
+  clearRecents()
+  recentRevision.value += 1
+}
+
+onMounted(() => {
+  clockTimer = window.setInterval(() => {
+    now.value = Date.now()
+  }, 30000)
+})
+onUnmounted(() => {
+  if (clockTimer) window.clearInterval(clockTimer)
+})
 </script>
 
 <template>
@@ -33,10 +59,10 @@ const open = (id) => emit('open', id)
       <div class="hero">
         <div class="eyebrow">
           <el-icon :size="14"><Lock /></el-icon>
-          全部本地处理 · 数据不离开本机
+          默认本地处理 · 联网与协作功能由你主动开启
         </div>
         <h1 class="greet">{{ greet }}，<span class="accent">欢迎使用工具箱</span></h1>
-        <p class="subtitle">10 个离线工具，覆盖图片、PDF、表格、文本、视频、文件与系统维护。</p>
+        <p class="subtitle">{{ TOOLS.length }} 个实用工具，覆盖图片、文档、表格、文本、视频、文件与系统维护。</p>
       </div>
 
       <!-- search -->
@@ -50,6 +76,8 @@ const open = (id) => emit('open', id)
       <div v-if="!q && recents.length" class="section">
         <div class="section-label">
           <el-icon :size="16"><Clock /></el-icon><span>最近活动</span>
+          <span class="section-spacer" />
+          <button class="section-action" type="button" @click="clearRecentActivity">清空</button>
         </div>
         <div class="recent-grid">
           <button v-for="r in recents" :key="r.tool.id" class="recent-card" @click="open(r.tool.id)">
@@ -58,7 +86,7 @@ const open = (id) => emit('open', id)
             </span>
             <div class="rmeta">
               <div class="rname">{{ r.tool.name }}</div>
-              <div class="rtime">{{ relativeTime(r.ts) }}</div>
+              <div class="rtime">{{ r.timeLabel }}</div>
             </div>
           </button>
         </div>
@@ -68,11 +96,12 @@ const open = (id) => emit('open', id)
       <div class="section">
         <div class="section-label">
           <el-icon :size="16"><Grid /></el-icon>
-          <span>{{ q ? `搜索结果 · ${filtered.length}` : '全部工具' }}</span>
+          <span>{{ q ? `搜索结果 · ${filtered.length}` : '全部工具 · 收藏优先' }}</span>
         </div>
         <el-empty v-if="!filtered.length" description="没有匹配的工具" />
         <div v-else class="tools-grid">
-          <button v-for="t in filtered" :key="t.id" class="tcard" :style="{ '--hue': t.hue }" @click="open(t.id)">
+          <article v-for="t in filtered" :key="t.id" class="tcard" :style="{ '--hue': t.hue }">
+            <button class="card-open" type="button" :aria-label="`打开${t.name}`" @click="open(t.id)" />
             <span class="tcard-rail" />
             <div class="tcard-head">
               <span class="ticon" :style="{ background: t.hue + '1a', color: t.hue }"
@@ -82,6 +111,9 @@ const open = (id) => emit('open', id)
                 <div class="tname">{{ t.name }}</div>
                 <div class="tdesc">{{ t.desc }}</div>
               </div>
+              <button class="favorite-btn" :class="{ active: isFavorite(t.id) }" type="button" :aria-label="isFavorite(t.id) ? `取消收藏${t.name}` : `收藏${t.name}`" :title="isFavorite(t.id) ? '取消收藏' : '收藏置顶'" @click.stop="toggleFavorite(t.id)">
+                <el-icon :size="16"><StarFilled v-if="isFavorite(t.id)" /><Star v-else /></el-icon>
+              </button>
               <el-icon class="tarrow" :size="17"><ArrowRight /></el-icon>
             </div>
             <div class="tpoints">
@@ -90,7 +122,7 @@ const open = (id) => emit('open', id)
                 <span>{{ p }}</span>
               </div>
             </div>
-          </button>
+          </article>
         </div>
       </div>
     </div>
@@ -194,6 +226,22 @@ const open = (id) => emit('open', id)
 .section-label span {
   font-size: 13.5px;
   font-weight: 700;
+}
+.section-spacer {
+  flex: 1;
+}
+.section-action {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 5px;
+  font: inherit;
+  font-size: 12px;
+}
+.section-action:hover {
+  background: var(--ppx-bg-hover);
 }
 
 .recent-grid {
@@ -315,6 +363,40 @@ const open = (id) => emit('open', id)
   opacity: 0;
   transform: translateX(-6px);
   transition: all var(--ppx-transition-normal);
+}
+.card-open {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: none;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.card-open:focus-visible {
+  outline: 2px solid var(--hue);
+  outline-offset: -3px;
+}
+.favorite-btn {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ppx-text-disabled);
+  cursor: pointer;
+  transition: all var(--ppx-transition-fast);
+  position: relative;
+  z-index: 2;
+}
+.favorite-btn:hover,
+.favorite-btn.active {
+  color: #e0a500;
+  background: #e0a50018;
 }
 .tcard:hover .tarrow {
   opacity: 1;

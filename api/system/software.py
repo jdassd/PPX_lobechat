@@ -10,12 +10,12 @@ usage: 调用window.pywebview.api.<methodname>(<parameters>)从Javascript执行
 '''
 
 import os
+import platform
 import re
 import shutil
 import stat
 import subprocess
 import sys
-import platform
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -29,7 +29,7 @@ if platform.system() == 'Windows':
     import winreg
 
 from api.utils import format_bytes
-from api.utils.error_handler import api_success, api_error, safe_execute
+from api.utils.error_handler import api_error, api_success, safe_execute
 
 
 # 注册表卸载信息根（显式读取 WOW6432Node，不依赖 WOW64 标志位）
@@ -335,7 +335,7 @@ class SoftwareMixin():
                 failed.append(str(p))
 
         # 最多重试 3 次以应对 AV / 句柄临时占用
-        for attempt in range(3):
+        for _attempt in range(3):
             failed = []
             try:
                 if sys.version_info >= (3, 12):
@@ -382,23 +382,18 @@ class SoftwareMixin():
         if not self._software_supported():
             return self._software_unsupported_error()
 
-        soft_id = None
         quiet = False
-        entry = None
         if isinstance(payload, dict):
             soft_id = payload.get('id')
             quiet = bool(payload.get('quiet', False))
         else:
             soft_id = payload
 
-        if soft_id:
-            entry = self._find_software_by_id(soft_id)
-            if not entry:
-                return api_error('未找到该软件，请刷新列表后重试')
-        elif isinstance(payload, dict):
-            entry = payload
+        if not soft_id:
+            return api_error('缺少软件标识，请刷新列表后重试')
+        entry = self._find_software_by_id(soft_id)
         if not entry:
-            return api_error('缺少软件信息')
+            return api_error('未找到该软件，请刷新列表后重试')
 
         uninstall_string = (entry.get('uninstallString') or '').strip()
         quiet_uninstall = (entry.get('quietUninstallString') or '').strip()
@@ -419,8 +414,8 @@ class SoftwareMixin():
         if not command:
             return api_error('该软件未提供卸载命令')
 
-        # EXE：用 shell 启动以尊重厂商自带的引号与参数；非阻塞，卸载器有自身 UI
-        process = subprocess.Popen(command, shell=True, creationflags=creationflags)
+        # 命令只取自刚刚回查的注册表权威记录；不经过 cmd.exe，避免解释 shell 元字符。
+        process = subprocess.Popen(command, shell=False, creationflags=creationflags)
         return api_success('已启动卸载程序，完成后请刷新列表', pid=process.pid,
                            mode='quiet' if (quiet and quiet_uninstall) else 'ui')
 
@@ -430,17 +425,13 @@ class SoftwareMixin():
         if not self._software_supported():
             return self._software_unsupported_error()
 
-        path = None
-        if isinstance(payload, dict):
-            if payload.get('id'):
-                entry = self._find_software_by_id(payload.get('id'))
-                if not entry:
-                    return api_error('未找到该软件，请刷新列表后重试')
-                path = entry.get('installLocation')
-            else:
-                path = payload.get('path')
-        else:
-            path = payload
+        soft_id = payload.get('id') if isinstance(payload, dict) else payload
+        if not soft_id:
+            return api_error('缺少软件标识，请刷新列表后重试')
+        entry = self._find_software_by_id(soft_id)
+        if not entry:
+            return api_error('未找到该软件，请刷新列表后重试')
+        path = entry.get('installLocation')
 
         if not path:
             return api_error('该软件未提供安装目录')
@@ -456,21 +447,21 @@ class SoftwareMixin():
         if not self._software_supported():
             return self._software_unsupported_error()
 
-        path = None
         kill_processes = True
         if isinstance(payload, dict):
             kill_processes = bool(payload.get('killProcesses', True))
-            if payload.get('id'):
-                entry = self._find_software_by_id(payload.get('id'))
-                if not entry:
-                    return api_error('未找到该软件，请刷新列表后重试')
-                path = entry.get('installLocation')
-                if not path:
-                    return api_error('该软件未记录安装目录，无法粉碎')
-            else:
-                path = payload.get('path')
+            soft_id = payload.get('id')
         else:
-            path = payload
+            soft_id = payload
+
+        if not soft_id:
+            return api_error('缺少软件标识，请刷新列表后重试')
+        entry = self._find_software_by_id(soft_id)
+        if not entry:
+            return api_error('未找到该软件，请刷新列表后重试')
+        path = entry.get('installLocation')
+        if not path:
+            return api_error('该软件未记录安装目录，无法粉碎')
 
         # 安全护栏：破坏性操作必须先过
         ok, reason = self._is_safe_to_shred(path)

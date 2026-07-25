@@ -19,6 +19,7 @@ scriptDir = os.path.dirname(os.path.abspath(__file__))
 pyappDir = os.path.dirname(os.path.dirname(scriptDir))
 sys.path.append(pyappDir)
 from config.config import Config
+
 try:
     # Ensure icons (including Linux PNG) are generated from root logo.png.
     from icon.generate_icons import generate_logo_icons
@@ -74,7 +75,7 @@ getPostinst = """#!/bin/bash
 # 更新桌面图标数据库
 update-desktop-database /usr/share/applications || true
 # 获取当前的用户名
-username=`getent passwd \`who\` | head -n 1 | cut -d : -f 1`
+username="$(who | awk 'NR==1 {print $1}')"
 # 判断桌面文件夹是否存在
 if [ -d "/home/${username}/Desktop" ]; then
 echo 'Desktop exist'

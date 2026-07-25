@@ -88,7 +88,6 @@ class Excel():
 
     def _rows_to_dicts(self, schema: Sequence[str], rows: Iterable[Sequence[Any]], source: str) -> List[Dict[str, Any]]:
         mapped: List[Dict[str, Any]] = []
-        max_len = len(schema)
         for raw in rows:
             row_dict: Dict[str, Any] = {}
             for idx, key in enumerate(schema):

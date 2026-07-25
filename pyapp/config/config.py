@@ -11,7 +11,6 @@ usage:
     print(Config.rootDir)
 '''
 
-import getpass
 import os
 import platform
 import sys
@@ -25,7 +24,7 @@ class Config:
     ##
     appName = '多功能工具箱'  # 应用名称
     appNameEN = 'tools'    # 应用名称-英文（用于生成缓存文件夹，必须是英文）
-    appVersion = "v1.7.0"  # 应用版本号
+    appVersion = "v1.8.0"  # 应用版本号
     appDeveloper = "Jdassd"  # 应用开发者
     appBlogs = "https://baidu.com"  # 个人博客
     appPackage = 'ppx.jdassd'    # 应用包名，用于在本地电脑生成 vip.pangao.ppx 唯一文件夹
@@ -39,7 +38,7 @@ class Config:
     cpuArch = platform.processor()    # 本机CPU架构
     appSystem = platform.system()    # 本机系统类型
     appIsMacOS = appSystem == 'Darwin'    # 是否为macOS系统
-    codeDir = sys.path[0].replace('base_library.zip', '')    # 代码根目录，一般情况下，也是程序所在的绝对目录（但在build:pure打包成的独立exe程序中，codeDir是执行代码的缓存根目录，而非程序所在的绝对目录）
+    codeDir = os.path.abspath(getattr(sys, '_MEIPASS', sys.path[0] or os.getcwd()))    # 源码根目录或 PyInstaller 资源根目录
     staticDir = os.path.join(codeDir, 'static')    # 代码根目录下的static文件夹的绝对路径
     appDataDir = ''    # 电脑上可持久使用的隐藏目录
     downloadDir = ''    # 电脑上的下载目录
@@ -63,20 +62,25 @@ class Config:
 
     def getDir(self):
         '''获取电脑上的目录'''
+        homeDir = os.path.expanduser('~')
+        if not homeDir or homeDir == '~':
+            homeDir = os.getcwd()
+
         if Config.appSystem == 'Darwin':
             # Mac系统
-            user = getpass.getuser()
-            downloadDir = os.path.join('/', 'Users', user, 'Downloads')
-            appDataDir = os.path.join('/', 'Users', user, 'Library', 'Application Support', Config.appPackage+'.'+Config.appNameEN)
+            downloadDir = os.path.join(homeDir, 'Downloads')
+            appDataDir = os.path.join(homeDir, 'Library', 'Application Support', Config.appPackage+'.'+Config.appNameEN)
         elif Config.appSystem == 'Windows':
             # win系统
-            downloadDir = os.path.join(os.getenv('USERPROFILE'), 'Downloads')
-            appDataDir = os.path.join(os.getenv('APPDATA'), Config.appPackage+'.'+Config.appNameEN)
-        elif Config.appSystem == 'Linux':
-            # linux系统
-            downloadDir = os.path.join(os.getenv('HOME'), 'Downloads')
-            appDataDir = os.path.join(os.getenv('HOME'), '.'+Config.appPackage+'.'+Config.appNameEN)
-        if not os.path.isdir(appDataDir):
-            os.mkdir(appDataDir)
+            userProfile = os.getenv('USERPROFILE') or homeDir
+            appDataRoot = os.getenv('APPDATA') or os.path.join(userProfile, 'AppData', 'Roaming')
+            downloadDir = os.path.join(userProfile, 'Downloads')
+            appDataDir = os.path.join(appDataRoot, Config.appPackage+'.'+Config.appNameEN)
+        else:
+            # Linux 及其它类 Unix 系统使用安全的用户目录回退，避免未知平台变量未初始化。
+            downloadDir = os.path.join(homeDir, 'Downloads')
+            appDataDir = os.path.join(homeDir, '.'+Config.appPackage+'.'+Config.appNameEN)
+
+        os.makedirs(appDataDir, exist_ok=True)
         Config.appDataDir = appDataDir    # 电脑上可持久使用的隐藏目录
         Config.downloadDir = downloadDir    # 电脑上的下载目录

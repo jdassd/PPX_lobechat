@@ -29,6 +29,8 @@ module.exports = {
     // 以下规则对存量代码降级为告警，避免一次性引入大量阻断性报错（务实档）
     'no-unused-vars': 'warn',
     'vue/no-unused-vars': 'warn',
-    'vue/require-v-for-key': 'warn'
+    'vue/require-v-for-key': 'warn',
+    // 工具面板接收父组件持有的响应式状态对象，允许修改其字段，但仍禁止替换整个 prop。
+    'vue/no-mutating-props': ['error', { shallowOnly: true }]
   }
 }

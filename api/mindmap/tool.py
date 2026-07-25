@@ -69,14 +69,26 @@ class MindMapTool:
                     secret = f.read().strip()
                 if secret:
                     return secret
-        except Exception:
-            pass
+        except OSError as exc:
+            raise RuntimeError(f'无法读取思维导图登录密钥：{exc}') from exc
         secret = secrets.token_hex(32)
+        temp_path = path + '.tmp'
         try:
-            with open(path, 'w', encoding='utf-8') as f:
+            with open(temp_path, 'w', encoding='utf-8') as f:
                 f.write(secret)
-        except Exception:
-            pass
+                f.flush()
+                os.fsync(f.fileno())
+            try:
+                os.chmod(temp_path, 0o600)
+            except OSError:
+                pass
+            os.replace(temp_path, path)
+        except OSError as exc:
+            try:
+                os.unlink(temp_path)
+            except FileNotFoundError:
+                pass
+            raise RuntimeError(f'无法保存思维导图登录密钥：{exc}') from exc
         return secret
 
     def _mm_prepare_env(self) -> None:

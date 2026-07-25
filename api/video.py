@@ -19,8 +19,8 @@ from api.utils import (
     api_success,
     ensure_file_path,
     ensure_files_payload,
-    parse_timespan,
     normalize_suffix,
+    parse_timespan,
 )
 
 
@@ -37,14 +37,23 @@ class VideoTool:
     def _require_ffmpeg(self) -> str:
         ffmpeg = shutil.which('ffmpeg')
         if not ffmpeg:
-            raise EnvironmentError('未检测到 FFmpeg，请先安装或在系统 PATH 中配置')
+            raise OSError('未检测到 FFmpeg，请先安装或在系统 PATH 中配置')
         return ffmpeg
 
     def _require_ffprobe(self) -> str:
         ffprobe = shutil.which('ffprobe')
         if not ffprobe:
-            raise EnvironmentError('未检测到 ffprobe，请安装完整 FFmpeg')
+            raise OSError('未检测到 ffprobe，请安装完整 FFmpeg')
         return ffprobe
+
+    def video_checkEnvironment(self):
+        """启动操作前检查 FFmpeg 工具链，供界面给出可执行的安装提示。"""
+        ffmpeg = shutil.which('ffmpeg')
+        ffprobe = shutil.which('ffprobe')
+        if not ffmpeg or not ffprobe:
+            missing = [name for name, path in (('ffmpeg', ffmpeg), ('ffprobe', ffprobe)) if not path]
+            return api_error(f'视频功能缺少运行环境：{", ".join(missing)}', available=False, missing=missing)
+        return api_success('FFmpeg 环境已就绪', available=True, ffmpegPath=ffmpeg, ffprobePath=ffprobe)
 
     def _run(self, args):
         process = subprocess.run(args, capture_output=True, text=True)
@@ -55,7 +64,7 @@ class VideoTool:
     def _probe_duration(self, file_path: Path) -> float:
         try:
             ffprobe = self._require_ffprobe()
-        except EnvironmentError:
+        except OSError:
             return 0.0
         cmd = [
             ffprobe,

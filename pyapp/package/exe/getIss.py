@@ -8,11 +8,13 @@ LastEditTime: 2024-02-24 09:36:56
 Description: 生成 .iss exe安装包配置文件，需要用到 InnoSetup 软件。
 '''
 
-import sys
 import os
+import sys
+
 pyappDir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(pyappDir)
 from config.config import Config
+
 try:
     # 统一从项目根目录 logo.png 生成 Windows 使用的 .ico 图标
     from icon.generate_icons import generate_logo_icons

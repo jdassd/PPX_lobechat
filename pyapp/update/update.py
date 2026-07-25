@@ -14,6 +14,7 @@ usage: 运行前，请确保本机已经搭建Python3开发环境，且已经安
 import os
 import shlex
 import subprocess
+from urllib.parse import urlparse
 
 import httpx
 
@@ -190,17 +191,32 @@ class AppUpdate:
             name = str(assets.get('name') or '')
             ext = os.path.splitext(name)[-1].lower()
             if ext == appExt:
-                size = assets.get('size')
+                safe_name = self.__safeAssetName(name, appExt)
+                if not safe_name:
+                    return {'status': False, 'msg': '安装包文件名不安全，已拒绝下载'}
+                try:
+                    size = int(assets.get('size') or 0)
+                except (TypeError, ValueError):
+                    size = 0
+                size = size if size > 0 else None
                 url = assets.get('browser_download_url')
                 if not url:
                     return {'status': False, 'msg': f'安装包 {name} 缺少下载地址'}
+                if not self.__trustedDownloadUrl(url):
+                    return {'status': False, 'msg': '安装包下载地址不可信，仅允许 GitHub HTTPS 地址'}
                 # 确保下载目录存在
                 if not os.path.exists(Config.downloadDir):
                     try:
                         os.makedirs(Config.downloadDir, exist_ok=True)
                     except Exception as e:
                         return {'status': False, 'msg': f'创建下载目录失败: {str(e)}'}
-                downloadPath = os.path.join(Config.downloadDir, name)
+                download_root = os.path.abspath(Config.downloadDir)
+                downloadPath = os.path.abspath(os.path.join(download_root, safe_name))
+                try:
+                    if os.path.commonpath((download_root, downloadPath)) != download_root:
+                        return {'status': False, 'msg': '安装包保存路径不安全，已拒绝下载'}
+                except ValueError:
+                    return {'status': False, 'msg': '安装包保存路径不安全，已拒绝下载'}
                 # 超时重连3次
                 timeoutCount = 0
                 while timeoutCount < 3:
@@ -213,6 +229,29 @@ class AppUpdate:
                 return {'status': False, 'msg': '连接超时，请稍后重试'}
         # 未找到匹配的安装包
         return {'status': False, 'msg': f'未找到适用于当前系统的安装包（需要 {appExt} 文件）'}
+
+    @staticmethod
+    def __safeAssetName(name, expected_extension):
+        '''只接受不含目录片段、且扩展名符合当前平台的发布文件名。'''
+        raw = str(name or '').strip()
+        normalized = raw.replace('\\', '/')
+        if not normalized or '/' in normalized or normalized in ('.', '..'):
+            return ''
+        if os.path.splitext(normalized)[-1].lower() != expected_extension:
+            return ''
+        return normalized
+
+    @staticmethod
+    def __trustedDownloadUrl(url):
+        '''更新包只能从 GitHub 官方 HTTPS 域名下载。'''
+        try:
+            parsed = urlparse(str(url))
+        except ValueError:
+            return False
+        host = (parsed.hostname or '').lower()
+        return parsed.scheme == 'https' and (
+            host in ('github.com', 'api.github.com') or host.endswith('.githubusercontent.com')
+        )
 
     @staticmethod
     def __isDebianOrUbuntu():
@@ -244,40 +283,78 @@ class AppUpdate:
         from api.api import API
         api = API()
         AppUpdate.cancelDownload = False
+        partial_path = downloadPath + '.part'
+
+        def cleanup_partial():
+            try:
+                os.remove(partial_path)
+            except FileNotFoundError:
+                pass
+
+        cleanup_partial()
         try:
-            with open(downloadPath, "wb") as f:
+            with open(partial_path, "wb") as f:
                 with httpx.Client(follow_redirects=True) as client:
                     with client.stream("GET", url, timeout=(5, 3600)) as r:
+                        r.raise_for_status()
+                        if not self.__trustedDownloadUrl(r.url):
+                            raise httpx.HTTPError('下载重定向到了不可信地址')
                         downloadSize = 0
-                        infoPy2jsDict = dict()
-                        # 每块 1KB
-                        for chunk in r.iter_bytes(chunk_size=1024):
+                        response_size = r.headers.get('content-length')
+                        try:
+                            response_size = int(response_size) if response_size else 0
+                        except (TypeError, ValueError):
+                            response_size = 0
+                        total_size = size or (response_size if response_size > 0 else None)
+                        # 64KB 块能显著减少大安装包的 Python 循环和 UI 通知开销。
+                        for chunk in r.iter_bytes(chunk_size=64 * 1024):
                             if AppUpdate.cancelDownload:
-                                # 取消下载
-                                return {'status': False, 'msg': '取消更新'}
+                                raise InterruptedError('取消更新')
                             if chunk:
                                 f.write(chunk)
-                                f.flush()
-                            downloadSize += 1024
-                            infoPy2jsDict['sizeShow'] = self.bytes2Size(downloadSize) + ' / ' + self.bytes2Size(size)
-                            infoPy2jsDict['percentage'] = int(downloadSize / size * 100)
+                                downloadSize += len(chunk)
+                            infoPy2jsDict = {
+                                'sizeShow': self.bytes2Size(downloadSize)
+                                + (' / ' + self.bytes2Size(total_size) if total_size else ' / 未知大小'),
+                                'percentage': min(99, int(downloadSize / total_size * 100)) if total_size else 0,
+                            }
                             api.system_py2js('py2js_updateAppProgress', infoPy2jsDict)
+                        f.flush()
+                        os.fsync(f.fileno())
+            if size and downloadSize != size:
+                cleanup_partial()
+                return {
+                    'status': False,
+                    'msg': f'安装包大小校验失败（期望 {self.bytes2Size(size)}，实际 {self.bytes2Size(downloadSize)}）'
+                }
+            os.replace(partial_path, downloadPath)
+            api.system_py2js(
+                'py2js_updateAppProgress',
+                {'sizeShow': self.bytes2Size(downloadSize), 'percentage': 100}
+            )
             return {'status': True, 'msg': '下载成功', 'downloadPath': downloadPath}
+        except InterruptedError:
+            cleanup_partial()
+            return {'status': False, 'msg': '取消更新'}
         except httpx.TimeoutException:
-            # print('TimeoutException => ', '超时')
+            cleanup_partial()
             return {'status': False, 'msg': '连接超时'}
         except httpx.NetworkError:
-            # print('NetworkError => ', '联网失败')
+            cleanup_partial()
             return {'status': False, 'msg': '联网失败'}
         except httpx.HTTPError as e:
-            # print('HTTPError => ', e)
+            cleanup_partial()
             return {'status': False, 'msg': str(e)}
         except Exception as e:
-            # print('Exception => ', e)
+            cleanup_partial()
             return {'status': False, 'msg': str(e)}
 
     def bytes2Size(self, bytes):
         '''将字节大小转为带单位的值'''
+        try:
+            bytes = max(0, int(bytes or 0))
+        except (TypeError, ValueError):
+            bytes = 0
         if bytes < 1024:    # 比特
             bytes = str(round(bytes, 0)) + ' B'    # 字节
         elif bytes >= 1024 and bytes < 1024 * 1024:
@@ -296,7 +373,7 @@ class AppUpdate:
 
     def IfMacAppleM(self):
         '''判断是苹果M芯片还是Intel芯片'''
-        p = subprocess.Popen('sysctl machdep.cpu.brand_string', shell=True, stdout=subprocess.PIPE)
+        p = subprocess.Popen(['sysctl', 'machdep.cpu.brand_string'], stdout=subprocess.PIPE)
         out, err = p.communicate()
         res = out.decode('UTF-8')
         if res.find('Apple M') > -1:

@@ -1,7 +1,7 @@
 {
   "name": "vue3",
   "private": true,
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "基于 Vue3 + Element-Plus 的前端应用",
   "author": "潘高 <pangao1990@qq.com>",
   "scripts": {
@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.1.0",
-    "echarts": "^5.5.0",
     "element-plus": "^2.3.4",
     "vue": "^3.2.47"
   },

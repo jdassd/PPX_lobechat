@@ -14,6 +14,7 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.config import Config
+
 try:
     # Generate platform icons from project root logo.png into pyapp/icon/.
     from icon.generate_icons import generate_logo_icons

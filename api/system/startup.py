@@ -20,7 +20,7 @@ from typing import Dict, List
 if platform.system() == 'Windows':
     import winreg
 
-from api.utils.error_handler import api_success, api_error, safe_execute
+from api.utils.error_handler import api_error, api_success, safe_execute
 from pyapp.config.config import Config
 
 

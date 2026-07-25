@@ -15,15 +15,15 @@ import mimetypes
 import os
 import signal
 import subprocess
-import socket
+import threading
 import time
-from contextlib import closing
+import urllib.error
+import urllib.request
 
 import webview
 
 from api.api import API
 from pyapp.config.config import Config
-
 from pyapp.db.db import DB
 
 cfg = Config()    # 配置
@@ -38,6 +38,8 @@ INITIAL_WINDOW_WIDTH = 1280
 INITIAL_WINDOW_HEIGHT = 800
 MIN_WINDOW_WIDTH = 640
 MIN_WINDOW_HEIGHT = 400
+DEV_SHUTDOWN_GRACE_SECONDS = 3.0
+_dev_shutdown_watchdog = None
 
 
 def on_shown():
@@ -52,8 +54,12 @@ def on_loaded():
 
 def on_closing():
     # print('程序关闭')
+    try:
+        api.mindmap_stop()
+    except Exception as err:
+        print(f'[Shutdown] 停止思维导图服务失败: {err}')
     _terminate_dev_supervisor()
-    _force_exit_dev_backend()
+    _start_dev_shutdown_watchdog()
 
 
 def _terminate_dev_supervisor():
@@ -83,19 +89,37 @@ def _terminate_dev_supervisor():
         print(f'[Shutdown] 结束开发父进程失败: {err}')
 
 
-def _force_exit_dev_backend():
-    '''开发环境下，窗口关闭后强制结束 Python 进程，避免命令行悬挂'''
-    if not Config.devEnv:
+def _start_dev_shutdown_watchdog():
+    '''正常关闭若被 GUI 后端卡住，宽限期后才强制结束开发进程。'''
+    global _dev_shutdown_watchdog
+    if not Config.devEnv or _dev_shutdown_watchdog is not None:
         return
-    os._exit(0)
+    _dev_shutdown_watchdog = threading.Timer(DEV_SHUTDOWN_GRACE_SECONDS, lambda: os._exit(0))
+    _dev_shutdown_watchdog.daemon = True
+    _dev_shutdown_watchdog.start()
 
 
-def _probe_port(host: str, port: int) -> bool:
-    '''简单探测某个端口是否可连接'''
+def _cancel_dev_shutdown_watchdog():
+    global _dev_shutdown_watchdog
+    if _dev_shutdown_watchdog is not None:
+        _dev_shutdown_watchdog.cancel()
+        _dev_shutdown_watchdog = None
+
+
+def _probe_vite_server(host: str, port: int) -> bool:
+    '''验证目标确实是 Vite 开发服务器，避免误连同端口上的其它服务。'''
+    url = f'http://{host}:{port}/@vite/client'
     try:
-        with closing(socket.create_connection((host, port), timeout=0.6)):
-            return True
-    except OSError:
+        request = urllib.request.Request(url, headers={'Accept': 'text/javascript'})
+        with urllib.request.urlopen(request, timeout=0.8) as response:
+            content_type = response.headers.get_content_type()
+            snippet = response.read(16384)
+            return (
+                response.status == 200
+                and content_type in ('text/javascript', 'application/javascript')
+                and (b'[vite] connecting' in snippet or b'createHotContext' in snippet)
+            )
+    except (OSError, urllib.error.URLError, ValueError):
         return False
 
 
@@ -128,8 +152,8 @@ def _resize_window_for_primary_screen(window):
         if not screens:
             return
         screen = screens[0]
-        width = int(screen.width * 2 / 3)
-        height = int(screen.height * 4 / 5)
+        width = max(MIN_WINDOW_WIDTH, int(screen.width * 2 / 3))
+        height = max(MIN_WINDOW_HEIGHT, int(screen.height * 4 / 5))
         if width > 0 and height > 0:
             window.resize(width, height)
     except Exception as err:
@@ -158,7 +182,7 @@ def _resolve_dev_server(base_port: int, timeout: float = 25.0, span: int = 16):
     hint_port = _wait_dev_port_hint(min(timeout * 0.4, 10))
     if hint_port:
         for host in hosts:
-            if _probe_port(host, hint_port):
+            if _probe_vite_server(host, hint_port):
                 Config.devPort = str(hint_port)
                 resolved = f'http://{host}:{hint_port}/'
                 print(f'[DevServer] 根据端口文件命中 {resolved}')
@@ -170,14 +194,16 @@ def _resolve_dev_server(base_port: int, timeout: float = 25.0, span: int = 16):
     while time.time() < deadline:
         for port in ports:
             for host in hosts:
-                if _probe_port(host, port):
+                if _probe_vite_server(host, port):
                     Config.devPort = str(port)
                     resolved = f'http://{host}:{port}/'
                     print(f'[DevServer] 已检测到 Vite 端口 {port}，将使用 {resolved}')
                     return resolved
         time.sleep(0.5)
-    print(f'[DevServer] 未检测到动态端口，回落至 http://localhost:{base_port}/')
-    return f'http://localhost:{base_port}/'
+    raise RuntimeError(
+        f'未检测到 Vite 开发服务器（已扫描端口 {base_port}-{base_port + max(1, span) - 1}），'
+        '请确认前端已启动并查看 pnpm run dev 的输出。'
+    )
 
 
 def WebViewApp(ifDev=False, ifCef=False):
@@ -230,7 +256,10 @@ def WebViewApp(ifDev=False, ifCef=False):
     window.events.closing += on_closing
 
     # 启动窗口
-    webview.start(debug=Config.devEnv, http_server=True, gui=guiCEF)
+    try:
+        webview.start(debug=Config.devEnv, http_server=True, gui=guiCEF)
+    finally:
+        _cancel_dev_shutdown_watchdog()
 
 
 if __name__ == "__main__":

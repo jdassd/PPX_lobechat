@@ -15,8 +15,8 @@ usage: 调用window.pywebview.api.<methodname>(<parameters>)从Javascript执行
 from api.system.base import SystemBaseMixin
 from api.system.info import SystemInfoMixin
 from api.system.process import ProcessMixin
-from api.system.startup import StartupMixin
 from api.system.software import SoftwareMixin
+from api.system.startup import StartupMixin
 from api.system.window import WindowMixin
 
 

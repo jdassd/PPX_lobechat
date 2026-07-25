@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 图片处理相关 API
@@ -17,10 +17,10 @@ from typing import Dict, List, Sequence, Tuple
 from PIL import Image, ImageColor, ImageDraw, ImageEnhance, ImageFont, ImageOps
 
 from api.utils import (
-    ensure_files_payload,
-    ensure_file_path,
-    api_success,
     api_error,
+    api_success,
+    ensure_file_path,
+    ensure_files_payload,
     format_bytes,
 )
 

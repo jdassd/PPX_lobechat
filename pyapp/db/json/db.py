@@ -11,6 +11,8 @@ usage: 运行前，请确保本机已经搭建Python3开发环境，且已经安
 
 import json
 import os
+import stat
+import tempfile
 
 from cryptography.fernet import Fernet
 from tinydb import TinyDB
@@ -56,6 +58,34 @@ class DB:
 
 class SessionDBError(RuntimeError):
     '''加密数据库无法安全读取或初始化时抛出的异常'''
+
+
+def _atomic_write(file_path, payload):
+    '''在目标目录内写临时文件后原子替换，写入失败时保留原数据库。'''
+    directory = os.path.dirname(os.path.abspath(file_path))
+    os.makedirs(directory, exist_ok=True)
+    descriptor, temp_path = tempfile.mkstemp(prefix=os.path.basename(file_path) + '.', suffix='.tmp', dir=directory)
+    descriptor_open = True
+    try:
+        with os.fdopen(descriptor, 'wb') as handler:
+            descriptor_open = False
+            handler.write(payload)
+            handler.flush()
+            os.fsync(handler.fileno())
+        try:
+            os.chmod(temp_path, stat.S_IRUSR | stat.S_IWUSR)
+        except OSError:
+            # 某些 Windows 文件系统不支持 POSIX 权限位，不影响原子替换。
+            pass
+        os.replace(temp_path, file_path)
+    except Exception:
+        if descriptor_open:
+            os.close(descriptor)
+        try:
+            os.unlink(temp_path)
+        except FileNotFoundError:
+            pass
+        raise
 
 
 # 加密数据库
@@ -127,6 +157,5 @@ class SessionDB:
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self._db is not None and self._can_persist:
             data = self._db.storage.read()
-            with open(self.file_path, 'wb') as f:
-                f.write(self._encrypt(data))
+            _atomic_write(self.file_path, self._encrypt(data))
         return False

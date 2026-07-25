@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 '''
 Author: Codex
@@ -6,16 +6,16 @@ Date: 2025-07-04
 Description: PDF 工具相关 API
 '''
 
-from datetime import datetime, timezone
 import random
+import zipfile
+from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
 from typing import Dict, Iterable, List
-import zipfile
 
 import fitz  # PyMuPDF
-from PyPDF2 import PdfReader, PdfWriter
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
+from PyPDF2 import PdfReader, PdfWriter
 
 from api.utils.validators import ensure_output_directory
 

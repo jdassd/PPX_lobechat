@@ -38,12 +38,18 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Mind Map API", version="1.0.0", lifespan=lifespan)
 
+_cors_origins = [
+    origin.strip()
+    for origin in os.environ.get("MINDMAP_CORS_ORIGINS", "").split(",")
+    if origin.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 @app.exception_handler(RequestValidationError)

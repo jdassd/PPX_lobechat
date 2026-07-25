@@ -28,7 +28,7 @@ except ImportError:
     psutil = None
 
 from api.utils import format_bytes
-from api.utils.error_handler import api_success, api_error
+from api.utils.error_handler import api_error, api_success
 from pyapp.config.config import Config
 from pyapp.update.update import AppUpdate
 

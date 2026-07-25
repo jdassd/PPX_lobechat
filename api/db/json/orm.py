@@ -14,9 +14,10 @@ usage:
     print('author', author)
 '''
 
-from pyapp.db.json.db import SessionDB
-from api.db.json.models import Models
 from tinydb import Query
+
+from api.db.json.models import Models
+from pyapp.db.json.db import SessionDB
 
 
 class ORM:

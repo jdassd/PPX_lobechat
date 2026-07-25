@@ -23,8 +23,16 @@ export function pushRecent(toolId) {
   }
 }
 
-export function relativeTime(ts) {
-  const s = Math.floor((Date.now() - ts) / 1000)
+export function clearRecents() {
+  try {
+    localStorage.removeItem(KEY)
+  } catch {
+    /* 忽略写入失败 */
+  }
+}
+
+export function relativeTime(ts, now = Date.now()) {
+  const s = Math.max(0, Math.floor((now - ts) / 1000))
   if (s < 60) return '刚刚'
   if (s < 3600) return `${Math.floor(s / 60)} 分钟前`
   if (s < 86400) return `${Math.floor(s / 3600)} 小时前`

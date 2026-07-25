@@ -70,6 +70,8 @@ PPX 内置了丰富的工具模块，满足多样化的需求：
 - **Node.js** (16.14+)
 - **pnpm** (8.x+)
 - **Python** (3.8 - 3.11)
+- **FFmpeg**（可选；视频转换、压缩、截取、音频提取需要 `ffmpeg` 与 `ffprobe`）
+- **LibreOffice**（可选；Word 按真实页码拆分/切割需要）
 
 ### 安装步骤
 
@@ -91,6 +93,16 @@ PPX 内置了丰富的工具模块，满足多样化的需求：
     ```bash
     pnpm run start
     ```
+
+### 质量检查
+
+```bash
+# 前端 ESLint + Python Ruff
+pnpm run lint
+
+# Python 标准库 unittest（无需额外测试依赖）
+pnpm run test
+```
 
 ## 📦 打包指南
 

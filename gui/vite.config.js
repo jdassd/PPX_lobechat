@@ -58,7 +58,7 @@ const devPortReporter = () => ({
 })
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
     vue(),
     // 自动导入 Element Plus 的命令式 API（ElMessage / ElMessageBox / ElLoading / ElNotification 等）
@@ -94,16 +94,12 @@ export default defineConfig({
     minify: 'esbuild',
     rollupOptions: {
       output: {
-        // 分块策略：仅把相对独立的大块 echarts 单独分出；
         // vue / element-plus 等相互深度依赖的库统一放入 vendor，
         // 避免将 vue 与 element-plus 拆成不同 chunk 后产生跨 chunk 循环依赖，
         // 导致打包后出现 "Cannot access 'X' before initialization"(TDZ) 而白屏
         manualChunks(id) {
           if (!id.includes('node_modules')) {
             return
-          }
-          if (id.includes('echarts') || id.includes('zrender')) {
-            return 'echarts'
           }
           return 'vendor'
         },
@@ -118,6 +114,6 @@ export default defineConfig({
   },
   // 生产环境移除 console / debugger
   esbuild: {
-    drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : []
+    drop: command === 'build' ? ['console', 'debugger'] : []
   }
-})
+}))
