@@ -7,7 +7,7 @@ import { markRaw } from 'vue'
 import { HomeFilled, PictureFilled, Files, Document, Tickets, Edit, VideoPlay, FolderOpened, Cpu, Stamp, Monitor, Delete, Share } from '@element-plus/icons-vue'
 
 export const TOOLS = [
-  { id: 'image', name: '图片处理', desc: '格式转换 · 压缩 · 水印', icon: markRaw(PictureFilled), group: 'media', hue: '#2b6fff', points: ['14 种格式互转', '按质量/目标大小压缩', '批量水印 · 裁剪 · 旋转', '图片合成 PDF'] },
+  { id: 'image', name: '图片处理', desc: '转换 · 压缩 · 裁剪 · 水印', icon: markRaw(PictureFilled), group: 'media', hue: '#2b6fff', points: ['14 种格式互转', '按质量/目标大小压缩', '批量水印 · 裁剪 · 旋转', '图片合成 PDF'] },
   { id: 'pdf', name: 'PDF 工具', desc: '转换 · 合并 · 拆分', icon: markRaw(Files), group: 'media', hue: '#e0533d', points: ['转高清图 / 仿真扫描件', '合并 · 拆分 · 页码切割', '提取文本 / 图片', 'PDF 转 Word'] },
   { id: 'word', name: 'Word 工具', desc: '拆分 · 切割 · 合并', icon: markRaw(Tickets), group: 'media', hue: '#2b579a', points: ['按真实页码/段落/标题拆分', '按页码范围切割留存', '多文档排序合并', '100% 保留原格式'] },
   { id: 'excel', name: 'Excel 工具', desc: '数据清洗 · 分组导出', icon: markRaw(Document), group: 'media', hue: '#1f9d55', points: ['自定义字段匹配分隔符', '逐行清洗插入逻辑', '按列分组输出多表', '多表合并统一处理'] },

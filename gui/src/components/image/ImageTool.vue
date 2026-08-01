@@ -4,6 +4,7 @@ import { onMounted, reactive, ref } from 'vue'
 import ToolWorkspace from '@/components/shared/ToolWorkspace.vue'
 import FormatPanel from './parts/FormatPanel.vue'
 import CompressPanel from './parts/CompressPanel.vue'
+import CropPanel from './parts/CropPanel.vue'
 import WatermarkPanel from './parts/WatermarkPanel.vue'
 import PdfPanel from './parts/PdfPanel.vue'
 
@@ -12,6 +13,7 @@ const activeTab = ref('convert')
 const TABS = [
   { name: 'convert', label: '格式转换' },
   { name: 'compress', label: '批量压缩' },
+  { name: 'crop', label: '图片裁剪' },
   { name: 'watermark', label: '批量水印' },
   { name: 'pdf', label: '图片转 PDF' }
 ]
@@ -99,6 +101,7 @@ onMounted(loadSupportedFormats)
   <ToolWorkspace v-model="activeTab" :tabs="TABS" accent="#2b6fff">
     <FormatPanel v-show="activeTab === 'convert'" :supported-formats="supportedFormats" />
     <CompressPanel v-show="activeTab === 'compress'" :supported-formats="supportedFormats" />
+    <CropPanel v-show="activeTab === 'crop'" :supported-formats="supportedFormats" />
     <WatermarkPanel v-show="activeTab === 'watermark'" :supported-formats="supportedFormats" />
     <PdfPanel v-show="activeTab === 'pdf'" :supported-formats="supportedFormats" />
   </ToolWorkspace>

@@ -139,7 +139,14 @@ class ImageTool:
             return f'{file_path.stem}{suffix}'
         return f'{file_path.stem}_converted{suffix}'
 
-    def _save_image(self, image: Image.Image, dest: Path, fmt: str, quality: int | None = None):
+    def _save_image(
+        self,
+        image: Image.Image,
+        dest: Path,
+        fmt: str,
+        quality: int | None = None,
+        dpi: int | None = None,
+    ):
         """Persist image with reasonable defaults and Pillow-compatible format names."""
         save_kwargs = {}
         fmt = self._normalize_format(fmt)
@@ -162,6 +169,8 @@ class ImageTool:
             image = image.convert('RGB')
         if fmt == 'png':
             save_kwargs.setdefault('compress_level', 6)
+        if dpi and fmt in {'jpg', 'png', 'tiff'}:
+            save_kwargs['dpi'] = (dpi, dpi)
 
         image.save(dest, pil_format, **save_kwargs)
 
@@ -391,8 +400,8 @@ class ImageTool:
                 max_size = 1920
             max_size = max(256, min(max_size, 8192))
 
-            with Image.open(file_path) as img:
-                img = img.convert('RGBA')
+            with Image.open(file_path) as source_image:
+                img = ImageOps.exif_transpose(source_image).convert('RGBA')
                 orig_w, orig_h = img.size
                 # 当图片尺寸超过阈值时，缩小以减轻前端的渲染负担
                 if max(orig_w, orig_h) > max_size:
@@ -520,13 +529,33 @@ class ImageTool:
             return api_error(f'水印处理失败：{exc}')
 
     def image_crop(self, options: Dict | None = None):
-        """图片裁剪"""
+        """图片裁剪，支持按选区裁剪并输出为指定像素尺寸"""
         try:
             opts = self._validate(options)
             source = self._ensure_single_file(opts)
             output_dir = self._prepare_output_dir([source], opts.get('outputDir'), 'image_crop')
             mode = str(opts.get('mode', 'custom')).lower()
-            with Image.open(source) as image:
+
+            output_width = opts.get('outputWidth')
+            output_height = opts.get('outputHeight')
+            if output_width is not None or output_height is not None:
+                if output_width is None or output_height is None:
+                    raise ValueError('输出宽度和高度必须同时提供')
+                output_width = int(output_width)
+                output_height = int(output_height)
+                if output_width < 1 or output_height < 1:
+                    raise ValueError('输出尺寸必须大于 0')
+                if output_width > 20000 or output_height > 20000:
+                    raise ValueError('输出尺寸不能超过 20000 × 20000 像素')
+                if output_width * output_height > 100_000_000:
+                    raise ValueError('输出图片总像素不能超过 1 亿')
+
+            output_dpi = opts.get('outputDpi')
+            if output_dpi is not None:
+                output_dpi = max(72, min(int(output_dpi), 1200))
+
+            with Image.open(source) as source_image:
+                image = ImageOps.exif_transpose(source_image)
                 if mode == 'ratio':
                     ratio_w, ratio_h = self._parse_ratio(opts.get('ratio'), opts.get('ratioWidth'), opts.get('ratioHeight'))
                     base_w, base_h = image.size
@@ -538,17 +567,40 @@ class ImageTool:
                     x = max(0, (base_w - target_w) // 2)
                     y = max(0, (base_h - target_h) // 2)
                 else:
-                    x = max(0, int(opts.get('x') or 0))
-                    y = max(0, int(opts.get('y') or 0))
+                    x = max(0, min(int(opts.get('x') or 0), image.width - 1))
+                    y = max(0, min(int(opts.get('y') or 0), image.height - 1))
                     width = int(opts.get('width') or image.width)
                     height = int(opts.get('height') or image.height)
                     target_w = max(1, min(width, image.width - x))
                     target_h = max(1, min(height, image.height - y))
                 box = (x, y, x + target_w, y + target_h)
                 cropped = image.crop(box)
+                if output_width is not None and output_height is not None:
+                    cropped = cropped.resize((output_width, output_height), Image.LANCZOS)
                 dest = output_dir / f'{source.stem}_crop{source.suffix}'
-                self._save_image(cropped, dest, source.suffix.lstrip('.') or 'png')
-            return api_success('裁剪完成', file=str(dest), outputDir=str(output_dir))
+                index = 2
+                while dest.exists() or dest.is_symlink():
+                    dest = output_dir / f'{source.stem}_crop_{index}{source.suffix}'
+                    index += 1
+                self._save_image(
+                    cropped,
+                    dest,
+                    source.suffix.lstrip('.') or 'png',
+                    dpi=output_dpi,
+                )
+            return api_success(
+                '裁剪完成',
+                file=str(dest),
+                outputDir=str(output_dir),
+                width=cropped.width,
+                height=cropped.height,
+                crop={
+                    'x': x,
+                    'y': y,
+                    'width': target_w,
+                    'height': target_h,
+                },
+            )
         except Exception as exc:
             return api_error(f'裁剪失败：{exc}')
 
