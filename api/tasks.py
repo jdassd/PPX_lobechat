@@ -22,7 +22,8 @@ TRACKED_METHODS = {
     'pdf_convert_to_images', 'pdf_convert_to_scan', 'pdf_compress', 'pdf_merge', 'pdf_split',
     'pdf_cut', 'pdf_multi_cut', 'pdf_extract_text', 'ocr_pdf', 'pdf_to_word', 'pdf_extract_images',
     'pdf_page_workbench', 'pdf_secure', 'word_split', 'word_cut', 'word_merge',
-    'excel_process', 'excel_merge_tables', 'excel_split_by_column', 'excel_quality_report',
+    'excel_process', 'excel_merge_tables', 'excel_column_profile', 'excel_split_by_column',
+    'excel_quality_report',
     'text_format_json', 'text_case_transform', 'text_deduplicate_sort', 'text_batch_replace',
     'video_format_convert', 'video_compress', 'video_cut', 'video_extract_audio', 'video_concat',
     'file_search', 'file_auto_classify', 'file_batch_copy', 'file_batch_delete',
@@ -33,6 +34,7 @@ TRACKED_METHODS = {
 _SENSITIVE_KEY = re.compile(r'(password|passwd|secret|token|cookie|authorization|api[_-]?key)', re.I)
 _MAX_TASKS = 200
 _MAX_STRING = 200_000
+_TASK_STATUSES = ('queued', 'running', 'success', 'failed', 'interrupted', 'canceled')
 
 
 def _json_safe(value: Any, key: str = '', depth: int = 0) -> Tuple[Any, bool]:
@@ -254,10 +256,72 @@ class TaskMixin:
         try:
             self._tasks_ensure()
             options = options or {}
-            limit = max(1, min(_MAX_TASKS, int(options.get('limit') or 100)))
+            page_size = max(1, min(_MAX_TASKS, int(options.get('pageSize') or options.get('limit') or 100)))
+            page = max(1, int(options.get('page') or 1))
+            raw_statuses = options.get('statuses') if options.get('statuses') is not None else options.get('status')
+            if isinstance(raw_statuses, str):
+                raw_statuses = [item.strip() for item in raw_statuses.split(',') if item.strip()]
+            statuses = {str(item) for item in (raw_statuses or []) if str(item) in _TASK_STATUSES}
+            method = str(options.get('method') or '').strip()
+            query = str(options.get('query') or options.get('search') or '').strip().lower()
             with self._task_lock:
-                tasks = [dict(self._task_items[task_id]) for task_id in self._task_order[:limit] if task_id in self._task_items]
-                return api_success(tasks=tasks, paused=self._task_paused)
+                all_tasks = [
+                    dict(self._task_items[task_id])
+                    for task_id in self._task_order
+                    if task_id in self._task_items
+                ]
+                status_counts = {status: 0 for status in _TASK_STATUSES}
+                method_counts: Dict[str, int] = {}
+                durations = []
+                for task in all_tasks:
+                    status = str(task.get('status') or '')
+                    if status in status_counts:
+                        status_counts[status] += 1
+                    task_method = str(task.get('method') or '')
+                    method_counts[task_method] = method_counts.get(task_method, 0) + 1
+                    started_at = task.get('startedAt')
+                    ended_at = task.get('endedAt')
+                    if isinstance(started_at, (int, float)) and isinstance(ended_at, (int, float)):
+                        durations.append(max(0.0, ended_at - started_at))
+
+                tasks = []
+                for task in all_tasks:
+                    if statuses and task.get('status') not in statuses:
+                        continue
+                    if method and task.get('method') != method:
+                        continue
+                    if query:
+                        haystack = ' '.join(
+                            str(task.get(key) or '')
+                            for key in ('id', 'method', 'message', 'retryOf')
+                        ).lower()
+                        if query not in haystack:
+                            continue
+                    tasks.append(task)
+
+                total = len(tasks)
+                offset = (page - 1) * page_size
+                page_tasks = tasks[offset:offset + page_size]
+                decisive = status_counts['success'] + status_counts['failed']
+                stats = {
+                    'total': len(all_tasks),
+                    'active': status_counts['queued'] + status_counts['running'],
+                    'attention': status_counts['failed'] + status_counts['interrupted'] + status_counts['canceled'],
+                    'finished': len(all_tasks) - status_counts['queued'] - status_counts['running'],
+                    'successRate': round(status_counts['success'] * 100 / decisive, 1) if decisive else 0,
+                    'averageDurationSeconds': round(sum(durations) / len(durations), 2) if durations else 0,
+                    'statusCounts': status_counts,
+                    'methodCounts': method_counts,
+                }
+                return api_success(
+                    tasks=page_tasks,
+                    paused=self._task_paused,
+                    stats=stats,
+                    total=total,
+                    page=page,
+                    pageSize=page_size,
+                    hasMore=offset + len(page_tasks) < total,
+                )
         except Exception as exc:
             return api_error(f'读取任务列表失败：{exc}')
 
@@ -303,6 +367,55 @@ class TaskMixin:
             method = task['method']
             args = task.get('args') or []
         return self.task_submit({'method': method, 'args': args, 'retryOf': task_id, 'priority': 1})
+
+    @staticmethod
+    def _task_batch_ids(options: Dict | None = None) -> List[str]:
+        if not isinstance(options, dict):
+            return []
+        raw_ids = options.get('ids') or []
+        if isinstance(raw_ids, str):
+            raw_ids = [raw_ids]
+        if not isinstance(raw_ids, list):
+            return []
+        output = []
+        seen = set()
+        for raw_id in raw_ids[:_MAX_TASKS]:
+            task_id = str(raw_id or '').strip()
+            if task_id and task_id not in seen:
+                output.append(task_id)
+                seen.add(task_id)
+        return output
+
+    def _task_batch_action(self, options: Dict | None, action: str):
+        task_ids = self._task_batch_ids(options)
+        if not task_ids:
+            return api_error('请选择至少一个任务')
+        handler = self.task_cancel if action == 'cancel' else self.task_retry
+        results = []
+        for task_id in task_ids:
+            outcome = handler({'id': task_id})
+            ok = self._task_ok(outcome)
+            result = {
+                'id': task_id,
+                'ok': ok,
+                'message': self._task_message(outcome, ok),
+            }
+            if isinstance(outcome, dict) and outcome.get('taskId'):
+                result['taskId'] = outcome['taskId']
+            results.append(result)
+        succeeded = sum(1 for item in results if item['ok'])
+        failed = len(results) - succeeded
+        label = '取消' if action == 'cancel' else '重试'
+        payload = {'results': results, 'succeeded': succeeded, 'failed': failed}
+        if not succeeded:
+            return api_error(f'批量{label}失败', **payload)
+        return api_success(f'已{label} {succeeded} 个任务，失败 {failed} 个', **payload)
+
+    def task_batch_cancel(self, options: Dict | None = None):
+        return self._task_batch_action(options, 'cancel')
+
+    def task_batch_retry(self, options: Dict | None = None):
+        return self._task_batch_action(options, 'retry')
 
     def task_queue_pause(self):
         self._tasks_ensure()

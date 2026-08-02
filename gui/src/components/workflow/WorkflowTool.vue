@@ -17,12 +17,30 @@ const watches = ref([])
 const runs = ref([])
 const selectedId = ref('')
 const runInput = ref('{}')
+const runQuery = ref('')
+const runStatus = ref('all')
+const runTrigger = ref('all')
+const triggerActionId = ref('')
 
 const editor = reactive({ id: '', name: '', description: '', enabled: true, steps: [] })
 const scheduleForm = reactive({ workflowId: '', name: '', intervalMinutes: 60, input: '{}' })
 const watchForm = reactive({ workflowId: '', name: '', path: '', extensions: '', recursive: false, debounceSeconds: 3, input: '{}' })
 
 const workflowOptions = computed(() => workflows.value.map((item) => ({ value: item.id, label: item.name })))
+const triggerRows = computed(() => [...schedules.value.map((item) => ({ ...item, kind: 'schedule' })), ...watches.value.map((item) => ({ ...item, kind: 'watch' }))])
+const filteredRuns = computed(() => {
+  const keyword = runQuery.value.trim().toLowerCase()
+  return runs.value.filter((run) => {
+    if (runStatus.value !== 'all' && run.status !== runStatus.value) return false
+    if (runTrigger.value !== 'all') {
+      const trigger = String(run.trigger || '')
+      if (runTrigger.value === 'manual' && trigger !== 'manual') return false
+      if (runTrigger.value !== 'manual' && !trigger.includes(runTrigger.value)) return false
+    }
+    if (!keyword) return true
+    return `${run.workflowName || ''} ${run.workflowId || ''} ${run.trigger || ''}`.toLowerCase().includes(keyword)
+  })
+})
 
 const formatTime = (value) => {
   if (!value) return '—'
@@ -42,7 +60,7 @@ const resetEditor = () => {
     name: '新工作流',
     description: '',
     enabled: true,
-    steps: [{ id: 'step-1', name: '第一个步骤', method: methods.value[0] || 'image_batch_compress', argsText: '{}', onError: 'stop' }]
+    steps: [{ id: 'step-1', name: '第一个步骤', method: methods.value[0] || 'image_batch_compress', argsText: '{}', onError: 'stop', retryCount: 0, retryDelaySeconds: 1 }]
   })
   runInput.value = '{}'
 }
@@ -56,6 +74,8 @@ const loadEditor = (workflow) => {
     enabled: workflow.enabled !== false,
     steps: (workflow.steps || []).map((step) => ({
       ...step,
+      retryCount: Number(step.retryCount || 0),
+      retryDelaySeconds: Number(step.retryDelaySeconds || 0),
       argsText: JSON.stringify(step.args || {}, null, 2)
     }))
   })
@@ -101,7 +121,7 @@ const useTemplate = async (template) => {
 
 const addStep = () => {
   const index = editor.steps.length + 1
-  editor.steps.push({ id: `step-${index}`, name: `步骤 ${index}`, method: methods.value[0] || '', argsText: '{}', onError: 'stop' })
+  editor.steps.push({ id: `step-${index}`, name: `步骤 ${index}`, method: methods.value[0] || '', argsText: '{}', onError: 'stop', retryCount: 0, retryDelaySeconds: 1 })
 }
 
 const moveStep = (index, offset) => {
@@ -121,7 +141,9 @@ const saveWorkflow = async () => {
       name: step.name || step.method,
       method: step.method,
       args: parseObject(step.argsText, `步骤 ${index + 1} 参数`),
-      onError: step.onError
+      onError: step.onError,
+      retryCount: Number(step.retryCount || 0),
+      retryDelaySeconds: Number(step.retryDelaySeconds || 0)
     }))
   } catch (error) {
     return ElMessage.error(error.message)
@@ -226,6 +248,38 @@ const removeTrigger = async (kind, id) => {
   await refresh(true)
 }
 
+const toggleTrigger = async (trigger, enabled) => {
+  triggerActionId.value = trigger.id
+  try {
+    const response = await callApi('workflow_trigger_set_enabled', { kind: trigger.kind, id: trigger.id, enabled })
+    if (!response.ok) {
+      await refresh(true)
+      return ElMessage.error(response.message || '更新触发器失败')
+    }
+    ElMessage.success(response.message)
+    await refresh(true)
+  } catch (error) {
+    ElMessage.error(error?.message || '更新触发器失败')
+    await refresh(true)
+  } finally {
+    triggerActionId.value = ''
+  }
+}
+
+const runTriggerNow = async (trigger) => {
+  triggerActionId.value = trigger.id
+  try {
+    const response = await callApi('workflow_trigger_run_now', { kind: trigger.kind, id: trigger.id })
+    if (!response.ok) return ElMessage.error(response.message || '提交运行失败')
+    ElMessage.success(response.message || '已提交运行')
+    await refresh(true)
+  } catch (error) {
+    ElMessage.error(error?.message || '提交运行失败')
+  } finally {
+    triggerActionId.value = ''
+  }
+}
+
 watch(
   () => props.initialTab,
   (value) => {
@@ -296,6 +350,13 @@ onMounted(() => refresh(false))
                       </el-select>
                     </div>
                     <el-input v-model="step.argsText" type="textarea" :rows="5" resize="vertical" placeholder="步骤参数 JSON" />
+                    <div class="step-policy">
+                      <span>失败自动重试</span>
+                      <el-input-number v-model="step.retryCount" :min="0" :max="5" size="small" />
+                      <span>次，每次等待</span>
+                      <el-input-number v-model="step.retryDelaySeconds" :min="0" :max="300" size="small" />
+                      <span>秒</span>
+                    </div>
                   </div>
                   <div class="step-actions">
                     <el-button text :disabled="index === 0" @click="moveStep(index, -1)">上移</el-button>
@@ -360,8 +421,8 @@ onMounted(() => refresh(false))
         </div>
 
         <div class="trigger-list">
-          <h3>已启用触发器</h3>
-          <el-table :data="[...schedules.map((item) => ({ ...item, kind: 'schedule' })), ...watches.map((item) => ({ ...item, kind: 'watch' }))]" empty-text="暂无触发器">
+          <h3>触发器</h3>
+          <el-table :data="triggerRows" empty-text="暂无触发器">
             <el-table-column label="类型" width="100"
               ><template #default="scope">{{ scope.row.kind === 'schedule' ? '周期' : '目录' }}</template></el-table-column
             >
@@ -372,9 +433,15 @@ onMounted(() => refresh(false))
             <el-table-column label="最近触发" width="180"
               ><template #default="scope">{{ formatTime(scope.row.lastRunAt || scope.row.lastEventAt) }}</template></el-table-column
             >
-            <el-table-column width="90"
-              ><template #default="scope"><el-button text type="danger" @click="removeTrigger(scope.row.kind, scope.row.id)">删除</el-button></template></el-table-column
-            >
+            <el-table-column label="状态" width="100"
+              ><template #default="scope"><el-switch :model-value="scope.row.enabled !== false" :loading="triggerActionId === scope.row.id" @change="toggleTrigger(scope.row, $event)" /></template
+            ></el-table-column>
+            <el-table-column label="操作" width="190" fixed="right">
+              <template #default="scope">
+                <el-button text type="primary" :loading="triggerActionId === scope.row.id" @click="runTriggerNow(scope.row)">立即运行</el-button>
+                <el-button text type="danger" @click="removeTrigger(scope.row.kind, scope.row.id)">删除</el-button>
+              </template>
+            </el-table-column>
           </el-table>
         </div>
       </el-tab-pane>
@@ -387,8 +454,23 @@ onMounted(() => refresh(false))
           </div>
           <el-button @click="refresh(true)">刷新</el-button>
         </div>
+        <div class="history-filters">
+          <el-input v-model="runQuery" clearable placeholder="搜索工作流名称或触发来源" />
+          <el-select v-model="runStatus">
+            <el-option label="全部状态" value="all" />
+            <el-option label="成功" value="success" />
+            <el-option label="失败" value="failed" />
+            <el-option label="运行中" value="running" />
+          </el-select>
+          <el-select v-model="runTrigger">
+            <el-option label="全部来源" value="all" />
+            <el-option label="手动运行" value="manual" />
+            <el-option label="周期任务" value="schedule" />
+            <el-option label="目录监听" value="watch" />
+          </el-select>
+        </div>
         <el-collapse class="run-list">
-          <el-collapse-item v-for="run in runs" :key="run.id" :name="run.id">
+          <el-collapse-item v-for="run in filteredRuns" :key="run.id" :name="run.id">
             <template #title>
               <div class="run-title">
                 <el-tag :type="run.status === 'success' ? 'success' : run.status === 'running' ? 'warning' : 'danger'" size="small">{{ run.status }}</el-tag>
@@ -401,11 +483,18 @@ onMounted(() => refresh(false))
               <el-timeline-item v-for="step in run.steps || []" :key="step.id" :type="step.status === 'success' ? 'success' : 'danger'" :timestamp="formatTime(step.endedAt)">
                 <strong>{{ step.name }}</strong> · <code>{{ step.method }}</code>
                 <p>{{ step.message || (step.status === 'success' ? '完成' : '失败') }}</p>
+                <small v-if="step.attemptCount > 1">共执行 {{ step.attemptCount }} 次（自动重试 {{ step.attemptCount - 1 }} 次）</small>
+                <ul v-if="step.attempts?.length > 1" class="attempt-list">
+                  <li v-for="attempt in step.attempts" :key="attempt.attempt">
+                    <el-tag :type="attempt.status === 'success' ? 'success' : 'danger'" size="small" effect="plain">第 {{ attempt.attempt }} 次</el-tag>
+                    <span>{{ attempt.message || (attempt.status === 'success' ? '完成' : '失败') }}</span>
+                  </li>
+                </ul>
               </el-timeline-item>
             </el-timeline>
           </el-collapse-item>
         </el-collapse>
-        <el-empty v-if="!runs.length" description="还没有运行记录" />
+        <el-empty v-if="!filteredRuns.length" :description="runs.length ? '没有符合筛选条件的运行记录' : '还没有运行记录'" />
       </el-tab-pane>
     </el-tabs>
   </div>
@@ -545,6 +634,18 @@ h3 {
   flex-direction: column;
   align-items: flex-end;
 }
+.step-policy {
+  margin-top: 9px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--ppx-text-muted);
+  font-size: 12px;
+}
+.step-policy .el-input-number {
+  width: 96px;
+}
 .error-select {
   width: 116px;
 }
@@ -570,6 +671,12 @@ h3 {
 .history-head {
   margin-bottom: 14px;
 }
+.history-filters {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 150px 150px;
+  gap: 10px;
+  margin-bottom: 14px;
+}
 .run-list {
   border-top: 1px solid var(--ppx-glass-border);
 }
@@ -586,6 +693,21 @@ h3 {
   color: var(--ppx-text-muted);
   font-size: 12px;
 }
+.attempt-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.attempt-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ppx-text-muted);
+  font-size: 12px;
+}
 code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--accent);
@@ -597,6 +719,9 @@ code {
   }
   .step-row {
     grid-template-columns: 1fr 1fr;
+  }
+  .history-filters {
+    grid-template-columns: 1fr;
   }
 }
 </style>

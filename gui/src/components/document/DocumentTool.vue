@@ -8,8 +8,8 @@ const activeTab = ref(props.initialTab || 'search')
 const loading = ref(false)
 const indexing = ref(false)
 const searching = ref(false)
-const status = reactive({ documents: 0, sourceBytes: 0, databaseBytes: 0, updatedAt: 0, extensions: [] })
-const indexForm = reactive({ directories: [], recursive: true, rebuild: false, prune: false })
+const status = reactive({ documents: 0, freshDocuments: 0, staleDocuments: 0, missingDocuments: 0, staleSamples: [], sourceBytes: 0, databaseBytes: 0, updatedAt: 0, extensions: [] })
+const indexForm = reactive({ directories: [], files: [], recursive: true, rebuild: false, prune: false })
 const searchForm = reactive({ query: '', extension: '', directory: '', limit: 50 })
 const results = ref([])
 const tableForm = reactive({ filePath: '', outputDir: '', outputName: '', outputFormat: 'xlsx', pageSpec: '', dpi: 220, columnTolerance: 0 })
@@ -23,7 +23,29 @@ const formatBytes = (bytes) => {
   return `${(value / 1024 ** 3).toFixed(1)} GB`
 }
 const updatedText = computed(() => (status.updatedAt ? new Date(status.updatedAt * 1000).toLocaleString() : '尚未建立'))
-const cleanExcerpt = (value) => String(value || '').replace(/<\/?mark>/g, '')
+const excerptParts = (value) => {
+  const text = String(value || '')
+  const parts = []
+  const marked = /<mark>([\s\S]*?)<\/mark>/gi
+  let cursor = 0
+  let match
+  let hasMarkedPart = false
+  while ((match = marked.exec(text))) {
+    hasMarkedPart = true
+    if (match.index > cursor) parts.push({ text: text.slice(cursor, match.index), highlight: false })
+    parts.push({ text: match[1], highlight: true })
+    cursor = marked.lastIndex
+  }
+  if (cursor < text.length) parts.push({ text: text.slice(cursor), highlight: false })
+  if (hasMarkedPart) return parts
+  const keyword = searchForm.query.trim()
+  if (!keyword) return [{ text, highlight: false }]
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return text
+    .split(new RegExp(`(${escaped})`, 'gi'))
+    .filter(Boolean)
+    .map((item) => ({ text: item, highlight: item.toLowerCase() === keyword.toLowerCase() }))
+}
 
 const refreshStatus = async () => {
   const response = await callApi('document_index_status')
@@ -35,8 +57,15 @@ const chooseDirectory = async () => {
   if (path && !indexForm.directories.includes(path)) indexForm.directories.push(path)
 }
 
+const chooseFiles = async () => {
+  const files = await callApiRaw('system_pyCreateFileDialog', ['支持的文档 (*.pdf;*.docx;*.xlsx;*.xlsm;*.txt;*.md;*.markdown;*.csv;*.json;*.log)'])
+  for (const file of files || []) {
+    if (file?.path && !indexForm.files.includes(file.path)) indexForm.files.push(file.path)
+  }
+}
+
 const buildIndex = async () => {
-  if (!indexForm.directories.length) return ElMessage.warning('请先添加至少一个目录')
+  if (!indexForm.directories.length && !indexForm.files.length) return ElMessage.warning('请先添加至少一个目录或文件')
   indexing.value = true
   try {
     const response = await callApi('document_index_build', { ...indexForm })
@@ -143,11 +172,20 @@ onMounted(refreshStatus)
           <article v-for="item in results" :key="item.path" class="result-card">
             <div class="result-icon">{{ item.extension.replace('.', '').toUpperCase() }}</div>
             <div class="result-main">
-              <strong>{{ item.title }}</strong>
-              <p>{{ cleanExcerpt(item.excerpt) }}</p>
+              <div class="result-title">
+                <strong>{{ item.title }}</strong>
+                <el-tag v-if="item.missing" size="small" type="danger" effect="plain">源文件缺失</el-tag>
+                <el-tag v-else-if="item.stale" size="small" type="warning" effect="plain">索引已过期</el-tag>
+              </div>
+              <p>
+                <template v-for="(part, index) in excerptParts(item.excerpt)" :key="index"
+                  ><mark v-if="part.highlight">{{ part.text }}</mark
+                  ><span v-else>{{ part.text }}</span></template
+                >
+              </p>
               <small>{{ item.path }} · {{ formatBytes(item.size) }}</small>
             </div>
-            <div class="result-actions"><el-button type="primary" text @click="openPath(item.path)">打开</el-button><el-button type="danger" text @click="removeResult(item.path)">移出索引</el-button></div>
+            <div class="result-actions"><el-button type="primary" text :disabled="item.missing" @click="openPath(item.path)">打开</el-button><el-button type="danger" text @click="removeResult(item.path)">移出索引</el-button></div>
           </article>
           <el-empty v-if="!results.length" description="输入关键词搜索本机文档" />
         </div>
@@ -171,21 +209,35 @@ onMounted(refreshStatus)
             <strong class="time-value">{{ updatedText }}</strong
             ><span>最近更新</span>
           </div>
+          <div class="metric" :class="{ warning: status.staleDocuments }">
+            <strong>{{ status.staleDocuments }}</strong
+            ><span>过期或缺失（缺失 {{ status.missingDocuments }}）</span>
+          </div>
         </div>
+        <el-alert v-if="status.staleDocuments" class="stale-alert" type="warning" :closable="false" show-icon title="部分源文件已变化或缺失；更新索引可刷新内容，勾选清理可移除目录中的失效记录。" />
         <section class="index-card">
           <div class="section-head">
             <div>
               <h3>建立本地索引</h3>
               <p>支持 PDF、DOCX、XLSX、TXT、Markdown、CSV、JSON 和日志文件。</p>
             </div>
-            <el-button @click="chooseDirectory">添加目录</el-button>
+            <div class="source-actions"><el-button @click="chooseFiles">添加文件</el-button><el-button @click="chooseDirectory">添加目录</el-button></div>
           </div>
+          <h4>目录</h4>
           <div class="directory-list">
             <div v-for="(directory, index) in indexForm.directories" :key="directory" class="directory-item">
               <span>{{ directory }}</span
               ><el-button text type="danger" @click="indexForm.directories.splice(index, 1)">移除</el-button>
             </div>
             <el-empty v-if="!indexForm.directories.length" :image-size="54" description="还没有选择目录" />
+          </div>
+          <h4>单独文件</h4>
+          <div class="directory-list file-list">
+            <div v-for="(file, index) in indexForm.files" :key="file" class="directory-item">
+              <span>{{ file }}</span
+              ><el-button text type="danger" @click="indexForm.files.splice(index, 1)">移除</el-button>
+            </div>
+            <el-empty v-if="!indexForm.files.length" :image-size="48" description="可按需添加单个文档" />
           </div>
           <div class="index-options"><el-checkbox v-model="indexForm.recursive">包含子目录</el-checkbox><el-checkbox v-model="indexForm.prune">移除目录中已不存在文件的旧记录</el-checkbox><el-checkbox v-model="indexForm.rebuild">重建全部索引</el-checkbox></div>
           <div class="footer-actions"><el-button type="danger" plain @click="clearIndex">清空索引</el-button><el-button type="primary" :loading="indexing" @click="buildIndex">更新索引</el-button></div>
@@ -292,10 +344,22 @@ p {
 .result-main {
   min-width: 0;
 }
+.result-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .result-main p {
   margin: 5px 0;
   font-size: 13px;
   line-height: 1.5;
+}
+.result-main mark {
+  padding: 1px 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--el-color-warning) 35%, transparent);
+  color: var(--ppx-text-primary);
 }
 .result-main small {
   display: block;
@@ -310,7 +374,7 @@ p {
 }
 .status-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
   margin-bottom: 16px;
 }
@@ -326,6 +390,9 @@ p {
 .metric strong {
   font-size: 24px;
   color: var(--accent);
+}
+.metric.warning strong {
+  color: var(--el-color-warning);
 }
 .metric .time-value {
   font-size: 14px;
@@ -346,6 +413,10 @@ p {
   justify-content: space-between;
   margin-bottom: 14px;
 }
+.source-actions {
+  display: flex;
+  gap: 8px;
+}
 .section-head p {
   font-size: 13px;
 }
@@ -354,6 +425,17 @@ p {
   border-radius: 10px;
   min-height: 100px;
   padding: 8px;
+}
+.index-card h4 {
+  margin: 14px 0 8px;
+  color: var(--ppx-text-secondary);
+  font-size: 13px;
+}
+.file-list {
+  min-height: 80px;
+}
+.stale-alert {
+  margin-bottom: 14px;
 }
 .directory-item {
   justify-content: space-between;

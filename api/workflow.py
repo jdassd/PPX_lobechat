@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import copy
 import json
+import math
 import os
 import re
 import threading
@@ -22,7 +23,8 @@ WORKFLOW_METHODS = {
     'pdf_convert_to_images', 'pdf_convert_to_scan', 'pdf_compress', 'pdf_merge', 'pdf_split',
     'pdf_cut', 'pdf_multi_cut', 'pdf_extract_text', 'ocr_pdf', 'pdf_to_word', 'pdf_extract_images',
     'pdf_page_workbench', 'pdf_secure', 'word_split', 'word_cut', 'word_merge',
-    'excel_process', 'excel_merge_tables', 'excel_split_by_column', 'excel_quality_report',
+    'excel_process', 'excel_merge_tables', 'excel_column_profile', 'excel_split_by_column',
+    'excel_quality_report',
     'text_format_json', 'text_case_transform', 'text_deduplicate_sort', 'text_batch_replace',
     'video_format_convert', 'video_compress', 'video_cut', 'video_extract_audio', 'video_concat',
     'file_search', 'file_auto_classify', 'file_batch_copy', 'file_batch_rename',
@@ -32,6 +34,8 @@ WORKFLOW_METHODS = {
 
 _BINDING = re.compile(r'\{\{\s*([a-zA-Z_][\w]*(?:\.[\w-]+)*)\s*\}\}')
 _MAX_RUNS = 80
+_MAX_STEP_RETRIES = 5
+_MAX_RETRY_DELAY_SECONDS = 300
 
 BUILTIN_WORKFLOWS = [
     {
@@ -147,7 +151,7 @@ def _clean_id(value: Any, prefix: str) -> str:
 
 
 class WorkflowMixin:
-    """API mixin for v2.3 no-code automation."""
+    """API mixin for persistent no-code automation."""
 
     _workflow_boot_lock = threading.Lock()
 
@@ -206,12 +210,25 @@ class WorkflowMixin:
             args = raw.get('args') or {}
             if not isinstance(args, dict):
                 raise ValueError(f'步骤 {step_id} 的参数必须是对象')
+            try:
+                retry_count = max(0, min(int(raw.get('retryCount') or raw.get('retries') or 0), _MAX_STEP_RETRIES))
+                retry_delay_value = float(raw.get('retryDelaySeconds') or 0)
+                if not math.isfinite(retry_delay_value):
+                    raise ValueError('重试延迟必须是有限数值')
+                retry_delay = max(
+                    0.0,
+                    min(retry_delay_value, _MAX_RETRY_DELAY_SECONDS),
+                )
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f'步骤 {step_id} 的重试配置无效') from exc
             clean.append({
                 'id': step_id,
                 'name': str(raw.get('name') or method)[:120],
                 'method': method,
                 'args': _copy(args),
                 'onError': 'continue' if raw.get('onError') == 'continue' else 'stop',
+                'retryCount': retry_count,
+                'retryDelaySeconds': retry_delay,
             })
         return clean
 
@@ -296,6 +313,76 @@ class WorkflowMixin:
         except Exception as exc:
             return api_error(f'删除工作流失败：{exc}')
 
+    @staticmethod
+    def _workflow_result_ok(result: Any) -> bool:
+        return isinstance(result, dict) and (result.get('code') == 0 or result.get('success') is True)
+
+    def _workflow_execute_step(self, step: Dict[str, Any], context: Dict[str, Any]):
+        step_started = time.time()
+        attempts = []
+        result: Any = None
+        ok = False
+        try:
+            args = _resolve(step['args'], context)
+            handler = getattr(self, step['method'], None)
+            if step['method'] not in WORKFLOW_METHODS or not callable(handler):
+                raise ValueError(f'步骤方法不可用：{step["method"]}')
+            retry_count = int(step.get('retryCount') or 0)
+            retry_delay = float(step.get('retryDelaySeconds') or 0)
+            for attempt_index in range(retry_count + 1):
+                attempt_started = time.time()
+                try:
+                    result = handler(args)
+                    ok = self._workflow_result_ok(result)
+                    message = (
+                        str(result.get('msg') or result.get('message') or '')
+                        if isinstance(result, dict)
+                        else ''
+                    )
+                except Exception as exc:
+                    result = {'code': -1, 'msg': str(exc)}
+                    ok = False
+                    message = str(exc)
+                attempts.append({
+                    'attempt': attempt_index + 1,
+                    'status': 'success' if ok else 'failed',
+                    'message': message,
+                    'startedAt': attempt_started,
+                    'endedAt': time.time(),
+                })
+                if ok:
+                    break
+                if attempt_index < retry_count and retry_delay:
+                    time.sleep(retry_delay)
+        except Exception as exc:
+            result = {'code': -1, 'msg': str(exc)}
+            attempts.append({
+                'attempt': 1,
+                'status': 'failed',
+                'message': str(exc),
+                'startedAt': step_started,
+                'endedAt': time.time(),
+            })
+
+        message = (
+            str(result.get('msg') or result.get('message') or '')
+            if isinstance(result, dict)
+            else ''
+        )
+        step_run = {
+            'id': step['id'],
+            'name': step['name'],
+            'method': step['method'],
+            'status': 'success' if ok else 'failed',
+            'message': message,
+            'startedAt': step_started,
+            'endedAt': time.time(),
+            'result': _copy(result),
+            'attemptCount': len(attempts),
+            'attempts': attempts,
+        }
+        return step_run, result, ok
+
     def workflow_run(self, options: Dict | None = None):
         self._workflow_ensure()
         options = options or {}
@@ -325,7 +412,7 @@ class WorkflowMixin:
             'steps': [],
         }
         with self._workflow_lock:
-            self._workflow_data['runs'].insert(0, run)
+            self._workflow_data['runs'].insert(0, _copy(run))
             self._workflow_data['runs'] = self._workflow_data['runs'][:_MAX_RUNS]
             self._workflow_persist_locked()
 
@@ -333,34 +420,11 @@ class WorkflowMixin:
         failed = False
         try:
             for step in workflow['steps']:
-                step_started = time.time()
-                try:
-                    args = _resolve(step['args'], context)
-                    handler = getattr(self, step['method'], None)
-                    if step['method'] not in WORKFLOW_METHODS or not callable(handler):
-                        raise ValueError(f'步骤方法不可用：{step["method"]}')
-                    result = handler(args)
-                    ok = isinstance(result, dict) and (result.get('code') == 0 or result.get('success') is True)
-                    context['steps'][step['id']] = _copy(result)
-                    step_run = {
-                        'id': step['id'], 'name': step['name'], 'method': step['method'],
-                        'status': 'success' if ok else 'failed',
-                        'message': str(result.get('msg') or result.get('message') or '') if isinstance(result, dict) else '',
-                        'startedAt': step_started, 'endedAt': time.time(), 'result': _copy(result),
-                    }
-                    run['steps'].append(step_run)
-                    if not ok:
-                        failed = True
-                        if step['onError'] != 'continue':
-                            break
-                except Exception as exc:
+                step_run, result, ok = self._workflow_execute_step(step, context)
+                context['steps'][step['id']] = _copy(result)
+                run['steps'].append(step_run)
+                if not ok:
                     failed = True
-                    context['steps'][step['id']] = {'code': -1, 'msg': str(exc)}
-                    run['steps'].append({
-                        'id': step['id'], 'name': step['name'], 'method': step['method'],
-                        'status': 'failed', 'message': str(exc),
-                        'startedAt': step_started, 'endedAt': time.time(),
-                    })
                     if step['onError'] != 'continue':
                         break
         finally:
@@ -457,6 +521,72 @@ class WorkflowMixin:
     def workflow_watch_delete(self, options: Dict | str | None = None):
         return self._workflow_trigger_delete('watches', options, '目录监听')
 
+    @staticmethod
+    def _workflow_trigger_key(kind: str) -> str:
+        key = {'schedule': 'schedules', 'watch': 'watches'}.get(kind)
+        if not key:
+            raise ValueError('触发器类型必须是 schedule 或 watch')
+        return key
+
+    def workflow_trigger_set_enabled(self, options: Dict | None = None):
+        try:
+            self._workflow_ensure()
+            options = options or {}
+            kind = str(options.get('kind') or '')
+            key = self._workflow_trigger_key(kind)
+            item_id = str(options.get('id') or '')
+            with self._workflow_lock:
+                trigger = self._workflow_find(self._workflow_data[key], item_id)
+                if not trigger:
+                    return api_error('触发器不存在')
+                trigger['enabled'] = bool(options.get('enabled', True))
+                trigger['updatedAt'] = time.time()
+                if kind == 'watch':
+                    self._workflow_watch_state.pop(item_id, None)
+                self._workflow_persist_locked()
+                snapshot = _copy(trigger)
+            return api_success('触发器已启用' if snapshot['enabled'] else '触发器已停用', trigger=snapshot)
+        except Exception as exc:
+            return api_error(f'更新触发器失败：{exc}')
+
+    def workflow_trigger_run_now(self, options: Dict | None = None):
+        try:
+            self._workflow_ensure()
+            options = options or {}
+            kind = str(options.get('kind') or '')
+            key = self._workflow_trigger_key(kind)
+            item_id = str(options.get('id') or '')
+            now = time.time()
+            with self._workflow_lock:
+                trigger = self._workflow_find(self._workflow_data[key], item_id)
+                if not trigger:
+                    return api_error('触发器不存在')
+                snapshot = _copy(trigger)
+            watch_data = {}
+            if kind == 'watch':
+                watch_data = {'directory': snapshot.get('path'), 'watchId': snapshot['id']}
+            submission = self._workflow_submit(
+                snapshot['workflowId'],
+                snapshot.get('input') or {},
+                f'manual:{kind}:{snapshot["id"]}',
+                watch_data,
+            )
+            accepted = self._workflow_result_ok(submission)
+            with self._workflow_lock:
+                stored = self._workflow_find(self._workflow_data[key], item_id)
+                if stored:
+                    stored['lastRunAt' if kind == 'schedule' else 'lastEventAt'] = now
+                    stored['lastError'] = '' if accepted else str((submission or {}).get('msg') or '提交失败')
+                    self._workflow_persist_locked()
+            if not accepted:
+                return api_error(
+                    str((submission or {}).get('msg') or '立即运行失败'),
+                    submission=_copy(submission),
+                )
+            return api_success('触发器已提交运行', submission=_copy(submission))
+        except Exception as exc:
+            return api_error(f'立即运行触发器失败：{exc}')
+
     def _workflow_trigger_delete(self, key: str, options: Dict | str | None, label: str):
         try:
             self._workflow_ensure()
@@ -472,13 +602,12 @@ class WorkflowMixin:
         except Exception as exc:
             return api_error(f'删除{label}失败：{exc}')
 
-    def _workflow_submit(self, workflow_id: str, input_data: Dict[str, Any], trigger: str, watch=None) -> None:
+    def _workflow_submit(self, workflow_id: str, input_data: Dict[str, Any], trigger: str, watch=None):
         payload = {'id': workflow_id, 'input': input_data, 'trigger': trigger, 'watch': watch or {}}
         submit = getattr(self, 'task_submit', None)
         if callable(submit):
-            submit({'method': 'workflow_run', 'args': [payload]})
-        else:
-            self.workflow_run(payload)
+            return submit({'method': 'workflow_run', 'args': [payload]})
+        return self.workflow_run(payload)
 
     @staticmethod
     def _workflow_scan(watch: Dict[str, Any]) -> Dict[str, tuple]:

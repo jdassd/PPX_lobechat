@@ -142,6 +142,17 @@ class DocumentIndexMixin:
                     continue
                 yield path.resolve()
 
+    @staticmethod
+    def _document_index_source_state(path: str, mtime_ns: int, size: int) -> Dict[str, bool]:
+        try:
+            stat = Path(path).stat()
+        except OSError:
+            return {'stale': True, 'missing': True}
+        return {
+            'stale': stat.st_mtime_ns != int(mtime_ns) or stat.st_size != int(size),
+            'missing': False,
+        }
+
     def document_index_status(self):
         try:
             self._document_index_ensure()
@@ -150,8 +161,26 @@ class DocumentIndexMixin:
                     'SELECT COUNT(*), COALESCE(SUM(size), 0), COALESCE(MAX(indexed_at), 0) FROM documents'
                 ).fetchone()
                 tokenizer_row = connection.execute("SELECT value FROM index_meta WHERE key='tokenizer'").fetchone()
+                sources = connection.execute('SELECT path, mtime_ns, size FROM documents').fetchall()
+            stale_samples = []
+            stale_documents = 0
+            missing_documents = 0
+            for path, mtime_ns, size in sources:
+                source_state = self._document_index_source_state(path, mtime_ns, size)
+                if source_state['stale']:
+                    stale_documents += 1
+                    missing_documents += int(source_state['missing'])
+                    if len(stale_samples) < 20:
+                        stale_samples.append({
+                            'path': path,
+                            'reason': 'missing' if source_state['missing'] else 'changed',
+                        })
             return api_success(
                 documents=count,
+                freshDocuments=max(0, count - stale_documents),
+                staleDocuments=stale_documents,
+                missingDocuments=missing_documents,
+                staleSamples=stale_samples,
                 sourceBytes=total_size,
                 databaseBytes=self._document_index_path.stat().st_size if self._document_index_path.exists() else 0,
                 updatedAt=updated_at,
@@ -260,7 +289,7 @@ class DocumentIndexMixin:
                         rows = connection.execute(
                             '''SELECT f.path, f.title, d.extension,
                                       snippet(documents_fts, 2, '<mark>', '</mark>', '…', 28) AS excerpt,
-                                      bm25(documents_fts) AS score, d.size, d.indexed_at
+                                      bm25(documents_fts) AS score, d.size, d.indexed_at, d.mtime_ns
                                FROM documents_fts AS f
                                JOIN documents AS d ON d.path = f.path
                                WHERE documents_fts MATCH ?
@@ -275,7 +304,7 @@ class DocumentIndexMixin:
                     rows = connection.execute(
                         '''SELECT path, title, extension,
                                   substr(content, max(1, instr(lower(content), lower(?)) - 80), 240),
-                                  0, size, indexed_at
+                                  0, size, indexed_at, mtime_ns
                            FROM documents
                            WHERE (lower(title) LIKE lower(?) OR lower(content) LIKE lower(?))
                              AND (? = '' OR extension = ?)
@@ -283,10 +312,19 @@ class DocumentIndexMixin:
                            ORDER BY indexed_at DESC LIMIT ?''',
                         (query, f'%{query}%', f'%{query}%', extension, extension, directory, f'{directory}%', limit),
                     ).fetchall()
-            results = [
-                {'path': row[0], 'title': row[1], 'extension': row[2], 'excerpt': row[3] or '', 'score': row[4], 'size': row[5], 'indexedAt': row[6]}
-                for row in rows
-            ]
+            results = []
+            for row in rows:
+                source_state = self._document_index_source_state(row[0], row[7], row[5])
+                results.append({
+                    'path': row[0],
+                    'title': row[1],
+                    'extension': row[2],
+                    'excerpt': row[3] or '',
+                    'score': row[4],
+                    'size': row[5],
+                    'indexedAt': row[6],
+                    **source_state,
+                })
             return api_success(f'找到 {len(results)} 个结果', results=results, query=query)
         except Exception as exc:
             return api_error(f'搜索失败：{exc}')

@@ -1,4 +1,4 @@
-// v2.3 工具注册表：导航、首页、命令面板和模块中心共享同一份元数据。
+// v2.4 工具注册表：导航、首页、命令面板和模块中心共享同一份元数据。
 import { markRaw } from 'vue'
 import { Connection, Cpu, Document, Edit, Files, FolderOpened, HomeFilled, Monitor, PictureFilled, Share, Stamp, Tickets, VideoPlay } from '@element-plus/icons-vue'
 
@@ -118,8 +118,8 @@ export const TOOLS = [
     group: 'automation',
     hue: '#8b5cf6',
     defaultEnabled: true,
-    badge: 'v2.3',
-    points: ['可视化串联本地工具', '周期运行与目录监听', '逐步骤运行记录'],
+    badge: 'v2.4',
+    points: ['可视化串联本地工具', '失败重试与触发器控制', '可筛选的逐步骤运行记录'],
     features: [feature('workflows', '编排工作流', ['流水线', '批处理', '模板'], { featured: true }), feature('triggers', '自动触发器', ['定时', '目录监听'], { featured: true }), feature('history', '运行记录', ['日志', '步骤结果'])]
   },
   {
@@ -138,13 +138,13 @@ export const TOOLS = [
   {
     id: 'text',
     name: '文本工具',
-    desc: 'JSON · 转换 · 替换',
+    desc: 'JSON · Diff · JWT',
     icon: markRaw(Edit),
     group: 'more',
     hue: '#7c5cff',
     defaultEnabled: true,
-    points: ['JSON 格式化', '大小写与全半角转换', '去重与批量替换'],
-    features: [feature('json', '格式化 JSON', ['校验', '查询']), feature('transform', '转换文本', ['大小写', '全半角']), feature('dedup', '文本去重与排序', ['排序']), feature('replace', '批量查找替换', ['正则', '替换'])]
+    points: ['JSON 格式化与查询', '文本和列表差异比较', 'JWT 本地结构与时效诊断'],
+    features: [feature('json', '格式化 JSON', ['校验', '查询']), feature('transform', '转换文本', ['大小写', '全半角']), feature('dedup', '文本去重与排序', ['排序']), feature('replace', '批量查找替换', ['正则', '替换']), feature('diff', '文本差异比较', ['Diff', '列表', '对比'], { featured: true }), feature('jwt', 'JWT 本地诊断', ['Token', 'Payload', '过期'], { featured: true })]
   },
   {
     id: 'video',

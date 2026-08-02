@@ -28,7 +28,7 @@ class OcrMixin:
                 try:
                     from rapidocr import RapidOCR
                 except ImportError as exc:
-                    raise RuntimeError('离线 OCR 组件未安装，请重新安装 v2.3.0 完整版') from exc
+                    raise RuntimeError('离线 OCR 组件未安装，请重新安装 v2.4.0 完整版') from exc
                 cls._ocr_engine = RapidOCR()
         return cls._ocr_engine
 

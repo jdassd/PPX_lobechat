@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import base64
 import csv
+import difflib
 import hashlib
 import html
 import json
@@ -297,3 +298,184 @@ class TextTool:
             return api_success('批量替换完成', result=result, replaced=total_replaced, report=report)
         except Exception as exc:
             return api_error(f'批量替换失败：{exc}')
+
+    @staticmethod
+    def _decode_jwt_segment(segment: str, label: str):
+        raw_segment = str(segment or '')
+        normalized = raw_segment.rstrip('=')
+        if not normalized or not re.fullmatch(r'[A-Za-z0-9_-]+', normalized):
+            raise ValueError(f'{label}不是有效的 Base64URL 数据')
+        if len(normalized) % 4 == 1:
+            raise ValueError(f'{label}的 Base64URL 长度无效')
+        padding = '=' * (-len(normalized) % 4)
+        try:
+            raw = base64.urlsafe_b64decode(normalized + padding)
+            return json.loads(raw.decode('utf-8'))
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+            raise ValueError(f'{label}不是有效的 UTF-8 JSON') from exc
+
+    @staticmethod
+    def _jwt_time_claim(value):
+        try:
+            timestamp = float(value)
+            parsed = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+            return {'valid': True, 'timestamp': timestamp, 'iso': parsed.isoformat()}
+        except (TypeError, ValueError, OSError, OverflowError):
+            return {'valid': False, 'value': value, 'iso': ''}
+
+    def text_decode_jwt(self, options: Dict | str | None = None):
+        """Decode JWT metadata locally without claiming signature verification."""
+        try:
+            if isinstance(options, str):
+                token = options
+            else:
+                token = str(self._validate(options).get('token') or '')
+            token = token.strip()
+            if not token:
+                raise ValueError('请输入 JWT')
+            if len(token) > 256_000:
+                raise ValueError('JWT 超过 256 KB 限制')
+            segments = token.split('.')
+            if len(segments) != 3:
+                raise ValueError('JWT 必须包含 header、payload 和 signature 三段')
+            header = self._decode_jwt_segment(segments[0], 'Header')
+            payload = self._decode_jwt_segment(segments[1], 'Payload')
+            if not isinstance(header, dict) or not isinstance(payload, dict):
+                raise ValueError('JWT 的 Header 和 Payload 必须是 JSON 对象')
+
+            signature_segment = segments[2].rstrip('=')
+            if signature_segment and not re.fullmatch(r'[A-Za-z0-9_-]+', signature_segment):
+                raise ValueError('Signature 不是有效的 Base64URL 数据')
+            signature_bytes = 0
+            if signature_segment:
+                if len(signature_segment) % 4 == 1:
+                    raise ValueError('Signature 的 Base64URL 长度无效')
+                signature_bytes = len(
+                    base64.urlsafe_b64decode(signature_segment + '=' * (-len(signature_segment) % 4))
+                )
+
+            now = datetime.now(timezone.utc).timestamp()
+            claim_times = {
+                claim: self._jwt_time_claim(payload[claim])
+                for claim in ('iat', 'nbf', 'exp')
+                if claim in payload
+            }
+            expired = bool(claim_times.get('exp', {}).get('valid') and claim_times['exp']['timestamp'] <= now)
+            not_yet_valid = bool(
+                claim_times.get('nbf', {}).get('valid') and claim_times['nbf']['timestamp'] > now
+            )
+            issued_in_future = bool(
+                claim_times.get('iat', {}).get('valid') and claim_times['iat']['timestamp'] > now + 300
+            )
+            algorithm = str(header.get('alg') or '')
+            warnings = ['未提供验签密钥，本工具只解码内容，不验证签名真实性。']
+            if not signature_segment or algorithm.lower() == 'none':
+                warnings.append('Token 未携带可验证签名，不能用于身份或权限判断。')
+            if expired:
+                warnings.append('Token 已超过 exp 声明的有效期。')
+            if not_yet_valid:
+                warnings.append('Token 尚未到 nbf 声明的生效时间。')
+            if issued_in_future:
+                warnings.append('Token 的 iat 时间比本机时间晚超过 5 分钟。')
+            if 'exp' not in payload:
+                warnings.append('Payload 没有 exp 声明，无法判断过期时间。')
+
+            return api_success(
+                'JWT 解码完成（签名未验证）',
+                header=header,
+                payload=payload,
+                algorithm=algorithm,
+                tokenType=str(header.get('typ') or ''),
+                signaturePresent=bool(signature_segment),
+                signatureBytes=signature_bytes,
+                signatureVerified=False,
+                claimTimes=claim_times,
+                expired=expired,
+                notYetValid=not_yet_valid,
+                issuedInFuture=issued_in_future,
+                warnings=warnings,
+                checkedAt=datetime.fromtimestamp(now, tz=timezone.utc).isoformat(),
+            )
+        except Exception as exc:
+            return api_error(f'JWT 解码失败：{exc}')
+
+    def text_compare(self, options: Dict | None = None):
+        """Compare two local text values as lines or words."""
+        try:
+            opts = self._validate(options)
+            left_text = str(opts.get('left') or '')
+            right_text = str(opts.get('right') or '')
+            if len(left_text) > 1_000_000 or len(right_text) > 1_000_000:
+                raise ValueError('单侧文本不能超过 100 万字符')
+            mode = str(opts.get('mode') or 'lines').lower()
+            if mode not in {'lines', 'words'}:
+                raise ValueError('比较模式必须是 lines 或 words')
+            ignore_whitespace = bool(opts.get('ignoreWhitespace', False))
+            ignore_case = bool(opts.get('ignoreCase', False))
+
+            if mode == 'lines':
+                left_items = left_text.splitlines()
+                right_items = right_text.splitlines()
+            else:
+                left_items = re.findall(r'\s+|[^\s]+', left_text)
+                right_items = re.findall(r'\s+|[^\s]+', right_text)
+                if ignore_whitespace:
+                    left_items = [item for item in left_items if not item.isspace()]
+                    right_items = [item for item in right_items if not item.isspace()]
+            if len(left_items) + len(right_items) > 200_000:
+                raise ValueError('比较项目总数不能超过 20 万，请缩小文本范围')
+
+            def comparison_key(value: str) -> str:
+                output = re.sub(r'\s+', ' ', value).strip() if ignore_whitespace else value
+                return output.casefold() if ignore_case else output
+
+            matcher = difflib.SequenceMatcher(
+                None,
+                [comparison_key(item) for item in left_items],
+                [comparison_key(item) for item in right_items],
+                autojunk=True,
+            )
+            operations = []
+            stats = {'added': 0, 'removed': 0, 'unchanged': 0, 'changedGroups': 0}
+            for tag, left_start, left_end, right_start, right_end in matcher.get_opcodes():
+                left_segment = left_items[left_start:left_end]
+                right_segment = right_items[right_start:right_end]
+                operations.append({
+                    'type': tag,
+                    'left': left_segment,
+                    'right': right_segment,
+                    'leftStart': left_start + 1,
+                    'rightStart': right_start + 1,
+                })
+                if tag == 'equal':
+                    stats['unchanged'] += len(left_segment)
+                else:
+                    stats['removed'] += len(left_segment)
+                    stats['added'] += len(right_segment)
+                    stats['changedGroups'] += 1
+
+            context_lines = max(0, min(int(opts.get('contextLines') or 3), 20))
+            unified_diff = ''
+            if mode == 'lines':
+                unified_diff = '\n'.join(
+                    difflib.unified_diff(
+                        left_items,
+                        right_items,
+                        fromfile=str(opts.get('leftLabel') or '左侧'),
+                        tofile=str(opts.get('rightLabel') or '右侧'),
+                        lineterm='',
+                        n=context_lines,
+                    )
+                )[:500_000]
+            similarity = matcher.ratio()
+            return api_success(
+                '文本比较完成',
+                mode=mode,
+                operations=operations,
+                stats=stats,
+                similarity=round(similarity * 100, 1),
+                identical=similarity == 1.0,
+                unifiedDiff=unified_diff,
+            )
+        except Exception as exc:
+            return api_error(f'文本比较失败：{exc}')

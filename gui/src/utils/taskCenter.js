@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 
-const STORAGE_KEY = 'ppx-v23-tasks'
-const LEGACY_STORAGE_KEY = 'ppx-v2-tasks'
+const STORAGE_KEY = 'ppx-v24-tasks'
+const LEGACY_STORAGE_KEYS = ['ppx-v23-tasks', 'ppx-v2-tasks']
 const MAX_TASKS = 200
 const SENSITIVE_KEY = /(password|passwd|secret|token|cookie|authorization|api[_-]?key)/i
 
@@ -93,7 +93,7 @@ const sanitizeValue = (value, key = '', depth = 0) => {
 const readTasks = () => {
   try {
     const current = localStorage.getItem(STORAGE_KEY)
-    const legacy = localStorage.getItem(LEGACY_STORAGE_KEY)
+    const legacy = LEGACY_STORAGE_KEYS.map((key) => localStorage.getItem(key)).find(Boolean)
     const list = JSON.parse(current || legacy || '[]')
     if (!Array.isArray(list)) return []
     return list.map((item) => (item.status === 'running' ? { ...item, status: 'interrupted', message: '应用在任务完成前退出' } : item))
