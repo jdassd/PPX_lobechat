@@ -115,6 +115,33 @@ class SystemInfoMixin():
 
         return api_success('已打开文件', path=str(file_path))
 
+    def system_revealFile(self, path):
+        '''在系统文件管理器中定位文件；目录则直接打开。'''
+        if not isinstance(path, (str, os.PathLike)):
+            return api_error('请指定要定位的文件或目录')
+        target = os.fspath(path).strip()
+        if not target:
+            return api_error('请指定要定位的文件或目录')
+        try:
+            file_path = Path(target).expanduser()
+            if not file_path.exists():
+                return api_error('文件或目录不存在', path=str(file_path))
+            file_path = file_path.resolve()
+            if Config.appSystem == 'Windows':
+                command = ['explorer', str(file_path)] if file_path.is_dir() else ['explorer', '/select,', str(file_path)]
+            elif Config.appSystem == 'Darwin':
+                command = ['open', str(file_path)] if file_path.is_dir() else ['open', '-R', str(file_path)]
+            elif Config.appSystem == 'Linux':
+                command = ['xdg-open', str(file_path if file_path.is_dir() else file_path.parent)]
+            else:
+                return api_error(f'不支持在 {Config.appSystem or "未知系统"} 上定位文件', path=str(file_path))
+            subprocess.run(command, check=True)
+            return api_success('已在文件管理器中定位', path=str(file_path))
+        except (OSError, subprocess.SubprocessError) as exc:
+            return api_error(f'定位文件失败：{exc}', path=target)
+        except Exception as exc:
+            return api_error(f'定位文件失败：{exc}', path=target)
+
     def system_pyCreateFileDialog(self, fileTypes=None, directory=''):
         '''打开文件对话框'''
         # 可选文件类型

@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Vue-3.0+-4FC08D?style=flat-square&logo=vue.js&logoColor=white" alt="Vue 3" />
   <img src="https://img.shields.io/badge/Python-3.10-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.10" />
   <img src="https://img.shields.io/badge/Pywebview-5.0+-FFD43B?style=flat-square&logo=python&logoColor=blue" alt="Pywebview" />
-  <img src="https://img.shields.io/badge/version-2.4.0-2b6fff?style=flat-square" alt="Version 2.4.0" />
+  <img src="https://img.shields.io/badge/version-2.5.0-2b6fff?style=flat-square" alt="Version 2.5.0" />
   <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License" />
 </p>
 
@@ -20,13 +20,13 @@
 
 ## 📖 简介
 
-**PPX 2.4** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
+**PPX 2.5** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
 
-2.4 继续沿用“动作 → 持久任务 → 可恢复结果”主线，并补齐任务洞察、批量恢复、自动化重试、索引健康检查与本地文本诊断，让处理结果更容易观察、复用和排错。
+2.5 把“动作 → 持久任务 → 可恢复结果”推进为可观测闭环：统一管理一个任务产生的多个输出文件，自动归类失败原因并给出修复建议，以 7 天趋势和方法可靠性定位瓶颈；工作流可以安全导入导出，备份则新增逐文件 SHA-256 完整性校验。
 
 ## ✨ 主要功能
 
-PPX 2.4 的核心能力包括：
+PPX 2.5 的核心能力包括：
 
 ### 📄 文档与数据
 
@@ -45,16 +45,16 @@ PPX 2.4 的核心能力包括：
 ### 🛠️ 文件与自动化
 
 - **文件批处理**：搜索、分类、复制、安全删除、回收站恢复、批量改名与撤销、查重及压缩解压。
-- **自动化工作流**：使用安全白名单串联本地工具，支持参数引用、步骤重试与退避、内置模板、周期运行、目录监听、触发器启停/立即运行及逐步骤日志。
+- **自动化工作流**：使用安全白名单串联本地工具，支持参数引用、步骤重试与退避、内置模板、周期运行、目录监听、触发器启停/立即运行、模板包导入导出及运行历史导出/清理。
 - **网页数据采集**：点选字段、翻页采集并导出 Excel / Word。
 - **安全边界**：删除操作可恢复且必须预览；重命名不覆盖；系统启动项只读。
 
 ### 🧭 工作台
 
-- **任务中心**：持久保存队列与历史，支持筛选分页、批量取消/重试、成功率、平均耗时、进度、输出路径和失败原因。
+- **任务中心**：持久保存队列与历史，支持筛选分页、批量取消/重试、7 天趋势、方法可靠性、失败诊断、多输出资产的打开/定位/复制，以及 JSON/CSV 导出和可预览清理。
 - **模块中心**：按需开启可选能力，并检查 OCR、FFmpeg、LibreOffice 与 Playwright 依赖。
 - **全局搜索**：按 `Ctrl/⌘ + K` 搜索工具或具体动作。
-- **设置与维护**：跨平台健康检查、完整备份、延迟安全恢复、隐私诊断报告及窗口状态记忆。
+- **设置与维护**：跨平台健康检查、SHA-256 完整备份、延迟安全恢复、隐私诊断报告及窗口状态记忆；旧版备份继续兼容并明确标注校验等级。
 
 ## 🏗️ 技术栈
 

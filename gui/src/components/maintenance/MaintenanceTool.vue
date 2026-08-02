@@ -66,7 +66,7 @@ const chooseBackup = async () => {
   restore.filePath = files[0].path
   restore.manifest = response.data.manifest
   restore.frontendState = response.data.frontendState || {}
-  ElMessage.success('备份校验通过')
+  ElMessage.success(response.data.manifest?.integrity?.verified ? 'SHA-256 完整性校验通过' : '旧版备份兼容校验通过')
 }
 
 const scheduleRestore = async () => {
@@ -147,7 +147,7 @@ onMounted(refreshHealth)
         <div class="two-panels">
           <section class="panel-card">
             <h3>创建完整备份</h3>
-            <p>包含本地任务、工作流、文档索引、数据库和界面偏好；不读取浏览器密码或环境变量。</p>
+            <p>包含本地任务、工作流、文档索引、数据库和界面偏好；逐文件记录 SHA-256，不读取浏览器密码或环境变量。</p>
             <el-form label-position="top">
               <el-form-item label="保存目录（留空则保存到应用数据目录）"
                 ><el-input v-model="backup.outputDir"
@@ -162,7 +162,7 @@ onMounted(refreshHealth)
           </section>
           <section class="panel-card">
             <h3>恢复备份</h3>
-            <p>先校验格式与路径安全，再在下次启动前恢复；当前数据会自动生成恢复前备份。</p>
+            <p>先校验路径、清单、大小、重复条目与内容摘要，再在下次启动前恢复；当前数据会自动生成恢复前备份。</p>
             <el-button @click="chooseBackup">选择并校验备份</el-button>
             <dl v-if="restore.manifest" class="manifest">
               <div>
@@ -176,6 +176,12 @@ onMounted(refreshHealth)
               <div>
                 <dt>文件数量</dt>
                 <dd>{{ restore.manifest.fileCount }}</dd>
+              </div>
+              <div>
+                <dt>内容完整性</dt>
+                <dd>
+                  <el-tag :type="restore.manifest.integrity?.verified ? 'success' : 'warning'" effect="plain">{{ restore.manifest.integrity?.verified ? 'SHA-256 已验证' : '旧版 ZIP 兼容校验' }}</el-tag>
+                </dd>
               </div>
             </dl>
             <el-button v-if="restore.manifest" type="danger" plain @click="scheduleRestore">安排恢复并关闭</el-button>

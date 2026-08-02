@@ -1,4 +1,4 @@
-// v2.4 工具注册表：导航、首页、命令面板和模块中心共享同一份元数据。
+// v2.5 工具注册表：导航、首页、命令面板和模块中心共享同一份元数据。
 import { markRaw } from 'vue'
 import { Connection, Cpu, Document, Edit, Files, FolderOpened, HomeFilled, Monitor, PictureFilled, Share, Stamp, Tickets, VideoPlay } from '@element-plus/icons-vue'
 
@@ -118,9 +118,9 @@ export const TOOLS = [
     group: 'automation',
     hue: '#8b5cf6',
     defaultEnabled: true,
-    badge: 'v2.4',
-    points: ['可视化串联本地工具', '失败重试与触发器控制', '可筛选的逐步骤运行记录'],
-    features: [feature('workflows', '编排工作流', ['流水线', '批处理', '模板'], { featured: true }), feature('triggers', '自动触发器', ['定时', '目录监听'], { featured: true }), feature('history', '运行记录', ['日志', '步骤结果'])]
+    badge: 'v2.5',
+    points: ['可视化串联本地工具', '模板包导入导出', '可筛选、导出的逐步骤运行记录'],
+    features: [feature('workflows', '编排工作流', ['流水线', '批处理', '模板包'], { featured: true }), feature('triggers', '自动触发器', ['定时', '目录监听'], { featured: true }), feature('history', '运行记录', ['日志', '步骤结果', '导出'])]
   },
   {
     id: 'webauto',

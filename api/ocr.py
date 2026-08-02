@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Sequence
 
 from api.utils.error_handler import api_success, safe_execute
+from pyapp.config.config import Config
 
 
 class OcrMixin:
@@ -28,7 +29,7 @@ class OcrMixin:
                 try:
                     from rapidocr import RapidOCR
                 except ImportError as exc:
-                    raise RuntimeError('离线 OCR 组件未安装，请重新安装 v2.4.0 完整版') from exc
+                    raise RuntimeError(f'离线 OCR 组件未安装，请重新安装 {Config.appVersion} 完整版') from exc
                 cls._ocr_engine = RapidOCR()
         return cls._ocr_engine
 

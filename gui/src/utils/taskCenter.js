@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 
-const STORAGE_KEY = 'ppx-v24-tasks'
-const LEGACY_STORAGE_KEYS = ['ppx-v23-tasks', 'ppx-v2-tasks']
+const STORAGE_KEY = 'ppx-v25-tasks'
+const LEGACY_STORAGE_KEYS = ['ppx-v24-tasks', 'ppx-v23-tasks', 'ppx-v2-tasks']
 const MAX_TASKS = 200
 const SENSITIVE_KEY = /(password|passwd|secret|token|cookie|authorization|api[_-]?key)/i
 
@@ -115,12 +115,36 @@ const persist = () => {
   }
 }
 
-const extractOutput = (data) => {
-  if (!data || typeof data !== 'object') return ''
-  const direct = data.output || data.outputPath || data.outputDir || data.path || data.archive || data.file
-  if (direct) return String(direct)
-  const outputs = data.outputs || data.files || data.created
-  return Array.isArray(outputs) && outputs.length ? String(outputs[0]?.path || outputs[0]) : ''
+const OUTPUT_KEYS = ['output', 'outputPath', 'outputDir', 'path', 'archive', 'file']
+const OUTPUT_LIST_KEYS = ['outputs', 'files', 'created', 'items']
+
+const isPathLike = (value) => {
+  if (typeof value !== 'string') return false
+  const raw = value.trim()
+  return Boolean(raw && raw.length <= 4096 && !/[\r\n]/.test(raw) && (/^(?:[a-z]:[\\/]|[\\/])/i.test(raw) || raw.includes('/') || raw.includes('\\')))
+}
+
+export const extractOutputs = (data) => {
+  if (!data || typeof data !== 'object') return []
+  const paths = []
+  const add = (value) => {
+    if (isPathLike(value)) {
+      paths.push(value.trim())
+      return
+    }
+    if (Array.isArray(value)) {
+      value.slice(0, 200).forEach(add)
+      return
+    }
+    if (value && typeof value === 'object') OUTPUT_KEYS.forEach((key) => key in value && add(value[key]))
+  }
+  const candidateKeys = [...OUTPUT_KEYS, ...OUTPUT_LIST_KEYS]
+  candidateKeys.forEach((key) => key in data && add(data[key]))
+  return [...new Set(paths)].map((path) => {
+    const normalized = path.replace(/[\\/]+$/, '')
+    const name = normalized.split(/[\\/]/).pop() || path
+    return { path, name, kind: path.endsWith('/') || path.endsWith('\\') ? 'directory' : 'file', exists: null, size: null }
+  })
 }
 
 const toMilliseconds = (value) => {
@@ -137,7 +161,7 @@ export const beginApiTask = (method, args = [], id = '') => {
   const safe = sanitizeValue(args)
   const task = {
     id: id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    schemaVersion: 1,
+    schemaVersion: 2,
     method,
     args: safe.value,
     retryable: safe.retryable,
@@ -149,7 +173,8 @@ export const beginApiTask = (method, args = [], id = '') => {
     startedAt: Date.now(),
     endedAt: null,
     message: '等待执行',
-    output: ''
+    output: '',
+    outputs: []
   }
   tasks.value = [task, ...tasks.value.filter((item) => item.id !== task.id)].slice(0, MAX_TASKS)
   persist()
@@ -167,12 +192,14 @@ export const settleApiTask = (id, result, error) => {
   const current = tasks.value.find((item) => item.id === id)
   if (!current) return
   const ok = !error && result?.ok
+  const outputs = ok ? extractOutputs(result?.data) : []
   updateApiTask(id, {
     status: ok ? 'success' : 'failed',
     progress: 100,
     endedAt: Date.now(),
     message: error?.message || result?.message || (ok ? '处理完成' : '处理失败'),
-    output: ok ? extractOutput(result?.data) : ''
+    output: outputs[0]?.path || '',
+    outputs
   })
 }
 
@@ -182,6 +209,7 @@ export const hydrateBackendTasks = (backendTasks = [], paused = false) => {
   const mapped = backendTasks.map((task) => {
     const meta = TASK_METHODS[task.method] || ['advanced', '', task.method]
     const [tool, feature, label] = meta
+    const outputs = Array.isArray(task.outputs) && task.outputs.length ? task.outputs : extractOutputs(task.result)
     return {
       ...task,
       tool,
@@ -189,7 +217,8 @@ export const hydrateBackendTasks = (backendTasks = [], paused = false) => {
       label,
       startedAt: toMilliseconds(task.startedAt || task.createdAt),
       endedAt: toMilliseconds(task.endedAt),
-      output: extractOutput(task.result),
+      output: outputs[0]?.path || '',
+      outputs,
       progress: Number(task.progress || 0)
     }
   })
@@ -200,5 +229,11 @@ export const hydrateBackendTasks = (backendTasks = [], paused = false) => {
 
 export const clearFinishedTasks = () => {
   tasks.value = tasks.value.filter((item) => ['queued', 'running'].includes(item.status))
+  persist()
+}
+
+export const removeTasksByIds = (ids = []) => {
+  const removed = new Set(ids)
+  tasks.value = tasks.value.filter((item) => !removed.has(item.id))
   persist()
 }

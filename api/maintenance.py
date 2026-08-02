@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import os
 import platform
@@ -22,6 +24,9 @@ from pyapp.config.config import Config
 _BACKUP_MANIFEST = "PPX_BACKUP_MANIFEST.json"
 _FRONTEND_STATE = "frontend_state.json"
 _EXCLUDED_ROOTS = {"backups", "restore"}
+_MAX_BACKUP_MEMBERS = 200_000
+_MAX_BACKUP_BYTES = 100 * 1024 * 1024 * 1024
+_HASH_CHUNK_SIZE = 1024 * 1024
 
 
 class MaintenanceMixin:
@@ -54,6 +59,22 @@ class MaintenanceMixin:
     def _maintenance_is_excluded(relative: Path) -> bool:
         return bool(relative.parts and relative.parts[0] in _EXCLUDED_ROOTS)
 
+    @staticmethod
+    def _maintenance_sha256_file(path: Path) -> str:
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(_HASH_CHUNK_SIZE), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+
+    @staticmethod
+    def _maintenance_sha256_archive_member(archive: zipfile.ZipFile, name: str) -> str:
+        digest = hashlib.sha256()
+        with archive.open(name) as handle:
+            for chunk in iter(lambda: handle.read(_HASH_CHUNK_SIZE), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+
     def maintenance_backup_create(self, options: Dict | None = None):
         try:
             options = options or {}
@@ -61,9 +82,11 @@ class MaintenanceMixin:
             marker = "before_restore" if options.get("_marker") == "before_restore" else "backup"
             target = self._maintenance_backup_path(str(options.get("outputDir") or ""), marker)
             frontend_state = self._maintenance_safe_frontend_state(options.get("frontendState"))
+            frontend_bytes = json.dumps(frontend_state, ensure_ascii=False, indent=2).encode("utf-8")
             files = []
             total_bytes = 0
-            with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
+            temp_target = target.with_name(f".{target.name}.{uuid.uuid4().hex}.tmp")
+            with zipfile.ZipFile(temp_target, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
                 for path in app_data.rglob("*"):
                     if not path.is_file() or path.is_symlink():
                         continue
@@ -73,25 +96,34 @@ class MaintenanceMixin:
                     try:
                         if path.resolve() == target.resolve():
                             continue
+                        checksum = self._maintenance_sha256_file(path)
                         archive.write(path, f"data/{relative.as_posix()}")
                         size = path.stat().st_size
-                        files.append({"path": relative.as_posix(), "size": size})
+                        files.append({"path": relative.as_posix(), "size": size, "sha256": checksum})
                         total_bytes += size
                     except OSError:
                         continue
-                archive.writestr(_FRONTEND_STATE, json.dumps(frontend_state, ensure_ascii=False, indent=2))
+                archive.writestr(_FRONTEND_STATE, frontend_bytes)
                 manifest = {
-                    "schemaVersion": 1,
+                    "schemaVersion": 2,
                     "appVersion": Config.appVersion,
                     "createdAt": time.time(),
                     "platform": Config.appSystem,
                     "fileCount": len(files),
                     "totalBytes": total_bytes,
+                    "hashAlgorithm": "sha256",
+                    "frontendStateSha256": hashlib.sha256(frontend_bytes).hexdigest(),
                     "files": files,
                 }
                 archive.writestr(_BACKUP_MANIFEST, json.dumps(manifest, ensure_ascii=False, indent=2))
-            return api_success("备份已创建", output=str(target), manifest=manifest)
+            os.replace(temp_target, target)
+            validated_manifest, _ = self._maintenance_validate_backup(target)
+            return api_success("备份已创建并通过完整性校验", output=str(target), manifest=validated_manifest)
         except Exception as exc:
+            if 'temp_target' in locals():
+                temp_target.unlink(missing_ok=True)
+            if 'target' in locals():
+                target.unlink(missing_ok=True)
             return api_error(f"创建备份失败：{exc}")
 
     @staticmethod
@@ -99,20 +131,84 @@ class MaintenanceMixin:
         if not path.is_file() or path.suffix.lower() != ".zip":
             raise ValueError("请选择 PPX 备份 ZIP 文件")
         with zipfile.ZipFile(path) as archive:
-            names = archive.namelist()
+            infos = archive.infolist()
+            if len(infos) > _MAX_BACKUP_MEMBERS:
+                raise ValueError("备份文件条目数量超过安全上限")
+            if sum(max(0, info.file_size) for info in infos) > _MAX_BACKUP_BYTES:
+                raise ValueError("备份展开后的体积超过安全上限")
+            names = [info.filename for info in infos]
+            if len(names) != len(set(names)):
+                raise ValueError("备份包含重复文件条目")
             if _BACKUP_MANIFEST not in names:
                 raise ValueError("不是有效的 PPX 备份文件")
-            for name in names:
-                member = Path(name)
+            for info in infos:
+                member = Path(info.filename)
                 if member.is_absolute() or ".." in member.parts:
                     raise ValueError("备份包含不安全路径")
+                if info.flag_bits & 0x1:
+                    raise ValueError("不支持加密的备份条目")
             manifest = json.loads(archive.read(_BACKUP_MANIFEST).decode("utf-8"))
+            if not isinstance(manifest, dict):
+                raise ValueError("备份清单格式无效")
+            schema_version = int(manifest.get("schemaVersion") or 0)
+            if schema_version not in {1, 2}:
+                raise ValueError("备份版本不受支持")
+            manifest_files = manifest.get("files")
+            if not isinstance(manifest_files, list):
+                raise ValueError("备份文件清单无效")
+            expected = {}
+            manifest_total = 0
+            for item in manifest_files:
+                if not isinstance(item, dict):
+                    raise ValueError("备份文件清单无效")
+                relative = Path(str(item.get("path") or ""))
+                if not relative.parts or relative.is_absolute() or ".." in relative.parts or MaintenanceMixin._maintenance_is_excluded(relative):
+                    raise ValueError("备份清单包含不安全路径")
+                member_name = f"data/{relative.as_posix()}"
+                if member_name in expected:
+                    raise ValueError("备份清单包含重复路径")
+                size = int(item.get("size") or 0)
+                if size < 0:
+                    raise ValueError("备份清单包含无效文件大小")
+                expected[member_name] = item
+                manifest_total += size
+            actual = {info.filename: info for info in infos if info.filename.startswith("data/") and not info.is_dir()}
+            if set(actual) != set(expected):
+                raise ValueError("备份内容与文件清单不一致")
+            if int(manifest.get("fileCount") or 0) != len(expected) or int(manifest.get("totalBytes") or 0) != manifest_total:
+                raise ValueError("备份汇总信息与文件清单不一致")
+            for member_name, item in expected.items():
+                if actual[member_name].file_size != int(item.get("size") or 0):
+                    raise ValueError(f"备份文件大小校验失败：{item.get('path')}")
+                if schema_version >= 2:
+                    expected_hash = str(item.get("sha256") or "").lower()
+                    if len(expected_hash) != 64:
+                        raise ValueError(f"备份文件摘要缺失：{item.get('path')}")
+                    actual_hash = MaintenanceMixin._maintenance_sha256_archive_member(archive, member_name)
+                    if not hmac.compare_digest(actual_hash, expected_hash):
+                        raise ValueError(f"备份文件完整性校验失败：{item.get('path')}")
             try:
                 frontend_state = (
                     json.loads(archive.read(_FRONTEND_STATE).decode("utf-8")) if _FRONTEND_STATE in names else {}
                 )
             except (ValueError, UnicodeDecodeError):
                 frontend_state = {}
+            if schema_version >= 2:
+                if _FRONTEND_STATE not in names:
+                    raise ValueError("备份缺少界面状态文件")
+                frontend_hash = MaintenanceMixin._maintenance_sha256_archive_member(archive, _FRONTEND_STATE)
+                expected_frontend_hash = str(manifest.get("frontendStateSha256") or "").lower()
+                if not hmac.compare_digest(frontend_hash, expected_frontend_hash):
+                    raise ValueError("备份界面状态完整性校验失败")
+            corrupted = archive.testzip()
+            if corrupted:
+                raise ValueError(f"备份 ZIP 校验失败：{corrupted}")
+        manifest = dict(manifest)
+        manifest["integrity"] = {
+            "algorithm": "SHA-256" if schema_version >= 2 else "ZIP CRC",
+            "verified": schema_version >= 2,
+            "legacy": schema_version < 2,
+        }
         return manifest, MaintenanceMixin._maintenance_safe_frontend_state(frontend_state)
 
     def maintenance_backup_inspect(self, options: Dict | str | None = None):

@@ -6,10 +6,12 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import threading
 import time
 import uuid
 from collections import deque
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -35,6 +37,133 @@ _SENSITIVE_KEY = re.compile(r'(password|passwd|secret|token|cookie|authorization
 _MAX_TASKS = 200
 _MAX_STRING = 200_000
 _TASK_STATUSES = ('queued', 'running', 'success', 'failed', 'interrupted', 'canceled')
+_TERMINAL_STATUSES = {'success', 'failed', 'interrupted', 'canceled'}
+_OUTPUT_KEYS = ('output', 'outputPath', 'outputDir', 'path', 'archive', 'file')
+_OUTPUT_LIST_KEYS = ('outputs', 'files', 'created', 'items')
+
+
+def _task_path_like(value: Any) -> bool:
+    if not isinstance(value, (str, os.PathLike)):
+        return False
+    raw = os.fspath(value).strip()
+    if not raw or len(raw) > 4096 or '\n' in raw or '\r' in raw or raw.lower().startswith(('http://', 'https://')):
+        return False
+    path = Path(raw).expanduser()
+    return path.exists() or path.is_absolute() or '/' in raw or '\\' in raw
+
+
+def _task_output_assets(result: Any) -> List[Dict[str, Any]]:
+    """Extract local result files/directories without mistaking text output for a path."""
+    raw_paths: List[str] = []
+
+    def add(value: Any) -> None:
+        if _task_path_like(value):
+            raw_paths.append(os.fspath(value).strip())
+            return
+        if isinstance(value, dict):
+            for key in _OUTPUT_KEYS:
+                if key in value:
+                    add(value.get(key))
+            return
+        if isinstance(value, (list, tuple)):
+            for item in value[:200]:
+                add(item)
+
+    if isinstance(result, dict):
+        for key in _OUTPUT_KEYS + _OUTPUT_LIST_KEYS:
+            if key in result:
+                add(result.get(key))
+
+    assets = []
+    seen = set()
+    for raw in raw_paths:
+        expanded = Path(raw).expanduser()
+        identity = os.path.normcase(os.path.abspath(str(expanded)))
+        if identity in seen:
+            continue
+        seen.add(identity)
+        exists = expanded.exists()
+        is_directory = expanded.is_dir() if exists else raw.endswith(('/', '\\'))
+        size = None
+        if exists and not is_directory:
+            try:
+                size = expanded.stat().st_size
+            except OSError:
+                pass
+        assets.append({
+            'path': raw,
+            'name': expanded.name or raw,
+            'kind': 'directory' if is_directory else 'file',
+            'exists': exists,
+            'size': size,
+        })
+    return assets
+
+
+def _task_diagnosis(task: Dict[str, Any]) -> Dict[str, str] | None:
+    status = str(task.get('status') or '')
+    if status not in {'failed', 'interrupted', 'canceled'}:
+        return None
+    message = str(task.get('message') or '')
+    lowered = message.lower()
+    if status == 'interrupted':
+        return {
+            'category': 'interrupted',
+            'title': '任务被应用退出中断',
+            'suggestion': '确认输入文件仍在原位置后直接重试；任务会以新记录重新进入队列。',
+        }
+    if status == 'canceled':
+        return {
+            'category': 'canceled',
+            'title': '任务已取消',
+            'suggestion': '取消可能留下部分输出，请先检查结果目录，再决定是否重试。',
+        }
+    rules = (
+        (
+            'dependency',
+            '缺少处理组件',
+            ('ffmpeg', 'ffprobe', 'libreoffice', 'rapidocr', 'playwright', 'chromium', '组件未安装', 'not installed'),
+            '前往模块中心重新检测依赖，按提示安装或修复后再重试。',
+        ),
+        (
+            'storage',
+            '磁盘空间不足',
+            ('no space left', 'disk full', '磁盘空间', '空间不足'),
+            '释放输出磁盘空间，或在工具页面改用其他输出目录后重新提交。',
+        ),
+        (
+            'permission',
+            '没有文件访问权限',
+            ('permission denied', 'access denied', '拒绝访问', '没有权限', '权限不足'),
+            '检查源文件和输出目录权限，关闭可能占用文件的程序后重试。',
+        ),
+        (
+            'missing-input',
+            '源文件或目录已不存在',
+            ('no such file', 'not found', '文件不存在', '目录不存在', '找不到文件'),
+            '返回原工具重新选择仍然存在的输入文件或目录。',
+        ),
+        (
+            'timeout',
+            '处理超时',
+            ('timeout', 'timed out', '超时'),
+            '减少单次文件数量或文件体积，确认依赖组件可用后再重试。',
+        ),
+        (
+            'input',
+            '输入参数或文件格式不符合要求',
+            ('invalid', 'json', '参数', '格式错误', '不支持的文件格式', '密码错误'),
+            '打开原工具检查文件格式与参数，再重新提交任务。',
+        ),
+    )
+    for category, title, patterns, suggestion in rules:
+        if any(pattern in lowered for pattern in patterns):
+            return {'category': category, 'title': title, 'suggestion': suggestion}
+    return {
+        'category': 'unknown',
+        'title': '处理未完成',
+        'suggestion': '展开错误信息核对输入；如果问题持续，可在维护中心导出隐私安全的诊断报告。',
+    }
 
 
 def _json_safe(value: Any, key: str = '', depth: int = 0) -> Tuple[Any, bool]:
@@ -99,10 +228,16 @@ class TaskMixin:
             self._task_worker_thread.start()
 
     def _task_load_locked(self) -> None:
-        try:
-            payload = json.loads(self._task_store_path.read_text(encoding='utf-8'))
-            items = payload.get('tasks', []) if isinstance(payload, dict) else []
-        except (OSError, ValueError, TypeError):
+        items = []
+        for candidate in (self._task_store_path, self._task_store_path.with_suffix('.bak')):
+            try:
+                payload = json.loads(candidate.read_text(encoding='utf-8'))
+                items = payload.get('tasks', []) if isinstance(payload, dict) else []
+                if isinstance(items, list):
+                    break
+            except (OSError, ValueError, TypeError):
+                continue
+        if not isinstance(items, list):
             items = []
         changed = False
         for item in items[:_MAX_TASKS]:
@@ -122,10 +257,98 @@ class TaskMixin:
 
     def _task_persist_locked(self) -> None:
         tasks = [self._task_items[task_id] for task_id in self._task_order[:_MAX_TASKS] if task_id in self._task_items]
-        payload = {'schemaVersion': 1, 'paused': self._task_paused, 'tasks': tasks}
+        payload = {'schemaVersion': 2, 'paused': self._task_paused, 'tasks': tasks}
         temp_path = self._task_store_path.with_suffix('.tmp')
-        temp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding='utf-8')
+        with temp_path.open('w', encoding='utf-8') as handle:
+            json.dump(payload, handle, ensure_ascii=False, indent=2)
+            handle.flush()
+            os.fsync(handle.fileno())
+        if self._task_store_path.is_file():
+            backup_temp = self._task_store_path.with_suffix('.bak.tmp')
+            shutil.copy2(self._task_store_path, backup_temp)
+            os.replace(backup_temp, self._task_store_path.with_suffix('.bak'))
         os.replace(temp_path, self._task_store_path)
+
+    @staticmethod
+    def _task_snapshot(task: Dict[str, Any]) -> Dict[str, Any]:
+        snapshot = dict(task)
+        snapshot['outputs'] = _task_output_assets(snapshot.get('result'))
+        diagnosis = _task_diagnosis(snapshot)
+        if diagnosis:
+            snapshot['diagnosis'] = diagnosis
+        else:
+            snapshot.pop('diagnosis', None)
+        return snapshot
+
+    @staticmethod
+    def _task_stats(tasks: List[Dict[str, Any]]) -> Dict[str, Any]:
+        status_counts = {status: 0 for status in _TASK_STATUSES}
+        method_metrics: Dict[str, Dict[str, Any]] = {}
+        durations = []
+        first_day = date.today() - timedelta(days=6)
+        daily = {
+            first_day + timedelta(days=offset): {'total': 0, 'success': 0, 'attention': 0}
+            for offset in range(7)
+        }
+        for task in tasks:
+            status = str(task.get('status') or '')
+            if status in status_counts:
+                status_counts[status] += 1
+            method = str(task.get('method') or '')
+            metric = method_metrics.setdefault(
+                method,
+                {'method': method, 'total': 0, 'success': 0, 'attention': 0, 'durationTotal': 0.0, 'durationCount': 0},
+            )
+            metric['total'] += 1
+            if status == 'success':
+                metric['success'] += 1
+            if status in {'failed', 'interrupted', 'canceled'}:
+                metric['attention'] += 1
+            started_at = task.get('startedAt')
+            ended_at = task.get('endedAt')
+            if isinstance(started_at, (int, float)) and isinstance(ended_at, (int, float)):
+                duration = max(0.0, ended_at - started_at)
+                durations.append(duration)
+                metric['durationTotal'] += duration
+                metric['durationCount'] += 1
+            created_at = task.get('createdAt')
+            if isinstance(created_at, (int, float)):
+                task_day = date.fromtimestamp(created_at)
+                if task_day in daily:
+                    daily[task_day]['total'] += 1
+                    if status == 'success':
+                        daily[task_day]['success'] += 1
+                    if status in {'failed', 'interrupted', 'canceled'}:
+                        daily[task_day]['attention'] += 1
+
+        method_stats = []
+        for metric in method_metrics.values():
+            decisive = metric['success'] + metric['attention']
+            method_stats.append({
+                'method': metric['method'],
+                'total': metric['total'],
+                'success': metric['success'],
+                'attention': metric['attention'],
+                'successRate': round(metric['success'] * 100 / decisive, 1) if decisive else 0,
+                'averageDurationSeconds': round(metric['durationTotal'] / metric['durationCount'], 2) if metric['durationCount'] else 0,
+            })
+        method_stats.sort(key=lambda item: (-item['attention'], -item['total'], -item['averageDurationSeconds'], item['method']))
+        decisive = status_counts['success'] + status_counts['failed']
+        return {
+            'total': len(tasks),
+            'active': status_counts['queued'] + status_counts['running'],
+            'attention': status_counts['failed'] + status_counts['interrupted'] + status_counts['canceled'],
+            'finished': len(tasks) - status_counts['queued'] - status_counts['running'],
+            'successRate': round(status_counts['success'] * 100 / decisive, 1) if decisive else 0,
+            'averageDurationSeconds': round(sum(durations) / len(durations), 2) if durations else 0,
+            'statusCounts': status_counts,
+            'methodCounts': {item['method']: item['total'] for item in method_stats},
+            'daily': [
+                {'date': day.isoformat(), **values}
+                for day, values in daily.items()
+            ],
+            'methodStats': method_stats,
+        }
 
     @staticmethod
     def _task_ok(result: Any) -> bool:
@@ -211,7 +434,7 @@ class TaskMixin:
             created_at = time.time()
             task = {
                 'id': task_id,
-                'schemaVersion': 1,
+                'schemaVersion': 2,
                 'method': method,
                 'args': safe_args,
                 'retryable': retryable,
@@ -236,7 +459,7 @@ class TaskMixin:
                 self._task_order = self._task_order[:_MAX_TASKS]
                 self._task_persist_locked()
                 self._task_condition.notify_all()
-            return api_success('任务已加入队列', taskId=task_id, task=task)
+            return api_success('任务已加入队列', taskId=task_id, task=self._task_snapshot(task))
         except Exception as exc:
             return api_error(f'创建任务失败：{exc}')
 
@@ -248,7 +471,7 @@ class TaskMixin:
                 task = self._task_items.get(task_id)
                 if not task:
                     return api_error('任务不存在')
-                return api_success(task=dict(task), paused=self._task_paused)
+                return api_success(task=self._task_snapshot(task), paused=self._task_paused)
         except Exception as exc:
             return api_error(f'读取任务失败：{exc}')
 
@@ -266,24 +489,10 @@ class TaskMixin:
             query = str(options.get('query') or options.get('search') or '').strip().lower()
             with self._task_lock:
                 all_tasks = [
-                    dict(self._task_items[task_id])
+                    self._task_snapshot(self._task_items[task_id])
                     for task_id in self._task_order
                     if task_id in self._task_items
                 ]
-                status_counts = {status: 0 for status in _TASK_STATUSES}
-                method_counts: Dict[str, int] = {}
-                durations = []
-                for task in all_tasks:
-                    status = str(task.get('status') or '')
-                    if status in status_counts:
-                        status_counts[status] += 1
-                    task_method = str(task.get('method') or '')
-                    method_counts[task_method] = method_counts.get(task_method, 0) + 1
-                    started_at = task.get('startedAt')
-                    ended_at = task.get('endedAt')
-                    if isinstance(started_at, (int, float)) and isinstance(ended_at, (int, float)):
-                        durations.append(max(0.0, ended_at - started_at))
-
                 tasks = []
                 for task in all_tasks:
                     if statuses and task.get('status') not in statuses:
@@ -291,10 +500,14 @@ class TaskMixin:
                     if method and task.get('method') != method:
                         continue
                     if query:
-                        haystack = ' '.join(
-                            str(task.get(key) or '')
-                            for key in ('id', 'method', 'message', 'retryOf')
-                        ).lower()
+                        output_paths = ' '.join(str(item.get('path') or '') for item in task.get('outputs') or [])
+                        diagnosis = task.get('diagnosis') or {}
+                        haystack = ' '.join([
+                            *(str(task.get(key) or '') for key in ('id', 'method', 'message', 'retryOf')),
+                            output_paths,
+                            str(diagnosis.get('title') or ''),
+                            str(diagnosis.get('suggestion') or ''),
+                        ]).lower()
                         if query not in haystack:
                             continue
                     tasks.append(task)
@@ -302,21 +515,10 @@ class TaskMixin:
                 total = len(tasks)
                 offset = (page - 1) * page_size
                 page_tasks = tasks[offset:offset + page_size]
-                decisive = status_counts['success'] + status_counts['failed']
-                stats = {
-                    'total': len(all_tasks),
-                    'active': status_counts['queued'] + status_counts['running'],
-                    'attention': status_counts['failed'] + status_counts['interrupted'] + status_counts['canceled'],
-                    'finished': len(all_tasks) - status_counts['queued'] - status_counts['running'],
-                    'successRate': round(status_counts['success'] * 100 / decisive, 1) if decisive else 0,
-                    'averageDurationSeconds': round(sum(durations) / len(durations), 2) if durations else 0,
-                    'statusCounts': status_counts,
-                    'methodCounts': method_counts,
-                }
                 return api_success(
                     tasks=page_tasks,
                     paused=self._task_paused,
-                    stats=stats,
+                    stats=self._task_stats(all_tasks),
                     total=total,
                     page=page,
                     pageSize=page_size,
@@ -349,7 +551,7 @@ class TaskMixin:
                     return api_error('该任务已经结束')
                 self._task_persist_locked()
                 self._task_condition.notify_all()
-                return api_success(task=dict(task))
+                return api_success(task=self._task_snapshot(task))
         except Exception as exc:
             return api_error(f'取消任务失败：{exc}')
 
@@ -432,15 +634,60 @@ class TaskMixin:
             self._task_condition.notify_all()
         return api_success('任务队列已继续', paused=False)
 
-    def task_clear(self):
-        self._tasks_ensure()
-        with self._task_condition:
-            active = {'queued', 'running'}
-            keep = [task_id for task_id in self._task_order if self._task_items.get(task_id, {}).get('status') in active]
-            self._task_items = {task_id: self._task_items[task_id] for task_id in keep}
-            self._task_order = keep
-            self._task_persist_locked()
-        return api_success('已清除结束任务')
+    def task_clear(self, options: Dict | None = None):
+        """Preview or remove a bounded subset of terminal task history."""
+        try:
+            self._tasks_ensure()
+            options = options or {}
+            raw_statuses = options.get('statuses') if options.get('statuses') is not None else options.get('status')
+            statuses_supplied = raw_statuses is not None
+            if isinstance(raw_statuses, str):
+                raw_statuses = [item.strip() for item in raw_statuses.split(',') if item.strip()]
+            statuses = {str(item) for item in (raw_statuses if statuses_supplied else _TERMINAL_STATUSES)} & _TERMINAL_STATUSES
+            if not statuses:
+                return api_error('请选择至少一种可清理的结束状态')
+            ids_supplied = options.get('ids') is not None
+            ids = set(self._task_batch_ids(options)) if ids_supplied else set()
+            method = str(options.get('method') or '').strip()
+            try:
+                before = float(options.get('before') or 0)
+            except (TypeError, ValueError):
+                return api_error('清理时间无效')
+            dry_run = bool(options.get('dryRun'))
+            with self._task_condition:
+                removable = []
+                for task_id in self._task_order:
+                    task = self._task_items.get(task_id, {})
+                    if task.get('status') not in statuses:
+                        continue
+                    if ids_supplied and task_id not in ids:
+                        continue
+                    if method and task.get('method') != method:
+                        continue
+                    ended_at = task.get('endedAt') or task.get('createdAt') or 0
+                    if before and (not isinstance(ended_at, (int, float)) or ended_at >= before):
+                        continue
+                    removable.append(task_id)
+                if dry_run:
+                    return api_success(
+                        '清理预览已生成',
+                        removableCount=len(removable),
+                        removableIds=removable,
+                        statuses=sorted(statuses),
+                    )
+                removable_set = set(removable)
+                self._task_order = [task_id for task_id in self._task_order if task_id not in removable_set]
+                for task_id in removable:
+                    self._task_items.pop(task_id, None)
+                    self._task_runtime_args.pop(task_id, None)
+                self._task_persist_locked()
+            return api_success(
+                f'已清除 {len(removable)} 条任务记录',
+                removedCount=len(removable),
+                removedIds=removable,
+            )
+        except Exception as exc:
+            return api_error(f'清理任务记录失败：{exc}')
 
     def task_shutdown(self):
         if not getattr(self, '_task_ready', False):

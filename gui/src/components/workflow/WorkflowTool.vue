@@ -21,6 +21,9 @@ const runQuery = ref('')
 const runStatus = ref('all')
 const runTrigger = ref('all')
 const triggerActionId = ref('')
+const bundleBusy = ref(false)
+const bundleOutput = ref('')
+const historyBusy = ref(false)
 
 const editor = reactive({ id: '', name: '', description: '', enabled: true, steps: [] })
 const scheduleForm = reactive({ workflowId: '', name: '', intervalMinutes: 60, input: '{}' })
@@ -203,6 +206,100 @@ const runWorkflow = async () => {
   }
 }
 
+const exportBundle = async (scope = 'all') => {
+  if (scope === 'selected' && !editor.id) return ElMessage.warning('请先选择一个工作流')
+  bundleBusy.value = true
+  try {
+    const response = await callApi('workflow_bundle_export', scope === 'selected' ? { ids: [editor.id] } : {})
+    if (!response.ok) return ElMessage.error(response.message || '导出失败')
+    bundleOutput.value = response.data.output
+    ElMessage.success(`已导出 ${response.data.workflowCount} 个工作流到下载目录`)
+  } catch (error) {
+    ElMessage.error(error?.message || '导出失败')
+  } finally {
+    bundleBusy.value = false
+  }
+}
+
+const importBundle = async () => {
+  bundleBusy.value = true
+  try {
+    const files = await callApiRaw('system_pyCreateFileDialog', ['PPX 工作流包 (*.json)'])
+    if (!files?.length) return
+    const response = await callApi('workflow_bundle_import', { filePath: files[0].path })
+    if (!response.ok) return ElMessage.error(response.message || '导入失败')
+    const renamed = Number(response.data.renamedCount || 0)
+    ElMessage.success(`已导入 ${response.data.importedCount} 个工作流${renamed ? `，${renamed} 个同名 ID 已安全重命名` : ''}`)
+    selectedId.value = response.data.workflows?.[0]?.id || ''
+    await refresh(true)
+  } catch (error) {
+    ElMessage.error(error?.message || '导入失败')
+  } finally {
+    bundleBusy.value = false
+  }
+}
+
+const revealBundle = async () => {
+  if (!bundleOutput.value) return
+  const response = await callApi('system_revealFile', bundleOutput.value)
+  if (!response.ok) ElMessage.error(response.message || '无法定位模板包')
+}
+
+const downloadHistory = (content, type, extension) => {
+  const blob = new Blob([content], { type })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = `ppx-workflow-runs-${new Date().toISOString().slice(0, 10)}.${extension}`
+  link.click()
+  URL.revokeObjectURL(link.href)
+}
+
+const csvCell = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`
+const exportRuns = (format) => {
+  if (!filteredRuns.value.length) return ElMessage.warning('没有可导出的运行记录')
+  if (format === 'csv') {
+    const headers = ['运行ID', '工作流', '触发来源', '状态', '开始时间', '结束时间', '步骤数', '失败步骤']
+    const rows = filteredRuns.value.map((run) => [
+      run.id,
+      run.workflowName || run.workflowId,
+      run.trigger,
+      run.status,
+      formatTime(run.startedAt),
+      formatTime(run.endedAt),
+      run.steps?.length || 0,
+      (run.steps || [])
+        .filter((step) => step.status === 'failed')
+        .map((step) => `${step.name}: ${step.message || '失败'}`)
+        .join(' | ')
+    ])
+    downloadHistory(`\ufeff${[headers, ...rows].map((row) => row.map(csvCell).join(',')).join('\n')}`, 'text/csv;charset=utf-8', 'csv')
+  } else {
+    downloadHistory(JSON.stringify({ type: 'ppx-workflow-runs', schemaVersion: 1, exportedAt: new Date().toISOString(), runs: filteredRuns.value }, null, 2), 'application/json;charset=utf-8', 'json')
+  }
+  ElMessage.success(`已导出 ${filteredRuns.value.length} 条运行记录`)
+}
+
+const clearRuns = async () => {
+  const ids = filteredRuns.value.filter((run) => run.status !== 'running').map((run) => run.id)
+  if (!ids.length) return ElMessage.warning('当前筛选中没有已结束的运行记录')
+  historyBusy.value = true
+  try {
+    const preview = await callApi('workflow_runs_clear', { ids, dryRun: true })
+    if (!preview.ok) return ElMessage.error(preview.message || '无法生成清理预览')
+    const count = Number(preview.data.removableCount || 0)
+    if (!count) return ElMessage.warning('没有可清理的运行记录')
+    await ElMessageBox.confirm(`将清除当前筛选中的 ${count} 条运行记录，工作流与触发器不会受影响。`, '清理运行记录', { type: 'warning', confirmButtonText: `清理 ${count} 条`, cancelButtonText: '返回' })
+    const response = await callApi('workflow_runs_clear', { ids })
+    if (!response.ok) return ElMessage.error(response.message || '清理失败')
+    ElMessage.success(response.message)
+    await refresh(true)
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') ElMessage.error(error?.message || '清理失败')
+  } finally {
+    historyBusy.value = false
+  }
+}
+
 const saveSchedule = async () => {
   if (!scheduleForm.workflowId) return ElMessage.warning('请先选择工作流')
   let input
@@ -300,6 +397,20 @@ onMounted(() => refresh(false))
               <strong>我的工作流</strong>
               <el-button size="small" @click="resetEditor">新建</el-button>
             </div>
+            <div class="bundle-toolbar">
+              <el-button size="small" :loading="bundleBusy" @click="importBundle">导入模板包</el-button>
+              <el-dropdown :disabled="!workflows.length || bundleBusy" @command="exportBundle">
+                <el-button size="small" :loading="bundleBusy" :disabled="!workflows.length">导出模板包</el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="selected" :disabled="!editor.id">当前工作流</el-dropdown-item>
+                    <el-dropdown-item command="all">全部工作流</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
+            <small class="bundle-hint">包含步骤参数与输入示例，不含运行历史；分享前请检查敏感字段。</small>
+            <el-button v-if="bundleOutput" class="bundle-output" text type="primary" size="small" @click="revealBundle">定位最近导出的模板包</el-button>
             <button v-for="item in workflows" :key="item.id" class="workflow-list-item" :class="{ active: item.id === selectedId }" type="button" @click="loadEditor(item)">
               <span>{{ item.name }}</span>
               <small>{{ item.steps?.length || 0 }} 步 · {{ item.enabled === false ? '停用' : '启用' }}</small>
@@ -450,9 +561,21 @@ onMounted(() => refresh(false))
         <div class="history-head">
           <div>
             <h3>自动化运行记录</h3>
-            <p>每一步的结果都会保存在本机，最多保留 80 次。</p>
+            <p>每一步的结果都会保存在本机，最多保留 80 次；当前筛选可导出或清理。</p>
           </div>
-          <el-button @click="refresh(true)">刷新</el-button>
+          <div class="history-actions">
+            <el-button @click="refresh(true)">刷新</el-button>
+            <el-dropdown :disabled="!filteredRuns.length" @command="exportRuns">
+              <el-button :disabled="!filteredRuns.length">导出当前筛选</el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="json">JSON 完整记录</el-dropdown-item>
+                  <el-dropdown-item command="csv">CSV 摘要</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <el-button type="danger" plain :loading="historyBusy" :disabled="!filteredRuns.length" @click="clearRuns">清理当前筛选</el-button>
+          </div>
         </div>
         <div class="history-filters">
           <el-input v-model="runQuery" clearable placeholder="搜索工作流名称或触发来源" />
@@ -534,6 +657,26 @@ onMounted(() => refresh(false))
   align-items: center;
   justify-content: space-between;
   gap: 14px;
+}
+.bundle-toolbar,
+.history-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.bundle-toolbar {
+  margin: 9px 0 4px;
+}
+.bundle-output {
+  max-width: 100%;
+  margin-bottom: 4px;
+}
+.bundle-hint {
+  display: block;
+  color: var(--ppx-text-muted);
+  font-size: 10px;
+  line-height: 1.5;
 }
 .workflow-list-item {
   width: 100%;
@@ -722,6 +865,10 @@ code {
   }
   .history-filters {
     grid-template-columns: 1fr;
+  }
+  .history-head {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

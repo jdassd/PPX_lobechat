@@ -36,6 +36,9 @@ _BINDING = re.compile(r'\{\{\s*([a-zA-Z_][\w]*(?:\.[\w-]+)*)\s*\}\}')
 _MAX_RUNS = 80
 _MAX_STEP_RETRIES = 5
 _MAX_RETRY_DELAY_SECONDS = 300
+_MAX_BUNDLE_BYTES = 2 * 1024 * 1024
+_MAX_BUNDLE_WORKFLOWS = 100
+_WORKFLOW_BUNDLE_TYPE = 'ppx-workflow-bundle'
 
 BUILTIN_WORKFLOWS = [
     {
@@ -188,7 +191,10 @@ class WorkflowMixin:
 
     def _workflow_persist_locked(self) -> None:
         temp = self._workflow_store_path.with_suffix('.tmp')
-        temp.write_text(json.dumps(self._workflow_data, ensure_ascii=False, indent=2), encoding='utf-8')
+        with temp.open('w', encoding='utf-8') as handle:
+            json.dump(self._workflow_data, handle, ensure_ascii=False, indent=2)
+            handle.flush()
+            os.fsync(handle.fileno())
         os.replace(temp, self._workflow_store_path)
 
     @staticmethod
@@ -256,6 +262,60 @@ class WorkflowMixin:
         except Exception as exc:
             return api_error(f'读取工作流失败：{exc}')
 
+    def workflow_runs_clear(self, options: Dict | None = None):
+        """Preview or clear selected completed workflow run records."""
+        try:
+            self._workflow_ensure()
+            options = options or {}
+            raw_statuses = options.get('statuses') if options.get('statuses') is not None else options.get('status')
+            statuses_supplied = raw_statuses is not None
+            if isinstance(raw_statuses, str):
+                raw_statuses = [item.strip() for item in raw_statuses.split(',') if item.strip()]
+            statuses = {str(item) for item in (raw_statuses if statuses_supplied else ('success', 'failed'))} & {'success', 'failed'}
+            if not statuses:
+                return api_error('请选择成功或失败的运行状态')
+            ids_supplied = options.get('ids') is not None
+            raw_ids = options.get('ids') or []
+            if isinstance(raw_ids, str):
+                raw_ids = [raw_ids]
+            ids = {str(item) for item in raw_ids if str(item).strip()}
+            workflow_id = str(options.get('workflowId') or '')
+            trigger = str(options.get('trigger') or '')
+            try:
+                before = float(options.get('before') or 0)
+            except (TypeError, ValueError):
+                return api_error('清理时间无效')
+            with self._workflow_lock:
+                removable = []
+                for run in self._workflow_data['runs']:
+                    run_id = str(run.get('id') or '')
+                    if run.get('status') not in statuses:
+                        continue
+                    if ids_supplied and run_id not in ids:
+                        continue
+                    if workflow_id and str(run.get('workflowId') or '') != workflow_id:
+                        continue
+                    if trigger and trigger not in str(run.get('trigger') or ''):
+                        continue
+                    ended_at = run.get('endedAt') or run.get('startedAt') or 0
+                    if before and (not isinstance(ended_at, (int, float)) or ended_at >= before):
+                        continue
+                    removable.append(run_id)
+                if options.get('dryRun'):
+                    return api_success('运行记录清理预览已生成', removableCount=len(removable), removableIds=removable)
+                removable_set = set(removable)
+                self._workflow_data['runs'] = [
+                    run for run in self._workflow_data['runs'] if str(run.get('id') or '') not in removable_set
+                ]
+                self._workflow_persist_locked()
+            return api_success(
+                f'已清除 {len(removable)} 条工作流运行记录',
+                removedCount=len(removable),
+                removedIds=removable,
+            )
+        except Exception as exc:
+            return api_error(f'清理工作流运行记录失败：{exc}')
+
     def workflow_save(self, options: Dict | None = None):
         try:
             self._workflow_ensure()
@@ -296,6 +356,129 @@ class WorkflowMixin:
         payload.pop('id', None)
         payload['name'] = str(options.get('name') or template['name'])
         return self.workflow_save(payload)
+
+    def workflow_bundle_export(self, options: Dict | None = None):
+        """Export reusable workflow definitions without schedules, watches or run history."""
+        try:
+            self._workflow_ensure()
+            options = options or {}
+            ids_supplied = options.get('ids') is not None
+            raw_ids = options.get('ids') or []
+            if isinstance(raw_ids, str):
+                raw_ids = [raw_ids]
+            selected_ids = {str(item) for item in raw_ids if str(item).strip()}
+            if ids_supplied and not selected_ids:
+                return api_error('请选择至少一个要导出的工作流')
+            with self._workflow_lock:
+                selected = [
+                    _copy(item)
+                    for item in self._workflow_data['workflows']
+                    if not ids_supplied or str(item.get('id')) in selected_ids
+                ]
+            if not selected:
+                return api_error('没有可导出的工作流')
+            output_raw = str(options.get('outputDir') or Config.downloadDir or (Path(Config.appDataDir) / 'exports'))
+            output_dir = Path(output_raw).expanduser().resolve()
+            output_dir.mkdir(parents=True, exist_ok=True)
+            timestamp = time.strftime('%Y%m%d_%H%M%S')
+            target = output_dir / f'PPX_workflows_{timestamp}.json'
+            index = 2
+            while target.exists() or target.is_symlink():
+                target = output_dir / f'PPX_workflows_{timestamp}_{index}.json'
+                index += 1
+            workflows = []
+            for item in selected:
+                workflows.append({
+                    'id': item.get('id'),
+                    'name': item.get('name'),
+                    'description': item.get('description'),
+                    'enabled': item.get('enabled', True),
+                    'steps': item.get('steps') or [],
+                    'inputExample': item.get('inputExample') or {},
+                })
+            bundle = {
+                'type': _WORKFLOW_BUNDLE_TYPE,
+                'schemaVersion': 1,
+                'appVersion': Config.appVersion,
+                'exportedAt': time.time(),
+                'workflows': workflows,
+            }
+            temp = target.with_name(f'.{target.name}.{uuid.uuid4().hex}.tmp')
+            with temp.open('w', encoding='utf-8') as handle:
+                json.dump(bundle, handle, ensure_ascii=False, indent=2)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temp, target)
+            return api_success('工作流模板包已导出', output=str(target), workflowCount=len(workflows))
+        except Exception as exc:
+            if 'temp' in locals():
+                temp.unlink(missing_ok=True)
+            return api_error(f'导出工作流模板包失败：{exc}')
+
+    def workflow_bundle_import(self, options: Dict | None = None):
+        """Validate and import a versioned local workflow bundle."""
+        try:
+            self._workflow_ensure()
+            options = options or {}
+            source = Path(str(options.get('filePath') or '')).expanduser().resolve()
+            if not source.is_file() or source.suffix.lower() != '.json':
+                return api_error('请选择 PPX 工作流 JSON 模板包')
+            if source.stat().st_size > _MAX_BUNDLE_BYTES:
+                return api_error('工作流模板包超过 2 MB 安全上限')
+            bundle = json.loads(source.read_text(encoding='utf-8'))
+            if not isinstance(bundle, dict) or bundle.get('type') != _WORKFLOW_BUNDLE_TYPE:
+                return api_error('不是有效的 PPX 工作流模板包')
+            if int(bundle.get('schemaVersion') or 0) != 1:
+                return api_error('工作流模板包版本不受支持')
+            raw_workflows = bundle.get('workflows')
+            if not isinstance(raw_workflows, list) or not raw_workflows:
+                return api_error('模板包不包含工作流')
+            if len(raw_workflows) > _MAX_BUNDLE_WORKFLOWS:
+                return api_error(f'单次最多导入 {_MAX_BUNDLE_WORKFLOWS} 个工作流')
+
+            with self._workflow_lock:
+                used_ids = {str(item.get('id')) for item in self._workflow_data['workflows']}
+                imported = []
+                renamed = 0
+                now = time.time()
+                for index, raw in enumerate(raw_workflows, 1):
+                    if not isinstance(raw, dict):
+                        raise ValueError(f'第 {index} 个工作流格式不正确')
+                    workflow_id = _clean_id(raw.get('id'), 'workflow')
+                    if workflow_id.startswith('builtin-') or workflow_id in used_ids:
+                        workflow_id = f'workflow-{uuid.uuid4().hex[:10]}'
+                        renamed += 1
+                    used_ids.add(workflow_id)
+                    input_example = raw.get('inputExample') or {}
+                    if not isinstance(input_example, dict):
+                        raise ValueError(f'第 {index} 个工作流的输入示例必须是对象')
+                    imported.append({
+                        'id': workflow_id,
+                        'name': str(raw.get('name') or f'导入工作流 {index}').strip()[:120],
+                        'description': str(raw.get('description') or '').strip()[:500],
+                        'enabled': bool(raw.get('enabled', True)),
+                        'steps': self._workflow_validate_steps(raw.get('steps')),
+                        'inputExample': _copy(input_example),
+                        'createdAt': now,
+                        'updatedAt': now,
+                    })
+                previous_workflows = self._workflow_data['workflows']
+                self._workflow_data['workflows'] = imported + previous_workflows
+                try:
+                    self._workflow_persist_locked()
+                except Exception:
+                    self._workflow_data['workflows'] = previous_workflows
+                    raise
+            return api_success(
+                f'已导入 {len(imported)} 个工作流',
+                workflows=_copy(imported),
+                importedCount=len(imported),
+                renamedCount=renamed,
+            )
+        except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+            return api_error(f'导入工作流模板包失败：{exc}')
+        except Exception as exc:
+            return api_error(f'导入工作流模板包失败：{exc}')
 
     def workflow_delete(self, options: Dict | str | None = None):
         try:
