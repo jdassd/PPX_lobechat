@@ -1,7 +1,6 @@
 <script setup>
-import { ref } from 'vue'
-
 import ToolWorkspace from '@/components/shared/ToolWorkspace.vue'
+import { useInitialTab } from '@/composables/useInitialTab'
 import SearchPanel from './parts/SearchPanel.vue'
 import ClassifyPanel from './parts/ClassifyPanel.vue'
 import CopyPanel from './parts/CopyPanel.vue'
@@ -9,8 +8,6 @@ import DeletePanel from './parts/DeletePanel.vue'
 import RenamePanel from './parts/RenamePanel.vue'
 import DedupPanel from './parts/DedupPanel.vue'
 import ArchivePanel from './parts/ArchivePanel.vue'
-
-const activeTab = ref('search')
 
 const TABS = [
   { name: 'search', label: '文件搜索' },
@@ -21,6 +18,9 @@ const TABS = [
   { name: 'dedup', label: '文件去重' },
   { name: 'archive', label: '压缩 / 解压' }
 ]
+
+const props = defineProps({ initialTab: { type: String, default: '' } })
+const activeTab = useInitialTab(TABS, () => props.initialTab, 'search')
 </script>
 
 <template>

@@ -24,8 +24,9 @@
 </template>
 
 <script setup>
-import { provide, reactive, ref } from 'vue'
+import { provide, reactive } from 'vue'
 import ToolWorkspace from '@/components/shared/ToolWorkspace.vue'
+import { useInitialTab } from '@/composables/useInitialTab'
 import { useWordApi } from './parts/useWordApi'
 import SplitPanel from './parts/SplitPanel.vue'
 import CutPanel from './parts/CutPanel.vue'
@@ -37,7 +38,8 @@ const TABS = [
   { name: 'merge', label: '合并 Word' }
 ]
 
-const activeTab = ref('split')
+const props = defineProps({ initialTab: { type: String, default: '' } })
+const activeTab = useInitialTab(TABS, () => props.initialTab, 'split')
 
 const shared = reactive({
   loading: false,

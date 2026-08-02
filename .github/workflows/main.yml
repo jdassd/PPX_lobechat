@@ -66,6 +66,12 @@ jobs:
       - name: 初始化打包环境
         run: pnpm run init:ci
 
+      - name: 运行前端静态检查
+        run: pnpm -C ./gui run lint
+
+      - name: 运行 Python 单元测试
+        run: pnpm run test
+
       - name: 开始打包
         run: pnpm run build
 

@@ -1,36 +1,15 @@
 <template>
   <div>
     <div class="toolbar">
-      <el-input
-        v-model.trim="filters.keyword"
-        placeholder="进程名称 / 命令关键字"
-        clearable
-        class="keyword-input"
-        @keyup.enter="fetchProcesses"
-      />
-      <el-input
-        v-model="filters.port"
-        placeholder="端口"
-        clearable
-        class="port-input"
-        maxlength="5"
-        @keyup.enter="fetchProcesses"
-      />
+      <el-input v-model.trim="filters.keyword" placeholder="进程名称 / 命令关键字" clearable class="keyword-input" @keyup.enter="fetchProcesses" />
+      <el-input v-model="filters.port" placeholder="端口" clearable class="port-input" maxlength="5" @keyup.enter="fetchProcesses" />
       <el-select v-model="filters.limit" class="limit-select">
         <el-option v-for="count in limitOptions" :key="count" :label="`最多 ${count} 条`" :value="count" />
       </el-select>
       <el-button type="primary" @click="fetchProcesses">检索</el-button>
       <el-button @click="resetFilters">重置</el-button>
     </div>
-    <el-table
-      :data="processRows"
-      row-key="pid"
-      height="360"
-      border
-      v-loading="processLoading"
-      size="small"
-      empty-text="暂无进程匹配结果"
-    >
+    <el-table v-loading="processLoading" :data="processRows" row-key="pid" height="360" border size="small" empty-text="暂无进程匹配结果">
       <el-table-column prop="name" label="进程" min-width="170" show-overflow-tooltip />
       <el-table-column prop="pid" label="PID" width="90" />
       <el-table-column label="端口" min-width="150">
@@ -51,11 +30,6 @@
       </el-table-column>
       <el-table-column prop="createLabel" label="启动时间" min-width="160" show-overflow-tooltip />
       <el-table-column prop="cmdline" label="命令" min-width="210" show-overflow-tooltip />
-      <el-table-column label="操作" width="120">
-        <template #default="{ row }">
-          <el-button type="danger" text @click="killProcess(row)">强制结束</el-button>
-        </template>
-      </el-table-column>
     </el-table>
     <div class="table-footer">
       <span>{{ processSummary }}</span>
@@ -66,7 +40,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { callApi as pyCall } from '@/utils/pyapi'
 
 const props = defineProps({
@@ -133,33 +107,6 @@ const resetFilters = () => {
   filters.keyword = ''
   filters.port = ''
   fetchProcesses()
-}
-
-const killProcess = async (row) => {
-  if (!props.apiReady || !window.pywebview?.api?.system_killProcess) {
-    ElMessage.warning('当前环境不支持结束进程')
-    return
-  }
-  try {
-    await ElMessageBox.confirm(
-      `确定要强制结束 ${row.name || '该进程'} (PID ${row.pid}) 吗？`,
-      '强制结束进程',
-      {
-        confirmButtonText: '结束',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-  } catch {
-    return
-  }
-  const { ok, data: res } = await pyCall('system_killProcess', row.pid)
-  if (ok) {
-    ElMessage.success(`已结束 PID ${row.pid}`)
-    fetchProcesses()
-  } else {
-    ElMessage.error(res?.message || '结束进程失败')
-  }
 }
 
 const processSummary = computed(() => {

@@ -1,13 +1,10 @@
 <script setup>
-import { ref } from 'vue'
-
 import ToolWorkspace from '@/components/shared/ToolWorkspace.vue'
+import { useInitialTab } from '@/composables/useInitialTab'
 import JsonPanel from './parts/JsonPanel.vue'
 import TransformPanel from './parts/TransformPanel.vue'
 import DedupPanel from './parts/DedupPanel.vue'
 import ReplacePanel from './parts/ReplacePanel.vue'
-
-const activeTab = ref('json')
 
 const TABS = [
   { name: 'json', label: 'JSON 工具' },
@@ -15,6 +12,9 @@ const TABS = [
   { name: 'dedup', label: '去重 / 排序' },
   { name: 'replace', label: '批量替换' }
 ]
+
+const props = defineProps({ initialTab: { type: String, default: '' } })
+const activeTab = useInitialTab(TABS, () => props.initialTab, 'json')
 </script>
 
 <template>

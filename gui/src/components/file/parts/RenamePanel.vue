@@ -1,6 +1,6 @@
 <script setup>
-import { reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { reactive, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
 const loading = ref(false)
@@ -24,6 +24,7 @@ const state = reactive({
   skipped: [],
   showHelp: false
 })
+const previewReady = ref(false)
 
 // 预置模板选项
 const presetTemplates = [
@@ -125,15 +126,42 @@ const buildRenameParams = () => {
   }
 }
 
-const runRename = async () => {
+watch(
+  () => [state.directory, state.extensions, state.recursive, state.rule, state.prefix, state.start, state.padding, state.search, state.pattern, state.replace, state.template],
+  () => {
+    previewReady.value = false
+  }
+)
+
+const runRename = async (dryRun = true) => {
   if (!ensurePyReady()) return
   if (!state.directory) {
     ElMessage.warning('请选择目录')
     return
   }
+  if (!dryRun && !previewReady.value) {
+    ElMessage.warning('请先预览重命名结果')
+    return
+  }
+  if (!dryRun) {
+    try {
+      await ElMessageBox.confirm(`将重命名 ${state.result.length} 个文件；名称冲突的文件会自动跳过。`, '确认批量重命名', {
+        confirmButtonText: '执行改名',
+        cancelButtonText: '取消',
+        type: 'warning'
+      })
+    } catch {
+      return
+    }
+  }
+  state.dryRun = dryRun
   loading.value = true
   try {
-    const { ok, data: res, message } = await pyCall('file_batch_rename', {
+    const {
+      ok,
+      data: res,
+      message
+    } = await pyCall('file_batch_rename', {
       directory: state.directory,
       extensions: parseExtensions(state.extensions || ''),
       recursive: state.recursive,
@@ -145,7 +173,8 @@ const runRename = async () => {
     if (ok) {
       state.result = res.renamed || []
       state.skipped = res.skipped || []
-      ElMessage.success(message || (state.dryRun ? '预览完成' : '重命名完成'))
+      previewReady.value = dryRun && state.result.length > 0
+      ElMessage.success(message || (dryRun ? '预览完成' : '重命名完成'))
     } else {
       ElMessage.error(message || '重命名失败')
     }
@@ -161,7 +190,7 @@ const runRename = async () => {
   <section class="panel">
     <header>
       <h4>重命名规则</h4>
-      <p>支持序号、时间戳、替换、正则表达式或自定义模板</p>
+      <p>支持序号、时间戳、替换、正则或模板；必须先预览，且永不覆盖已有文件</p>
     </header>
     <el-form :model="state" label-width="120px">
       <el-form-item label="目录">
@@ -175,13 +204,9 @@ const runRename = async () => {
       </el-form-item>
       <el-form-item label="选项">
         <el-checkbox v-model="state.recursive">包含子目录</el-checkbox>
-        <el-switch v-model="state.dryRun" active-text="仅预览" inactive-text="立即改名" />
       </el-form-item>
       <el-form-item label="冲突策略">
-        <el-select v-model="state.conflictPolicy" style="width: 200px">
-          <el-option label="跳过已有文件" value="skip" />
-          <el-option label="直接覆盖" value="overwrite" />
-        </el-select>
+        <el-tag type="info" effect="plain">跳过已有文件（不覆盖）</el-tag>
       </el-form-item>
       <el-form-item label="规则">
         <el-radio-group v-model="state.rule">
@@ -219,28 +244,13 @@ const runRename = async () => {
       <!-- 模板模式 -->
       <div v-else-if="state.rule === 'template'" class="rename-template-section">
         <el-form-item label="预置模板">
-          <el-select
-            v-model="state.presetTemplate"
-            placeholder="选择常用模板"
-            style="width: 220px"
-            clearable
-            @change="applyPreset"
-          >
-            <el-option
-              v-for="item in presetTemplates"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
-            />
+          <el-select v-model="state.presetTemplate" placeholder="选择常用模板" style="width: 220px" clearable @change="applyPreset">
+            <el-option v-for="item in presetTemplates" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="自定义模板">
           <div class="field-row">
-            <el-input
-              v-model="state.template"
-              placeholder="如 {date}_{name}"
-              style="flex: 1"
-            />
+            <el-input v-model="state.template" placeholder="如 {date}_{name}" style="flex: 1" />
             <el-popover placement="right" :width="320" trigger="hover">
               <template #reference>
                 <el-button type="info" text>变量说明</el-button>
@@ -265,11 +275,7 @@ const runRename = async () => {
       <div v-else-if="state.rule === 'regex'" class="rename-regex-section">
         <el-form-item label="正则表达式">
           <div class="field-row">
-            <el-input
-              v-model="state.pattern"
-              placeholder="如 \s+ 匹配空格"
-              style="flex: 1"
-            />
+            <el-input v-model="state.pattern" placeholder="如 \s+ 匹配空格" style="flex: 1" />
             <el-popover placement="right" :width="400" trigger="hover">
               <template #reference>
                 <el-button type="info" text>常用示例</el-button>
@@ -282,9 +288,7 @@ const runRename = async () => {
                   <el-table-column prop="desc" label="效果" />
                   <el-table-column label="操作" width="70">
                     <template #default="scope">
-                      <el-button size="small" text type="primary" @click="applyRegexExample(scope.row)">
-                        应用
-                      </el-button>
+                      <el-button size="small" text type="primary" @click="applyRegexExample(scope.row)"> 应用 </el-button>
                     </template>
                   </el-table-column>
                 </el-table>
@@ -308,9 +312,8 @@ const runRename = async () => {
       </div>
 
       <el-form-item>
-        <el-button type="primary" :loading="loading" @click="runRename">
-          {{ state.dryRun ? '预览结果' : '执行改名' }}
-        </el-button>
+        <el-button type="primary" plain :loading="loading" @click="runRename(true)">1. 预览结果</el-button>
+        <el-button type="primary" :loading="loading" :disabled="!previewReady" @click="runRename(false)">2. 执行改名</el-button>
       </el-form-item>
     </el-form>
 
@@ -335,13 +338,7 @@ const runRename = async () => {
       </el-collapse-item>
     </el-collapse>
 
-    <el-table
-      v-if="state.result.length"
-      :data="state.result"
-      border
-      size="small"
-      style="margin-top: 12px"
-    >
+    <el-table v-if="state.result.length" :data="state.result" border size="small" style="margin-top: 12px">
       <el-table-column label="原文件" prop="from" show-overflow-tooltip />
       <el-table-column label="新文件" prop="to" show-overflow-tooltip />
     </el-table>

@@ -7,6 +7,7 @@
     <SplitPanel v-show="activeTab === 'split'" />
     <CutPanel v-show="activeTab === 'cut'" />
     <ExtractTextPanel v-show="activeTab === 'text'" />
+    <OcrPanel v-show="activeTab === 'ocr'" source-type="pdf" />
     <WordPanel v-show="activeTab === 'word'" />
     <ExtractImagesPanel v-show="activeTab === 'images'" />
 
@@ -30,8 +31,10 @@
 </template>
 
 <script setup>
-import { provide, reactive, ref } from 'vue'
+import { provide, reactive } from 'vue'
+import OcrPanel from '@/components/shared/OcrPanel.vue'
 import ToolWorkspace from '@/components/shared/ToolWorkspace.vue'
+import { useInitialTab } from '@/composables/useInitialTab'
 import { usePdfApi } from './parts/usePdfApi'
 import ImagePanel from './parts/ImagePanel.vue'
 import ScanPanel from './parts/ScanPanel.vue'
@@ -51,11 +54,13 @@ const TABS = [
   { name: 'split', label: '拆分 PDF' },
   { name: 'cut', label: '页码切割' },
   { name: 'text', label: '提取文本' },
+  { name: 'ocr', label: '扫描件 OCR' },
   { name: 'word', label: 'PDF 转 Word' },
   { name: 'images', label: '提取图片' }
 ]
 
-const activeTab = ref('image')
+const props = defineProps({ initialTab: { type: String, default: '' } })
+const activeTab = useInitialTab(TABS, () => props.initialTab, 'image')
 
 // 全局共享：loading 为唯一开关，logs 显示在底部统一日志面板，需跨所有子面板共享。
 const shared = reactive({

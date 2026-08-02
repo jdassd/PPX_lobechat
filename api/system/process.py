@@ -5,7 +5,7 @@ Author: 潘高
 LastEditors: 潘高
 Date: 2023-03-26 20:48:26
 LastEditTime: 2025-02-10 14:25:13
-Description: 系统类 - 进程管理 Mixin（进程列表、性能指标、结束进程）
+Description: 系统类 - 只读进程诊断 Mixin（进程列表、性能指标）
 usage: 调用window.pywebview.api.<methodname>(<parameters>)从Javascript执行
 '''
 
@@ -17,11 +17,11 @@ except ImportError:
     psutil = None
 
 from api.utils import format_bytes
-from api.utils.error_handler import api_error, api_success
+from api.utils.error_handler import api_success
 
 
 class ProcessMixin():
-    '''进程管理 Mixin：进程列表、性能指标、结束进程、网络访问控制'''
+    '''只读进程诊断 Mixin：进程列表与性能指标。'''
 
     @staticmethod
     def _collect_process_ports(proc, max_ports=16):
@@ -188,58 +188,3 @@ class ProcessMixin():
                     'timestamp': timestamp
                 })
         return api_success(metrics=metrics, timestamp=timestamp)
-
-    def system_killProcess(self, pid):
-        '''强制结束指定进程'''
-        if psutil is None:
-            return self._psutil_missing_response()
-
-        try:
-            target_pid = int(pid)
-        except (TypeError, ValueError):
-            return api_error('请输入正确的 PID')
-
-        if target_pid <= 0:
-            return api_error('PID 需要为正整数')
-
-        try:
-            proc = psutil.Process(target_pid)
-            name = proc.name()
-            proc.kill()
-            try:
-                proc.wait(timeout=3)
-            except psutil.TimeoutExpired:
-                pass
-            return api_success(pid=target_pid, name=name)
-        except psutil.NoSuchProcess:
-            return api_success('进程已不存在', pid=target_pid)
-        except psutil.AccessDenied:
-            return api_error('权限不足，建议以管理员方式运行 PPX 后重试', pid=target_pid)
-        except Exception as err:
-            return api_error(f'结束进程失败：{err}', pid=target_pid)
-
-    def system_killProcesses(self, payload=None):
-        '''批量结束进程'''
-        if psutil is None:
-            return self._psutil_missing_response()
-        if isinstance(payload, dict):
-            raw = payload.get('pids') or payload.get('pid')
-        else:
-            raw = payload
-        if isinstance(raw, (list, tuple, set)):
-            pids = raw
-        elif raw:
-            pids = [raw]
-        else:
-            return api_error('请提供 PID 列表')
-        results = []
-        overall_success = True
-        for pid in pids:
-            result = self.system_killProcess(pid)
-            results.append(result)
-            # 子结果采用统一返回格式，code==0 视为成功
-            if result.get('code') != 0:
-                overall_success = False
-        if overall_success:
-            return api_success(results=results)
-        return api_error('部分进程结束失败', results=results)

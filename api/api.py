@@ -9,10 +9,12 @@ Description: 业务层API，供前端JS调用
 usage: 在Javascript中调用window.pywebview.api.<methodname>(<parameters>)
 '''
 
+from api.capabilities import CapabilitiesMixin
 from api.excel import Excel
 from api.file import FileTool
 from api.image import ImageTool
 from api.mindmap.tool import MindMapTool
+from api.ocr import OcrMixin
 from api.pdf import PDF
 from api.seal import Seal
 from api.storage import Storage
@@ -23,7 +25,22 @@ from api.webauto import WebAutoTool
 from api.word import WordTool
 
 
-class API(System, Storage, PDF, WordTool, Excel, Seal, ImageTool, TextTool, VideoTool, FileTool, WebAutoTool, MindMapTool):
+class API(
+    CapabilitiesMixin,
+    OcrMixin,
+    System,
+    Storage,
+    PDF,
+    WordTool,
+    Excel,
+    Seal,
+    ImageTool,
+    TextTool,
+    VideoTool,
+    FileTool,
+    WebAutoTool,
+    MindMapTool,
+):
     '''业务层API，供前端JS调用'''
 
     def setWindow(self, window):

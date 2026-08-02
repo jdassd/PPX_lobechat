@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 
 import ToolWorkspace from '@/components/shared/ToolWorkspace.vue'
+import { useInitialTab } from '@/composables/useInitialTab'
 import { callApi } from '@/utils/pyapi'
 import ConvertPanel from './parts/ConvertPanel.vue'
 import CompressPanel from './parts/CompressPanel.vue'
@@ -9,7 +10,6 @@ import CutPanel from './parts/CutPanel.vue'
 import AudioPanel from './parts/AudioPanel.vue'
 import ConcatPanel from './parts/ConcatPanel.vue'
 
-const activeTab = ref('convert')
 const environment = ref(null)
 
 const TABS = [
@@ -19,6 +19,9 @@ const TABS = [
   { name: 'audio', label: '音频提取' },
   { name: 'concat', label: '视频合成' }
 ]
+
+const props = defineProps({ initialTab: { type: String, default: '' } })
+const activeTab = useInitialTab(TABS, () => props.initialTab, 'convert')
 
 onMounted(async () => {
   try {

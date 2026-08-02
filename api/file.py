@@ -16,7 +16,7 @@ import time
 import zipfile
 from collections import Counter
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Dict, Iterable, List, Tuple
 
 try:
@@ -43,6 +43,30 @@ class FileTool:
         if not isinstance(options, dict):
             raise ValueError('参数格式错误')
         return options
+
+    @staticmethod
+    def _validate_archive_members(target_dir: Path, names: Iterable[str]) -> None:
+        """拒绝会写出目标目录或触发 Windows 特殊路径语义的归档成员。"""
+        root = target_dir.resolve()
+        for raw_name in names:
+            name = str(raw_name or '').replace('\\', '/')
+            member = PurePosixPath(name)
+            parts = member.parts
+            unsafe = (
+                not name
+                or '\x00' in name
+                or member.is_absolute()
+                or '..' in parts
+                or any(':' in part for part in parts)
+            )
+            if unsafe:
+                raise ValueError(f'归档包含不安全路径：{raw_name}')
+
+            destination = root.joinpath(*(part for part in parts if part not in {'', '.'})).resolve()
+            try:
+                destination.relative_to(root)
+            except ValueError as exc:
+                raise ValueError(f'归档包含越界路径：{raw_name}') from exc
 
     def _iter_files(self, root: Path, recursive: bool = True) -> Iterable[Path]:
         if recursive:
@@ -382,11 +406,13 @@ class FileTool:
                 with zipfile.ZipFile(archive, 'r') as handler:
                     password = opts.get('password')
                     pwd = password.encode('utf-8') if password else None
+                    self._validate_archive_members(target_dir, (item.filename for item in handler.infolist()))
                     handler.extractall(target_dir, pwd=pwd)
             elif suffix == '.7z':
                 if py7zr is None:
                     raise ImportError('缺少 py7zr 依赖，请运行 pip install py7zr')
                 with py7zr.SevenZipFile(archive, 'r', password=opts.get('password') or None) as handler:
+                    self._validate_archive_members(target_dir, handler.getnames())
                     handler.extractall(target_dir)
             else:
                 raise ValueError('当前仅支持解压 ZIP / 7Z')
@@ -437,32 +463,29 @@ class FileTool:
             filters = self._parse_common_filters(opts)
             filters['recursive'] = bool(opts.get('recursive', True))
             files = self._collect_filtered_files(directory, filters)
-            delete_policy = str(opts.get('deletePolicy', 'recycle')).lower()
+            files = [path for path in files if '.ppx_recycle' not in path.relative_to(directory).parts]
+            if not files:
+                raise ValueError('未匹配到可安全删除的文件')
             dry_run = bool(opts.get('dryRun', False))
             preview = [str(path) for path in files]
             if dry_run:
                 return api_success('预览删除列表', preview=preview, count=len(preview))
-            recycle_dir = None
-            if delete_policy != 'permanent':
-                recycle_dir = directory / '.ppx_recycle' / str(int(time.time()))
-                recycle_dir.mkdir(parents=True, exist_ok=True)
+            # v2.0 只允许可恢复删除：文件先移入当前目录下的 .ppx_recycle。
+            recycle_dir = directory / '.ppx_recycle' / str(int(time.time()))
+            recycle_dir.mkdir(parents=True, exist_ok=True)
             total_size = 0
             for path in files:
                 total_size += path.stat().st_size
-                if recycle_dir:
-                    target = recycle_dir / path.relative_to(directory)
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.move(str(path), str(target))
-                else:
-                    path.unlink()
+                target = recycle_dir / path.relative_to(directory)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(path), str(target))
             payload = {
                 'deleted': len(files),
                 'size': total_size,
                 'sizeText': format_bytes(total_size),
             }
-            if recycle_dir:
-                payload['recycleDir'] = str(recycle_dir)
-            return api_success('删除完成', **payload)
+            payload['recycleDir'] = str(recycle_dir)
+            return api_success('已移入回收目录', **payload)
         except Exception as exc:
             return api_error(f'批量删除失败：{exc}')
 
@@ -477,7 +500,6 @@ class FileTool:
             rule = str(opts.get('rule', 'sequence')).lower()
             params = opts.get('ruleParams') or {}
             start_index = int(params.get('start', 1))
-            conflict_policy = str(opts.get('conflictPolicy', 'skip')).lower()
             dry_run = bool(opts.get('dryRun', False))
             renamed = []
             skipped = []
@@ -489,11 +511,9 @@ class FileTool:
                     skipped.append(str(path))
                     continue
                 if dest.exists() and dest != path:
-                    if conflict_policy == 'overwrite':
-                        dest.unlink()
-                    else:
-                        skipped.append(str(path))
-                        continue
+                    # v2.0 禁止覆盖已有文件，避免批量改名造成不可恢复的数据丢失。
+                    skipped.append(str(path))
+                    continue
                 renamed.append({'from': str(path), 'to': str(dest)})
                 if not dry_run:
                     path.rename(dest)

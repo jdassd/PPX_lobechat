@@ -11,10 +11,11 @@ export function getRecents() {
   }
 }
 
-export function pushRecent(toolId) {
+export function pushRecent(toolId, featureId = '') {
   if (!toolId || toolId === 'home') return
-  let list = getRecents().filter((r) => r.tool !== toolId)
-  list.unshift({ tool: toolId, ts: Date.now() })
+  const key = `${toolId}:${featureId || ''}`
+  let list = getRecents().filter((r) => `${r.tool}:${r.feature || ''}` !== key)
+  list.unshift({ tool: toolId, feature: featureId || '', ts: Date.now() })
   list = list.slice(0, MAX)
   try {
     localStorage.setItem(KEY, JSON.stringify(list))

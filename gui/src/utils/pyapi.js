@@ -33,6 +33,8 @@
  *   而用 res.ok 判断"调通了但业务失败"，与既有组件逻辑等价。
  */
 
+import { beginApiTask, settleApiTask } from './taskCenter'
+
 // 轮询兜底间隔（毫秒）与默认超时（毫秒）
 const POLL_INTERVAL = 50
 const DEFAULT_TIMEOUT = 15000
@@ -138,12 +140,7 @@ export function normalizeResult(res) {
   }
   const ok = res.code === 0 || res.success === true
   // 文案优先级：msg（多数模块） > message（system 等模块）
-  const message =
-    res.msg !== undefined && res.msg !== null
-      ? res.msg
-      : res.message !== undefined && res.message !== null
-        ? res.message
-        : ''
+  const message = res.msg !== undefined && res.msg !== null ? res.msg : res.message !== undefined && res.message !== null ? res.message : ''
   return { ok, message, data: res }
 }
 
@@ -156,14 +153,21 @@ export function normalizeResult(res) {
  * @throws {Error} 非桌面环境/就绪超时/方法不存在/后端执行异常 时抛出（带 message）
  */
 export async function callApi(method, ...args) {
-  await whenPyReady()
-  const api = window.pywebview.api
-  if (typeof api[method] !== 'function') {
-    throw new Error(`当前客户端缺少能力：${method}`)
+  const taskId = beginApiTask(method, args)
+  try {
+    await whenPyReady()
+    const api = window.pywebview.api
+    if (typeof api[method] !== 'function') {
+      throw new Error(`当前客户端缺少能力：${method}`)
+    }
+    // 后端方法自身抛出的异常向上透传（由调用方 try/catch 处理）
+    const res = normalizeResult(await api[method](...args))
+    settleApiTask(taskId, res)
+    return res
+  } catch (error) {
+    settleApiTask(taskId, null, error)
+    throw error
   }
-  // 后端方法自身抛出的异常向上透传（由调用方 try/catch 处理）
-  const res = await api[method](...args)
-  return normalizeResult(res)
 }
 
 /**

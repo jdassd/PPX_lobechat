@@ -1,130 +1,107 @@
-<!-- gui/src/components/home/HomeLauncher.vue —— 首页 Dashboard
-     问候(按时段) + 搜索框(⌘K 提示) + 最近活动 + 全部工具网格 -->
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { TOOLS, toolById } from '@/config/tools'
-import { getFavorites, toggleFavorite as persistFavorite } from '@/utils/favorites'
-import { clearRecents, getRecents, relativeTime } from '@/utils/recent'
+import { computed } from 'vue'
+import { ArrowRight, Clock, Grid, Lock, Search } from '@element-plus/icons-vue'
 
-const emit = defineEmits(['open'])
+import { FEATURED_ACTIONS, toolById } from '@/config/tools'
+import { useToolRegistry } from '@/composables/useToolRegistry'
+import { recentTasks, runningTasks } from '@/utils/taskCenter'
 
-const hour = new Date().getHours()
-const greet = hour < 6 ? '夜深了' : hour < 12 ? '上午好' : hour < 18 ? '下午好' : '晚上好'
+const emit = defineEmits(['open', 'search', 'modules', 'tasks'])
+const { enabledTools } = useToolRegistry()
 
-const q = ref('')
-const favoriteIds = ref(getFavorites())
-const recentRevision = ref(0)
-const now = ref(Date.now())
-let clockTimer = null
+const enabledIds = computed(() => new Set(enabledTools.value.map((tool) => tool.id)))
+const featured = computed(() => FEATURED_ACTIONS.filter((item) => enabledIds.value.has(item.tool)).slice(0, 8))
+const taskItems = computed(() =>
+  recentTasks.value
+    .slice(0, 5)
+    .map((task) => ({ ...task, toolMeta: toolById(task.tool) }))
+    .filter((task) => task.toolMeta)
+)
+const statusLabel = { running: '处理中', success: '已完成', failed: '失败', interrupted: '已中断' }
+const statusType = { running: 'warning', success: 'success', failed: 'danger', interrupted: 'info' }
 
-const isFavorite = (id) => favoriteIds.value.includes(id)
-const filtered = computed(() => {
-  const k = q.value.trim().toLowerCase()
-  const matches = k ? TOOLS.filter((t) => (t.name + t.desc + t.points.join('')).toLowerCase().includes(k)) : [...TOOLS]
-  return matches.sort((a, b) => Number(isFavorite(b.id)) - Number(isFavorite(a.id)))
-})
-
-const recents = computed(() => {
-  recentRevision.value
-  const currentTime = now.value
-  return getRecents()
-    .map((r) => ({ ...r, tool: toolById(r.tool) }))
-    .filter((r) => r.tool)
-    .map((r) => ({ ...r, timeLabel: relativeTime(r.ts, currentTime) }))
-})
-
-const open = (id) => emit('open', id)
-const toggleFavorite = (id) => {
-  favoriteIds.value = persistFavorite(id)
-}
-const clearRecentActivity = () => {
-  clearRecents()
-  recentRevision.value += 1
-}
-
-onMounted(() => {
-  clockTimer = window.setInterval(() => {
-    now.value = Date.now()
-  }, 30000)
-})
-onUnmounted(() => {
-  if (clockTimer) window.clearInterval(clockTimer)
-})
+const openAction = (action) => emit('open', { tool: action.tool, feature: action.id || action.feature })
 </script>
 
 <template>
   <div class="home-scroll">
     <div class="home-inner">
-      <!-- hero -->
-      <div class="hero">
+      <section class="hero">
         <div class="eyebrow">
-          <el-icon :size="14"><Lock /></el-icon>
-          默认本地处理 · 联网与协作功能由你主动开启
+          <el-icon><Lock /></el-icon>本地优先 · 文件默认不离开电脑
         </div>
-        <h1 class="greet">{{ greet }}，<span class="accent">欢迎使用工具箱</span></h1>
-        <p class="subtitle">{{ TOOLS.length }} 个实用工具，覆盖图片、文档、表格、文本、视频、文件与系统维护。</p>
-      </div>
-
-      <!-- search -->
-      <div class="search-wrap">
-        <el-icon class="search-ico" :size="18"><Search /></el-icon>
-        <input v-model="q" class="search-input" placeholder="搜索工具或功能，例如「压缩」「合并 PDF」" />
-        <kbd>⌘K</kbd>
-      </div>
-
-      <!-- recent -->
-      <div v-if="!q && recents.length" class="section">
-        <div class="section-label">
-          <el-icon :size="16"><Clock /></el-icon><span>最近活动</span>
-          <span class="section-spacer" />
-          <button class="section-action" type="button" @click="clearRecentActivity">清空</button>
-        </div>
-        <div class="recent-grid">
-          <button v-for="r in recents" :key="r.tool.id" class="recent-card" @click="open(r.tool.id)">
-            <span class="ricon" :style="{ background: r.tool.hue + '1f', color: r.tool.hue }">
-              <el-icon :size="19"><component :is="r.tool.icon" /></el-icon>
-            </span>
-            <div class="rmeta">
-              <div class="rname">{{ r.tool.name }}</div>
-              <div class="rtime">{{ r.timeLabel }}</div>
-            </div>
+        <div class="hero-row">
+          <div>
+            <h1>从一个动作开始，<span>批量完成工作。</span></h1>
+            <p>图片、PDF、Word、Excel 与文件整理汇集在同一个任务工作台。</p>
+          </div>
+          <button class="search-command" type="button" @click="emit('search')">
+            <el-icon :size="19"><Search /></el-icon><span>搜索功能或动作</span><kbd>⌘ K</kbd>
           </button>
         </div>
-      </div>
+      </section>
 
-      <!-- all tools -->
-      <div class="section">
-        <div class="section-label">
-          <el-icon :size="16"><Grid /></el-icon>
-          <span>{{ q ? `搜索结果 · ${filtered.length}` : '全部工具 · 收藏优先' }}</span>
+      <section class="section">
+        <div class="section-head"><span>常用动作</span><small>直接进入具体步骤</small></div>
+        <div class="action-grid">
+          <button v-for="action in featured" :key="`${action.tool}-${action.id}`" class="action-card" type="button" :style="{ '--hue': action.hue }" @click="openAction(action)">
+            <span class="action-icon"
+              ><el-icon :size="19"><component :is="action.icon" /></el-icon
+            ></span>
+            <span class="action-meta"
+              ><b>{{ action.label }}</b
+              ><small>{{ action.toolName }}</small></span
+            >
+            <el-icon class="arrow"><ArrowRight /></el-icon>
+          </button>
         </div>
-        <el-empty v-if="!filtered.length" description="没有匹配的工具" />
-        <div v-else class="tools-grid">
-          <article v-for="t in filtered" :key="t.id" class="tcard" :style="{ '--hue': t.hue }">
-            <button class="card-open" type="button" :aria-label="`打开${t.name}`" @click="open(t.id)" />
-            <span class="tcard-rail" />
-            <div class="tcard-head">
-              <span class="ticon" :style="{ background: t.hue + '1a', color: t.hue }"
-                ><el-icon :size="23"><component :is="t.icon" /></el-icon
+      </section>
+
+      <section class="work-grid">
+        <div class="panel task-panel">
+          <div class="panel-head">
+            <div>
+              <span>最近任务</span><small v-if="runningTasks.length">{{ runningTasks.length }} 个正在处理</small><small v-else>输出和失败记录都在这里</small>
+            </div>
+            <button class="panel-link" type="button" @click="emit('tasks')">全部任务</button>
+          </div>
+          <div v-if="taskItems.length" class="task-list">
+            <button v-for="task in taskItems" :key="task.id" type="button" class="task-row" @click="emit('open', { tool: task.tool, feature: task.feature })">
+              <span class="task-icon" :style="{ background: task.toolMeta.hue + '18', color: task.toolMeta.hue }"
+                ><el-icon><component :is="task.toolMeta.icon" /></el-icon
               ></span>
-              <div class="ttitle">
-                <div class="tname">{{ t.name }}</div>
-                <div class="tdesc">{{ t.desc }}</div>
-              </div>
-              <button class="favorite-btn" :class="{ active: isFavorite(t.id) }" type="button" :aria-label="isFavorite(t.id) ? `取消收藏${t.name}` : `收藏${t.name}`" :title="isFavorite(t.id) ? '取消收藏' : '收藏置顶'" @click.stop="toggleFavorite(t.id)">
-                <el-icon :size="16"><StarFilled v-if="isFavorite(t.id)" /><Star v-else /></el-icon>
-              </button>
-              <el-icon class="tarrow" :size="17"><ArrowRight /></el-icon>
-            </div>
-            <div class="tpoints">
-              <div v-for="p in t.points.slice(0, 3)" :key="p" class="tpoint">
-                <span class="dot" />
-                <span>{{ p }}</span>
-              </div>
-            </div>
-          </article>
+              <span class="task-meta"
+                ><b>{{ task.label }}</b
+                ><small>{{ task.message }}</small></span
+              >
+              <el-tag :type="statusType[task.status]" size="small" effect="plain">{{ statusLabel[task.status] }}</el-tag>
+            </button>
+          </div>
+          <div v-else class="empty-tasks">
+            <el-icon :size="24"><Clock /></el-icon><span>完成一次文件处理后，结果会保留在这里</span>
+          </div>
         </div>
-      </div>
+
+        <div class="panel module-panel">
+          <div class="panel-head">
+            <div>
+              <span>已启用模块</span><small>{{ enabledTools.length }} 个模块可用</small>
+            </div>
+            <button class="panel-link" type="button" @click="emit('modules')">管理</button>
+          </div>
+          <div class="module-list">
+            <button v-for="tool in enabledTools.slice(0, 7)" :key="tool.id" type="button" @click="emit('open', { tool: tool.id })">
+              <span :style="{ background: tool.hue + '18', color: tool.hue }"
+                ><el-icon><component :is="tool.icon" /></el-icon
+              ></span>
+              <b>{{ tool.name }}</b>
+            </button>
+          </div>
+          <button class="module-cta" type="button" @click="emit('modules')">
+            <el-icon><Grid /></el-icon>开启视频、印章或高级模块
+          </button>
+        </div>
+      </section>
     </div>
   </div>
 </template>
@@ -132,294 +109,308 @@ onUnmounted(() => {
 <style scoped>
 .home-scroll {
   height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: auto;
 }
 .home-inner {
-  max-width: 1080px;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: clamp(24px, 4vw, 44px) clamp(20px, 4vw, 40px) 48px;
+  padding: clamp(24px, 4vw, 46px) clamp(20px, 4vw, 42px) 52px;
 }
-
+.hero {
+  padding: clamp(22px, 3vw, 32px);
+  border: 1px solid var(--ppx-glass-border);
+  border-radius: 20px;
+  background: linear-gradient(135deg, var(--ppx-bg-surface), color-mix(in srgb, var(--accent) 7%, var(--ppx-bg-surface)));
+  box-shadow: var(--ppx-shadow-sm);
+}
 .eyebrow {
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: var(--ppx-text-muted);
-  font-size: 13px;
-  font-weight: 500;
-  margin-bottom: 10px;
+  gap: 7px;
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 650;
 }
-.greet {
+.hero-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 28px;
+  margin-top: 12px;
+}
+h1 {
   margin: 0;
-  font-size: clamp(28px, 4vw, 38px);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-size: clamp(28px, 4vw, 40px);
+  line-height: 1.15;
+  letter-spacing: -0.035em;
   color: var(--ppx-text-primary);
 }
-.greet .accent {
+h1 span {
   color: var(--accent);
 }
-.subtitle {
+.hero p {
   margin: 10px 0 0;
-  font-size: 15px;
   color: var(--ppx-text-muted);
+  font-size: 14px;
 }
-
-.search-wrap {
-  position: relative;
-  max-width: 560px;
-  margin: 28px 0;
-}
-.search-ico {
-  position: absolute;
-  left: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--ppx-text-muted);
-}
-.search-input {
-  width: 100%;
-  height: 50px;
-  box-sizing: border-box;
-  padding: 0 46px;
-  font-size: 14.5px;
-  border-radius: var(--ppx-radius-md);
-  border: 1px solid var(--ppx-glass-border);
-  background: var(--ppx-bg-surface);
-  color: var(--ppx-text-primary);
-  outline: none;
-  box-shadow: var(--ppx-shadow-sm);
-  transition: border var(--ppx-transition-fast);
-  font-family: var(--ppx-font-body);
-}
-.search-input:focus {
-  border-color: var(--accent);
-}
-.search-input::placeholder {
-  color: var(--ppx-text-disabled);
-}
-.search-wrap kbd {
-  position: absolute;
-  right: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--ppx-text-muted);
-  background: var(--ppx-bg-inset);
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-family: var(--ppx-font-mono);
-}
-
-.section {
-  margin-bottom: 34px;
-}
-.section-label {
+.search-command {
+  min-width: 286px;
+  height: 48px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-  color: var(--ppx-text-secondary);
+  gap: 10px;
+  padding: 0 13px;
+  border: 1px solid var(--ppx-glass-border);
+  border-radius: 12px;
+  background: var(--ppx-bg-surface);
+  color: var(--ppx-text-muted);
+  box-shadow: var(--ppx-shadow-sm);
+  cursor: pointer;
+  text-align: left;
 }
-.section-label span {
-  font-size: 13.5px;
-  font-weight: 700;
-}
-.section-spacer {
+.search-command span {
   flex: 1;
 }
-.section-action {
-  border: none;
-  background: transparent;
-  color: var(--accent);
-  cursor: pointer;
-  padding: 3px 6px;
-  border-radius: 5px;
-  font: inherit;
-  font-size: 12px;
+kbd {
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: var(--ppx-bg-inset);
+  font: 11px var(--ppx-font-mono);
 }
-.section-action:hover {
-  background: var(--ppx-bg-hover);
+.section {
+  margin-top: 30px;
 }
-
-.recent-grid {
+.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 13px;
+}
+.section-head span,
+.panel-head span {
+  color: var(--ppx-text-primary);
+  font-size: 14px;
+  font-weight: 750;
+}
+.section-head small,
+.panel-head small {
+  color: var(--ppx-text-muted);
+  font-size: 11.5px;
+}
+.action-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
-  gap: var(--ppx-gap);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
 }
-.recent-card {
-  text-align: left;
+.action-card {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px;
-  border-radius: var(--ppx-radius-md);
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
   border: 1px solid var(--ppx-glass-border);
+  border-radius: 12px;
   background: var(--ppx-bg-surface);
+  color: var(--ppx-text-primary);
   cursor: pointer;
-  transition: all var(--ppx-transition-fast);
+  text-align: left;
+  transition: 0.18s ease;
 }
-.recent-card:hover {
-  border-color: var(--ppx-glass-border-hover);
+.action-card:hover {
   transform: translateY(-2px);
+  border-color: var(--hue);
   box-shadow: var(--ppx-shadow-sm);
 }
-.ricon {
-  width: 38px;
-  height: 38px;
-  flex-shrink: 0;
+.action-icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
   border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: color-mix(in srgb, var(--hue) 11%, transparent);
+  color: var(--hue);
 }
-.rmeta {
+.action-meta {
+  flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
-.rname {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--ppx-text-primary);
+.action-meta b {
+  font-size: 12.5px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.rtime {
-  font-size: 11.5px;
-  color: var(--ppx-text-muted);
+.action-meta small {
   margin-top: 2px;
+  color: var(--ppx-text-muted);
+  font-size: 10.5px;
 }
-
-.tools-grid {
+.arrow {
+  color: var(--hue);
+  opacity: 0.65;
+}
+.work-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: var(--ppx-gap);
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+  gap: 14px;
+  margin-top: 28px;
 }
-.tcard {
-  text-align: left;
-  display: flex;
-  flex-direction: column;
-  padding: calc(var(--ppx-pad) + 2px);
-  border-radius: var(--ppx-radius-lg);
+.panel {
   border: 1px solid var(--ppx-glass-border);
+  border-radius: 16px;
   background: var(--ppx-bg-surface);
-  box-shadow: var(--ppx-shadow-sm);
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  transition: all var(--ppx-transition-normal);
+  padding: 16px;
 }
-.tcard:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--ppx-shadow-md);
-  border-color: var(--hue);
-}
-.tcard-rail {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: var(--hue);
-  opacity: 0;
-  transition: opacity var(--ppx-transition-normal);
-}
-.tcard:hover .tcard-rail {
-  opacity: 1;
-}
-.tcard-head {
-  display: flex;
-  align-items: flex-start;
-  gap: 13px;
-  margin-bottom: 13px;
-}
-.ticon {
-  width: 46px;
-  height: 46px;
-  flex-shrink: 0;
-  border-radius: 13px;
+.panel-head {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
 }
-.ttitle {
+.panel-head > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.panel-link {
+  padding: 5px 8px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+.panel-link:hover {
+  background: var(--ppx-bg-hover);
+}
+.task-list {
+  display: flex;
+  flex-direction: column;
+}
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 6px;
+  border: none;
+  border-top: 1px solid var(--ppx-glass-border);
+  background: transparent;
+  color: var(--ppx-text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+.task-row:first-child {
+  border-top: none;
+}
+.task-row:hover {
+  background: var(--ppx-bg-hover);
+}
+.task-icon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+}
+.task-meta {
   flex: 1;
   min-width: 0;
-}
-.tname {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--ppx-text-primary);
-}
-.tdesc {
-  font-size: 12.5px;
-  color: var(--ppx-text-muted);
-  margin-top: 2px;
-}
-.tarrow {
-  color: var(--hue);
-  opacity: 0;
-  transform: translateX(-6px);
-  transition: all var(--ppx-transition-normal);
-}
-.card-open {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  border: none;
-  border-radius: inherit;
-  background: transparent;
-  cursor: pointer;
-}
-.card-open:focus-visible {
-  outline: 2px solid var(--hue);
-  outline-offset: -3px;
-}
-.favorite-btn {
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--ppx-text-disabled);
-  cursor: pointer;
-  transition: all var(--ppx-transition-fast);
-  position: relative;
-  z-index: 2;
-}
-.favorite-btn:hover,
-.favorite-btn.active {
-  color: #e0a500;
-  background: #e0a50018;
-}
-.tcard:hover .tarrow {
-  opacity: 1;
-  transform: none;
-}
-.tpoints {
   display: flex;
   flex-direction: column;
-  gap: 6px;
 }
-.tpoint {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
+.task-meta b {
   font-size: 12.5px;
-  color: var(--ppx-text-secondary);
 }
-.tpoint .dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 99px;
-  background: var(--hue);
-  margin-top: 6.5px;
-  flex-shrink: 0;
+.task-meta small {
+  margin-top: 2px;
+  color: var(--ppx-text-muted);
+  font-size: 10.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.empty-tasks {
+  min-height: 168px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  color: var(--ppx-text-muted);
+  font-size: 12px;
+}
+.module-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+.module-list button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  border: none;
+  border-radius: 9px;
+  background: var(--ppx-bg-inset);
+  color: var(--ppx-text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+.module-list button:hover {
+  background: var(--ppx-bg-hover);
+}
+.module-list button span {
+  width: 27px;
+  height: 27px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 8px;
+}
+.module-list button b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+}
+.module-cta {
+  width: 100%;
+  margin-top: 10px;
+  padding: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px dashed var(--ppx-glass-border-hover);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 11.5px;
+}
+@media (max-width: 900px) {
+  .hero-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .search-command {
+    width: 100%;
+    min-width: 0;
+  }
+  .action-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .work-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -5,13 +5,14 @@
 </p>
 
 <p align="center">
-  <strong>基于 Vue 3 + Python + Pywebview 构建的轻量级、高性能桌面应用框架</strong>
+  <strong>本地优先的图片、文档、表格与文件批处理工作台</strong>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Vue-3.0+-4FC08D?style=flat-square&logo=vue.js&logoColor=white" alt="Vue 3" />
-  <img src="https://img.shields.io/badge/Python-3.8+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python" />
+  <img src="https://img.shields.io/badge/Python-3.10-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.10" />
   <img src="https://img.shields.io/badge/Pywebview-5.0+-FFD43B?style=flat-square&logo=python&logoColor=blue" alt="Pywebview" />
+  <img src="https://img.shields.io/badge/version-2.0.0-2b6fff?style=flat-square" alt="Version 2.0.0" />
   <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License" />
 </p>
 
@@ -19,31 +20,37 @@
 
 ## 📖 简介
 
-**PPX** 是一款集成了众多实用功能的现代化桌面工具箱。它利用 Web 技术（Vue 3）构建精美的用户界面，同时发挥 Python 强大的生态能力处理后台业务逻辑。通过 `pywebview` 将两者完美融合，提供轻量、流畅的跨平台体验（Windows, macOS, Linux）。
+**PPX 2.0** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel 和文件批处理；文件默认不上传到第三方服务。
 
-无论是日常办公的文件处理，还是开发调试的系统工具，PPX 都能为你提供便捷的解决方案。
+2.0 以“动作 → 任务 → 结果”为主线：从首页或全局搜索直接进入具体功能，在任务中心查看状态和输出；非核心模块可以按需启用。
 
 ## ✨ 主要功能
 
-PPX 内置了丰富的工具模块，满足多样化的需求：
+PPX 2.0 的核心能力包括：
 
-### 📄 文档处理
-- **PDF 工具箱**：支持 PDF 合并、拆分、页面提取、文本提取。
-- **电子签章**：支持 PDF 文件添加水印、电子印章，保障文档安全。
-- **Excel 助手**：高效读取、编辑 XLSX 表格数据，支持自定义格式化导出。
+### 📄 文档与数据
 
-### 🖼️ 多媒体工具
-- **图片处理**：格式转换、压缩、尺寸调整。
-- **视频工具**：基础视频处理功能。
+- **PDF 工具**：合并、拆分、压缩、切割、图片 / Word 转换、文本与图片提取。
+- **离线 OCR**：识别图片或扫描 PDF，可生成纯文本和可搜索 PDF。
+- **Word 工具**：按结构或真实页码拆分、切割及多文档合并。
+- **Excel 工具**：结构预览、数据清洗、分组导出及多表合并。
 
-### 🛠️ 系统与效率
-- **文件管理**：提供系统级文件/文件夹选择器，批量文件操作。
-- **系统监控**：实时查看系统进程、CPU 及内存占用情况。
-- **自动化工具**：内置自动化脚本执行能力（基于 Python）。
+### 🖼️ 图片与媒体
 
-### 💾 数据存储
-- **多模式存储**：支持轻量级 `TinyDB` (JSON) 和 关系型 `SQLite` 数据库。
-- **安全备份**：自动备份关键数据，支持本地加密存储。
+- **图片处理**：多格式转换、批量压缩、裁剪、水印、合成 PDF 和 OCR。
+- **视频处理（可选）**：使用 FFmpeg 完成格式转换、压缩、截取、音频提取与合并。
+
+### 🛠️ 文件与自动化
+
+- **文件批处理**：搜索、分类、复制、安全删除、批量改名、查重及压缩解压。
+- **网页数据采集**：点选字段、翻页采集并导出 Excel / Word。
+- **安全边界**：删除操作可恢复且必须预览；重命名不覆盖；系统启动项只读。
+
+### 🧭 工作台
+
+- **任务中心**：记录处理状态、耗时、输出路径和失败原因，数据仅保存在本机。
+- **模块中心**：按需开启可选能力，并检查 OCR、FFmpeg、LibreOffice 与 Playwright 依赖。
+- **全局搜索**：按 `Ctrl/⌘ + K` 搜索工具或具体动作。
 
 ## 🏗️ 技术栈
 
@@ -69,7 +76,8 @@ PPX 内置了丰富的工具模块，满足多样化的需求：
 确保你的开发环境已安装以下工具：
 - **Node.js** (16.14+)
 - **pnpm** (8.x+)
-- **Python** (3.8 - 3.11)
+- **Python** (3.10)
+- **OCR 运行时**（随完整安装包提供，无需联网识别）
 - **FFmpeg**（可选；视频转换、压缩、截取、音频提取需要 `ffmpeg` 与 `ffprobe`）
 - **LibreOffice**（可选；Word 按真实页码拆分/切割需要）
 

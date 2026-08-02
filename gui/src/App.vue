@@ -1,31 +1,29 @@
-<!-- ============================================================
-     App.vue —— 重构后的外壳(固定侧边栏 + 工作区, 替代抽屉模式)
-     ============================================================ -->
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watchEffect } from 'vue'
-import { Sunny, Moon } from '@element-plus/icons-vue'
-import { TOOLS } from './config/tools'
+import { computed, onMounted, onUnmounted, ref, watchEffect } from 'vue'
+import { List, Moon, Search, SetUp, Sunny } from '@element-plus/icons-vue'
+
+import { toolById } from './config/tools'
 import { pushRecent } from './utils/recent'
-import WindowTitleBar from './components/WindowTitleBar.vue'
-import WindowResizeHandles from './components/WindowResizeHandles.vue'
 import BtnUpdate from './components/BtnUpdate.vue'
-import Sidebar from './components/Sidebar.vue'
 import CommandPalette from './components/CommandPalette.vue'
 import HomeLauncher from './components/home/HomeLauncher.vue'
+import ModuleCenter from './components/ModuleCenter.vue'
+import Sidebar from './components/Sidebar.vue'
+import TaskCenter from './components/TaskCenter.vue'
+import WindowResizeHandles from './components/WindowResizeHandles.vue'
+import WindowTitleBar from './components/WindowTitleBar.vue'
 
-// 各工具视图(已去抽屉化, 内容直接渲染进工作区)
-import ImageTool from './components/image/ImageTool.vue'
-import PdfTool from './components/pdf/PdfTool.vue'
-import WordTool from './components/word/WordTool.vue'
 import ExcelTool from './components/excel/ExcelTool.vue'
-import TextTool from './components/text/TextTool.vue'
-import VideoTool from './components/video/VideoTool.vue'
 import FileTool from './components/file/FileTool.vue'
-import WebAutoTool from './components/webauto/WebAutoTool.vue'
+import ImageTool from './components/image/ImageTool.vue'
 import MindMapTool from './components/mindmap/MindMapTool.vue'
+import PdfTool from './components/pdf/PdfTool.vue'
 import SealTool from './components/seal/SealTool.vue'
 import SystemCenter from './components/system/SystemCenter.vue'
-import SoftwareManager from './components/cleanup/SoftwareManager.vue'
+import TextTool from './components/text/TextTool.vue'
+import VideoTool from './components/video/VideoTool.vue'
+import WebAutoTool from './components/webauto/WebAutoTool.vue'
+import WordTool from './components/word/WordTool.vue'
 
 const VIEWS = {
   image: ImageTool,
@@ -38,24 +36,24 @@ const VIEWS = {
   webauto: WebAutoTool,
   mindmap: MindMapTool,
   seal: SealTool,
-  system: SystemCenter,
-  cleanup: SoftwareManager
+  system: SystemCenter
 }
 
-const active = ref('home') // 'home' | 工具 id
+const active = ref('home')
+const activeFeature = ref('')
 const collapsed = ref(localStorage.getItem('ppx-sidebar-collapsed') === '1')
 const cmdOpen = ref(false)
 const theme = ref(localStorage.getItem('ppx-theme') || 'light')
 const density = ref(localStorage.getItem('ppx-density') || 'regular')
 
-const activeTool = computed(() => TOOLS.find((t) => t.id === active.value))
+const activeTool = computed(() => toolById(active.value))
 const activeView = computed(() => VIEWS[active.value])
 
 watchEffect(() => {
   const el = document.documentElement
   el.dataset.theme = theme.value
   el.dataset.density = density.value
-  el.classList.toggle('dark', theme.value === 'dark') // Element Plus 内部暗色变量
+  el.classList.toggle('dark', theme.value === 'dark')
   localStorage.setItem('ppx-theme', theme.value)
   localStorage.setItem('ppx-density', density.value)
 })
@@ -64,19 +62,25 @@ watchEffect(() => {
   localStorage.setItem('ppx-sidebar-collapsed', collapsed.value ? '1' : '0')
 })
 
-const onKey = (e) => {
-  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-    e.preventDefault()
+const onKey = (event) => {
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+    event.preventDefault()
     cmdOpen.value = !cmdOpen.value
   }
 }
+
 onMounted(() => window.addEventListener('keydown', onKey))
 onUnmounted(() => window.removeEventListener('keydown', onKey))
 
-const go = (id) => {
+const go = (target) => {
+  const id = typeof target === 'string' ? target : target?.tool || target?.id
+  if (!id) return
+  const feature = typeof target === 'object' ? target.feature || '' : ''
   active.value = id
-  pushRecent(id)
+  activeFeature.value = feature
+  if (toolById(id)) pushRecent(id, feature)
 }
+
 const toggleTheme = () => {
   theme.value = theme.value === 'dark' ? 'light' : 'dark'
 }
@@ -88,14 +92,20 @@ const toggleTheme = () => {
       <template #left>
         <div class="logo-area">
           <img class="logo-image" src="/logo.png" alt="" />
-          <span class="logo-label">多功能工具箱</span>
+          <span class="logo-label">多功能工具箱 <small>2.0</small></span>
         </div>
       </template>
       <template #right>
-        <el-button text circle title="搜索 (Ctrl/⌘ + K)" @click="cmdOpen = true">
+        <el-button text circle title="任务中心" aria-label="打开任务中心" @click="go('tasks')">
+          <el-icon :size="18"><List /></el-icon>
+        </el-button>
+        <el-button text circle title="模块管理" aria-label="打开模块管理" @click="go('modules')">
+          <el-icon :size="18"><SetUp /></el-icon>
+        </el-button>
+        <el-button text circle title="搜索 (Ctrl/⌘ + K)" aria-label="搜索功能" @click="cmdOpen = true">
           <el-icon :size="18"><Search /></el-icon>
         </el-button>
-        <el-button text circle title="切换主题" @click="toggleTheme">
+        <el-button text circle title="切换主题" aria-label="切换主题" @click="toggleTheme">
           <el-icon :size="18"><component :is="theme === 'dark' ? Sunny : Moon" /></el-icon>
         </el-button>
         <BtnUpdate />
@@ -108,7 +118,7 @@ const toggleTheme = () => {
       <Sidebar :active="active" :collapsed="collapsed" @select="go" @toggle="collapsed = !collapsed" />
 
       <main class="workspace">
-        <header v-if="active !== 'home' && activeTool" class="tool-bar">
+        <header v-if="activeTool" class="tool-bar">
           <span class="tool-ico" :style="{ background: activeTool.hue + '1f', color: activeTool.hue }">
             <el-icon :size="19"><component :is="activeTool.icon" /></el-icon>
           </span>
@@ -116,15 +126,15 @@ const toggleTheme = () => {
             <div class="tool-name">{{ activeTool.name }}</div>
             <div class="tool-desc">{{ activeTool.desc }}</div>
           </div>
-          <span class="flex1" />
-          <el-button text @click="go('home')">
-            <el-icon><HomeFilled /></el-icon>&nbsp;返回首页
-          </el-button>
+          <el-tag v-if="activeTool.badge" class="tool-badge" size="small" effect="plain">{{ activeTool.badge }}</el-tag>
         </header>
 
         <div class="tool-content">
-          <HomeLauncher v-if="active === 'home'" @open="go" />
-          <component :is="activeView" v-else />
+          <HomeLauncher v-if="active === 'home'" @open="go" @search="cmdOpen = true" @modules="go('modules')" @tasks="go('tasks')" />
+          <TaskCenter v-else-if="active === 'tasks'" @open="go" />
+          <ModuleCenter v-else-if="active === 'modules'" @open="go" />
+          <component :is="activeView" v-else-if="activeView" :initial-tab="activeFeature" />
+          <el-empty v-else description="该模块暂不可用" />
         </div>
       </main>
     </div>
@@ -183,16 +193,17 @@ const toggleTheme = () => {
   color: var(--ppx-text-primary);
 }
 .tool-desc {
+  margin-top: 3px;
   font-size: 11.5px;
   color: var(--ppx-text-muted);
+}
+.tool-badge {
+  margin-left: auto;
 }
 .tool-content {
   flex: 1;
   min-height: 0;
   overflow: hidden;
-}
-.flex1 {
-  flex: 1;
 }
 .logo-area {
   display: flex;
@@ -208,5 +219,10 @@ const toggleTheme = () => {
   font-size: 13px;
   font-weight: 600;
   color: var(--ppx-text-secondary);
+}
+.logo-label small {
+  margin-left: 4px;
+  color: var(--accent);
+  font-size: 10px;
 }
 </style>

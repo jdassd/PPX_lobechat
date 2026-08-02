@@ -64,6 +64,16 @@ def specFirstPart():
 import os
 
 import PyInstaller.config
+from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_submodules
+
+try:
+    ocrDatas = collect_data_files('rapidocr')
+    ocrBinaries = collect_dynamic_libs('onnxruntime')
+    ocrHiddenImports = collect_submodules('rapidocr') + collect_submodules('onnxruntime')
+except Exception:
+    ocrDatas = []
+    ocrBinaries = []
+    ocrHiddenImports = []
 
 # Dist directory (relative)
 buildPath = '{buildPath}'
@@ -85,9 +95,9 @@ version = '{version}'
 
 a = Analysis(['../../main.py'],
             pathex=[],
-            binaries=[{addDll}],
-            datas=[{addModules}],
-            hiddenimports=[{hiddenImports}],
+            binaries=[{addDll}] + ocrBinaries,
+            datas=[{addModules}] + ocrDatas,
+            hiddenimports=[{hiddenImports}] + ocrHiddenImports,
             hookspath=[],
             hooksconfig={{}},
             runtime_hooks=[],

@@ -1,29 +1,59 @@
-<!-- gui/src/components/CommandPalette.vue —— ⌘K 命令面板 -->
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
-import { TOOLS, HOME } from '../config/tools'
+import { computed, nextTick, ref, watch } from 'vue'
+import { ArrowRight, Clock, Grid, HomeFilled, Search } from '@element-plus/icons-vue'
+
+import { useToolRegistry } from '@/composables/useToolRegistry'
 
 const props = defineProps({ modelValue: Boolean })
 const emit = defineEmits(['update:modelValue', 'select'])
+const { enabledTools } = useToolRegistry()
 
 const q = ref('')
 const idx = ref(0)
 const inputRef = ref(null)
-const items = computed(() => [{ id: 'home', name: '首页', desc: '返回工具总览', icon: HOME.icon, hue: 'var(--accent)' }, ...TOOLS])
+
+const items = computed(() => {
+  const pages = [
+    { key: 'page-home', name: '首页', desc: '返回工作台', target: 'home', icon: HomeFilled, hue: '#2b6fff', keywords: [] },
+    { key: 'page-tasks', name: '任务中心', desc: '查看处理记录与输出', target: 'tasks', icon: Clock, hue: '#5d6b7a', keywords: ['历史', '结果'] },
+    { key: 'page-modules', name: '模块管理', desc: '开启可选工具与检查依赖', target: 'modules', icon: Grid, hue: '#7c5cff', keywords: ['功能', '依赖', '设置'] }
+  ]
+  const tools = enabledTools.value.flatMap((tool) => [
+    {
+      key: `tool-${tool.id}`,
+      name: tool.name,
+      desc: tool.desc,
+      target: { tool: tool.id },
+      icon: tool.icon,
+      hue: tool.hue,
+      keywords: tool.points || []
+    },
+    ...(tool.features || []).map((feature) => ({
+      key: `${tool.id}-${feature.id}`,
+      name: feature.label,
+      desc: tool.name,
+      target: { tool: tool.id, feature: feature.id },
+      icon: tool.icon,
+      hue: tool.hue,
+      keywords: feature.keywords || []
+    }))
+  ])
+  return [...pages, ...tools]
+})
+
 const filtered = computed(() => {
-  const k = q.value.trim().toLowerCase()
-  if (!k) return items.value
-  return items.value.filter((t) => (t.name + (t.desc || '') + (t.points || []).join('')).toLowerCase().includes(k))
+  const keyword = q.value.trim().toLowerCase()
+  if (!keyword) return items.value.slice(0, 18)
+  return items.value.filter((item) => `${item.name} ${item.desc} ${(item.keywords || []).join(' ')}`.toLowerCase().includes(keyword)).slice(0, 30)
 })
 
 watch(
   () => props.modelValue,
-  (v) => {
-    if (v) {
-      q.value = ''
-      idx.value = 0
-      nextTick(() => inputRef.value?.focus())
-    }
+  (value) => {
+    if (!value) return
+    q.value = ''
+    idx.value = 0
+    nextTick(() => inputRef.value?.focus())
   }
 )
 watch(q, () => {
@@ -31,44 +61,44 @@ watch(q, () => {
 })
 
 const close = () => emit('update:modelValue', false)
-const choose = (t) => {
-  emit('select', t.id)
+const choose = (item) => {
+  emit('select', item.target)
   close()
 }
-const onKey = (e) => {
-  if (e.key === 'ArrowDown') {
-    e.preventDefault()
+const onKey = (event) => {
+  if (event.key === 'ArrowDown') {
+    event.preventDefault()
     idx.value = Math.min(idx.value + 1, filtered.value.length - 1)
-  } else if (e.key === 'ArrowUp') {
-    e.preventDefault()
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault()
     idx.value = Math.max(idx.value - 1, 0)
-  } else if (e.key === 'Enter') {
-    e.preventDefault()
-    filtered.value[idx.value] && choose(filtered.value[idx.value])
-  } else if (e.key === 'Escape') close()
+  } else if (event.key === 'Enter') {
+    event.preventDefault()
+    if (filtered.value[idx.value]) choose(filtered.value[idx.value])
+  } else if (event.key === 'Escape') close()
 }
 </script>
 
 <template>
   <teleport to="body">
     <div v-if="modelValue" class="cp-scrim" @click="close">
-      <div class="cp-box" @click.stop>
+      <div class="cp-box" role="dialog" aria-modal="true" aria-label="搜索功能" @click.stop>
         <div class="cp-head">
           <el-icon :size="19" color="var(--ppx-text-muted)"><Search /></el-icon>
-          <input ref="inputRef" v-model="q" @keydown="onKey" class="cp-input" placeholder="跳转到工具，或搜索功能…" />
+          <input ref="inputRef" v-model="q" class="cp-input" aria-label="搜索工具和功能" placeholder="搜索工具或具体动作，例如「OCR」「合并 PDF」" @keydown="onKey" />
           <kbd>ESC</kbd>
         </div>
-        <div class="cp-list">
+        <div class="cp-list" role="listbox" aria-label="搜索结果">
           <div v-if="!filtered.length" class="cp-empty">没有匹配项</div>
-          <button v-for="(t, i) in filtered" :key="t.id" class="cp-item" :class="{ on: i === idx }" @mouseenter="idx = i" @click="choose(t)">
-            <span class="cp-ico" :style="{ background: t.id === 'home' ? 'var(--ppx-bg-active)' : (t.hue || 'var(--accent)') + '1f', color: t.hue || 'var(--accent)' }">
-              <el-icon :size="18"><component :is="t.icon" /></el-icon>
+          <button v-for="(item, index) in filtered" :key="item.key" class="cp-item" :class="{ on: index === idx }" role="option" :aria-selected="index === idx" @mouseenter="idx = index" @click="choose(item)">
+            <span class="cp-ico" :style="{ background: item.hue + '1f', color: item.hue }">
+              <el-icon :size="18"><component :is="item.icon" /></el-icon>
             </span>
             <span class="cp-meta"
-              ><b>{{ t.name }}</b
-              ><small>{{ t.desc }}</small></span
+              ><b>{{ item.name }}</b
+              ><small>{{ item.desc }}</small></span
             >
-            <el-icon v-if="i === idx" :size="15" color="var(--accent)"><ArrowRight /></el-icon>
+            <el-icon v-if="index === idx" :size="15" color="var(--accent)"><ArrowRight /></el-icon>
           </button>
         </div>
         <div class="cp-foot">
@@ -95,7 +125,7 @@ const onKey = (e) => {
   background: rgba(0, 0, 0, 0.55);
 }
 .cp-box {
-  width: min(92vw, 560px);
+  width: min(92vw, 600px);
   background: var(--ppx-bg-surface);
   border: 1px solid var(--ppx-glass-border);
   border-radius: var(--ppx-radius-lg);
@@ -118,7 +148,7 @@ const onKey = (e) => {
   color: var(--ppx-text-primary);
 }
 .cp-list {
-  max-height: 360px;
+  max-height: 420px;
   overflow-y: auto;
   padding: 8px;
 }
@@ -138,6 +168,7 @@ const onKey = (e) => {
   border-radius: var(--ppx-radius-sm);
   cursor: pointer;
   text-align: left;
+  color: var(--ppx-text-primary);
 }
 .cp-item.on {
   background: var(--ppx-bg-active);

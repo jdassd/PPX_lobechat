@@ -1,37 +1,10 @@
 <template>
   <ToolWorkspace v-model="activeTab" :tabs="TABS" accent="#1f9d55">
-    <StructurePanel
-      v-show="activeTab === 'structure'"
-      :preview="state.preview"
-      :loading="state.loading"
-      :select-excel="selectExcel"
-      :load-preview="loadPreview"
-    />
+    <StructurePanel v-show="activeTab === 'structure'" :preview="state.preview" :loading="state.loading" :select-excel="selectExcel" :load-preview="loadPreview" />
 
-    <ProcessPanel
-      v-show="activeTab === 'process'"
-      :process="state.process"
-      :schema-fields="schemaFields"
-      :loading="state.loading"
-      :select-excel="selectExcel"
-      :select-dir="selectDir"
-      :remove-file="removeFile"
-      :clear-list="clearList"
-      :open-path="openPath"
-      :run-process="runProcess"
-    />
+    <ProcessPanel v-show="activeTab === 'process'" :process="state.process" :schema-fields="schemaFields" :loading="state.loading" :select-excel="selectExcel" :select-dir="selectDir" :remove-file="removeFile" :clear-list="clearList" :open-path="openPath" :run-process="runProcess" />
 
-    <MergePanel
-      v-show="activeTab === 'merge'"
-      :merge="state.merge"
-      :loading="state.loading"
-      :select-excel="selectExcel"
-      :select-dir="selectDir"
-      :remove-file="removeFile"
-      :clear-list="clearList"
-      :open-path="openPath"
-      :run-merge-tables="runMergeTables"
-    />
+    <MergePanel v-show="activeTab === 'merge'" :merge="state.merge" :loading="state.loading" :select-excel="selectExcel" :select-dir="selectDir" :remove-file="removeFile" :clear-list="clearList" :open-path="openPath" :run-merge-tables="runMergeTables" />
 
     <section class="panel log-panel">
       <header>
@@ -39,13 +12,7 @@
         <p>展示最近的执行记录与返回信息</p>
       </header>
       <el-timeline>
-        <el-timeline-item
-          v-for="item in state.logs"
-          :key="item.id"
-          :type="item.type"
-          :timestamp="item.time"
-          placement="top"
-        >
+        <el-timeline-item v-for="item in state.logs" :key="item.id" :type="item.type" :timestamp="item.time" placement="top">
           <div class="log-entry">
             <p>{{ item.message }}</p>
             <p class="log-sub">{{ item.action }}</p>
@@ -60,6 +27,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
+import { useInitialTab } from '@/composables/useInitialTab'
 import ToolWorkspace from '@/components/shared/ToolWorkspace.vue'
 import StructurePanel from './parts/StructurePanel.vue'
 import ProcessPanel from './parts/ProcessPanel.vue'
@@ -70,10 +38,11 @@ const excelFilter = ['Excel 文件 (*.xlsx;*.xlsm;*.xltx;*.xltm)']
 const TABS = [
   { name: 'structure', label: '结构定义' },
   { name: 'process', label: '数据处理' },
-  { name: 'merge', label: '分表合并' },
+  { name: 'merge', label: '分表合并' }
 ]
 
-const activeTab = ref('structure')
+const props = defineProps({ initialTab: { type: String, default: '' } })
+const activeTab = useInitialTab(TABS, () => props.initialTab, 'structure')
 
 const state = reactive({
   loading: false,
@@ -218,10 +187,7 @@ const resetPreviewData = () => {
 
 const selectDir = async (target) => {
   if (!ensurePyReady()) return
-  const current =
-    target === 'process'
-      ? state.process.outputDir
-      : state.merge.outputDir
+  const current = target === 'process' ? state.process.outputDir : state.merge.outputDir
   const dir = await callApiRaw('system_pySelectDirDialog', current || '')
   if (!dir) return
   if (target === 'process') {

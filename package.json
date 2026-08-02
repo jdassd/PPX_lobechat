@@ -1,8 +1,8 @@
 {
   "name": "tools",
   "private": true,
-  "version": "1.9.0",
-  "description": "多功能工具箱的目标是采用简洁美观现代的界面，提供常用的一些工具，一次付费，终身使用，无广告，包更新",
+  "version": "2.0.0",
+  "description": "本地优先的图片、文档、表格与文件批处理桌面工作台",
   "author": "jdassd <jdassd@163.com>",
   "scripts": {
     "initComments": "清空缓存，配置环境",

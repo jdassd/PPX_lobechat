@@ -18,8 +18,8 @@ const emit = defineEmits(['update:modelValue'])
 
 <template>
   <div class="ws" :style="{ '--accent': accent }">
-    <nav class="subtabs">
-      <button v-for="t in tabs" :key="t.name" class="subtab" :class="{ on: t.name === modelValue }" @click="emit('update:modelValue', t.name)">
+    <nav class="subtabs" aria-label="子功能">
+      <button v-for="t in tabs" :key="t.name" class="subtab" :class="{ on: t.name === modelValue }" :aria-current="t.name === modelValue ? 'page' : undefined" @click="emit('update:modelValue', t.name)">
         <el-icon v-if="t.icon" :size="16" class="subtab-ico"><component :is="t.icon" /></el-icon>
         <span>{{ t.label }}</span>
       </button>
@@ -71,6 +71,10 @@ const emit = defineEmits(['update:modelValue'])
 .subtab:hover {
   background: var(--ppx-bg-hover);
   color: var(--ppx-text-primary);
+}
+.subtab:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 1px;
 }
 .subtab.on {
   background: var(--ppx-bg-active);

@@ -9,6 +9,8 @@ Description: 系统类 - 窗口控制 Mixin（最小化、调整大小、关闭�
 usage: 调用window.pywebview.api.<methodname>(<parameters>)从Javascript执行
 '''
 
+from __future__ import annotations
+
 import threading
 
 from webview.window import FixPoint

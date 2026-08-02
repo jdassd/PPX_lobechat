@@ -5,15 +5,13 @@ Author: 潘高
 LastEditors: 潘高
 Date: 2023-03-26 20:48:26
 LastEditTime: 2025-02-10 14:25:13
-Description: 系统类 - 开机启动项 Mixin（自定义启动规则、系统启动项管理）
+Description: 系统类 - 开机启动项 Mixin（v2.0 仅保留只读查看）
 usage: 调用window.pywebview.api.<methodname>(<parameters>)从Javascript执行
 '''
 
 import os
 import platform
 import subprocess
-import uuid
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List
 
@@ -21,22 +19,15 @@ if platform.system() == 'Windows':
     import winreg
 
 from api.utils.error_handler import api_error, api_success, safe_execute
-from pyapp.config.config import Config
 
 
 class StartupMixin():
-    '''开机启动项 Mixin：自定义启动规则、系统启动项管理'''
+    '''开机启动项 Mixin：只读查看系统启动项'''
 
     @safe_execute
     def system_listStartupRules(self):
-        '''列出自动启动规则（包括系统启动项）'''
-        # 自定义规则
-        custom_rules = self._load_startup_rules()
-        # 系统启动项
-        system_rules = self._load_system_startup_items()
-        # 合并：系统项在前，自定义在后
-        all_rules = system_rules + custom_rules
-        return api_success(rules=all_rules)
+        '''列出系统自动启动项。v2.0 不再加载或执行自定义命令。'''
+        return api_success(rules=self._load_system_startup_items(), readOnly=True)
 
     def _load_system_startup_items(self) -> List[Dict]:
         '''读取系统开机启动项'''
@@ -100,117 +91,23 @@ class StartupMixin():
 
     @safe_execute
     def system_saveStartupRule(self, rule):
-        '''新增或更新自动启动规则'''
-        if not isinstance(rule, dict):
-            raise ValueError('参数格式错误')
-        name = (rule.get('name') or '').strip() or '未命名规则'
-        command = (rule.get('command') or '').strip()
-        if not command:
-            raise ValueError('请设置启动命令')
-        auto_start = bool(rule.get('autoStart', True))
-        description = rule.get('description', '')
-        rules = self._load_startup_rules()
-        rule_id = rule.get('id') or ''
-        now = datetime.now(timezone.utc).isoformat()
-        updated = False
-        if rule_id:
-            for item in rules:
-                if item.get('id') == rule_id:
-                    item.update({
-                        'name': name,
-                        'command': command,
-                        'autoStart': auto_start,
-                        'description': description,
-                        'updatedAt': now
-                    })
-                    updated = True
-                    break
-            if not updated:
-                raise ValueError('规则不存在')
-        else:
-            rule_id = uuid.uuid4().hex
-            rules.append({
-                'id': rule_id,
-                'name': name,
-                'command': command,
-                'autoStart': auto_start,
-                'description': description,
-                'createdAt': now,
-                'updatedAt': now,
-                'lastRun': '',
-                'lastPid': None
-            })
-        self._save_startup_rules(rules)
-        return api_success(id=rule_id, rules=rules)
+        '''v2.0 已移除任意启动命令写入能力。'''
+        return api_error('v2.0 已移除自定义启动命令，请使用系统设置管理启动项')
 
     @safe_execute
     def system_removeStartupRule(self, payload=None):
-        '''删除自动启动规则'''
-        rule_id = None
-        if isinstance(payload, dict):
-            rule_id = payload.get('id')
-        else:
-            rule_id = payload
-        if not rule_id:
-            raise ValueError('请提供规则 ID')
-        rules = self._load_startup_rules()
-        new_rules = [rule for rule in rules if rule.get('id') != rule_id]
-        if len(new_rules) == len(rules):
-            raise ValueError('规则不存在')
-        self._save_startup_rules(new_rules)
-        return api_success(rules=new_rules)
+        '''v2.0 已移除应用内启动项修改能力。'''
+        return api_error('v2.0 的启动项页面为只读，请使用系统设置修改')
 
     @safe_execute
     def system_runStartupRule(self, payload=None):
-        '''运行自动启动规则'''
-        rule_id = None
-        if isinstance(payload, dict):
-            rule_id = payload.get('id')
-        else:
-            rule_id = payload
-        if not rule_id:
-            raise ValueError('请提供规则 ID')
-        rules = self._load_startup_rules()
-        target = next((rule for rule in rules if rule.get('id') == rule_id), None)
-        if not target:
-            raise ValueError('规则不存在')
-        command = target.get('command')
-        if not command:
-            raise ValueError('规则未设置命令')
-        creationflags = 0
-        if platform.system() == 'Windows' and hasattr(subprocess, 'CREATE_NO_WINDOW'):
-            creationflags = subprocess.CREATE_NO_WINDOW
-        process = subprocess.Popen(command, shell=True, creationflags=creationflags)
-        target['lastRun'] = datetime.now(timezone.utc).isoformat()
-        target['lastPid'] = process.pid
-        self._save_startup_rules(rules)
-        return api_success(pid=process.pid, rule=target)
+        '''v2.0 禁止执行用户提供的任意命令。'''
+        return api_error('v2.0 已移除任意启动命令执行能力')
 
     @safe_execute
     def system_runSystemStartup(self, payload=None):
-        '''运行系统启动项'''
-        command = None
-        file_path = None
-        if isinstance(payload, dict):
-            command = payload.get('command')
-            file_path = payload.get('filePath')
-        if not command and not file_path:
-            return api_error('请提供启动命令')
-
-        # 如果是启动文件夹中的文件，使用 os.startfile 打开
-        if file_path and Path(file_path).exists():
-            if Config.appIsMacOS:
-                subprocess.Popen(['open', file_path])
-            else:
-                os.startfile(file_path)
-            return api_success()
-
-        # 否则执行命令
-        creationflags = 0
-        if platform.system() == 'Windows' and hasattr(subprocess, 'CREATE_NO_WINDOW'):
-            creationflags = subprocess.CREATE_NO_WINDOW
-        subprocess.Popen(command, shell=True, creationflags=creationflags)
-        return api_success()
+        '''v2.0 禁止执行系统启动项中的任意命令。'''
+        return api_error('v2.0 的启动项页面为只读')
 
     @safe_execute
     def system_openStartupLocation(self, payload=None):

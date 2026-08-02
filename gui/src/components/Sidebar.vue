@@ -1,34 +1,51 @@
-<!-- gui/src/components/Sidebar.vue —— 固定侧边栏导航(可收起) -->
 <script setup>
-import { TOOLS, GROUPS, HOME } from '../config/tools'
+import { ArrowRight, List, SetUp } from '@element-plus/icons-vue'
 
-defineProps({ active: String, collapsed: Boolean })
+import { HOME } from '@/config/tools'
+import { useToolRegistry } from '@/composables/useToolRegistry'
+
+defineProps({
+  active: { type: String, default: 'home' },
+  collapsed: { type: Boolean, default: false }
+})
 const emit = defineEmits(['select', 'toggle'])
-const toolsOf = (g) => TOOLS.filter((t) => t.group === g)
+const { groupedTools } = useToolRegistry()
 </script>
 
 <template>
-  <aside class="sidebar" :class="{ collapsed }">
+  <aside class="sidebar" :class="{ collapsed }" aria-label="主导航">
     <div class="top">
-      <button class="nav home" :class="{ on: active === 'home' }" @click="emit('select', 'home')" :title="collapsed ? '首页' : ''">
+      <button class="nav home" :class="{ on: active === 'home' }" :aria-current="active === 'home' ? 'page' : undefined" :aria-label="collapsed ? '首页' : undefined" @click="emit('select', 'home')">
         <el-icon :size="18"><component :is="HOME.icon" /></el-icon>
         <span v-if="!collapsed">首页</span>
       </button>
     </div>
 
-    <nav class="groups">
-      <div v-for="g in GROUPS" :key="g.id" class="group">
-        <div v-if="!collapsed" class="group-label">{{ g.label }}</div>
+    <nav class="groups" aria-label="工具">
+      <div v-for="group in groupedTools" :key="group.id" class="group">
+        <div v-if="!collapsed" class="group-label">{{ group.label }}</div>
         <div v-else class="divider" />
-        <button v-for="t in toolsOf(g.id)" :key="t.id" class="nav" :class="{ on: active === t.id }" :style="{ '--hue': t.hue }" @click="emit('select', t.id)" :title="collapsed ? t.name : ''">
-          <span v-if="active === t.id && !collapsed" class="rail" />
-          <el-icon :size="18"><component :is="t.icon" /></el-icon>
-          <span v-if="!collapsed">{{ t.name }}</span>
+        <button v-for="tool in group.tools" :key="tool.id" class="nav" :class="{ on: active === tool.id }" :style="{ '--hue': tool.hue }" :aria-current="active === tool.id ? 'page' : undefined" :aria-label="collapsed ? tool.name : undefined" @click="emit('select', tool.id)">
+          <span v-if="active === tool.id && !collapsed" class="rail" />
+          <el-icon :size="18"><component :is="tool.icon" /></el-icon>
+          <span v-if="!collapsed" class="nav-label">{{ tool.name }}</span>
+          <span v-if="!collapsed && tool.experimental" class="beta-dot" title="实验性模块" />
         </button>
       </div>
     </nav>
 
-    <button class="nav muted foot" @click="emit('toggle')">
+    <div class="sidebar-utilities">
+      <button class="nav muted" :class="{ on: active === 'tasks' }" :aria-current="active === 'tasks' ? 'page' : undefined" :aria-label="collapsed ? '任务中心' : undefined" @click="emit('select', 'tasks')">
+        <el-icon :size="18"><List /></el-icon>
+        <span v-if="!collapsed">任务中心</span>
+      </button>
+      <button class="nav muted" :class="{ on: active === 'modules' }" :aria-current="active === 'modules' ? 'page' : undefined" :aria-label="collapsed ? '工具与能力' : undefined" @click="emit('select', 'modules')">
+        <el-icon :size="18"><SetUp /></el-icon>
+        <span v-if="!collapsed">工具与能力</span>
+      </button>
+    </div>
+
+    <button class="nav muted foot" :aria-expanded="!collapsed" :aria-label="collapsed ? '展开侧栏' : '收起侧栏'" @click="emit('toggle')">
       <el-icon :size="18" :style="{ transform: collapsed ? 'none' : 'rotate(180deg)' }"><ArrowRight /></el-icon>
       <span v-if="!collapsed">收起侧栏</span>
     </button>
@@ -58,25 +75,26 @@ const toolsOf = (g) => TOOLS.filter((t) => t.group === g)
   padding: 0 12px;
 }
 .sidebar.collapsed .groups,
-.sidebar.collapsed .top {
+.sidebar.collapsed .top,
+.sidebar.collapsed .sidebar-utilities {
   padding-left: 8px;
   padding-right: 8px;
 }
 .group {
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 .group-label {
+  padding: 6px 11px 5px;
+  color: var(--ppx-text-disabled);
   font-size: 11px;
   font-weight: 700;
-  color: var(--ppx-text-disabled);
-  text-transform: uppercase;
   letter-spacing: 0.06em;
-  padding: 6px 11px 5px;
+  text-transform: uppercase;
 }
 .divider {
   height: 1px;
-  background: var(--ppx-glass-border);
   margin: 8px 6px;
+  background: var(--ppx-glass-border);
 }
 .nav {
   position: relative;
@@ -87,50 +105,66 @@ const toolsOf = (g) => TOOLS.filter((t) => t.group === g)
   margin-bottom: 2px;
   padding: 9px 11px;
   border: none;
-  background: transparent;
   border-radius: var(--ppx-radius-sm);
+  background: transparent;
   color: var(--ppx-text-secondary);
   font-size: 13.5px;
   font-weight: 500;
+  text-align: left;
   cursor: pointer;
   transition: all var(--ppx-transition-fast);
-  text-align: left;
 }
 .sidebar.collapsed .nav {
   justify-content: center;
   padding: 10px;
 }
-.nav:hover {
+.nav:hover,
+.nav:focus-visible {
   background: var(--ppx-bg-hover);
   color: var(--ppx-text-primary);
+  outline: none;
 }
 .nav.on {
   background: var(--ppx-bg-active);
   color: var(--hue, var(--accent));
   font-weight: 600;
 }
-.nav.home.on {
-  color: var(--accent);
+.nav-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .rail {
   position: absolute;
   left: 0;
   top: 50%;
-  transform: translateY(-50%);
   width: 3px;
   height: 18px;
   border-radius: 99px;
   background: var(--hue, var(--accent));
+  transform: translateY(-50%);
+}
+.beta-dot {
+  width: 6px;
+  height: 6px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: #8a5cf5;
+}
+.sidebar-utilities {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--ppx-glass-border);
+}
+.muted {
+  color: var(--ppx-text-muted);
 }
 .foot {
   flex-shrink: 0;
   margin: 0;
+  padding: 12px;
   border-top: 1px solid var(--ppx-glass-border);
   border-radius: 0;
-  padding: 14px 12px;
-  color: var(--ppx-text-muted);
-}
-.muted {
-  color: var(--ppx-text-muted);
 }
 </style>
