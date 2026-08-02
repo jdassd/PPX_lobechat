@@ -2,7 +2,11 @@
   <ToolWorkspace v-model="activeTab" :tabs="TABS" accent="#1f9d55">
     <StructurePanel v-show="activeTab === 'structure'" :preview="state.preview" :loading="state.loading" :select-excel="selectExcel" :load-preview="loadPreview" />
 
+    <ProfilePanel v-show="activeTab === 'profile'" />
+
     <ProcessPanel v-show="activeTab === 'process'" :process="state.process" :schema-fields="schemaFields" :loading="state.loading" :select-excel="selectExcel" :select-dir="selectDir" :remove-file="removeFile" :clear-list="clearList" :open-path="openPath" :run-process="runProcess" />
+
+    <SplitPanel v-show="activeTab === 'split'" />
 
     <MergePanel v-show="activeTab === 'merge'" :merge="state.merge" :loading="state.loading" :select-excel="selectExcel" :select-dir="selectDir" :remove-file="removeFile" :clear-list="clearList" :open-path="openPath" :run-merge-tables="runMergeTables" />
 
@@ -24,20 +28,24 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
 import { useInitialTab } from '@/composables/useInitialTab'
 import ToolWorkspace from '@/components/shared/ToolWorkspace.vue'
 import StructurePanel from './parts/StructurePanel.vue'
+import ProfilePanel from './parts/ProfilePanel.vue'
 import ProcessPanel from './parts/ProcessPanel.vue'
+import SplitPanel from './parts/SplitPanel.vue'
 import MergePanel from './parts/MergePanel.vue'
 
 const excelFilter = ['Excel 文件 (*.xlsx;*.xlsm;*.xltx;*.xltm)']
 
 const TABS = [
   { name: 'structure', label: '结构定义' },
+  { name: 'profile', label: '数据质检' },
   { name: 'process', label: '数据处理' },
+  { name: 'split', label: '按列拆分' },
   { name: 'merge', label: '分表合并' }
 ]
 

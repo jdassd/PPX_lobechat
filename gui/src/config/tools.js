@@ -1,6 +1,6 @@
-// v2.0 工具注册表：导航、首页、命令面板和模块中心共享同一份元数据。
+// v2.3 工具注册表：导航、首页、命令面板和模块中心共享同一份元数据。
 import { markRaw } from 'vue'
-import { Cpu, Document, Edit, Files, FolderOpened, HomeFilled, Monitor, PictureFilled, Share, Stamp, Tickets, VideoPlay } from '@element-plus/icons-vue'
+import { Connection, Cpu, Document, Edit, Files, FolderOpened, HomeFilled, Monitor, PictureFilled, Share, Stamp, Tickets, VideoPlay } from '@element-plus/icons-vue'
 
 const feature = (id, label, keywords = [], options = {}) => ({ id, label, keywords, ...options })
 
@@ -15,7 +15,17 @@ export const TOOLS = [
     locked: true,
     defaultEnabled: true,
     points: ['14 种格式互转', '批量压缩与水印', '本地图片文字识别'],
-    features: [feature('convert', '图片格式转换', ['格式', 'PNG', 'JPG', 'WEBP'], { featured: true }), feature('compress', '批量压缩图片', ['质量', '目标大小'], { featured: true }), feature('crop', '图片裁剪', ['尺寸', '比例']), feature('watermark', '批量添加水印', ['文字水印', '图片水印']), feature('pdf', '图片合成 PDF', ['图片转 PDF'], { featured: true }), feature('ocr', '图片 OCR 文字识别', ['扫描', '识别文字'], { featured: true })]
+    features: [
+      feature('convert', '图片格式转换', ['格式', 'PNG', 'JPG', 'WEBP'], { featured: true }),
+      feature('compress', '批量压缩图片', ['质量', '目标大小'], { featured: true }),
+      feature('crop', '图片裁剪', ['尺寸', '比例']),
+      feature('watermark', '批量添加水印', ['文字水印', '图片水印']),
+      feature('rotate', '旋转与翻转', ['旋转', '镜像', '翻转']),
+      feature('concat', '图片拼接', ['长图', '网格', '横向', '纵向']),
+      feature('rename', '图片批量命名', ['重命名', '序号', '预演']),
+      feature('pdf', '图片合成 PDF', ['图片转 PDF'], { featured: true }),
+      feature('ocr', '图片 OCR 文字识别', ['扫描', '识别文字'], { featured: true })
+    ]
   },
   {
     id: 'pdf',
@@ -37,7 +47,9 @@ export const TOOLS = [
       feature('text', '提取 PDF 文本', ['Markdown', 'HTML']),
       feature('ocr', '扫描 PDF OCR', ['可搜索 PDF', '扫描件文字识别'], { featured: true }),
       feature('word', 'PDF 转 Word', ['DOCX'], { featured: true }),
-      feature('images', '提取 PDF 图片', ['内嵌图片'])
+      feature('images', '提取 PDF 图片', ['内嵌图片']),
+      feature('pages', 'PDF 页面工作台', ['缩略图', '重排', '旋转', '页码'], { featured: true }),
+      feature('security', 'PDF 安全副本', ['水印', '脱敏', '密码', '元数据'])
     ]
   },
   {
@@ -63,7 +75,19 @@ export const TOOLS = [
     locked: true,
     defaultEnabled: true,
     points: ['数据结构预览', '批量清洗', '按列分组导出'],
-    features: [feature('structure', '预览 Excel 结构', ['字段', '工作表']), feature('process', '清洗 Excel 数据', ['排序', '分组'], { featured: true }), feature('merge', '合并 Excel 表格', ['多表合并'], { featured: true })]
+    features: [feature('structure', '预览 Excel 结构', ['字段', '工作表']), feature('profile', 'Excel 数据质检', ['列画像', '缺失值', '唯一值'], { featured: true }), feature('process', '清洗 Excel 数据', ['排序', '分组'], { featured: true }), feature('split', '按列拆分 Excel', ['分组导出', '拆表']), feature('merge', '合并 Excel 表格', ['多表合并'], { featured: true })]
+  },
+  {
+    id: 'document',
+    name: '文档中心',
+    desc: '本地搜索 · 表格 OCR',
+    icon: markRaw(Document),
+    group: 'office',
+    hue: '#4f7cff',
+    defaultEnabled: true,
+    badge: '本地索引',
+    points: ['PDF / Word / Excel 全文检索', '增量索引与智能收件箱', '图片和 PDF 表格识别'],
+    features: [feature('search', '本地文档全文搜索', ['索引', '检索', 'PDF', 'Word'], { featured: true }), feature('index', '智能收件箱', ['目录', '增量索引']), feature('table', '表格 OCR', ['图片表格', 'PDF 表格', 'Excel'], { featured: true })]
   },
   {
     id: 'file',
@@ -75,7 +99,28 @@ export const TOOLS = [
     locked: true,
     defaultEnabled: true,
     points: ['按条件查找文件', '批量改名与分类', 'ZIP / 7Z 压缩'],
-    features: [feature('search', '搜索文件', ['名称', '类型', '大小'], { featured: true }), feature('classify', '自动分类文件', ['整理', '移动']), feature('copy', '批量复制文件', ['复制']), feature('delete', '安全批量删除', ['回收站', '预演'], { danger: true }), feature('rename', '批量重命名', ['正则', '序号'], { featured: true }), feature('dedup', '查找重复文件', ['去重', 'MD5']), feature('archive', '压缩与解压', ['ZIP', '7Z'], { featured: true })]
+    features: [
+      feature('search', '搜索文件', ['名称', '类型', '大小'], { featured: true }),
+      feature('classify', '自动分类文件', ['整理', '移动']),
+      feature('copy', '批量复制文件', ['复制']),
+      feature('delete', '安全批量删除', ['回收站', '预演'], { danger: true }),
+      feature('recycle', 'PPX 回收站', ['恢复', '撤销', '清理']),
+      feature('rename', '批量重命名', ['正则', '序号'], { featured: true }),
+      feature('dedup', '查找重复文件', ['去重', 'MD5']),
+      feature('archive', '压缩与解压', ['ZIP', '7Z'], { featured: true })
+    ]
+  },
+  {
+    id: 'workflow',
+    name: '自动化工作流',
+    desc: '编排 · 定时 · 目录监听',
+    icon: markRaw(Connection),
+    group: 'automation',
+    hue: '#8b5cf6',
+    defaultEnabled: true,
+    badge: 'v2.3',
+    points: ['可视化串联本地工具', '周期运行与目录监听', '逐步骤运行记录'],
+    features: [feature('workflows', '编排工作流', ['流水线', '批处理', '模板'], { featured: true }), feature('triggers', '自动触发器', ['定时', '目录监听'], { featured: true }), feature('history', '运行记录', ['日志', '步骤结果'])]
   },
   {
     id: 'webauto',
@@ -125,6 +170,18 @@ export const TOOLS = [
     badge: '不含数字签名',
     points: ['圆形或椭圆图形', '自定义文字与弧度', '透明 PNG'],
     features: [feature('design', '生成印章图片', ['圆章', '椭圆章', 'PNG'])]
+  },
+  {
+    id: 'maintenance',
+    name: '设置与维护',
+    desc: '健康检查 · 备份恢复',
+    icon: markRaw(Monitor),
+    group: 'advanced',
+    hue: '#536dfe',
+    defaultEnabled: true,
+    badge: '跨平台',
+    points: ['核心环境与可选能力检查', '完整本地备份与安全恢复', '隐私安全的诊断报告'],
+    features: [feature('health', '应用健康检查', ['诊断', '依赖', '环境'], { featured: true }), feature('backup', '备份与恢复', ['迁移', '数据', '设置'], { featured: true }), feature('diagnostics', '生成诊断报告', ['日志', '支持'])]
   },
   {
     id: 'mindmap',

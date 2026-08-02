@@ -1,16 +1,26 @@
 <script setup>
 import { computed } from 'vue'
-import { ArrowRight, Clock, Grid, Lock, Search } from '@element-plus/icons-vue'
+import { ArrowRight, Clock, Grid, Lock, Search, Star, StarFilled } from '@element-plus/icons-vue'
 
-import { FEATURED_ACTIONS, toolById } from '@/config/tools'
+import { FEATURED_ACTIONS, featureById, toolById } from '@/config/tools'
 import { useToolRegistry } from '@/composables/useToolRegistry'
+import { favoriteIds, toggleFavorite } from '@/utils/favorites'
+import { recentActions, relativeTime } from '@/utils/recent'
 import { recentTasks, runningTasks } from '@/utils/taskCenter'
 
 const emit = defineEmits(['open', 'search', 'modules', 'tasks'])
 const { enabledTools } = useToolRegistry()
 
 const enabledIds = computed(() => new Set(enabledTools.value.map((tool) => tool.id)))
-const featured = computed(() => FEATURED_ACTIONS.filter((item) => enabledIds.value.has(item.tool)).slice(0, 8))
+const favoriteSet = computed(() => new Set(favoriteIds.value))
+const actionKey = (action) => `${action.tool}:${action.id || action.feature || ''}`
+const isActionFavorite = (action) => favoriteSet.value.has(actionKey(action)) || favoriteSet.value.has(action.tool)
+const featured = computed(() =>
+  FEATURED_ACTIONS.filter((item) => enabledIds.value.has(item.tool))
+    .sort((left, right) => Number(isActionFavorite(right)) - Number(isActionFavorite(left)))
+    .slice(0, 8)
+)
+const recentItems = computed(() => recentActions.value.map((item) => ({ ...item, toolMeta: toolById(item.tool), featureMeta: featureById(item.tool, item.feature) })).filter((item) => item.toolMeta && enabledIds.value.has(item.tool)))
 const taskItems = computed(() =>
   recentTasks.value
     .slice(0, 5)
@@ -21,6 +31,7 @@ const statusLabel = { running: '处理中', success: '已完成', failed: '失�
 const statusType = { running: 'warning', success: 'success', failed: 'danger', interrupted: 'info' }
 
 const openAction = (action) => emit('open', { tool: action.tool, feature: action.id || action.feature })
+const toggleActionFavorite = (action) => toggleFavorite(actionKey(action))
 </script>
 
 <template>
@@ -44,7 +55,7 @@ const openAction = (action) => emit('open', { tool: action.tool, feature: action
       <section class="section">
         <div class="section-head"><span>常用动作</span><small>直接进入具体步骤</small></div>
         <div class="action-grid">
-          <button v-for="action in featured" :key="`${action.tool}-${action.id}`" class="action-card" type="button" :style="{ '--hue': action.hue }" @click="openAction(action)">
+          <article v-for="action in featured" :key="`${action.tool}-${action.id}`" class="action-card" :style="{ '--hue': action.hue }" role="button" tabindex="0" @click="openAction(action)" @keydown.enter="openAction(action)">
             <span class="action-icon"
               ><el-icon :size="19"><component :is="action.icon" /></el-icon
             ></span>
@@ -53,6 +64,16 @@ const openAction = (action) => emit('open', { tool: action.tool, feature: action
               ><small>{{ action.toolName }}</small></span
             >
             <el-icon class="arrow"><ArrowRight /></el-icon>
+            <button class="favorite-toggle" :class="{ active: isActionFavorite(action) }" type="button" :title="isActionFavorite(action) ? '取消收藏' : '收藏动作'" @click.stop="toggleActionFavorite(action)">
+              <el-icon><StarFilled v-if="isActionFavorite(action)" /><Star v-else /></el-icon>
+            </button>
+          </article>
+        </div>
+        <div v-if="recentItems.length" class="recent-actions">
+          <span>最近使用</span>
+          <button v-for="item in recentItems" :key="`${item.tool}:${item.feature}`" type="button" @click="emit('open', { tool: item.tool, feature: item.feature })">
+            <b>{{ item.featureMeta?.label || item.toolMeta.name }}</b
+            ><small>{{ relativeTime(item.ts) }}</small>
           </button>
         </div>
       </section>
@@ -203,6 +224,7 @@ kbd {
   gap: 10px;
 }
 .action-card {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -215,6 +237,65 @@ kbd {
   cursor: pointer;
   text-align: left;
   transition: 0.18s ease;
+}
+.favorite-toggle {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 25px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--hue);
+  cursor: pointer;
+  opacity: 0;
+}
+.action-card:hover .favorite-toggle,
+.favorite-toggle:focus-visible {
+  opacity: 1;
+  background: color-mix(in srgb, var(--hue) 10%, var(--ppx-bg-surface));
+}
+.favorite-toggle.active {
+  opacity: 1;
+}
+.recent-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 11px;
+  overflow-x: auto;
+  color: var(--ppx-text-muted);
+  font-size: 11px;
+}
+.recent-actions > span {
+  flex: 0 0 auto;
+  font-weight: 650;
+}
+.recent-actions button {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  border: 1px solid var(--ppx-glass-border);
+  border-radius: 8px;
+  background: var(--ppx-bg-surface);
+  color: var(--ppx-text-primary);
+  cursor: pointer;
+}
+.recent-actions button:hover {
+  border-color: var(--accent);
+}
+.recent-actions b {
+  font-size: 11.5px;
+}
+.recent-actions small {
+  color: var(--ppx-text-muted);
+  font-size: 10px;
 }
 .action-card:hover {
   transform: translateY(-2px);

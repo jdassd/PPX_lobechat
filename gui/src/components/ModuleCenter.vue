@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted } from 'vue'
 import { CircleCheck, Connection, Refresh, Tools, WarningFilled } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { GROUPS, TOOLS } from '@/config/tools'
 import { useCapabilities } from '@/composables/useCapabilities'
@@ -15,6 +15,21 @@ const groups = computed(() => GROUPS.map((group) => ({ ...group, tools: TOOLS.fi
 const capabilityItems = computed(() => Object.values(state.capabilities || {}))
 
 const capabilityFor = (tool) => (tool.capability ? state.capabilities?.[tool.capability] : null)
+const repairGuide = {
+  ocr: 'OCR 随完整安装包提供。开发环境请重新运行 pnpm run init；安装版请下载安装完整包。',
+  ffmpeg: '请安装 FFmpeg，并确保 ffmpeg 与 ffprobe 可以从 PATH 调用。完成后返回此页重新检测。',
+  libreoffice: '请安装 LibreOffice。PPX 会自动检测 soffice，用于 Word 真实分页。',
+  system: '系统高级诊断只在 Windows 上提供；其他平台仍可使用全部文档与文件工具。'
+}
+
+const repairCapability = async (item) => {
+  if (item.id === 'playwright') {
+    emit('open', { tool: 'webauto', feature: 'collect' })
+    ElMessage.info('请在网页采集页面选择下载源并安装 Chromium 内核')
+    return
+  }
+  await ElMessageBox.alert(repairGuide[item.id] || item.detail, `${item.name}修复指引`, { confirmButtonText: '知道了' })
+}
 
 const toggle = (tool, value) => {
   setToolEnabled(tool.id, value)
@@ -65,7 +80,10 @@ onMounted(() => loadCapabilities())
             <b>{{ item.name }}</b>
             <p>{{ item.detail }}</p>
           </div>
-          <el-tag :type="item.available ? 'success' : 'warning'" size="small" effect="plain">{{ item.available ? '可用' : '未就绪' }}</el-tag>
+          <div class="cap-actions">
+            <el-tag :type="item.available ? 'success' : 'warning'" size="small" effect="plain">{{ item.available ? '可用' : '未就绪' }}</el-tag>
+            <el-button v-if="!item.available" text type="primary" size="small" @click="repairCapability(item)">处理</el-button>
+          </div>
         </article>
       </div>
       <div v-else-if="state.loading" class="loading-row">
@@ -213,6 +231,12 @@ h1 {
   margin: 3px 0 0;
   color: var(--ppx-text-muted);
   font-size: 11.5px;
+}
+.cap-actions {
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 3px;
 }
 .module-grid {
   display: grid;

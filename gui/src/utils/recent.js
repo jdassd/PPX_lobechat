@@ -1,4 +1,6 @@
-// gui/src/utils/recent.js —— 首页「最近活动」: 记录最近打开的工具(本地存储)
+import { ref } from 'vue'
+
+// 首页「最近活动」: 记录最近打开的工具和具体动作（本地存储）。
 const KEY = 'ppx-recents'
 const MAX = 6
 
@@ -11,12 +13,15 @@ export function getRecents() {
   }
 }
 
+export const recentActions = ref(getRecents())
+
 export function pushRecent(toolId, featureId = '') {
   if (!toolId || toolId === 'home') return
   const key = `${toolId}:${featureId || ''}`
   let list = getRecents().filter((r) => `${r.tool}:${r.feature || ''}` !== key)
   list.unshift({ tool: toolId, feature: featureId || '', ts: Date.now() })
   list = list.slice(0, MAX)
+  recentActions.value = list
   try {
     localStorage.setItem(KEY, JSON.stringify(list))
   } catch {
@@ -25,6 +30,7 @@ export function pushRecent(toolId, featureId = '') {
 }
 
 export function clearRecents() {
+  recentActions.value = []
   try {
     localStorage.removeItem(KEY)
   } catch {

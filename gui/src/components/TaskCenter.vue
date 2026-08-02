@@ -1,59 +1,123 @@
 <script setup>
-import { computed } from 'vue'
-import { CircleCheck, CircleClose, Clock, FolderOpened, Loading, RefreshRight, WarningFilled } from '@element-plus/icons-vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { CircleCheck, CircleClose, Clock, Download, FolderOpened, Loading, RefreshRight, Search, VideoPause, VideoPlay, WarningFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { featureById, toolById } from '@/config/tools'
 import { callApi } from '@/utils/pyapi'
-import { clearFinishedTasks, runningTasks, tasks } from '@/utils/taskCenter'
+import { clearFinishedTasks, hydrateBackendTasks, queuePaused, runningTasks, tasks } from '@/utils/taskCenter'
 
 const emit = defineEmits(['open'])
+const query = ref('')
+const statusFilter = ref('all')
+const refreshing = ref(false)
+let refreshTimer = null
 
 const completedCount = computed(() => tasks.value.filter((item) => item.status === 'success').length)
-const failedCount = computed(() => tasks.value.filter((item) => ['failed', 'interrupted'].includes(item.status)).length)
+const failedCount = computed(() => tasks.value.filter((item) => ['failed', 'interrupted', 'canceled'].includes(item.status)).length)
+const filteredTasks = computed(() => {
+  const keyword = query.value.trim().toLowerCase()
+  return tasks.value.filter((task) => {
+    if (statusFilter.value !== 'all' && task.status !== statusFilter.value) return false
+    if (!keyword) return true
+    return `${task.label || ''} ${task.message || ''} ${task.output || ''} ${task.method || ''}`.toLowerCase().includes(keyword)
+  })
+})
 
 const statusMeta = {
+  queued: { label: '排队中', type: 'info', icon: Clock },
   running: { label: '处理中', type: 'primary', icon: Loading },
   success: { label: '已完成', type: 'success', icon: CircleCheck },
   failed: { label: '失败', type: 'danger', icon: CircleClose },
-  interrupted: { label: '已中断', type: 'warning', icon: WarningFilled }
+  interrupted: { label: '已中断', type: 'warning', icon: WarningFilled },
+  canceled: { label: '已取消', type: 'info', icon: CircleClose }
 }
 
 const formatTime = (value) => {
   if (!value) return ''
   return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(value))
 }
-
 const duration = (task) => {
-  if (!task.endedAt) return '进行中'
+  if (!task.startedAt) return '尚未开始'
+  if (!task.endedAt) return task.status === 'queued' ? '等待执行' : '进行中'
   const seconds = Math.max(0, Math.round((task.endedAt - task.startedAt) / 1000))
   return seconds < 60 ? `${seconds} 秒` : `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`
 }
 
-const openTask = (task) => emit('open', { tool: task.tool, feature: task.feature })
-
-const openOutput = async (task) => {
-  if (!task.output) return
+const refreshTasks = async (notify = false) => {
+  if (refreshing.value) return
+  refreshing.value = true
   try {
-    const res = await callApi('system_pyOpenFile', task.output)
-    if (!res.ok) ElMessage.error(res.message || '无法打开输出')
-  } catch (error) {
-    ElMessage.error(error?.message || '无法打开输出')
+    const result = await callApi('task_list', { limit: 200 })
+    if (result.ok) {
+      hydrateBackendTasks(result.data.tasks || [], result.data.paused)
+      if (notify) ElMessage.success('任务状态已刷新')
+    }
+  } catch {
+    // 旧版后端仍可使用前端本地任务记录。
+  } finally {
+    refreshing.value = false
   }
 }
 
+onMounted(() => {
+  refreshTasks()
+  refreshTimer = window.setInterval(() => refreshTasks(), 1200)
+})
+onUnmounted(() => {
+  if (refreshTimer) window.clearInterval(refreshTimer)
+})
+
+const openTask = (task) => emit('open', { tool: task.tool, feature: task.feature })
+const openOutput = async (task) => {
+  if (!task.output) return
+  const result = await callApi('system_pyOpenFile', task.output)
+  if (!result.ok) ElMessage.error(result.message || '无法打开输出')
+}
+const cancelTask = async (task) => {
+  const result = await callApi('task_cancel', { id: task.id })
+  if (result.ok) {
+    ElMessage.success(result.message || '已请求取消')
+    await refreshTasks()
+  } else ElMessage.error(result.message || '取消失败')
+}
+const retryTask = async (task) => {
+  const result = await callApi('task_retry', { id: task.id })
+  if (result.ok) {
+    ElMessage.success('任务已重新加入队列')
+    await refreshTasks()
+  } else ElMessage.error(result.message || '重试失败')
+}
+const toggleQueue = async () => {
+  const result = await callApi(queuePaused.value ? 'task_queue_resume' : 'task_queue_pause')
+  if (result.ok) {
+    queuePaused.value = !queuePaused.value
+    ElMessage.success(result.message)
+    await refreshTasks()
+  } else ElMessage.error(result.message || '操作失败')
+}
 const clearTasks = async () => {
   if (!tasks.value.length) return
   try {
-    await ElMessageBox.confirm('将清除所有已完成、失败和中断的任务记录；正在运行的任务会保留。', '清除任务记录', {
-      confirmButtonText: '清除记录',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
+    await ElMessageBox.confirm('将清除所有已完成、失败、中断和取消的任务记录；活动任务会保留。', '清除任务记录', { confirmButtonText: '清除记录', cancelButtonText: '取消', type: 'warning' })
   } catch {
     return
   }
+  try {
+    await callApi('task_clear')
+  } catch {
+    // 后端不可用时仍清理本地缓存。
+  }
   clearFinishedTasks()
+}
+const exportTasks = () => {
+  const payload = { exportedAt: new Date().toISOString(), version: 1, tasks: tasks.value }
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = `ppx-tasks-${new Date().toISOString().slice(0, 10)}.json`
+  link.click()
+  URL.revokeObjectURL(link.href)
 }
 </script>
 
@@ -61,11 +125,22 @@ const clearTasks = async () => {
   <div class="task-page">
     <header class="page-head">
       <div>
-        <span class="eyebrow">V2 工作流</span>
+        <span class="eyebrow">V2.3 持久任务</span>
         <h1>任务中心</h1>
-        <p>集中查看文件处理状态、输出位置与失败原因。任务信息仅保存在本机。</p>
+        <p>队列、进度、取消、重试和输出记录保存在本机，可在应用重启后继续处理失败任务。</p>
       </div>
-      <el-button :disabled="!tasks.length" @click="clearTasks">清除已结束记录</el-button>
+      <div class="head-actions">
+        <el-button :type="queuePaused ? 'success' : 'warning'" plain @click="toggleQueue"
+          ><el-icon><VideoPlay v-if="queuePaused" /><VideoPause v-else /></el-icon>{{ queuePaused ? '继续队列' : '暂停队列' }}</el-button
+        >
+        <el-button :loading="refreshing" @click="refreshTasks(true)"
+          ><el-icon><RefreshRight /></el-icon>刷新</el-button
+        >
+        <el-button :disabled="!tasks.length" @click="exportTasks"
+          ><el-icon><Download /></el-icon>导出</el-button
+        >
+        <el-button :disabled="!tasks.length" @click="clearTasks">清理</el-button>
+      </div>
     </header>
 
     <section class="stats" aria-label="任务统计">
@@ -73,7 +148,7 @@ const clearTasks = async () => {
         <el-icon><Loading /></el-icon>
         <div>
           <b>{{ runningTasks.length }}</b
-          ><span>处理中</span>
+          ><span>排队或处理中</span>
         </div>
       </div>
       <div class="stat-card success">
@@ -92,12 +167,17 @@ const clearTasks = async () => {
       </div>
     </section>
 
-    <section class="task-list" aria-live="polite">
-      <el-empty v-if="!tasks.length" description="完成一次文件处理后，任务会显示在这里">
-        <el-button type="primary" @click="emit('open', 'home')">返回首页选择任务</el-button>
-      </el-empty>
+    <section class="filters">
+      <el-input v-model="query" clearable placeholder="搜索任务、输出路径或错误信息"
+        ><template #prefix
+          ><el-icon><Search /></el-icon></template
+      ></el-input>
+      <el-select v-model="statusFilter" style="width: 150px"><el-option label="全部状态" value="all" /><el-option v-for="(meta, key) in statusMeta" :key="key" :label="meta.label" :value="key" /></el-select>
+    </section>
 
-      <article v-for="task in tasks" v-else :key="task.id" class="task-card">
+    <section class="task-list" aria-live="polite">
+      <el-empty v-if="!filteredTasks.length" :description="tasks.length ? '没有符合筛选条件的任务' : '完成一次文件处理后，任务会显示在这里'"><el-button type="primary" @click="emit('open', 'home')">返回首页选择任务</el-button></el-empty>
+      <article v-for="task in filteredTasks" v-else :key="task.id" class="task-card">
         <div class="status-icon" :class="task.status">
           <el-icon><component :is="statusMeta[task.status]?.icon || Clock" /></el-icon>
         </div>
@@ -108,14 +188,19 @@ const clearTasks = async () => {
           </div>
           <p class="task-meta">{{ toolById(task.tool)?.name || task.tool }} · {{ featureById(task.tool, task.feature)?.label || task.feature }} · {{ formatTime(task.startedAt) }} · {{ duration(task) }}</p>
           <p class="task-message">{{ task.message }}</p>
+          <el-progress v-if="['queued', 'running'].includes(task.status)" :percentage="Number(task.progress || 0)" :stroke-width="5" :show-text="false" class="task-progress" />
           <p v-if="task.output" class="task-output" :title="task.output">{{ task.output }}</p>
         </div>
         <div class="task-actions">
           <el-button v-if="task.output" text type="primary" @click="openOutput(task)"
             ><el-icon><FolderOpened /></el-icon>打开输出</el-button
           >
+          <el-button v-if="['queued', 'running'].includes(task.status)" text type="danger" @click="cancelTask(task)">取消</el-button>
+          <el-button v-else-if="['failed', 'interrupted', 'canceled'].includes(task.status) && task.retryable !== false" text type="primary" @click="retryTask(task)"
+            ><el-icon><RefreshRight /></el-icon>重试</el-button
+          >
           <el-button text @click="openTask(task)"
-            ><el-icon><RefreshRight /></el-icon>再次打开</el-button
+            ><el-icon><RefreshRight /></el-icon>打开工具</el-button
           >
         </div>
       </article>
@@ -131,12 +216,18 @@ const clearTasks = async () => {
   box-sizing: border-box;
 }
 .page-head {
-  max-width: 980px;
+  max-width: 1080px;
   margin: 0 auto 22px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 24px;
+}
+.head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
 }
 .eyebrow {
   color: var(--accent);
@@ -151,12 +242,13 @@ h1 {
   font-size: 30px;
 }
 .page-head p {
+  max-width: 650px;
   margin: 0;
   color: var(--ppx-text-muted);
 }
 .stats {
-  max-width: 980px;
-  margin: 0 auto 18px;
+  max-width: 1080px;
+  margin: 0 auto 14px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
@@ -177,7 +269,7 @@ h1 {
 .stat-card.danger {
   color: var(--el-color-danger);
 }
-.stat-card .el-icon {
+.stat-card > .el-icon {
   font-size: 22px;
 }
 .stat-card div {
@@ -194,8 +286,17 @@ h1 {
   color: var(--ppx-text-muted);
   font-size: 12px;
 }
+.filters {
+  max-width: 1080px;
+  margin: 0 auto 14px;
+  display: flex;
+  gap: 10px;
+}
+.filters .el-input {
+  flex: 1;
+}
 .task-list {
-  max-width: 980px;
+  max-width: 1080px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -262,6 +363,9 @@ h1 {
 .task-message {
   color: var(--ppx-text-secondary);
 }
+.task-progress {
+  margin-top: 8px;
+}
 .task-output {
   overflow: hidden;
   color: var(--accent);
@@ -271,8 +375,16 @@ h1 {
 .task-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
-@media (max-width: 840px) {
+@media (max-width: 900px) {
+  .page-head {
+    flex-direction: column;
+  }
+  .head-actions {
+    justify-content: flex-start;
+  }
   .stats {
     grid-template-columns: 1fr;
   }
@@ -281,6 +393,13 @@ h1 {
   }
   .task-actions {
     grid-column: 2;
+    justify-content: flex-start;
+  }
+  .filters {
+    flex-direction: column;
+  }
+  .filters .el-select {
+    width: 100% !important;
   }
 }
 </style>

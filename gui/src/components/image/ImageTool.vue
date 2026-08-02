@@ -8,6 +8,9 @@ import FormatPanel from './parts/FormatPanel.vue'
 import CompressPanel from './parts/CompressPanel.vue'
 import CropPanel from './parts/CropPanel.vue'
 import WatermarkPanel from './parts/WatermarkPanel.vue'
+import RotateFlipPanel from './parts/RotateFlipPanel.vue'
+import ConcatPanel from './parts/ConcatPanel.vue'
+import BatchRenamePanel from './parts/BatchRenamePanel.vue'
 import PdfPanel from './parts/PdfPanel.vue'
 
 const TABS = [
@@ -15,6 +18,9 @@ const TABS = [
   { name: 'compress', label: '批量压缩' },
   { name: 'crop', label: '图片裁剪' },
   { name: 'watermark', label: '批量水印' },
+  { name: 'rotate', label: '旋转翻转' },
+  { name: 'concat', label: '图片拼接' },
+  { name: 'rename', label: '批量命名' },
   { name: 'pdf', label: '图片转 PDF' },
   { name: 'ocr', label: 'OCR 文字识别' }
 ]
@@ -107,6 +113,9 @@ onMounted(loadSupportedFormats)
     <CompressPanel v-show="activeTab === 'compress'" :supported-formats="supportedFormats" />
     <CropPanel v-show="activeTab === 'crop'" :supported-formats="supportedFormats" />
     <WatermarkPanel v-show="activeTab === 'watermark'" :supported-formats="supportedFormats" />
+    <RotateFlipPanel v-show="activeTab === 'rotate'" :supported-formats="supportedFormats" />
+    <ConcatPanel v-show="activeTab === 'concat'" :supported-formats="supportedFormats" />
+    <BatchRenamePanel v-show="activeTab === 'rename'" :supported-formats="supportedFormats" />
     <PdfPanel v-show="activeTab === 'pdf'" :supported-formats="supportedFormats" />
     <OcrPanel v-show="activeTab === 'ocr'" source-type="image" />
   </ToolWorkspace>

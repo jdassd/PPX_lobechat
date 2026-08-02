@@ -11,7 +11,9 @@ usage: 运行前，请确保本机已经搭建Python3开发环境，且已经安
         详细教程请移步至 https://blog.pangao.vip/Python环境搭建及模块安装/
 '''
 
+import hashlib
 import os
+import re
 import shlex
 import subprocess
 from urllib.parse import urlparse
@@ -60,7 +62,13 @@ class AppUpdate:
                 msg = str(resApp.get('msg', '未知错误')) if resApp else '未找到适用的安装包'
                 return {'code': -2, 'msg': '下载程序包失败: ' + msg, 'channel': resCheck.get('channel')}
             else:
-                return {'code': 0, 'msg': '下载程序包成功', 'downloadPath': resApp['downloadPath'], 'channel': resCheck.get('channel')}
+                return {
+                    'code': 0,
+                    'msg': '下载程序包成功并通过 SHA-256 校验',
+                    'downloadPath': resApp['downloadPath'],
+                    'sha256': resApp.get('sha256'),
+                    'channel': resCheck.get('channel')
+                }
         else:
             return resCheck
 
@@ -204,6 +212,9 @@ class AppUpdate:
                     return {'status': False, 'msg': f'安装包 {name} 缺少下载地址'}
                 if not self.__trustedDownloadUrl(url):
                     return {'status': False, 'msg': '安装包下载地址不可信，仅允许 GitHub HTTPS 地址'}
+                expected_sha256 = self.__assetSha256(assets)
+                if not expected_sha256:
+                    return {'status': False, 'msg': '发布资产缺少有效的 GitHub SHA-256 摘要，已拒绝下载'}
                 # 确保下载目录存在
                 if not os.path.exists(Config.downloadDir):
                     try:
@@ -220,7 +231,7 @@ class AppUpdate:
                 # 超时重连3次
                 timeoutCount = 0
                 while timeoutCount < 3:
-                    resDownload = self.__download(url, downloadPath, size)
+                    resDownload = self.__download(url, downloadPath, size, expected_sha256)
                     if resDownload['msg'] == '连接超时':
                         timeoutCount += 1
                     else:
@@ -254,6 +265,15 @@ class AppUpdate:
         )
 
     @staticmethod
+    def __assetSha256(asset):
+        '''GitHub Release Asset exposes digest as ``sha256:<64 hex>``.'''
+        if not isinstance(asset, dict):
+            return ''
+        digest = str(asset.get('digest') or '').strip().lower()
+        match = re.fullmatch(r'sha256:([0-9a-f]{64})', digest)
+        return match.group(1) if match else ''
+
+    @staticmethod
     def __isDebianOrUbuntu():
         '''仅识别可使用 .deb 安装包的 Debian/Ubuntu 系发行版。'''
         release = {}
@@ -278,7 +298,7 @@ class AppUpdate:
         identifiers.add(release.get('ID', ''))
         return bool(identifiers.intersection({'debian', 'ubuntu'}))
 
-    def __download(self, url, downloadPath, size):
+    def __download(self, url, downloadPath, size, expected_sha256):
         '''下载大文件'''
         from api.api import API
         api = API()
@@ -293,6 +313,7 @@ class AppUpdate:
 
         cleanup_partial()
         try:
+            hasher = hashlib.sha256()
             with open(partial_path, "wb") as f:
                 with httpx.Client(follow_redirects=True) as client:
                     with client.stream("GET", url, timeout=(5, 3600)) as r:
@@ -312,6 +333,7 @@ class AppUpdate:
                                 raise InterruptedError('取消更新')
                             if chunk:
                                 f.write(chunk)
+                                hasher.update(chunk)
                                 downloadSize += len(chunk)
                             infoPy2jsDict = {
                                 'sizeShow': self.bytes2Size(downloadSize)
@@ -327,12 +349,19 @@ class AppUpdate:
                     'status': False,
                     'msg': f'安装包大小校验失败（期望 {self.bytes2Size(size)}，实际 {self.bytes2Size(downloadSize)}）'
                 }
+            actual_sha256 = hasher.hexdigest()
+            if actual_sha256 != expected_sha256:
+                cleanup_partial()
+                return {
+                    'status': False,
+                    'msg': f'安装包 SHA-256 校验失败（期望 {expected_sha256}，实际 {actual_sha256}）'
+                }
             os.replace(partial_path, downloadPath)
             api.system_py2js(
                 'py2js_updateAppProgress',
                 {'sizeShow': self.bytes2Size(downloadSize), 'percentage': 100}
             )
-            return {'status': True, 'msg': '下载成功', 'downloadPath': downloadPath}
+            return {'status': True, 'msg': '下载成功并通过 SHA-256 校验', 'downloadPath': downloadPath, 'sha256': actual_sha256}
         except InterruptedError:
             cleanup_partial()
             return {'status': False, 'msg': '取消更新'}

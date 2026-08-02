@@ -1,8 +1,10 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
-import { ArrowRight, Clock, Grid, HomeFilled, Search } from '@element-plus/icons-vue'
+import { ArrowRight, Clock, Grid, HomeFilled, Search, StarFilled } from '@element-plus/icons-vue'
 
 import { useToolRegistry } from '@/composables/useToolRegistry'
+import { favoriteIds } from '@/utils/favorites'
+import { recentActions } from '@/utils/recent'
 
 const props = defineProps({ modelValue: Boolean })
 const emit = defineEmits(['update:modelValue', 'select'])
@@ -11,6 +13,8 @@ const { enabledTools } = useToolRegistry()
 const q = ref('')
 const idx = ref(0)
 const inputRef = ref(null)
+const favoriteSet = computed(() => new Set(favoriteIds.value))
+const recentRank = computed(() => new Map(recentActions.value.map((item, index) => [`${item.tool}:${item.feature || ''}`, index])))
 
 const items = computed(() => {
   const pages = [
@@ -26,7 +30,8 @@ const items = computed(() => {
       target: { tool: tool.id },
       icon: tool.icon,
       hue: tool.hue,
-      keywords: tool.points || []
+      keywords: tool.points || [],
+      favoriteId: tool.id
     },
     ...(tool.features || []).map((feature) => ({
       key: `${tool.id}-${feature.id}`,
@@ -35,10 +40,11 @@ const items = computed(() => {
       target: { tool: tool.id, feature: feature.id },
       icon: tool.icon,
       hue: tool.hue,
-      keywords: feature.keywords || []
+      keywords: feature.keywords || [],
+      favoriteId: `${tool.id}:${feature.id}`
     }))
   ])
-  return [...pages, ...tools]
+  return [...pages, ...tools].map((item) => ({ ...item, favorite: item.favoriteId ? favoriteSet.value.has(item.favoriteId) || favoriteSet.value.has(item.target?.tool) : false, recent: item.favoriteId ? recentRank.value.get(item.favoriteId) : undefined })).sort((left, right) => Number(right.favorite) - Number(left.favorite) || (left.recent ?? 99) - (right.recent ?? 99))
 })
 
 const filtered = computed(() => {
@@ -98,6 +104,7 @@ const onKey = (event) => {
               ><b>{{ item.name }}</b
               ><small>{{ item.desc }}</small></span
             >
+            <el-icon v-if="item.favorite" class="cp-favorite" :size="14"><StarFilled /></el-icon>
             <el-icon v-if="index === idx" :size="15" color="var(--accent)"><ArrowRight /></el-icon>
           </button>
         </div>
@@ -201,6 +208,9 @@ const onKey = (event) => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.cp-favorite {
+  color: var(--el-color-warning);
 }
 .cp-foot {
   display: flex;

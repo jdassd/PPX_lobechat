@@ -18,7 +18,9 @@ import subprocess
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
+from pathlib import Path
 
 import webview
 
@@ -40,11 +42,22 @@ MIN_WINDOW_WIDTH = 640
 MIN_WINDOW_HEIGHT = 400
 DEV_SHUTDOWN_GRACE_SECONDS = 3.0
 _dev_shutdown_watchdog = None
+_window_state_restored = False
 
 
 def on_shown():
     # print('程序启动')
+    try:
+        restore_result = api.maintenance_apply_pending_restore()
+        if isinstance(restore_result, dict) and restore_result.get('restored'):
+            print(f'[Restore] {restore_result.get("msg", "备份恢复完成")}')
+    except Exception as err:
+        print(f'[Restore] 应用待恢复备份失败: {err}')
     db.init()    # 初始化数据库
+    try:
+        api.workflow_start()
+    except Exception as err:
+        print(f'[Startup] 启动自动化服务失败: {err}')
 
 
 def on_loaded():
@@ -52,12 +65,22 @@ def on_loaded():
     pass
 
 
-def on_closing():
+def on_closing(window=None):
     # print('程序关闭')
+    if window is not None:
+        _save_window_state(window)
+    try:
+        api.workflow_stop()
+    except Exception as err:
+        print(f'[Shutdown] 停止自动化服务失败: {err}')
     try:
         api.mindmap_stop()
     except Exception as err:
         print(f'[Shutdown] 停止思维导图服务失败: {err}')
+    try:
+        api.task_shutdown()
+    except Exception as err:
+        print(f'[Shutdown] 停止任务队列失败: {err}')
     _terminate_dev_supervisor()
     _start_dev_shutdown_watchdog()
 
@@ -145,24 +168,78 @@ def _read_dev_port_hint():
         return None
 
 
-def _resize_window_for_primary_screen(window):
+def _window_state_path():
+    return Path(Config.appDataDir) / 'window-state.json'
+
+
+def _load_window_state():
+    try:
+        payload = json.loads(_window_state_path().read_text(encoding='utf-8'))
+        width = int(payload.get('width') or 0)
+        height = int(payload.get('height') or 0)
+        if not MIN_WINDOW_WIDTH <= width <= 10000 or not MIN_WINDOW_HEIGHT <= height <= 10000:
+            return None
+        return {
+            'width': width,
+            'height': height,
+            'x': int(payload['x']) if payload.get('x') is not None else None,
+            'y': int(payload['y']) if payload.get('y') is not None else None,
+        }
+    except (OSError, ValueError, TypeError, KeyError):
+        return None
+
+
+def _save_window_state(window):
+    try:
+        payload = {
+            'schemaVersion': 1,
+            'width': max(MIN_WINDOW_WIDTH, int(window.width)),
+            'height': max(MIN_WINDOW_HEIGHT, int(window.height)),
+            'x': int(window.x),
+            'y': int(window.y),
+            'savedAt': time.time(),
+        }
+        path = _window_state_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temp = path.with_suffix('.tmp')
+        temp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding='utf-8')
+        os.replace(temp, path)
+    except Exception as err:
+        print(f'[Window] 保存窗口状态失败: {err}')
+
+
+def _resize_window_for_primary_screen(window, restored=False):
     '''GUI 初始化完成后，按主屏幕尺寸恢复原有的窗口比例。'''
     try:
         screens = webview.screens
         if not screens:
             return
         screen = screens[0]
-        width = max(MIN_WINDOW_WIDTH, int(screen.width * 2 / 3))
-        height = max(MIN_WINDOW_HEIGHT, int(screen.height * 4 / 5))
-        if width > 0 and height > 0:
-            window.resize(width, height)
+        if restored:
+            visible = any(
+                window.x < item.x + item.width
+                and window.x + window.width > item.x
+                and window.y < item.y + item.height
+                and window.y + window.height > item.y
+                for item in screens
+            )
+            if not visible:
+                window.move(
+                    int(screen.x + max(0, screen.width - window.width) / 2),
+                    int(screen.y + max(0, screen.height - window.height) / 2),
+                )
+        else:
+            width = max(MIN_WINDOW_WIDTH, int(screen.width * 2 / 3))
+            height = max(MIN_WINDOW_HEIGHT, int(screen.height * 4 / 5))
+            if width > 0 and height > 0:
+                window.resize(width, height)
     except Exception as err:
         # 屏幕查询或后端不支持 resize 时保留稳定的初始尺寸即可。
         print(f'[Window] 未能按屏幕调整窗口尺寸: {err}')
 
 
 def _on_window_shown(window):
-    _resize_window_for_primary_screen(window)
+    _resize_window_for_primary_screen(window, _window_state_restored)
     on_shown()
 
 
@@ -206,7 +283,8 @@ def _resolve_dev_server(base_port: int, timeout: float = 25.0, span: int = 16):
     )
 
 
-def WebViewApp(ifDev=False, ifCef=False):
+def WebViewApp(ifDev=False, ifCef=False, open_files=None):
+    global _window_state_restored
 
     # 在任何 pywebview GUI 相关访问前确定后端，尤其不能让 --cef 被默认 GUI 抢先初始化。
     guiCEF = 'cef' if ifCef else None
@@ -234,13 +312,30 @@ def WebViewApp(ifDev=False, ifCef=False):
         # 修复某些情况下，打包后软件打开白屏的问题
         mimetypes.add_type('application/javascript', '.js')
 
+    launch_files = []
+    for raw_path in open_files or []:
+        path = Path(str(raw_path)).expanduser().resolve()
+        if path.is_file():
+            launch_files.append(str(path))
+    if launch_files:
+        separator = '&' if '?' in template else '?'
+        query = urllib.parse.urlencode({'openFiles': json.dumps(launch_files, ensure_ascii=False)})
+        template = f'{template}{separator}{query}'
+
+    window_state = _load_window_state()
+    _window_state_restored = bool(window_state)
+    width = window_state['width'] if window_state else INITIAL_WINDOW_WIDTH
+    height = window_state['height'] if window_state else INITIAL_WINDOW_HEIGHT
+
     # 创建窗口
     window = webview.create_window(
         title=Config.appName,
         url=template,
         js_api=api,
-        width=INITIAL_WINDOW_WIDTH,
-        height=INITIAL_WINDOW_HEIGHT,
+        width=width,
+        height=height,
+        x=window_state.get('x') if window_state else None,
+        y=window_state.get('y') if window_state else None,
         min_size=(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT),
         frameless=True,  # 禁用系统默认窗口装饰，使用自定义顶栏
         resizable=True,
@@ -253,7 +348,7 @@ def WebViewApp(ifDev=False, ifCef=False):
     # 绑定事件
     window.events.shown += lambda: _on_window_shown(window)
     window.events.loaded += on_loaded
-    window.events.closing += on_closing
+    window.events.closing += lambda: on_closing(window)
 
     # 启动窗口
     try:
@@ -267,9 +362,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--dev", action="store_true", dest="if_dev", help="if_dev")
     parser.add_argument("-c", "--cef", action="store_true", dest="if_cef", help="if_cef")
+    parser.add_argument('files', nargs='*', help='启动后打开的本地文件')
     args = parser.parse_args()
 
     ifDev = args.if_dev    # 是否开启开发环境
     ifCef = args.if_cef    # 是否开启cef模式
 
-    WebViewApp(ifDev, ifCef)
+    WebViewApp(ifDev, ifCef, args.files)

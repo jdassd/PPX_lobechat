@@ -374,6 +374,79 @@ class Excel():
         except Exception as exc:
             return {'code': -1, 'msg': f'分析失败：{exc}'}
 
+    def excel_quality_report(self, options: Dict = None):
+        '''生成可交付的 Excel 数据质量报告。'''
+        try:
+            opts = self._validate_payload(options)
+            source = self._ensure_excel_file(opts.get('filePath', ''))
+            profile_result = self.excel_column_profile(opts)
+            if profile_result.get('code') != 0:
+                raise ValueError(profile_result.get('msg') or '列分析失败')
+            summary = profile_result['summary']
+            profiles = profile_result['profiles']
+            threshold = max(0, min(float(opts.get('blankRatioThreshold') or 0.1), 1))
+            output_dir = self._ensure_output_dir(source, opts.get('outputDir', ''), 'quality')
+            filename = str(opts.get('outputName') or f'{source.stem}_quality_report.xlsx')
+            if not filename.lower().endswith('.xlsx'):
+                filename += '.xlsx'
+            dest = output_dir / Path(filename).name
+
+            workbook = Workbook()
+            overview = workbook.active
+            overview.title = '质量概览'
+            overview.append(['指标', '值'])
+            overview.append(['文件', source.name])
+            overview.append(['工作表', summary['sheet']])
+            overview.append(['数据行数', summary['totalRows']])
+            overview.append(['字段数', summary['columns']])
+            overview.append(['生成时间', datetime.now().strftime('%Y-%m-%d %H:%M:%S')])
+
+            details = workbook.create_sheet('字段画像')
+            details.append(['字段', '推断类型', '唯一值', '空值', '空值率', '最小值', '最大值', '平均值', '高频值'])
+            issues = workbook.create_sheet('质量问题')
+            issues.append(['级别', '字段', '问题', '建议'])
+            issue_count = 0
+            for profile in profiles:
+                numeric = profile.get('numeric') or {}
+                top_values = '；'.join(f'{item["value"]} ({item["count"]})' for item in profile.get('topValues') or [])
+                details.append([
+                    profile['field'],
+                    profile['type'],
+                    profile['unique'],
+                    profile['blanks'],
+                    profile['blankRatio'],
+                    numeric.get('min', ''),
+                    numeric.get('max', ''),
+                    numeric.get('avg', ''),
+                    top_values,
+                ])
+                if profile['blankRatio'] >= threshold and profile['blanks']:
+                    issues.append(['警告', profile['field'], f'空值率 {profile["blankRatio"]:.1%}', '检查缺失数据来源，确定填充或删除策略'])
+                    issue_count += 1
+                non_blank = max(0, summary['totalRows'] - profile['blanks'])
+                duplicate_count = max(0, non_blank - profile['unique'])
+                if duplicate_count and profile['unique'] == 1:
+                    issues.append(['提示', profile['field'], '除空值外仅有一个值', '确认该字段是否仍有分析价值'])
+                    issue_count += 1
+            for sheet in (overview, details, issues):
+                sheet.freeze_panes = 'A2'
+                for column in sheet.columns:
+                    width = min(60, max(10, max((len(str(cell.value or '')) for cell in column), default=8) + 2))
+                    sheet.column_dimensions[column[0].column_letter].width = width
+            workbook.save(dest)
+            workbook.close()
+            return {
+                'code': 0,
+                'msg': f'数据质量报告已生成，发现 {issue_count} 项提示',
+                'output': str(dest),
+                'outputDir': str(output_dir),
+                'issueCount': issue_count,
+                'summary': summary,
+                'profiles': profiles,
+            }
+        except Exception as exc:
+            return {'code': -1, 'msg': f'生成质量报告失败：{exc}'}
+
     def excel_split_by_column(self, options: Dict = None):
         '''按列拆分为多个工作簿'''
         try:

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watchEffect } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watchEffect } from 'vue'
 import { List, Moon, Search, SetUp, Sunny } from '@element-plus/icons-vue'
 
 import { toolById } from './config/tools'
@@ -14,9 +14,11 @@ import WindowResizeHandles from './components/WindowResizeHandles.vue'
 import WindowTitleBar from './components/WindowTitleBar.vue'
 
 import ExcelTool from './components/excel/ExcelTool.vue'
+import DocumentTool from './components/document/DocumentTool.vue'
 import FileTool from './components/file/FileTool.vue'
 import ImageTool from './components/image/ImageTool.vue'
 import MindMapTool from './components/mindmap/MindMapTool.vue'
+import MaintenanceTool from './components/maintenance/MaintenanceTool.vue'
 import PdfTool from './components/pdf/PdfTool.vue'
 import SealTool from './components/seal/SealTool.vue'
 import SystemCenter from './components/system/SystemCenter.vue'
@@ -24,18 +26,22 @@ import TextTool from './components/text/TextTool.vue'
 import VideoTool from './components/video/VideoTool.vue'
 import WebAutoTool from './components/webauto/WebAutoTool.vue'
 import WordTool from './components/word/WordTool.vue'
+import WorkflowTool from './components/workflow/WorkflowTool.vue'
 
 const VIEWS = {
   image: ImageTool,
   pdf: PdfTool,
   word: WordTool,
   excel: ExcelTool,
+  document: DocumentTool,
   text: TextTool,
   video: VideoTool,
   file: FileTool,
   webauto: WebAutoTool,
   mindmap: MindMapTool,
+  maintenance: MaintenanceTool,
   seal: SealTool,
+  workflow: WorkflowTool,
   system: SystemCenter
 }
 
@@ -81,6 +87,37 @@ const go = (target) => {
   if (toolById(id)) pushRecent(id, feature)
 }
 
+const routeLaunchFiles = async () => {
+  const encoded = new URLSearchParams(window.location.search).get('openFiles')
+  if (!encoded) return
+  try {
+    const files = JSON.parse(encoded)
+    if (!Array.isArray(files) || !files.length) return
+    window.__PPX_OPEN_FILES__ = files
+    const extension = String(files[0]).split('.').pop().toLowerCase()
+    const route = ['pdf'].includes(extension)
+      ? { tool: 'pdf', feature: 'pages' }
+      : ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif', 'tif', 'tiff'].includes(extension)
+        ? { tool: 'image', feature: 'convert' }
+        : ['doc', 'docx'].includes(extension)
+          ? { tool: 'word', feature: 'split' }
+          : ['xls', 'xlsx', 'xlsm', 'csv'].includes(extension)
+            ? { tool: 'excel', feature: 'structure' }
+            : ['mp4', 'mov', 'mkv', 'avi', 'webm'].includes(extension)
+              ? { tool: 'video', feature: 'convert' }
+              : ['txt', 'md', 'markdown', 'json', 'log'].includes(extension)
+                ? { tool: 'text', feature: extension === 'json' ? 'json' : 'transform' }
+                : { tool: 'file', feature: 'search' }
+    go(route)
+    await nextTick()
+    window.dispatchEvent(new CustomEvent('ppx-open-files', { detail: { files } }))
+  } catch {
+    // Ignore malformed launch parameters; the normal home page remains usable.
+  }
+}
+
+onMounted(routeLaunchFiles)
+
 const toggleTheme = () => {
   theme.value = theme.value === 'dark' ? 'light' : 'dark'
 }
@@ -92,7 +129,7 @@ const toggleTheme = () => {
       <template #left>
         <div class="logo-area">
           <img class="logo-image" src="/logo.png" alt="" />
-          <span class="logo-label">多功能工具箱 <small>2.0</small></span>
+          <span class="logo-label">多功能工具箱 <small>2.3</small></span>
         </div>
       </template>
       <template #right>

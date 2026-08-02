@@ -26,6 +26,13 @@ class AppUpdateSafetyTests(unittest.TestCase):
         self.assertEqual(self.update.bytes2Size('invalid'), '0 B')
         self.assertEqual(self.update.bytes2Size(1536), '2.0 KB')
 
+    def test_release_asset_requires_valid_sha256_digest(self):
+        digest = self.update._AppUpdate__assetSha256
+        value = 'a' * 64
+        self.assertEqual(digest({'digest': f'sha256:{value}'}), value)
+        self.assertEqual(digest({'digest': 'sha256:not-a-digest'}), '')
+        self.assertEqual(digest({}), '')
+
 
 if __name__ == '__main__':
     unittest.main()

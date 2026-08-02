@@ -6,6 +6,7 @@ Date: 2025-07-04
 Description: PDF 工具相关 API
 '''
 
+import base64
 import random
 import zipfile
 from datetime import datetime, timezone
@@ -794,3 +795,219 @@ class PDF():
             }
         except Exception as exc:
             return {'code': -1, 'msg': f'提取图片失败：{exc}'}
+
+    def pdf_page_preview(self, options: Dict = None):
+        '''返回低分辨率页面缩略图，供页面工作台排序与选择。'''
+        try:
+            opts = self._validate_payload(options)
+            source = self._ensure_pdf_file(opts.get('filePath', ''))
+            password = str(opts.get('password') or '')
+            max_pages = max(1, min(int(opts.get('maxPages') or 200), 500))
+            width = max(96, min(int(opts.get('width') or 180), 480))
+            pages = []
+            with fitz.open(source) as doc:
+                if doc.needs_pass and not doc.authenticate(password):
+                    raise ValueError('PDF 已加密，请输入正确密码')
+                total_pages = doc.page_count
+                for index in range(min(total_pages, max_pages)):
+                    page = doc.load_page(index)
+                    scale = width / max(page.rect.width, 1)
+                    pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
+                    encoded = base64.b64encode(pix.tobytes('jpeg', jpg_quality=72)).decode('ascii')
+                    pages.append({
+                        'page': index + 1,
+                        'rotation': page.rotation,
+                        'width': round(page.rect.width, 2),
+                        'height': round(page.rect.height, 2),
+                        'preview': f'data:image/jpeg;base64,{encoded}',
+                    })
+            return {
+                'code': 0,
+                'msg': f'已读取 {len(pages)} 页',
+                'pages': pages,
+                'pageCount': total_pages,
+                'loadedCount': len(pages),
+                'truncated': total_pages > len(pages),
+            }
+        except Exception as exc:
+            return {'code': -1, 'msg': f'读取页面失败：{exc}'}
+
+    def pdf_page_workbench(self, options: Dict = None):
+        '''页面重排、删除、旋转与页码添加，一次生成新的 PDF。'''
+        try:
+            opts = self._validate_payload(options)
+            source = self._ensure_pdf_file(opts.get('filePath', ''))
+            password = str(opts.get('password') or '')
+            output_path = opts.get('outputPath') or self._compose_output_path(
+                opts.get('outputDir', ''), opts.get('outputName', '')
+            )
+            dest = self._resolve_output_path(source, output_path, 'pages')
+            if dest.resolve() == source.resolve():
+                raise ValueError('输出文件不能覆盖源 PDF')
+
+            with fitz.open(source) as doc:
+                if doc.needs_pass and not doc.authenticate(password):
+                    raise ValueError('PDF 已加密，请输入正确密码')
+                total = doc.page_count
+                raw_order = opts.get('pageOrder')
+                if isinstance(raw_order, list) and raw_order:
+                    order = []
+                    for value in raw_order:
+                        page_no = int(value)
+                        if not 1 <= page_no <= total:
+                            raise ValueError(f'页码超出范围：{page_no}')
+                        order.append(page_no)
+                else:
+                    order = list(range(1, total + 1))
+
+                delete_pages = set(self._parse_page_spec(str(opts.get('deletePages') or ''), total))
+                order = [page_no for page_no in order if page_no not in delete_pages]
+                if not order:
+                    raise ValueError('不能删除全部页面')
+                doc.select([page_no - 1 for page_no in order])
+
+                rotations = opts.get('rotations') or {}
+                if not isinstance(rotations, dict):
+                    rotations = {}
+                for index, original_page in enumerate(order):
+                    delta = int(rotations.get(str(original_page), rotations.get(original_page, 0)) or 0)
+                    if delta:
+                        page = doc.load_page(index)
+                        page.set_rotation((page.rotation + delta) % 360)
+
+                if bool(opts.get('addPageNumbers', False)):
+                    start_number = int(opts.get('pageNumberStart') or 1)
+                    font_size = max(6, min(float(opts.get('pageNumberSize') or 10), 48))
+                    position = str(opts.get('pageNumberPosition') or 'bottom-center')
+                    for index in range(doc.page_count):
+                        page = doc.load_page(index)
+                        margin = max(14, font_size * 1.8)
+                        if position.startswith('top'):
+                            rect = fitz.Rect(20, margin / 2, page.rect.width - 20, margin * 1.5)
+                        else:
+                            rect = fitz.Rect(20, page.rect.height - margin * 1.5, page.rect.width - 20, page.rect.height - margin / 2)
+                        align = fitz.TEXT_ALIGN_LEFT if position.endswith('left') else fitz.TEXT_ALIGN_RIGHT if position.endswith('right') else fitz.TEXT_ALIGN_CENTER
+                        page.insert_textbox(
+                            rect,
+                            str(start_number + index),
+                            fontsize=font_size,
+                            fontname='china-s',
+                            color=(0.25, 0.25, 0.25),
+                            align=align,
+                            overlay=True,
+                        )
+
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                doc.save(str(dest), garbage=4, deflate=True, deflate_images=True, deflate_fonts=True)
+            return {
+                'code': 0,
+                'msg': f'页面处理完成，共保留 {len(order)} 页',
+                'output': str(dest),
+                'pageCount': len(order),
+                'pageOrder': order,
+            }
+        except Exception as exc:
+            return {'code': -1, 'msg': f'页面处理失败：{exc}'}
+
+    def pdf_secure(self, options: Dict = None):
+        '''添加可见水印、永久遮盖敏感文字、清理元数据并可设置密码。'''
+        try:
+            opts = self._validate_payload(options)
+            source = self._ensure_pdf_file(opts.get('filePath', ''))
+            source_password = str(opts.get('sourcePassword') or '')
+            output_path = opts.get('outputPath') or self._compose_output_path(
+                opts.get('outputDir', ''), opts.get('outputName', '')
+            )
+            dest = self._resolve_output_path(source, output_path, 'secure')
+            if dest.resolve() == source.resolve():
+                raise ValueError('输出文件不能覆盖源 PDF')
+
+            watermark = str(opts.get('watermarkText') or '').strip()
+            watermark_opacity = max(0.05, min(float(opts.get('watermarkOpacity') or 0.18), 1.0))
+            watermark_size = max(8, min(float(opts.get('watermarkSize') or 34), 120))
+            watermark_rotation = int(opts.get('watermarkRotation') or 0)
+            watermark_rotation = watermark_rotation if watermark_rotation in {0, 90, 180, 270} else 0
+            redact_text = str(opts.get('redactText') or '').strip()
+            manual_redactions = opts.get('redactions') or []
+            if not isinstance(manual_redactions, list):
+                raise ValueError('遮盖区域格式不正确')
+
+            redacted_count = 0
+            with fitz.open(source) as doc:
+                if doc.needs_pass and not doc.authenticate(source_password):
+                    raise ValueError('PDF 已加密，请输入正确的源文件密码')
+                for page_index in range(doc.page_count):
+                    page = doc.load_page(page_index)
+                    if watermark:
+                        band_height = min(page.rect.height * 0.3, max(watermark_size * 2.4, 70))
+                        band = fitz.Rect(20, (page.rect.height - band_height) / 2, page.rect.width - 20, (page.rect.height + band_height) / 2)
+                        page.insert_textbox(
+                            band,
+                            watermark,
+                            fontsize=watermark_size,
+                            fontname='china-s',
+                            color=(0.55, 0.08, 0.08),
+                            align=fitz.TEXT_ALIGN_CENTER,
+                            rotate=watermark_rotation,
+                            overlay=True,
+                            fill_opacity=watermark_opacity,
+                            stroke_opacity=watermark_opacity,
+                        )
+                    if redact_text:
+                        for rect in page.search_for(redact_text):
+                            page.add_redact_annot(rect, fill=(0, 0, 0))
+                            redacted_count += 1
+                    for item in manual_redactions:
+                        if not isinstance(item, dict) or int(item.get('page') or 0) != page_index + 1:
+                            continue
+                        rect = item.get('rect')
+                        if isinstance(rect, (list, tuple)) and len(rect) == 4:
+                            page.add_redact_annot(fitz.Rect(*(float(value) for value in rect)), fill=(0, 0, 0))
+                            redacted_count += 1
+                    if redact_text or manual_redactions:
+                        page.apply_redactions()
+
+                if bool(opts.get('removeMetadata', True)):
+                    doc.set_metadata({})
+
+                user_password = str(opts.get('userPassword') or '')
+                owner_password = str(opts.get('ownerPassword') or '')
+                save_options = {
+                    'garbage': 4,
+                    'deflate': True,
+                    'deflate_images': True,
+                    'deflate_fonts': True,
+                    'encryption': fitz.PDF_ENCRYPT_NONE,
+                }
+                if user_password or owner_password:
+                    permissions = fitz.PDF_PERM_ACCESSIBILITY
+                    if bool(opts.get('allowPrint', True)):
+                        permissions |= fitz.PDF_PERM_PRINT
+                    if bool(opts.get('allowCopy', False)):
+                        permissions |= fitz.PDF_PERM_COPY
+                    save_options.update({
+                        'encryption': fitz.PDF_ENCRYPT_AES_256,
+                        'permissions': permissions,
+                        'owner_pw': owner_password or user_password,
+                        'user_pw': user_password,
+                    })
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                doc.save(str(dest), **save_options)
+
+            actions = []
+            if watermark:
+                actions.append('水印')
+            if redacted_count:
+                actions.append(f'遮盖 {redacted_count} 处')
+            if opts.get('userPassword') or opts.get('ownerPassword'):
+                actions.append('AES-256 加密')
+            if bool(opts.get('removeMetadata', True)):
+                actions.append('清理元数据')
+            return {
+                'code': 0,
+                'msg': f'安全副本已生成（{"、".join(actions) or "无附加处理"}）',
+                'output': str(dest),
+                'redactedCount': redacted_count,
+            }
+        except Exception as exc:
+            return {'code': -1, 'msg': f'安全处理失败：{exc}'}

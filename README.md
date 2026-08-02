@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Vue-3.0+-4FC08D?style=flat-square&logo=vue.js&logoColor=white" alt="Vue 3" />
   <img src="https://img.shields.io/badge/Python-3.10-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.10" />
   <img src="https://img.shields.io/badge/Pywebview-5.0+-FFD43B?style=flat-square&logo=python&logoColor=blue" alt="Pywebview" />
-  <img src="https://img.shields.io/badge/version-2.0.0-2b6fff?style=flat-square" alt="Version 2.0.0" />
+  <img src="https://img.shields.io/badge/version-2.3.0-2b6fff?style=flat-square" alt="Version 2.3.0" />
   <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License" />
 </p>
 
@@ -20,37 +20,40 @@
 
 ## 📖 简介
 
-**PPX 2.0** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel 和文件批处理；文件默认不上传到第三方服务。
+**PPX 2.3** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
 
-2.0 以“动作 → 任务 → 结果”为主线：从首页或全局搜索直接进入具体功能，在任务中心查看状态和输出；非核心模块可以按需启用。
+2.3 以“动作 → 持久任务 → 可恢复结果”为主线：从首页或全局搜索进入具体功能，在任务中心暂停、取消或重试；还可以把多个能力编排成工作流，通过周期任务或目录监听自动执行。
 
 ## ✨ 主要功能
 
-PPX 2.0 的核心能力包括：
+PPX 2.3 的核心能力包括：
 
 ### 📄 文档与数据
 
-- **PDF 工具**：合并、拆分、压缩、切割、图片 / Word 转换、文本与图片提取。
-- **离线 OCR**：识别图片或扫描 PDF，可生成纯文本和可搜索 PDF。
+- **PDF 工具**：合并、拆分、压缩、切割、页面缩略图重排、页码、水印、永久脱敏、AES-256 加密及图片 / Word 转换。
+- **离线 OCR**：识别图片或扫描 PDF，可生成纯文本、可搜索 PDF，并将规则表格导出为 Excel / CSV / JSON。
 - **Word 工具**：按结构或真实页码拆分、切割及多文档合并。
-- **Excel 工具**：结构预览、数据清洗、分组导出及多表合并。
+- **Excel 工具**：结构预览、数据清洗、列画像、质量报告、按列拆分及多表合并。
+- **文档中心**：对 PDF、Word、Excel、Markdown 等本地文档建立增量全文索引并离线搜索。
 
 ### 🖼️ 图片与媒体
 
-- **图片处理**：多格式转换、批量压缩、裁剪、水印、合成 PDF 和 OCR。
+- **图片处理**：多格式转换、批量压缩、裁剪、水印、旋转翻转、拼接、批量命名、合成 PDF 和 OCR。
 - **视频处理（可选）**：使用 FFmpeg 完成格式转换、压缩、截取、音频提取与合并。
 
 ### 🛠️ 文件与自动化
 
-- **文件批处理**：搜索、分类、复制、安全删除、批量改名、查重及压缩解压。
+- **文件批处理**：搜索、分类、复制、安全删除、回收站恢复、批量改名与撤销、查重及压缩解压。
+- **自动化工作流**：使用安全白名单串联本地工具，支持参数引用、内置模板、周期运行、目录监听及逐步骤日志。
 - **网页数据采集**：点选字段、翻页采集并导出 Excel / Word。
 - **安全边界**：删除操作可恢复且必须预览；重命名不覆盖；系统启动项只读。
 
 ### 🧭 工作台
 
-- **任务中心**：记录处理状态、耗时、输出路径和失败原因，数据仅保存在本机。
+- **任务中心**：持久保存队列与历史，支持暂停、取消、重试、进度、输出路径和失败原因。
 - **模块中心**：按需开启可选能力，并检查 OCR、FFmpeg、LibreOffice 与 Playwright 依赖。
 - **全局搜索**：按 `Ctrl/⌘ + K` 搜索工具或具体动作。
+- **设置与维护**：跨平台健康检查、完整备份、延迟安全恢复、隐私诊断报告及窗口状态记忆。
 
 ## 🏗️ 技术栈
 

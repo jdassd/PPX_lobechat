@@ -5,6 +5,7 @@ import SearchPanel from './parts/SearchPanel.vue'
 import ClassifyPanel from './parts/ClassifyPanel.vue'
 import CopyPanel from './parts/CopyPanel.vue'
 import DeletePanel from './parts/DeletePanel.vue'
+import RecyclePanel from './parts/RecyclePanel.vue'
 import RenamePanel from './parts/RenamePanel.vue'
 import DedupPanel from './parts/DedupPanel.vue'
 import ArchivePanel from './parts/ArchivePanel.vue'
@@ -14,6 +15,7 @@ const TABS = [
   { name: 'classify', label: '自动分类' },
   { name: 'copy', label: '批量复制' },
   { name: 'delete', label: '批量删除' },
+  { name: 'recycle', label: '回收与恢复' },
   { name: 'rename', label: '批量改名' },
   { name: 'dedup', label: '文件去重' },
   { name: 'archive', label: '压缩 / 解压' }
@@ -29,6 +31,7 @@ const activeTab = useInitialTab(TABS, () => props.initialTab, 'search')
     <ClassifyPanel v-show="activeTab === 'classify'" />
     <CopyPanel v-show="activeTab === 'copy'" />
     <DeletePanel v-show="activeTab === 'delete'" />
+    <RecyclePanel v-show="activeTab === 'recycle'" />
     <RenamePanel v-show="activeTab === 'rename'" />
     <DedupPanel v-show="activeTab === 'dedup'" />
     <ArchivePanel v-show="activeTab === 'archive'" />

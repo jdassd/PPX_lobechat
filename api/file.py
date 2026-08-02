@@ -8,11 +8,13 @@ from __future__ import annotations
 import difflib
 import filecmp
 import hashlib
+import json
 import os
 import re
 import shutil
 import subprocess
 import time
+import uuid
 import zipfile
 from collections import Counter
 from datetime import datetime
@@ -70,9 +72,13 @@ class FileTool:
 
     def _iter_files(self, root: Path, recursive: bool = True) -> Iterable[Path]:
         if recursive:
-            yield from (path for path in root.rglob('*') if path.is_file())
+            yield from (
+                path
+                for path in root.rglob('*')
+                if path.is_file() and not {'.ppx_recycle', '.ppx_history'}.intersection(path.relative_to(root).parts)
+            )
         else:
-            yield from (path for path in root.iterdir() if path.is_file())
+            yield from (path for path in root.iterdir() if path.is_file() and path.name not in {'.ppx_recycle', '.ppx_history'})
 
     def _parse_common_filters(self, options: Dict) -> Dict:
         extensions = options.get('extensions') or []
@@ -470,16 +476,29 @@ class FileTool:
             preview = [str(path) for path in files]
             if dry_run:
                 return api_success('预览删除列表', preview=preview, count=len(preview))
-            # v2.0 只允许可恢复删除：文件先移入当前目录下的 .ppx_recycle。
-            recycle_dir = directory / '.ppx_recycle' / str(int(time.time()))
+            # v2.3 只允许可恢复删除，并为每批操作写入可审计、可恢复的清单。
+            batch_id = f'{int(time.time())}-{uuid.uuid4().hex[:8]}'
+            recycle_dir = directory / '.ppx_recycle' / batch_id
             recycle_dir.mkdir(parents=True, exist_ok=True)
             total_size = 0
+            manifest_items = []
             for path in files:
-                total_size += path.stat().st_size
+                file_size = path.stat().st_size
+                total_size += file_size
                 target = recycle_dir / path.relative_to(directory)
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(path), str(target))
+                manifest_items.append({'original': str(path), 'recycled': str(target), 'size': file_size})
+            manifest = {
+                'schemaVersion': 1,
+                'id': batch_id,
+                'directory': str(directory),
+                'createdAt': time.time(),
+                'items': manifest_items,
+            }
+            (recycle_dir / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
             payload = {
+                'id': batch_id,
                 'deleted': len(files),
                 'size': total_size,
                 'sizeText': format_bytes(total_size),
@@ -517,10 +536,181 @@ class FileTool:
                 renamed.append({'from': str(path), 'to': str(dest)})
                 if not dry_run:
                     path.rename(dest)
+            transaction_id = ''
+            if not dry_run and renamed:
+                transaction_id = f'{int(time.time())}-{uuid.uuid4().hex[:8]}'
+                history_dir = directory / '.ppx_history' / 'rename'
+                history_dir.mkdir(parents=True, exist_ok=True)
+                manifest = {
+                    'schemaVersion': 1,
+                    'id': transaction_id,
+                    'directory': str(directory),
+                    'createdAt': time.time(),
+                    'mappings': renamed,
+                }
+                (history_dir / f'{transaction_id}.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
             message = '重命名预览' if dry_run else '重命名完成'
-            return api_success(message, renamed=renamed, skipped=skipped, dryRun=dry_run)
+            return api_success(message, renamed=renamed, skipped=skipped, dryRun=dry_run, transactionId=transaction_id)
         except Exception as exc:
             return api_error(f'批量改名失败：{exc}')
+
+    @staticmethod
+    def _safe_child(root: Path, candidate: Path) -> Path:
+        resolved_root = root.resolve()
+        resolved = candidate.resolve()
+        try:
+            resolved.relative_to(resolved_root)
+        except ValueError as exc:
+            raise ValueError('目标路径超出允许范围') from exc
+        return resolved
+
+    def _load_recycle_manifest(self, directory: Path, batch_dir: Path) -> Dict:
+        recycle_root = directory / '.ppx_recycle'
+        safe_batch = self._safe_child(recycle_root, batch_dir)
+        manifest_path = safe_batch / 'manifest.json'
+        if manifest_path.is_file():
+            payload = json.loads(manifest_path.read_text(encoding='utf-8'))
+            if isinstance(payload, dict) and isinstance(payload.get('items'), list):
+                return payload
+        items = []
+        for path in safe_batch.rglob('*'):
+            if not path.is_file() or path.name == 'manifest.json':
+                continue
+            relative = path.relative_to(safe_batch)
+            items.append({'original': str(directory / relative), 'recycled': str(path), 'size': path.stat().st_size})
+        return {
+            'schemaVersion': 1,
+            'id': safe_batch.name,
+            'directory': str(directory),
+            'createdAt': safe_batch.stat().st_mtime,
+            'items': items,
+        }
+
+    def file_recycle_list(self, options: Dict | None = None):
+        """列出指定目录内由 PPX 创建的可恢复删除批次。"""
+        try:
+            opts = self._validate(options)
+            directory = ensure_directory(opts.get('directory'), auto_create=False)
+            recycle_root = directory / '.ppx_recycle'
+            if not recycle_root.is_dir():
+                return api_success('回收站为空', batches=[])
+            batches = []
+            for batch_dir in sorted((path for path in recycle_root.iterdir() if path.is_dir()), reverse=True):
+                manifest = self._load_recycle_manifest(directory, batch_dir)
+                items = manifest.get('items') or []
+                total_size = sum(int(item.get('size') or 0) for item in items)
+                batches.append({
+                    'id': manifest.get('id') or batch_dir.name,
+                    'recycleDir': str(batch_dir),
+                    'createdAt': float(manifest.get('createdAt') or batch_dir.stat().st_mtime),
+                    'count': len(items),
+                    'size': total_size,
+                    'sizeText': format_bytes(total_size),
+                    'files': [item.get('original') for item in items[:100]],
+                })
+            return api_success('回收站读取完成', batches=batches)
+        except Exception as exc:
+            return api_error(f'读取回收站失败：{exc}')
+
+    def file_recycle_restore(self, options: Dict | None = None):
+        """按批次恢复安全删除的文件，默认不覆盖已有文件。"""
+        try:
+            opts = self._validate(options)
+            directory = ensure_directory(opts.get('directory'), auto_create=False)
+            batch_id = str(opts.get('id') or '').strip()
+            if not batch_id or Path(batch_id).name != batch_id:
+                raise ValueError('回收批次编号无效')
+            batch_dir = self._safe_child(directory / '.ppx_recycle', directory / '.ppx_recycle' / batch_id)
+            if not batch_dir.is_dir():
+                raise FileNotFoundError('回收批次不存在')
+            manifest = self._load_recycle_manifest(directory, batch_dir)
+            conflict_policy = str(opts.get('conflictPolicy') or 'rename').lower()
+            restored = []
+            skipped = []
+            remaining = []
+            for item in manifest.get('items') or []:
+                source = self._safe_child(batch_dir, Path(item.get('recycled') or ''))
+                target = self._safe_child(directory, Path(item.get('original') or ''))
+                if not source.is_file():
+                    continue
+                if target.exists():
+                    if conflict_policy == 'skip':
+                        skipped.append(str(target))
+                        remaining.append(item)
+                        continue
+                    index = 1
+                    while True:
+                        candidate = target.with_name(f'{target.stem}_restored_{index}{target.suffix}')
+                        if not candidate.exists():
+                            target = candidate
+                            break
+                        index += 1
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(source), str(target))
+                restored.append({'from': str(source), 'to': str(target)})
+            if remaining:
+                manifest['items'] = remaining
+                (batch_dir / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
+            else:
+                shutil.rmtree(batch_dir, ignore_errors=False)
+            return api_success('文件恢复完成', restored=restored, skipped=skipped, restoredCount=len(restored))
+        except Exception as exc:
+            return api_error(f'恢复失败：{exc}')
+
+    def file_recycle_purge(self, options: Dict | None = None):
+        """永久清理一个回收批次，或清理超过保留天数的批次。"""
+        try:
+            opts = self._validate(options)
+            directory = ensure_directory(opts.get('directory'), auto_create=False)
+            recycle_root = directory / '.ppx_recycle'
+            if not recycle_root.is_dir():
+                return api_success('回收站为空', purged=0)
+            batch_id = str(opts.get('id') or '').strip()
+            older_days = max(0, int(opts.get('olderThanDays') or 0))
+            threshold = time.time() - older_days * 86400
+            candidates = []
+            for batch_dir in recycle_root.iterdir():
+                if not batch_dir.is_dir():
+                    continue
+                if batch_id and batch_dir.name != batch_id:
+                    continue
+                if not batch_id and older_days and batch_dir.stat().st_mtime > threshold:
+                    continue
+                candidates.append(self._safe_child(recycle_root, batch_dir))
+            for batch_dir in candidates:
+                shutil.rmtree(batch_dir, ignore_errors=False)
+            return api_success('回收站清理完成', purged=len(candidates))
+        except Exception as exc:
+            return api_error(f'清理回收站失败：{exc}')
+
+    def file_batch_rename_undo(self, options: Dict | None = None):
+        """根据事务清单撤销一次批量重命名。"""
+        try:
+            opts = self._validate(options)
+            directory = ensure_directory(opts.get('directory'), auto_create=False)
+            transaction_id = str(opts.get('transactionId') or opts.get('id') or '').strip()
+            if not transaction_id or Path(transaction_id).name != transaction_id:
+                raise ValueError('重命名事务编号无效')
+            history_root = directory / '.ppx_history' / 'rename'
+            manifest_path = self._safe_child(history_root, history_root / f'{transaction_id}.json')
+            if not manifest_path.is_file():
+                raise FileNotFoundError('重命名事务不存在或已撤销')
+            manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+            restored = []
+            skipped = []
+            for mapping in reversed(manifest.get('mappings') or []):
+                source = self._safe_child(directory, Path(mapping.get('to') or ''))
+                target = self._safe_child(directory, Path(mapping.get('from') or ''))
+                if not source.exists() or target.exists():
+                    skipped.append({'from': str(source), 'to': str(target)})
+                    continue
+                source.rename(target)
+                restored.append({'from': str(source), 'to': str(target)})
+            if not skipped:
+                manifest_path.unlink()
+            return api_success('批量重命名已撤销', restored=restored, skipped=skipped, restoredCount=len(restored))
+        except Exception as exc:
+            return api_error(f'撤销重命名失败：{exc}')
 
     def file_deduplicate(self, options: Dict | None = None):
         """文件去重"""

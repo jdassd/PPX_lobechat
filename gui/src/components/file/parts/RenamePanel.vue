@@ -22,6 +22,7 @@ const state = reactive({
   dryRun: true,
   result: [],
   skipped: [],
+  transactionId: '',
   showHelp: false
 })
 const previewReady = ref(false)
@@ -173,6 +174,7 @@ const runRename = async (dryRun = true) => {
     if (ok) {
       state.result = res.renamed || []
       state.skipped = res.skipped || []
+      state.transactionId = dryRun ? '' : res.transactionId || ''
       previewReady.value = dryRun && state.result.length > 0
       ElMessage.success(message || (dryRun ? '预览完成' : '重命名完成'))
     } else {
@@ -180,6 +182,26 @@ const runRename = async (dryRun = true) => {
     }
   } catch (error) {
     ElMessage.error(error?.message || '重命名失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+const undoRename = async () => {
+  if (!state.transactionId || !state.directory) return
+  try {
+    await ElMessageBox.confirm('将按本次改名前的映射恢复文件名；若原名称已被占用，对应文件会跳过。', '撤销批量重命名', { confirmButtonText: '撤销改名', cancelButtonText: '取消', type: 'warning' })
+  } catch {
+    return
+  }
+  loading.value = true
+  try {
+    const { ok, data: res, message } = await pyCall('file_batch_rename_undo', { directory: state.directory, transactionId: state.transactionId })
+    if (!ok) return ElMessage.error(message || '撤销失败')
+    state.result = res.restored || []
+    if (!(res.skipped || []).length) state.transactionId = ''
+    previewReady.value = false
+    ElMessage.success(message || '已撤销重命名')
   } finally {
     loading.value = false
   }
@@ -314,6 +336,7 @@ const runRename = async (dryRun = true) => {
       <el-form-item>
         <el-button type="primary" plain :loading="loading" @click="runRename(true)">1. 预览结果</el-button>
         <el-button type="primary" :loading="loading" :disabled="!previewReady" @click="runRename(false)">2. 执行改名</el-button>
+        <el-button v-if="state.transactionId" type="warning" plain :loading="loading" @click="undoRename">撤销本次改名</el-button>
       </el-form-item>
     </el-form>
 

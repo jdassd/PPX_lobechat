@@ -1,14 +1,19 @@
 import { computed, ref } from 'vue'
 
-const STORAGE_KEY = 'ppx-v2-tasks'
-const MAX_TASKS = 80
+const STORAGE_KEY = 'ppx-v23-tasks'
+const LEGACY_STORAGE_KEY = 'ppx-v2-tasks'
+const MAX_TASKS = 200
+const SENSITIVE_KEY = /(password|passwd|secret|token|cookie|authorization|api[_-]?key)/i
 
-// 仅记录真正产生结果或改变文件的调用；状态查询、预览和文件对话框不会污染任务中心。
-const TASK_METHODS = {
+// 仅将真正产生结果、改变文件或执行较重分析的调用送入持久任务队列。
+export const TASK_METHODS = {
   image_format_convert: ['image', 'convert', '图片格式转换'],
   image_batch_compress: ['image', 'compress', '批量压缩图片'],
   image_crop: ['image', 'crop', '裁剪图片'],
   image_add_watermark: ['image', 'watermark', '添加图片水印'],
+  image_rotate_flip: ['image', 'rotate', '旋转与翻转图片'],
+  image_concat: ['image', 'concat', '拼接图片'],
+  image_batch_rename: ['image', 'rename', '图片批量命名'],
   image_to_pdf: ['image', 'pdf', '图片合成 PDF'],
   ocr_image: ['image', 'ocr', '图片 OCR'],
   pdf_convert_to_images: ['pdf', 'image', 'PDF 转图片'],
@@ -17,15 +22,21 @@ const TASK_METHODS = {
   pdf_merge: ['pdf', 'merge', '合并 PDF'],
   pdf_split: ['pdf', 'split', '拆分 PDF'],
   pdf_cut: ['pdf', 'cut', '切割 PDF'],
+  pdf_multi_cut: ['pdf', 'cut', '批量切割 PDF'],
   pdf_extract_text: ['pdf', 'text', '提取 PDF 文本'],
   ocr_pdf: ['pdf', 'ocr', '扫描 PDF OCR'],
   pdf_to_word: ['pdf', 'word', 'PDF 转 Word'],
   pdf_extract_images: ['pdf', 'images', '提取 PDF 图片'],
+  pdf_page_workbench: ['pdf', 'pages', '整理 PDF 页面'],
+  pdf_secure: ['pdf', 'security', '保护 PDF'],
   word_split: ['word', 'split', '拆分 Word'],
   word_cut: ['word', 'cut', '切割 Word'],
   word_merge: ['word', 'merge', '合并 Word'],
+  excel_column_profile: ['excel', 'profile', 'Excel 数据质检'],
   excel_process: ['excel', 'process', '处理 Excel 数据'],
+  excel_split_by_column: ['excel', 'split', '按列拆分 Excel'],
   excel_merge_tables: ['excel', 'merge', '合并 Excel 表格'],
+  excel_quality_report: ['excel', 'profile', '导出 Excel 质检报告'],
   text_format_json: ['text', 'json', '格式化 JSON'],
   text_case_transform: ['text', 'transform', '转换文本'],
   text_deduplicate_sort: ['text', 'dedup', '文本去重排序'],
@@ -40,15 +51,50 @@ const TASK_METHODS = {
   file_batch_copy: ['file', 'copy', '批量复制文件'],
   file_batch_delete: ['file', 'delete', '批量删除文件'],
   file_batch_rename: ['file', 'rename', '批量重命名'],
+  file_batch_rename_undo: ['file', 'rename', '撤销批量重命名'],
   file_deduplicate: ['file', 'dedup', '查找重复文件'],
   file_compress: ['file', 'archive', '压缩文件'],
   file_decompress: ['file', 'archive', '解压文件'],
-  seal_generate: ['seal', 'design', '生成印章图片']
+  file_recycle_restore: ['file', 'recycle', '恢复回收文件'],
+  file_recycle_purge: ['file', 'recycle', '清理回收文件'],
+  seal_generate: ['seal', 'design', '生成印章图片'],
+  ocr_table: ['document', 'table', '表格 OCR'],
+  document_index_build: ['document', 'index', '建立文档索引'],
+  workflow_run: ['workflow', 'history', '运行工作流']
+}
+
+const sanitizeValue = (value, key = '', depth = 0) => {
+  if (key && SENSITIVE_KEY.test(key)) return { value: '[REDACTED]', retryable: false }
+  if (depth > 10) return { value: '[DEPTH_LIMIT]', retryable: false }
+  if (value === null || ['boolean', 'number'].includes(typeof value)) return { value, retryable: true }
+  if (typeof value === 'string') return value.length <= 200000 ? { value, retryable: true } : { value: `${value.slice(0, 200000)}\n[TRUNCATED]`, retryable: false }
+  if (Array.isArray(value)) {
+    let retryable = true
+    const output = value.map((item) => {
+      const safe = sanitizeValue(item, '', depth + 1)
+      retryable = retryable && safe.retryable
+      return safe.value
+    })
+    return { value: output, retryable }
+  }
+  if (value && typeof value === 'object') {
+    let retryable = true
+    const output = {}
+    Object.entries(value).forEach(([itemKey, item]) => {
+      const safe = sanitizeValue(item, itemKey, depth + 1)
+      output[itemKey] = safe.value
+      retryable = retryable && safe.retryable
+    })
+    return { value: output, retryable }
+  }
+  return { value: String(value), retryable: false }
 }
 
 const readTasks = () => {
   try {
-    const list = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
+    const current = localStorage.getItem(STORAGE_KEY)
+    const legacy = localStorage.getItem(LEGACY_STORAGE_KEY)
+    const list = JSON.parse(current || legacy || '[]')
     if (!Array.isArray(list)) return []
     return list.map((item) => (item.status === 'running' ? { ...item, status: 'interrupted', message: '应用在任务完成前退出' } : item))
   } catch {
@@ -57,7 +103,8 @@ const readTasks = () => {
 }
 
 export const tasks = ref(readTasks())
-export const runningTasks = computed(() => tasks.value.filter((item) => item.status === 'running'))
+export const queuePaused = ref(false)
+export const runningTasks = computed(() => tasks.value.filter((item) => ['queued', 'running'].includes(item.status)))
 export const recentTasks = computed(() => tasks.value.slice(0, 6))
 
 const persist = () => {
@@ -70,52 +117,88 @@ const persist = () => {
 
 const extractOutput = (data) => {
   if (!data || typeof data !== 'object') return ''
-  const direct = data.output || data.outputPath || data.outputDir || data.path || data.archive
+  const direct = data.output || data.outputPath || data.outputDir || data.path || data.archive || data.file
   if (direct) return String(direct)
   const outputs = data.outputs || data.files || data.created
   return Array.isArray(outputs) && outputs.length ? String(outputs[0]?.path || outputs[0]) : ''
 }
 
-export const beginApiTask = (method, args = []) => {
+const toMilliseconds = (value) => {
+  if (!value) return null
+  return Number(value) < 10_000_000_000 ? Number(value) * 1000 : Number(value)
+}
+
+export const isTaskMethod = (method) => Boolean(TASK_METHODS[method])
+
+export const beginApiTask = (method, args = [], id = '') => {
   const meta = TASK_METHODS[method]
-  if (!meta) return null
-  if (args[0]?.dryRun) return null
+  if (!meta || args[0]?.dryRun) return null
   const [tool, feature, label] = meta
+  const safe = sanitizeValue(args)
   const task = {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    id: id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    schemaVersion: 1,
     method,
+    args: safe.value,
+    retryable: safe.retryable,
     tool,
     feature,
     label,
-    status: 'running',
+    status: 'queued',
+    progress: 0,
     startedAt: Date.now(),
     endedAt: null,
-    message: '正在处理',
+    message: '等待执行',
     output: ''
   }
-  tasks.value = [task, ...tasks.value].slice(0, MAX_TASKS)
+  tasks.value = [task, ...tasks.value.filter((item) => item.id !== task.id)].slice(0, MAX_TASKS)
   persist()
   return task.id
 }
 
+export const updateApiTask = (id, patch = {}) => {
+  if (!id) return
+  tasks.value = tasks.value.map((item) => (item.id === id ? { ...item, ...patch } : item))
+  persist()
+}
+
 export const settleApiTask = (id, result, error) => {
   if (!id) return
-  const index = tasks.value.findIndex((item) => item.id === id)
-  if (index < 0) return
-  const current = tasks.value[index]
+  const current = tasks.value.find((item) => item.id === id)
+  if (!current) return
   const ok = !error && result?.ok
-  const next = {
-    ...current,
+  updateApiTask(id, {
     status: ok ? 'success' : 'failed',
+    progress: 100,
     endedAt: Date.now(),
     message: error?.message || result?.message || (ok ? '处理完成' : '处理失败'),
     output: ok ? extractOutput(result?.data) : ''
-  }
-  tasks.value = tasks.value.map((item, itemIndex) => (itemIndex === index ? next : item))
+  })
+}
+
+export const hydrateBackendTasks = (backendTasks = [], paused = false) => {
+  if (!Array.isArray(backendTasks)) return
+  queuePaused.value = Boolean(paused)
+  const mapped = backendTasks.map((task) => {
+    const meta = TASK_METHODS[task.method] || ['advanced', '', task.method]
+    const [tool, feature, label] = meta
+    return {
+      ...task,
+      tool,
+      feature,
+      label,
+      startedAt: toMilliseconds(task.startedAt || task.createdAt),
+      endedAt: toMilliseconds(task.endedAt),
+      output: extractOutput(task.result),
+      progress: Number(task.progress || 0)
+    }
+  })
+  const backendIds = new Set(mapped.map((item) => item.id))
+  tasks.value = [...mapped, ...tasks.value.filter((item) => !backendIds.has(item.id))].slice(0, MAX_TASKS)
   persist()
 }
 
 export const clearFinishedTasks = () => {
-  tasks.value = tasks.value.filter((item) => item.status === 'running')
+  tasks.value = tasks.value.filter((item) => ['queued', 'running'].includes(item.status))
   persist()
 }

@@ -10,6 +10,8 @@
     <OcrPanel v-show="activeTab === 'ocr'" source-type="pdf" />
     <WordPanel v-show="activeTab === 'word'" />
     <ExtractImagesPanel v-show="activeTab === 'images'" />
+    <PageWorkbenchPanel v-show="activeTab === 'pages'" />
+    <SecurityPanel v-show="activeTab === 'security'" />
 
     <section class="log-panel">
       <header>
@@ -45,6 +47,8 @@ import CutPanel from './parts/CutPanel.vue'
 import ExtractTextPanel from './parts/ExtractTextPanel.vue'
 import WordPanel from './parts/WordPanel.vue'
 import ExtractImagesPanel from './parts/ExtractImagesPanel.vue'
+import PageWorkbenchPanel from './parts/PageWorkbenchPanel.vue'
+import SecurityPanel from './parts/SecurityPanel.vue'
 
 const TABS = [
   { name: 'image', label: 'PDF 转高清图片' },
@@ -56,7 +60,9 @@ const TABS = [
   { name: 'text', label: '提取文本' },
   { name: 'ocr', label: '扫描件 OCR' },
   { name: 'word', label: 'PDF 转 Word' },
-  { name: 'images', label: '提取图片' }
+  { name: 'images', label: '提取图片' },
+  { name: 'pages', label: '页面工作台' },
+  { name: 'security', label: '安全副本' }
 ]
 
 const props = defineProps({ initialTab: { type: String, default: '' } })
