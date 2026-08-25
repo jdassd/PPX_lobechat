@@ -8,6 +8,7 @@ Description: PDF 工具相关 API
 
 import base64
 import random
+import re
 import zipfile
 from datetime import datetime, timezone
 from io import BytesIO
@@ -176,7 +177,8 @@ class PDF():
         pages: List[int] = []
         if not spec:
             return pages
-        for chunk in spec.replace('，', ',').split(','):
+        # 页码列表支持中英文逗号、分号和换行，与前端输入提示保持一致。
+        for chunk in re.split(r'[,，;；\r\n]+', spec):
             chunk = chunk.strip()
             if not chunk:
                 continue

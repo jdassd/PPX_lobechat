@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Vue-3.0+-4FC08D?style=flat-square&logo=vue.js&logoColor=white" alt="Vue 3" />
   <img src="https://img.shields.io/badge/Python-3.10-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.10" />
   <img src="https://img.shields.io/badge/Pywebview-5.0+-FFD43B?style=flat-square&logo=python&logoColor=blue" alt="Pywebview" />
-  <img src="https://img.shields.io/badge/version-2.5.0-2b6fff?style=flat-square" alt="Version 2.5.0" />
+  <img src="https://img.shields.io/badge/version-2.5.1-2b6fff?style=flat-square" alt="Version 2.5.1" />
   <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License" />
 </p>
 
@@ -20,13 +20,13 @@
 
 ## 📖 简介
 
-**PPX 2.5** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
+**PPX 2.5.1** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
 
-2.5 把“动作 → 持久任务 → 可恢复结果”推进为可观测闭环：统一管理一个任务产生的多个输出文件，自动归类失败原因并给出修复建议，以 7 天趋势和方法可靠性定位瓶颈；工作流可以安全导入导出，备份则新增逐文件 SHA-256 完整性校验。
+2.5 系列把“动作 → 持久任务 → 可恢复结果”推进为可观测闭环：统一管理一个任务产生的多个输出文件，自动归类失败原因并给出修复建议，以 7 天趋势和方法可靠性定位瓶颈；工作流可以安全导入导出，备份则新增逐文件 SHA-256 完整性校验。
 
 ## ✨ 主要功能
 
-PPX 2.5 的核心能力包括：
+PPX 2.5.1 的核心能力包括：
 
 ### 📄 文档与数据
 
