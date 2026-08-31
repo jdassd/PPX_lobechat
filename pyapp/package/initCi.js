@@ -8,7 +8,7 @@
  *   3. 使用默认 PyPI 源：GitHub runner 在境外，阿里云源反而更慢；配合 setup-python 的 pip 缓存。
  *   4. venv 可缓存复用：虚拟环境已存在且可用时，整体跳过创建与 pip 安装。
  *
- * 仍然完成：Linux 构建系统依赖、前端依赖、Python venv、appISSID 与数据库密钥生成。
+ * 仍然完成：Linux 构建系统依赖、前端依赖、Python venv、内置 FlyingMouse 运行时、appISSID 与数据库密钥生成。
  */
 
 'use strict'
@@ -63,7 +63,10 @@ if (venvUsable()) {
   run(`${pipBin} install -r pyapp/requirements-dev.txt`)
 }
 
-// 4) 生成 appISSID 与数据库密钥（幂等、快速）——每次执行，确保后续 build 可用
+// 4) 安装内置 FlyingMouse 的生产依赖并准备当前平台 Node 运行时
+run('pnpm run prepare:flyingmouse')
+
+// 5) 生成 appISSID 与数据库密钥（幂等、快速）——每次执行，确保后续 build 可用
 run(`${pyBin} pyapp/package/exe/getAppISSID.py`)
 run(`${pyBin} pyapp/db/json/getKeyDB.py`)
 

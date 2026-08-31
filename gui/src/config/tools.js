@@ -1,44 +1,60 @@
-// v2.5 工具注册表：导航、首页、命令面板和模块中心共享同一份元数据。
+// v2.6 工具注册表：导航、首页、命令面板和模块中心共享同一份元数据。
 import { markRaw } from 'vue'
-import { Connection, Cpu, Document, Edit, Files, FolderOpened, HomeFilled, Monitor, PictureFilled, Share, Stamp, Tickets, VideoPlay } from '@element-plus/icons-vue'
+import { Connection, Cpu, Document, Edit, Files, FolderOpened, HomeFilled, Monitor, PictureFilled, Refresh, Share, Stamp, Tickets, VideoPlay } from '@element-plus/icons-vue'
 
 const feature = (id, label, keywords = [], options = {}) => ({ id, label, keywords, ...options })
 
 export const TOOLS = [
   {
+    id: 'conversion',
+    name: '转换中心',
+    desc: '全格式 · 批量 · 本地',
+    icon: markRaw(Refresh),
+    group: 'office',
+    hue: '#0c9c8f',
+    locked: true,
+    defaultEnabled: true,
+    capability: 'flyingmouse',
+    badge: '内置 FlyingMouse',
+    points: ['图片、Office、PDF、音视频互转', '混合批量与目标格式记忆', '图片合成 PDF 与 PDF 合并'],
+    features: [
+      feature('universal', '通用格式转换', ['格式', '转换', 'Office', '音频', '视频'], { featured: true }),
+      feature('images-pdf', '图片合成 PDF', ['图片转 PDF', '装订'], { featured: true }),
+      feature('merge-pdf', 'PDF 合并', ['组合 PDF']),
+      feature('engine', '转换引擎与许可', ['FlyingMouse', '依赖', '运行时'])
+    ]
+  },
+  {
     id: 'image',
     name: '图片处理',
-    desc: '转换 · 压缩 · OCR',
+    desc: '压缩 · 编辑 · OCR',
     icon: markRaw(PictureFilled),
     group: 'office',
     hue: '#2b6fff',
     locked: true,
     defaultEnabled: true,
-    points: ['14 种格式互转', '批量压缩与水印', '本地图片文字识别'],
+    points: ['批量压缩与水印', '裁剪、拼接与批量命名', '本地图片文字识别'],
     features: [
-      feature('convert', '图片格式转换', ['格式', 'PNG', 'JPG', 'WEBP'], { featured: true }),
       feature('compress', '批量压缩图片', ['质量', '目标大小'], { featured: true }),
       feature('crop', '图片裁剪', ['尺寸', '比例']),
       feature('watermark', '批量添加水印', ['文字水印', '图片水印']),
       feature('rotate', '旋转与翻转', ['旋转', '镜像', '翻转']),
       feature('concat', '图片拼接', ['长图', '网格', '横向', '纵向']),
       feature('rename', '图片批量命名', ['重命名', '序号', '预演']),
-      feature('pdf', '图片合成 PDF', ['图片转 PDF'], { featured: true }),
       feature('ocr', '图片 OCR 文字识别', ['扫描', '识别文字'], { featured: true })
     ]
   },
   {
     id: 'pdf',
     name: 'PDF 工具',
-    desc: '转换 · OCR · 合并',
+    desc: '编辑 · OCR · 安全',
     icon: markRaw(Files),
     group: 'office',
     hue: '#e0533d',
     locked: true,
     defaultEnabled: true,
-    points: ['扫描件 OCR', '合并、拆分与压缩', '转换 Word / 图片'],
+    points: ['扫描件 OCR', '合并、拆分与压缩', '页面编辑与安全副本'],
     features: [
-      feature('image', 'PDF 转高清图片', ['DPI', 'PNG', 'JPG']),
       feature('scan', 'PDF 转仿真扫描件', ['扫描效果']),
       feature('compress', '压缩 PDF', ['减小体积'], { featured: true }),
       feature('merge', '合并 PDF', ['组合 PDF'], { featured: true }),
@@ -46,7 +62,6 @@ export const TOOLS = [
       feature('cut', '按页码切割 PDF', ['提取页面']),
       feature('text', '提取 PDF 文本', ['Markdown', 'HTML']),
       feature('ocr', '扫描 PDF OCR', ['可搜索 PDF', '扫描件文字识别'], { featured: true }),
-      feature('word', 'PDF 转 Word', ['DOCX'], { featured: true }),
       feature('images', '提取 PDF 图片', ['内嵌图片']),
       feature('pages', 'PDF 页面工作台', ['缩略图', '重排', '旋转', '页码'], { featured: true }),
       feature('security', 'PDF 安全副本', ['水印', '脱敏', '密码', '元数据'])
@@ -149,15 +164,15 @@ export const TOOLS = [
   {
     id: 'video',
     name: '视频处理',
-    desc: '转换 · 压缩 · 截取',
+    desc: '压缩 · 截取 · 合并',
     icon: markRaw(VideoPlay),
     group: 'more',
     hue: '#d6447a',
     defaultEnabled: false,
     capability: 'ffmpeg',
     badge: '需要 FFmpeg',
-    points: ['常见格式互转', '压缩与截取', '提取音频'],
-    features: [feature('convert', '转换视频格式', ['MP4', 'MOV', 'MKV']), feature('compress', '压缩视频', ['码率', '目标大小']), feature('cut', '截取视频片段', ['时间轴']), feature('audio', '提取视频音频', ['MP3', 'AAC']), feature('concat', '合并视频', ['拼接'])]
+    points: ['压缩与截取', '提取音频', '多段视频合并'],
+    features: [feature('compress', '压缩视频', ['码率', '目标大小']), feature('cut', '截取视频片段', ['时间轴']), feature('audio', '提取视频音频', ['MP3', 'AAC']), feature('concat', '合并视频', ['拼接'])]
   },
   {
     id: 'seal',

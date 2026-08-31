@@ -14,6 +14,7 @@ import WindowResizeHandles from './components/WindowResizeHandles.vue'
 import WindowTitleBar from './components/WindowTitleBar.vue'
 
 import ExcelTool from './components/excel/ExcelTool.vue'
+import ConversionCenter from './components/conversion/ConversionCenter.vue'
 import DocumentTool from './components/document/DocumentTool.vue'
 import FileTool from './components/file/FileTool.vue'
 import ImageTool from './components/image/ImageTool.vue'
@@ -29,6 +30,7 @@ import WordTool from './components/word/WordTool.vue'
 import WorkflowTool from './components/workflow/WorkflowTool.vue'
 
 const VIEWS = {
+  conversion: ConversionCenter,
   image: ImageTool,
   pdf: PdfTool,
   word: WordTool,
@@ -55,6 +57,23 @@ const density = ref(localStorage.getItem('ppx-density') || 'regular')
 const activeTool = computed(() => toolById(active.value))
 const activeView = computed(() => VIEWS[active.value])
 
+const LEGACY_CONVERSION_ROUTES = {
+  'image:convert': { tool: 'conversion', feature: 'universal' },
+  'image:pdf': { tool: 'conversion', feature: 'images-pdf' },
+  'pdf:image': { tool: 'conversion', feature: 'universal' },
+  'pdf:word': { tool: 'conversion', feature: 'universal' },
+  'video:convert': { tool: 'conversion', feature: 'universal' }
+}
+
+const CONVERSION_EXTENSIONS = new Set([
+  'jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', 'tif', 'tiff', 'bmp', 'heic', 'heif', 'ico', 'tga',
+  'cr2', 'cr3', 'crw', 'nef', 'arw', 'dng', 'raf', 'rw2', 'orf', 'pef', 'srw', '3fr', 'erf', 'fff', 'iiq', 'kdc', 'mef', 'mrw', 'x3f',
+  'txt', 'md', 'markdown', 'html', 'htm', 'json', 'csv', 'log', 'xml', 'yaml', 'yml', 'epub', 'mobi',
+  'doc', 'docx', 'odt', 'rtf', 'wps', 'wpt', 'wpd', 'ofd', 'xls', 'xlsx', 'xlsm', 'ods', 'tsv', 'et', 'ett',
+  'ppt', 'pptx', 'odp', 'dps', 'dpt', 'pdf', 'mp3', 'wav', 'flac', 'm4a', 'aac', 'ogg', 'opus', 'wma',
+  'mp4', 'mov', 'mkv', 'webm', 'avi', 'm4v', 'wmv', 'flv', 'zip'
+])
+
 watchEffect(() => {
   const el = document.documentElement
   el.dataset.theme = theme.value
@@ -79,9 +98,12 @@ onMounted(() => window.addEventListener('keydown', onKey))
 onUnmounted(() => window.removeEventListener('keydown', onKey))
 
 const go = (target) => {
-  const id = typeof target === 'string' ? target : target?.tool || target?.id
+  const rawId = typeof target === 'string' ? target : target?.tool || target?.id
+  const rawFeature = typeof target === 'object' ? target.feature || '' : ''
+  const redirect = LEGACY_CONVERSION_ROUTES[`${rawId}:${rawFeature}`]
+  const id = redirect?.tool || rawId
   if (!id) return
-  const feature = typeof target === 'object' ? target.feature || '' : ''
+  const feature = redirect?.feature || rawFeature
   active.value = id
   activeFeature.value = feature
   if (toolById(id)) pushRecent(id, feature)
@@ -95,19 +117,7 @@ const routeLaunchFiles = async () => {
     if (!Array.isArray(files) || !files.length) return
     window.__PPX_OPEN_FILES__ = files
     const extension = String(files[0]).split('.').pop().toLowerCase()
-    const route = ['pdf'].includes(extension)
-      ? { tool: 'pdf', feature: 'pages' }
-      : ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif', 'tif', 'tiff'].includes(extension)
-        ? { tool: 'image', feature: 'convert' }
-        : ['doc', 'docx'].includes(extension)
-          ? { tool: 'word', feature: 'split' }
-          : ['xls', 'xlsx', 'xlsm', 'csv'].includes(extension)
-            ? { tool: 'excel', feature: 'structure' }
-            : ['mp4', 'mov', 'mkv', 'avi', 'webm'].includes(extension)
-              ? { tool: 'video', feature: 'convert' }
-              : ['txt', 'md', 'markdown', 'json', 'log'].includes(extension)
-                ? { tool: 'text', feature: extension === 'json' ? 'json' : 'transform' }
-                : { tool: 'file', feature: 'search' }
+    const route = CONVERSION_EXTENSIONS.has(extension) ? { tool: 'conversion', feature: 'universal' } : { tool: 'file', feature: 'search' }
     go(route)
     await nextTick()
     window.dispatchEvent(new CustomEvent('ppx-open-files', { detail: { files } }))
@@ -129,7 +139,7 @@ const toggleTheme = () => {
       <template #left>
         <div class="logo-area">
           <img class="logo-image" src="/logo.png" alt="" />
-          <span class="logo-label">多功能工具箱 <small>2.5</small></span>
+          <span class="logo-label">多功能工具箱 <small>2.6</small></span>
         </div>
       </template>
       <template #right>

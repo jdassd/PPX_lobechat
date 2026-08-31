@@ -4,29 +4,25 @@ import { onMounted, reactive } from 'vue'
 import OcrPanel from '@/components/shared/OcrPanel.vue'
 import ToolWorkspace from '@/components/shared/ToolWorkspace.vue'
 import { useInitialTab } from '@/composables/useInitialTab'
-import FormatPanel from './parts/FormatPanel.vue'
 import CompressPanel from './parts/CompressPanel.vue'
 import CropPanel from './parts/CropPanel.vue'
 import WatermarkPanel from './parts/WatermarkPanel.vue'
 import RotateFlipPanel from './parts/RotateFlipPanel.vue'
 import ConcatPanel from './parts/ConcatPanel.vue'
 import BatchRenamePanel from './parts/BatchRenamePanel.vue'
-import PdfPanel from './parts/PdfPanel.vue'
 
 const TABS = [
-  { name: 'convert', label: '格式转换' },
   { name: 'compress', label: '批量压缩' },
   { name: 'crop', label: '图片裁剪' },
   { name: 'watermark', label: '批量水印' },
   { name: 'rotate', label: '旋转翻转' },
   { name: 'concat', label: '图片拼接' },
   { name: 'rename', label: '批量命名' },
-  { name: 'pdf', label: '图片转 PDF' },
   { name: 'ocr', label: 'OCR 文字识别' }
 ]
 
 const props = defineProps({ initialTab: { type: String, default: '' } })
-const activeTab = useInitialTab(TABS, () => props.initialTab, 'convert')
+const activeTab = useInitialTab(TABS, () => props.initialTab, 'compress')
 
 const fallbackConvertFormatOptions = [
   { label: 'PNG', value: 'png' },
@@ -109,14 +105,12 @@ onMounted(loadSupportedFormats)
 
 <template>
   <ToolWorkspace v-model="activeTab" :tabs="TABS" accent="#2b6fff">
-    <FormatPanel v-show="activeTab === 'convert'" :supported-formats="supportedFormats" />
     <CompressPanel v-show="activeTab === 'compress'" :supported-formats="supportedFormats" />
     <CropPanel v-show="activeTab === 'crop'" :supported-formats="supportedFormats" />
     <WatermarkPanel v-show="activeTab === 'watermark'" :supported-formats="supportedFormats" />
     <RotateFlipPanel v-show="activeTab === 'rotate'" :supported-formats="supportedFormats" />
     <ConcatPanel v-show="activeTab === 'concat'" :supported-formats="supportedFormats" />
     <BatchRenamePanel v-show="activeTab === 'rename'" :supported-formats="supportedFormats" />
-    <PdfPanel v-show="activeTab === 'pdf'" :supported-formats="supportedFormats" />
     <OcrPanel v-show="activeTab === 'ocr'" source-type="image" />
   </ToolWorkspace>
 </template>

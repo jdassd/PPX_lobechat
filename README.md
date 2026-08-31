@@ -12,25 +12,26 @@
   <img src="https://img.shields.io/badge/Vue-3.0+-4FC08D?style=flat-square&logo=vue.js&logoColor=white" alt="Vue 3" />
   <img src="https://img.shields.io/badge/Python-3.10-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.10" />
   <img src="https://img.shields.io/badge/Pywebview-5.0+-FFD43B?style=flat-square&logo=python&logoColor=blue" alt="Pywebview" />
-  <img src="https://img.shields.io/badge/version-2.5.1-2b6fff?style=flat-square" alt="Version 2.5.1" />
-  <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License" />
+  <img src="https://img.shields.io/badge/version-2.6.0-2b6fff?style=flat-square" alt="Version 2.6.0" />
+  <img src="https://img.shields.io/badge/License-AGPL--3.0-green?style=flat-square" alt="License" />
 </p>
 
 ---
 
 ## 📖 简介
 
-**PPX 2.5.1** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
+**PPX 2.6.0** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
 
-2.5 系列把“动作 → 持久任务 → 可恢复结果”推进为可观测闭环：统一管理一个任务产生的多个输出文件，自动归类失败原因并给出修复建议，以 7 天趋势和方法可靠性定位瓶颈；工作流可以安全导入导出，备份则新增逐文件 SHA-256 完整性校验。
+2.6 系列新增内置 FlyingMouse Format 的转换中心，将原先分散在图片、PDF 和视频工具中的格式转换收拢为统一的本地批处理流程，同时延续“动作 → 持久任务 → 可恢复结果”的可观测闭环。
 
 ## ✨ 主要功能
 
-PPX 2.5.1 的核心能力包括：
+PPX 2.6.0 的核心能力包括：
 
 ### 📄 文档与数据
 
-- **PDF 工具**：合并、拆分、压缩、切割、页面缩略图重排、页码、水印、永久脱敏、AES-256 加密及图片 / Word 转换。
+- **转换中心**：通过本机 FlyingMouse Format 引擎统一处理图片、文本、Office / WPS、PDF、音频、视频、电子书与 ZIP，支持混合批量、目标格式记忆、图片合成 PDF 和 PDF 合并。
+- **PDF 工具**：合并、拆分、压缩、切割、页面缩略图重排、页码、水印、永久脱敏及 AES-256 安全副本；PDF / Word / 图片互转集中在转换中心。
 - **离线 OCR**：识别图片或扫描 PDF，可生成纯文本、可搜索 PDF，并将规则表格导出为 Excel / CSV / JSON。
 - **Word 工具**：按结构或真实页码拆分、切割及多文档合并。
 - **Excel 工具**：结构预览、数据清洗、列画像、质量报告、按列拆分及多表合并。
@@ -39,8 +40,8 @@ PPX 2.5.1 的核心能力包括：
 
 ### 🖼️ 图片与媒体
 
-- **图片处理**：多格式转换、批量压缩、裁剪、水印、旋转翻转、拼接、批量命名、合成 PDF 和 OCR。
-- **视频处理（可选）**：使用 FFmpeg 完成格式转换、压缩、截取、音频提取与合并。
+- **图片处理**：批量压缩、裁剪、水印、旋转翻转、拼接、批量命名与 OCR；格式转换和合成 PDF 集中在转换中心。
+- **视频处理（可选）**：使用 FFmpeg 完成压缩、截取、音频提取与合并；格式转换集中在转换中心。
 
 ### 🛠️ 文件与自动化
 
@@ -78,18 +79,19 @@ PPX 2.5.1 的核心能力包括：
 ### 环境要求
 
 确保你的开发环境已安装以下工具：
-- **Node.js** (16.14+)
+- **Node.js** (18+；仅开发和自行构建需要，安装包已内置运行时)
 - **pnpm** (8.x+)
 - **Python** (3.10)
 - **OCR 运行时**（随完整安装包提供，无需联网识别）
 - **FFmpeg**（可选；视频转换、压缩、截取、音频提取需要 `ffmpeg` 与 `ffprobe`）
 - **LibreOffice**（可选；Word 按真实页码拆分/切割需要）
+- **FlyingMouse Format**（已作为固定上游组件内置，安装版无需单独安装）
 
 ### 安装步骤
 
 1.  **克隆项目**
     ```bash
-    git clone https://github.com/jdassd/PPX_lobechat.git
+    git clone --recurse-submodules https://github.com/jdassd/PPX_lobechat.git
     cd PPX_lobechat
     ```
 
@@ -105,6 +107,8 @@ PPX 2.5.1 的核心能力包括：
     ```bash
     pnpm run start
     ```
+
+`pnpm run init` 会准备内置 FlyingMouse 的生产依赖；若克隆时未带子模块，可先运行 `git submodule update --init --recursive`。运行时与许可细节见[转换引擎接入说明](docs/flyingmouse-format-integration.md)。
 
 ### 质量检查
 
@@ -181,4 +185,6 @@ PPX/
 
 ## 📄 开源协议
 
-本项目采用 [MIT License](LICENSE) 开源协议。
+PPX 自有代码采用 [GNU AGPL v3](LICENSE) 开源协议。
+
+安装包内置的 FlyingMouse Format 仍是具有独立版权与许可的上游组件，其许可不因 PPX 的 AGPL v3 而改变。作者署名、授权边界和依赖声明见[转换引擎接入说明](docs/flyingmouse-format-integration.md)与[第三方组件声明](THIRD_PARTY_NOTICES.md)。

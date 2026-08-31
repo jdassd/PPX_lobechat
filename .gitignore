@@ -8,6 +8,7 @@ gui/node_modules
 gui/pnpm-lock.yaml
 node_modules
 pnpm-lock.yaml
+vendor/flyingmouse-runtime/
 pyapp/pyenv
 pyapp/spec/*
 !pyapp/spec/getSpec.py

@@ -23,11 +23,21 @@ jobs:
     steps:
       - name: 拉取项目代码
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: 安装node环境
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: vendor/flyingmouse-format/package-lock.json
+
+      - name: 缓存 FlyingMouse 生产依赖
+        uses: actions/cache@v4
+        with:
+          path: vendor/flyingmouse-format/node_modules
+          key: ${{ runner.os }}-${{ runner.arch }}-node-20-flyingmouse-${{ hashFiles('vendor/flyingmouse-format/package-lock.json') }}
 
       - name: 安装pnpm
         uses: pnpm/action-setup@v4

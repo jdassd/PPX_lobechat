@@ -8,6 +8,7 @@ import shutil
 import sys
 from pathlib import Path
 
+from api.format_center import discover_flyingmouse_runtime
 from api.utils.error_handler import api_success, safe_execute
 from pyapp.config.config import Config
 
@@ -43,6 +44,7 @@ class CapabilitiesMixin:
         ffprobe_path = shutil.which('ffprobe') or ''
         libreoffice_path = self._find_libreoffice()
         playwright_ready = self._module_available('playwright')
+        flyingmouse_runtime = discover_flyingmouse_runtime()
         chromium_ready = False
         if playwright_ready and hasattr(self, '_wa_chromium_installed'):
             try:
@@ -74,6 +76,12 @@ class CapabilitiesMixin:
                 'name': '网页自动化',
                 'available': playwright_ready and chromium_ready,
                 'detail': 'Playwright 与 Chromium 已就绪' if playwright_ready and chromium_ready else '需要安装 Playwright Chromium 内核',
+            },
+            'flyingmouse': {
+                'id': 'flyingmouse',
+                'name': '全格式转换引擎',
+                'available': bool(flyingmouse_runtime.get('available')),
+                'detail': flyingmouse_runtime.get('detail') or '未检测到 FlyingMouse Format',
             },
             'system': {
                 'id': 'system',

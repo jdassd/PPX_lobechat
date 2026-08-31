@@ -7,6 +7,9 @@ const SENSITIVE_KEY = /(password|passwd|secret|token|cookie|authorization|api[_-
 
 // 仅将真正产生结果、改变文件或执行较重分析的调用送入持久任务队列。
 export const TASK_METHODS = {
+  format_center_convert: ['conversion', 'universal', '通用格式转换'],
+  format_center_images_to_pdf: ['conversion', 'images-pdf', '图片合成 PDF'],
+  format_center_merge_pdfs: ['conversion', 'merge-pdf', '合并 PDF'],
   image_format_convert: ['image', 'convert', '图片格式转换'],
   image_batch_compress: ['image', 'compress', '批量压缩图片'],
   image_crop: ['image', 'crop', '裁剪图片'],

@@ -2,7 +2,7 @@
      通用工作区外壳: 左侧竖向子标签栏 + 右侧滚动内容区。
      用法(包裹现有 panel, 复用真实 API 逻辑):
        <ToolWorkspace v-model="activeTab" :tabs="tabs" accent="#2b6fff">
-         <FormatPanel v-show="activeTab === 'convert'" ... />
+         <PrimaryPanel v-show="activeTab === 'primary'" ... />
          <CompressPanel v-show="activeTab === 'compress'" ... />
        </ToolWorkspace>
      - tabs: [{ name, label, icon? }]
@@ -11,7 +11,8 @@
 defineProps({
   modelValue: { type: String, required: true },
   tabs: { type: Array, required: true },
-  accent: { type: String, default: 'var(--accent)' }
+  accent: { type: String, default: 'var(--accent)' },
+  contentWidth: { type: String, default: '760px' }
 })
 const emit = defineEmits(['update:modelValue'])
 </script>
@@ -26,7 +27,7 @@ const emit = defineEmits(['update:modelValue'])
     </nav>
 
     <div class="form-area">
-      <div class="form-inner">
+      <div class="form-inner" :style="{ maxWidth: contentWidth }">
         <slot />
       </div>
     </div>
@@ -89,7 +90,24 @@ const emit = defineEmits(['update:modelValue'])
   padding: 24px;
 }
 .form-inner {
-  max-width: 760px;
   margin: 0 auto;
+}
+@media (max-width: 760px) {
+  .ws {
+    flex-direction: column;
+  }
+  .subtabs {
+    width: auto;
+    flex-direction: row;
+    padding: 9px 12px;
+    border-right: none;
+    border-bottom: 1px solid var(--ppx-glass-border);
+  }
+  .subtab {
+    flex: 0 0 auto;
+  }
+  .form-area {
+    padding: 16px;
+  }
 }
 </style>

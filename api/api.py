@@ -13,6 +13,7 @@ from api.capabilities import CapabilitiesMixin
 from api.document_index import DocumentIndexMixin
 from api.excel import Excel
 from api.file import FileTool
+from api.format_center import FormatCenterMixin
 from api.image import ImageTool
 from api.maintenance import MaintenanceMixin
 from api.mindmap.tool import MindMapTool
@@ -31,6 +32,7 @@ from api.workflow import WorkflowMixin
 
 class API(
     CapabilitiesMixin,
+    FormatCenterMixin,
     TaskMixin,
     WorkflowMixin,
     DocumentIndexMixin,

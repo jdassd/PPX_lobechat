@@ -1,0 +1,3 @@
+[submodule "vendor/flyingmouse-format"]
+	path = vendor/flyingmouse-format
+	url = https://github.com/LaoFeng-mouse/flyingmouse-format.git

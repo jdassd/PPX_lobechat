@@ -1,6 +1,5 @@
 <template>
   <ToolWorkspace v-model="activeTab" :tabs="TABS" accent="#e0533d">
-    <ImagePanel v-show="activeTab === 'image'" />
     <ScanPanel v-show="activeTab === 'scan'" />
     <CompressPanel v-show="activeTab === 'compress'" />
     <MergePanel v-show="activeTab === 'merge'" />
@@ -8,7 +7,6 @@
     <CutPanel v-show="activeTab === 'cut'" />
     <ExtractTextPanel v-show="activeTab === 'text'" />
     <OcrPanel v-show="activeTab === 'ocr'" source-type="pdf" />
-    <WordPanel v-show="activeTab === 'word'" />
     <ExtractImagesPanel v-show="activeTab === 'images'" />
     <PageWorkbenchPanel v-show="activeTab === 'pages'" />
     <SecurityPanel v-show="activeTab === 'security'" />
@@ -38,20 +36,17 @@ import OcrPanel from '@/components/shared/OcrPanel.vue'
 import ToolWorkspace from '@/components/shared/ToolWorkspace.vue'
 import { useInitialTab } from '@/composables/useInitialTab'
 import { usePdfApi } from './parts/usePdfApi'
-import ImagePanel from './parts/ImagePanel.vue'
 import ScanPanel from './parts/ScanPanel.vue'
 import CompressPanel from './parts/CompressPanel.vue'
 import MergePanel from './parts/MergePanel.vue'
 import SplitPanel from './parts/SplitPanel.vue'
 import CutPanel from './parts/CutPanel.vue'
 import ExtractTextPanel from './parts/ExtractTextPanel.vue'
-import WordPanel from './parts/WordPanel.vue'
 import ExtractImagesPanel from './parts/ExtractImagesPanel.vue'
 import PageWorkbenchPanel from './parts/PageWorkbenchPanel.vue'
 import SecurityPanel from './parts/SecurityPanel.vue'
 
 const TABS = [
-  { name: 'image', label: 'PDF 转高清图片' },
   { name: 'scan', label: 'PDF → 扫描件' },
   { name: 'compress', label: 'PDF 压缩' },
   { name: 'merge', label: '合并 PDF' },
@@ -59,14 +54,13 @@ const TABS = [
   { name: 'cut', label: '页码切割' },
   { name: 'text', label: '提取文本' },
   { name: 'ocr', label: '扫描件 OCR' },
-  { name: 'word', label: 'PDF 转 Word' },
   { name: 'images', label: '提取图片' },
   { name: 'pages', label: '页面工作台' },
   { name: 'security', label: '安全副本' }
 ]
 
 const props = defineProps({ initialTab: { type: String, default: '' } })
-const activeTab = useInitialTab(TABS, () => props.initialTab, 'image')
+const activeTab = useInitialTab(TABS, () => props.initialTab, 'scan')
 
 // 全局共享：loading 为唯一开关，logs 显示在底部统一日志面板，需跨所有子面板共享。
 const shared = reactive({

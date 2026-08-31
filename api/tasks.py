@@ -32,6 +32,7 @@ TRACKED_METHODS = {
     'file_batch_rename', 'file_batch_rename_undo', 'file_deduplicate', 'file_compress',
     'file_decompress', 'file_recycle_restore', 'file_recycle_purge', 'seal_generate',
     'ocr_table', 'document_index_build', 'workflow_run',
+    'format_center_convert', 'format_center_images_to_pdf', 'format_center_merge_pdfs',
 }
 _SENSITIVE_KEY = re.compile(r'(password|passwd|secret|token|cookie|authorization|api[_-]?key)', re.I)
 _MAX_TASKS = 200

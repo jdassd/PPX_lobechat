@@ -10,6 +10,8 @@ Description: 生成 .spec APP 配置文件
 
 import argparse
 import os
+import shutil
+import subprocess
 import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -29,6 +31,13 @@ args = parser.parse_args()
 ifMac = args.if_mac
 ifLinux = args.if_linux
 
+projectRoot = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+prepareFlyingMouse = os.path.join(projectRoot, 'pyapp', 'package', 'prepareFlyingMouse.js')
+nodeCommand = shutil.which('node')
+if not nodeCommand:
+    raise RuntimeError('打包内置 FlyingMouse Format 需要 Node.js 18 或更新版本')
+subprocess.run([nodeCommand, prepareFlyingMouse], cwd=projectRoot, check=True)
+
 # Ensure icon files are generated from root logo.png before packaging.
 if 'generate_logo_icons' in globals() and generate_logo_icons is not None:
     generate_logo_icons()
@@ -42,8 +51,15 @@ version = Config.appVersion  # version string
 logoExt = 'icns' if ifMac else 'png' if ifLinux else 'ico'
 
 # Extra binaries and data folders
-addDll = ''
-addModules = "('../../gui/dist', 'web'), ('../../static', 'static')"
+nodeRuntimeName = 'node.exe' if not ifMac and not ifLinux else 'node'
+flyingMouseNode = f"('../../build/flyingmouse-runtime/{nodeRuntimeName}', 'vendor/flyingmouse-runtime'),"
+addDll = flyingMouseNode
+addModules = (
+    "('../../gui/dist', 'web'), ('../../static', 'static'), "
+    "('../../build/flyingmouse-source', 'vendor/flyingmouse-format'), "
+    "('../../vendor/flyingmouse-format/node_modules', 'vendor/flyingmouse-format/node_modules'), "
+    "('../../LICENSE', 'licenses'), ('../../THIRD_PARTY_NOTICES.md', 'licenses')"
+)
 
 # Hidden imports (uvicorn/sqlalchemy 等使用动态导入，PyInstaller 静态分析发现不了)
 hiddenImports = (
@@ -133,7 +149,7 @@ coll = COLLECT(exe,
                 a.datas,
                 strip=False,
                 upx=True,
-                upx_exclude=[],
+                upx_exclude=['node.exe', 'node'],
                 name='{appCollectName}')
 app = BUNDLE(coll,
             name=appName+'.app',
@@ -158,7 +174,7 @@ exe = EXE(pyz,
         bootloader_ignore_signals=False,
         strip=False,
         upx=True,
-        upx_exclude=[],
+        upx_exclude=['node.exe', 'node'],
         runtime_tmpdir=None,
         console={console},
         disable_windowed_traceback=False,
@@ -194,7 +210,7 @@ coll = COLLECT(exe,
             a.datas,
             strip=False,
             upx=True,
-            upx_exclude=[],
+            upx_exclude=['node.exe', 'node'],
             name='{appCollectName}')
 
 '''
@@ -245,7 +261,7 @@ else:
 
     console = False  # no console window
     # add missing cef binaries
-    addDll = """
+    addDll = flyingMouseNode + """
         ('../../pyapp/pyenv/pyenvCEF/Lib/site-packages/cefpython3/icudtl.dat', './'),
         ('../../pyapp/pyenv/pyenvCEF/Lib/site-packages/cefpython3/natives_blob.bin','./'),
         ('../../pyapp/pyenv/pyenvCEF/Lib/site-packages/cefpython3/subprocess.exe','./'),

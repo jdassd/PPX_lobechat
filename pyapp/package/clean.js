@@ -12,7 +12,8 @@ const removable = [
   path.join(rootDir, 'build'),
   path.join(rootDir, 'gui', 'dist'),
   path.join(rootDir, 'gui', 'node_modules'),
-  path.join(rootDir, 'pyapp', 'pyenv')
+  path.join(rootDir, 'pyapp', 'pyenv'),
+  path.join(rootDir, 'vendor', 'flyingmouse-format', 'node_modules')
 ]
 
 for (const target of removable) {

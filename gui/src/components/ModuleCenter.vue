@@ -19,6 +19,7 @@ const repairGuide = {
   ocr: 'OCR 随完整安装包提供。开发环境请重新运行 pnpm run init；安装版请下载安装完整包。',
   ffmpeg: '请安装 FFmpeg，并确保 ffmpeg 与 ffprobe 可以从 PATH 调用。完成后返回此页重新检测。',
   libreoffice: '请安装 LibreOffice。PPX 会自动检测 soffice，用于 Word 真实分页。',
+  flyingmouse: '完整安装包已内置 FlyingMouse Format。若组件缺失，请重新安装；开发环境请运行 pnpm run prepare:flyingmouse。',
   system: '系统高级诊断只在 Windows 上提供；其他平台仍可使用全部文档与文件工具。'
 }
 
