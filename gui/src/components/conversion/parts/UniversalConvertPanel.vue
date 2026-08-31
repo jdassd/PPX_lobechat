@@ -9,10 +9,7 @@ import ConversionFileQueue from './ConversionFileQueue.vue'
 const props = defineProps({ engine: { type: Object, required: true } })
 const emit = defineEmits(['open-engine'])
 
-const FILE_FILTER = [
-  '可转换文件 (*.jpg;*.jpeg;*.png;*.webp;*.gif;*.avif;*.tif;*.tiff;*.bmp;*.heic;*.heif;*.ico;*.tga;*.cr2;*.cr3;*.nef;*.arw;*.dng;*.txt;*.md;*.html;*.json;*.csv;*.xml;*.yaml;*.epub;*.mobi;*.doc;*.docx;*.odt;*.rtf;*.wps;*.wpt;*.wpd;*.ofd;*.xls;*.xlsx;*.xlsm;*.ods;*.tsv;*.et;*.ett;*.ppt;*.pptx;*.odp;*.dps;*.dpt;*.pdf;*.mp3;*.wav;*.flac;*.m4a;*.aac;*.ogg;*.opus;*.wma;*.mp4;*.mov;*.mkv;*.webm;*.avi;*.m4v;*.wmv;*.flv;*.zip)',
-  '全部文件 (*.*)'
-]
+const FILE_FILTER = ['可转换文件 (*.jpg;*.jpeg;*.png;*.webp;*.gif;*.avif;*.tif;*.tiff;*.bmp;*.heic;*.heif;*.ico;*.tga;*.cr2;*.cr3;*.nef;*.arw;*.dng;*.txt;*.md;*.html;*.json;*.csv;*.xml;*.yaml;*.epub;*.mobi;*.doc;*.docx;*.odt;*.rtf;*.wps;*.wpt;*.wpd;*.ofd;*.xls;*.xlsx;*.xlsm;*.ods;*.tsv;*.et;*.ett;*.ppt;*.pptx;*.odp;*.dps;*.dpt;*.pdf;*.mp3;*.wav;*.flac;*.m4a;*.aac;*.ogg;*.opus;*.wma;*.mp4;*.mov;*.mkv;*.webm;*.avi;*.m4v;*.wmv;*.flv;*.zip)', '全部文件 (*.*)']
 const PREFERENCE_KEY = 'ppx-conversion-target-by-source'
 
 const files = ref([])
@@ -78,7 +75,9 @@ const categoryLabels = {
 const filePath = (file) => file?.path || String(file || '')
 const fileName = (file) => file?.filename || filePath(file).split(/[\\/]/).pop()
 const extensionOf = (file) => {
-  const match = fileName(file).toLowerCase().match(/\.([^.]+)$/)
+  const match = fileName(file)
+    .toLowerCase()
+    .match(/\.([^.]+)$/)
   return match?.[1] || ''
 }
 const sourceExtensions = computed(() => [...new Set(files.value.map(extensionOf).filter(Boolean))])
@@ -325,24 +324,18 @@ onUnmounted(() => window.removeEventListener('ppx-open-files', onLaunchFiles))
           <span class="step-index">01</span>
           <div><b>添加源文件</b><small>可混合选择；转换中心只显示所有文件共有的目标格式</small></div>
           <div class="step-actions">
-            <el-button v-if="files.length" text :disabled="loading" @click="clearFiles"><el-icon><Delete /></el-icon>清空</el-button>
-            <el-button type="primary" :disabled="loading" @click="selectFiles"><el-icon><Plus /></el-icon>添加文件</el-button>
+            <el-button v-if="files.length" text :disabled="loading" @click="clearFiles"
+              ><el-icon><Delete /></el-icon>清空</el-button
+            >
+            <el-button type="primary" :disabled="loading" @click="selectFiles"
+              ><el-icon><Plus /></el-icon>添加文件</el-button
+            >
           </div>
         </div>
-        <div
-          v-if="!files.length"
-          class="drop-zone"
-          :class="{ active: dropActive }"
-          role="button"
-          tabindex="0"
-          @click="selectFiles"
-          @keydown.enter="selectFiles"
-          @dragenter.prevent="dropActive = true"
-          @dragover.prevent="dropActive = true"
-          @dragleave.prevent="dropActive = false"
-          @drop.prevent="handleDrop"
-        >
-          <span class="drop-plus"><el-icon :size="22"><Plus /></el-icon></span>
+        <div v-if="!files.length" class="drop-zone" :class="{ active: dropActive }" role="button" tabindex="0" @click="selectFiles" @keydown.enter="selectFiles" @dragenter.prevent="dropActive = true" @dragover.prevent="dropActive = true" @dragleave.prevent="dropActive = false" @drop.prevent="handleDrop">
+          <span class="drop-plus"
+            ><el-icon :size="22"><Plus /></el-icon
+          ></span>
           <b>选择或拖入要转换的文件</b>
           <p>可一次添加多种格式；所有处理都在本机完成</p>
         </div>
@@ -350,9 +343,15 @@ onUnmounted(() => window.removeEventListener('ppx-open-files', onLaunchFiles))
       </section>
 
       <div class="route-line" aria-label="转换路径">
-        <div><small>输入</small><b>{{ sourceSummary }}</b></div>
-        <span><el-icon><ArrowRight /></el-icon></span>
-        <div><small>输出</small><b>{{ form.targetFormat ? formatLabels[form.targetFormat] || form.targetFormat.toUpperCase() : '选择目标格式' }}</b></div>
+        <div>
+          <small>输入</small><b>{{ sourceSummary }}</b>
+        </div>
+        <span
+          ><el-icon><ArrowRight /></el-icon
+        ></span>
+        <div>
+          <small>输出</small><b>{{ form.targetFormat ? formatLabels[form.targetFormat] || form.targetFormat.toUpperCase() : '选择目标格式' }}</b>
+        </div>
       </div>
 
       <section class="step-block target-step">
@@ -374,13 +373,16 @@ onUnmounted(() => window.removeEventListener('ppx-open-files', onLaunchFiles))
             <span>输出目录</span>
             <div class="path-field">
               <el-input v-model="form.outputDir" readonly placeholder="默认保存到 下载/PPX转换结果" />
-              <el-button @click="selectOutputDir"><el-icon><FolderOpened /></el-icon>选择</el-button>
+              <el-button @click="selectOutputDir"
+                ><el-icon><FolderOpened /></el-icon>选择</el-button
+              >
             </div>
           </label>
         </div>
 
         <button v-if="hasAdvancedOptions" class="advanced-toggle" type="button" :aria-expanded="form.advanced" @click="form.advanced = !form.advanced">
-          <span>{{ form.advanced ? '收起高级选项' : '显示此格式的高级选项' }}</span><small>{{ form.targetFormat.toUpperCase() }}</small>
+          <span>{{ form.advanced ? '收起高级选项' : '显示此格式的高级选项' }}</span
+          ><small>{{ form.targetFormat.toUpperCase() }}</small>
         </button>
         <el-collapse-transition>
           <div v-if="hasAdvancedOptions && form.advanced" class="advanced-grid">
@@ -419,19 +421,33 @@ onUnmounted(() => window.removeEventListener('ppx-open-files', onLaunchFiles))
 
       <section v-if="results.length || failures.length" class="result-section">
         <div class="result-head">
-          <div><span class="step-index">03</span><div><b>转换结果</b><small>{{ results.length }} 个成功<span v-if="failures.length"> · {{ failures.length }} 个失败</span></small></div></div>
+          <div>
+            <span class="step-index">03</span>
+            <div>
+              <b>转换结果</b
+              ><small
+                >{{ results.length }} 个成功<span v-if="failures.length"> · {{ failures.length }} 个失败</span></small
+              >
+            </div>
+          </div>
           <el-button v-if="form.outputDir" text type="primary" @click="reveal(form.outputDir)">打开输出目录</el-button>
         </div>
         <div class="result-list">
           <article v-for="item in results" :key="item.path">
             <span class="result-status">完成</span>
-            <div><b>{{ item.fileName || item.path?.split(/[\\/]/).pop() }}</b><small>{{ item.path }}</small></div>
+            <div>
+              <b>{{ item.fileName || item.path?.split(/[\\/]/).pop() }}</b
+              ><small>{{ item.path }}</small>
+            </div>
             <el-button text @click="openFile(item.path)">打开</el-button>
             <el-button text @click="reveal(item.path)">定位</el-button>
           </article>
           <article v-for="item in failures" :key="`failed-${item.input}`" class="failed">
             <span class="result-status">失败</span>
-            <div><b>{{ item.input?.split(/[\\/]/).pop() || '文件转换失败' }}</b><small>{{ item.error }}</small></div>
+            <div>
+              <b>{{ item.input?.split(/[\\/]/).pop() || '文件转换失败' }}</b
+              ><small>{{ item.error }}</small>
+            </div>
           </article>
         </div>
         <el-alert v-if="warnings.length" class="warning-list" type="warning" :closable="false" :title="warnings.join('；')" />
@@ -538,7 +554,10 @@ onUnmounted(() => window.removeEventListener('ppx-open-files', onLaunchFiles))
   border-radius: var(--ppx-radius-md);
   background: var(--ppx-bg-base);
   cursor: pointer;
-  transition: border-color var(--ppx-transition-fast), background var(--ppx-transition-fast), transform var(--ppx-transition-fast);
+  transition:
+    border-color var(--ppx-transition-fast),
+    background var(--ppx-transition-fast),
+    transform var(--ppx-transition-fast);
 }
 .drop-zone:hover,
 .drop-zone.active,

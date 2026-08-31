@@ -22,6 +22,7 @@ exclude = [
     "pyapp/db/sql/alembic/versions",     # Alembic 自动生成的迁移脚本
     "node_modules",
     "gui",                               # 前端（Vue）代码
+    "vendor",                            # 固定的第三方源码子模块（由上游独立检查）
     ".claude",                           # 本地 Claude 工作树/会话产物
     ".agents",                           # 本地代理工作产物
     ".git",
@@ -103,4 +104,5 @@ exclude = [
     "dist",
     "pyapp/db/sql/alembic/versions",
     "gui",
+    "vendor",
 ]

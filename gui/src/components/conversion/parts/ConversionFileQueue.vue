@@ -10,7 +10,12 @@ const props = defineProps({
 
 const emit = defineEmits(['remove', 'move'])
 
-const fileName = (file) => file?.filename || file?.name || String(file?.path || file || '').split(/[\\/]/).pop()
+const fileName = (file) =>
+  file?.filename ||
+  file?.name ||
+  String(file?.path || file || '')
+    .split(/[\\/]/)
+    .pop()
 const filePath = (file) => file?.path || String(file || '')
 const fileExt = (file) => {
   const match = fileName(file).match(/\.([^.]+)$/)

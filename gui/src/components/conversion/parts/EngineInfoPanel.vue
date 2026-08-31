@@ -35,7 +35,9 @@ const groups = computed(() =>
         <h2>{{ engine.metadata.name }}</h2>
         <p>PPX 通过其公开 CLI 调用转换能力，文件仍在本机处理。</p>
       </div>
-      <el-button :loading="engine.loading" @click="emit('refresh')"><el-icon><Refresh /></el-icon>重新检测</el-button>
+      <el-button :loading="engine.loading" @click="emit('refresh')"
+        ><el-icon><Refresh /></el-icon>重新检测</el-button
+      >
     </header>
 
     <div class="status-line" :class="{ ready: engine.available }">

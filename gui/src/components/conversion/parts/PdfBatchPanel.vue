@@ -12,10 +12,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['open-engine'])
 
-const IMAGE_FILTER = [
-  '图片文件 (*.jpg;*.jpeg;*.png;*.webp;*.gif;*.avif;*.tif;*.tiff;*.bmp;*.heic;*.heif;*.ico;*.tga;*.cr2;*.cr3;*.nef;*.arw;*.dng)',
-  '全部文件 (*.*)'
-]
+const IMAGE_FILTER = ['图片文件 (*.jpg;*.jpeg;*.png;*.webp;*.gif;*.avif;*.tif;*.tiff;*.bmp;*.heic;*.heif;*.ico;*.tga;*.cr2;*.cr3;*.nef;*.arw;*.dng)', '全部文件 (*.*)']
 const PDF_FILTER = ['PDF 文件 (*.pdf)']
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', 'tif', 'tiff', 'bmp', 'heic', 'heif', 'ico', 'tga', 'cr2', 'cr3', 'crw', 'nef', 'arw', 'dng', 'raf', 'rw2', 'orf', 'pef', 'srw', '3fr', 'erf', 'fff', 'iiq', 'kdc', 'mef', 'mrw', 'x3f'])
 
@@ -26,15 +23,15 @@ const form = reactive({ outputDir: '', outputName: '' })
 
 const isMerge = computed(() => props.mode === 'pdf')
 const title = computed(() => (isMerge.value ? '把多份 PDF，收进一个文件。' : '按你的顺序，把图片装订成 PDF。'))
-const description = computed(() =>
-  isMerge.value ? '队列顺序就是最终文档顺序；原文件不会被修改。' : '支持常见图片、HEIC 与相机 RAW；队列顺序就是 PDF 页序。'
-)
+const description = computed(() => (isMerge.value ? '队列顺序就是最终文档顺序；原文件不会被修改。' : '支持常见图片、HEIC 与相机 RAW；队列顺序就是 PDF 页序。'))
 const minimum = computed(() => (isMerge.value ? 2 : 1))
 const canRun = computed(() => props.engine.available && files.value.length >= minimum.value && !loading.value)
 
 const filePath = (file) => file?.path || String(file || '')
 const extensionOf = (file) => {
-  const match = filePath(file).toLowerCase().match(/\.([^.]+)$/)
+  const match = filePath(file)
+    .toLowerCase()
+    .match(/\.([^.]+)$/)
   return match?.[1] || ''
 }
 const accepts = (file) => (isMerge.value ? extensionOf(file) === 'pdf' : IMAGE_EXTENSIONS.has(extensionOf(file)))
@@ -137,11 +134,21 @@ const run = async () => {
     <div class="binding-sheet">
       <section class="source-section">
         <div class="section-head">
-          <div><span>01</span><div><b>{{ isMerge ? 'PDF 队列' : '图片页序' }}</b><small>使用上下箭头调整最终顺序</small></div></div>
-          <el-button type="primary" :disabled="loading" @click="selectFiles"><el-icon><Plus /></el-icon>添加{{ isMerge ? ' PDF' : '图片' }}</el-button>
+          <div>
+            <span>01</span>
+            <div>
+              <b>{{ isMerge ? 'PDF 队列' : '图片页序' }}</b
+              ><small>使用上下箭头调整最终顺序</small>
+            </div>
+          </div>
+          <el-button type="primary" :disabled="loading" @click="selectFiles"
+            ><el-icon><Plus /></el-icon>添加{{ isMerge ? ' PDF' : '图片' }}</el-button
+          >
         </div>
         <div v-if="!files.length" class="empty-source" role="button" tabindex="0" @click="selectFiles" @keydown.enter="selectFiles">
-          <span><el-icon :size="22"><Plus /></el-icon></span>
+          <span
+            ><el-icon :size="22"><Plus /></el-icon
+          ></span>
           <b>{{ isMerge ? '选择两份或更多 PDF' : '选择一张或更多图片' }}</b>
           <p>添加后可在转换前重新排序</p>
         </div>
@@ -150,7 +157,10 @@ const run = async () => {
 
       <section class="output-section">
         <div class="section-head">
-          <div><span>02</span><div><b>命名与保存</b><small>留空名称时，由引擎根据第一项自动命名</small></div></div>
+          <div>
+            <span>02</span>
+            <div><b>命名与保存</b><small>留空名称时，由引擎根据第一项自动命名</small></div>
+          </div>
         </div>
         <div class="option-grid">
           <label>
@@ -161,14 +171,18 @@ const run = async () => {
             <span>输出目录</span>
             <div class="path-field">
               <el-input v-model="form.outputDir" readonly placeholder="默认保存到 下载/PPX转换结果" />
-              <el-button @click="selectOutputDir"><el-icon><FolderOpened /></el-icon>选择</el-button>
+              <el-button @click="selectOutputDir"
+                ><el-icon><FolderOpened /></el-icon>选择</el-button
+              >
             </div>
           </label>
         </div>
       </section>
 
       <footer class="run-row">
-        <div><b>{{ files.length }} 个文件</b><small>{{ files.length >= minimum ? '顺序确认后即可开始' : `还需至少 ${minimum - files.length} 个文件` }}</small></div>
+        <div>
+          <b>{{ files.length }} 个文件</b><small>{{ files.length >= minimum ? '顺序确认后即可开始' : `还需至少 ${minimum - files.length} 个文件` }}</small>
+        </div>
         <el-button type="primary" size="large" :loading="loading" :disabled="!canRun" @click="run">{{ isMerge ? '合并 PDF' : '生成 PDF' }}</el-button>
       </footer>
 
@@ -178,11 +192,17 @@ const run = async () => {
 
       <section v-if="results.length" class="result-section">
         <div class="section-head">
-          <div><span>03</span><div><b>已生成</b><small>输出文件已同步到任务中心</small></div></div>
+          <div>
+            <span>03</span>
+            <div><b>已生成</b><small>输出文件已同步到任务中心</small></div>
+          </div>
           <el-button v-if="form.outputDir" text type="primary" @click="reveal(form.outputDir)">打开输出目录</el-button>
         </div>
         <article v-for="item in results" :key="item.path" class="result-row">
-          <div><b>{{ item.fileName || item.path?.split(/[\\/]/).pop() }}</b><small>{{ item.path }}</small></div>
+          <div>
+            <b>{{ item.fileName || item.path?.split(/[\\/]/).pop() }}</b
+            ><small>{{ item.path }}</small>
+          </div>
           <el-button text @click="openFile(item.path)">打开</el-button>
           <el-button text @click="reveal(item.path)">定位</el-button>
         </article>

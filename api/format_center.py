@@ -7,15 +7,14 @@ import json
 import os
 import platform
 import re
-import signal
 import shutil
+import signal
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
 from api.utils.error_handler import api_error, api_success
 from pyapp.config.config import Config
-
 
 ENGINE_NAME = 'FlyingMouse Format'
 ENGINE_AUTHOR = '牢蜂（LaoFeng）'
