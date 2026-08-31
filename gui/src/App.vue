@@ -216,7 +216,7 @@ const toggleTheme = () => {
       <template #left>
         <div class="logo-area">
           <img class="logo-image" src="/logo.png" alt="" />
-          <span class="logo-label">多功能工具箱 <small>2.6</small></span>
+          <span class="logo-label">多功能工具箱 <small>2.6.1</small></span>
         </div>
       </template>
       <template #right>
