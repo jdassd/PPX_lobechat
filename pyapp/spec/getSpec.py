@@ -57,7 +57,6 @@ addDll = flyingMouseNode
 addModules = (
     "('../../gui/dist', 'web'), ('../../static', 'static'), "
     "('../../build/flyingmouse-source', 'vendor/flyingmouse-format'), "
-    "('../../vendor/flyingmouse-format/node_modules', 'vendor/flyingmouse-format/node_modules'), "
     "('../../LICENSE', 'licenses'), ('../../THIRD_PARTY_NOTICES.md', 'licenses')"
 )
 
@@ -125,9 +124,9 @@ a = Analysis(['../../main.py'],
 
 # FlyingMouse's prebuilt Node addons must keep their npm directory layout intact.
 # Analysis auto-classifies .node/.dylib/.so files as binaries; on macOS that turns
-# deeply nested node_modules folders into mixed Frameworks/Resources trees and can
-# make BUNDLE create dangling cross-links. Restore this one runtime subtree to DATA
-# after Analysis; the standalone Node executable remains a BINARY in its own path.
+# deeply nested node_modules folders into mixed Frameworks/Resources trees. Restore
+# this staged, symlink-free runtime subtree to DATA after Analysis; the standalone
+# Node executable remains a BINARY in its own path.
 _flying_mouse_prefix = 'vendor/flyingmouse-format'
 _flying_mouse_runtime_data = []
 _other_binaries = []

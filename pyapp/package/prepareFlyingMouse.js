@@ -83,12 +83,16 @@ function installProductionDependencies(fingerprint) {
   fs.writeFileSync(markerPath, `${JSON.stringify(fingerprint, null, 2)}\n`, 'utf8')
 }
 
-function copyEntry(relativePath) {
+function copyEntry(relativePath, options = {}) {
   const source = path.join(sourceDir, relativePath)
   const destination = path.join(stagedAppDir, relativePath)
   if (!fs.existsSync(source)) fail(`上游运行文件缺失：${relativePath}`)
   fs.mkdirSync(path.dirname(destination), { recursive: true })
-  fs.cpSync(source, destination, { recursive: true, force: true })
+  fs.cpSync(source, destination, {
+    recursive: true,
+    force: true,
+    dereference: Boolean(options.dereference)
+  })
 }
 
 function stageRuntimeSource(packageJson) {
@@ -100,6 +104,11 @@ function stageRuntimeSource(packageJson) {
     if (entry === 'node_modules/**/*') continue
     copyEntry(entry.endsWith('/**/*') ? entry.slice(0, -5) : entry)
   }
+  // npm creates relative symlinks in node_modules/.bin on Unix. PyInstaller's
+  // macOS BUNDLE relocates symlinks and data into different bundle roots, which
+  // breaks the npm tree before its Resources target exists. Materialize those
+  // links while staging so the embedded runtime is a self-contained data tree.
+  copyEntry('node_modules', { dereference: true })
   for (const entry of ['LICENSE', 'README.md', 'package-lock.json']) copyEntry(entry)
 }
 
