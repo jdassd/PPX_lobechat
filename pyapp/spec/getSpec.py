@@ -78,6 +78,7 @@ def specFirstPart():
 # -*- mode: python ; coding: utf-8 -*-
 
 import os
+import sys
 
 import PyInstaller.config
 from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_submodules
@@ -121,6 +122,25 @@ a = Analysis(['../../main.py'],
             win_no_prefer_redirects=False,
             win_private_assemblies=False,
             noarchive=False)
+
+# FlyingMouse's prebuilt Node addons must keep their npm directory layout intact.
+# Analysis auto-classifies .node/.dylib/.so files as binaries; on macOS that turns
+# deeply nested node_modules folders into mixed Frameworks/Resources trees and can
+# make BUNDLE create dangling cross-links. Restore this one runtime subtree to DATA
+# after Analysis; the standalone Node executable remains a BINARY in its own path.
+_flying_mouse_prefix = 'vendor/flyingmouse-format'
+_flying_mouse_runtime_data = []
+_other_binaries = []
+if sys.platform == 'darwin':
+    for _dest_name, _source_name, _typecode in a.binaries:
+        _normalized_dest = _dest_name.replace(chr(92), '/')
+        if _normalized_dest == _flying_mouse_prefix or _normalized_dest.startswith(_flying_mouse_prefix + '/'):
+            _flying_mouse_runtime_data.append((_dest_name, _source_name, 'DATA'))
+        else:
+            _other_binaries.append((_dest_name, _source_name, _typecode))
+    a.binaries = _other_binaries
+    a.datas.extend(_flying_mouse_runtime_data)
+
 pyz = PYZ(a.pure, a.zipped_data)
 
 '''
