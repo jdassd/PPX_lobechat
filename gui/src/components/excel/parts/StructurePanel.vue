@@ -1,7 +1,7 @@
 <template>
   <section class="panel">
     <header>
-      <h4>配置固定格式</h4>
+      <h4>设置工作表与字段</h4>
       <p>定义第一行字段、选择工作表并预览样例数据</p>
     </header>
     <el-form :model="preview" label-width="110px">

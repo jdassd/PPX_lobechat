@@ -30,6 +30,14 @@ const taskItems = computed(() =>
 const statusLabel = { running: '处理中', success: '已完成', failed: '失败', interrupted: '已中断' }
 const statusType = { running: 'warning', success: 'success', failed: 'danger', interrupted: 'info' }
 
+const greeting = computed(() => {
+  const hour = new Date().getHours()
+  if (hour < 6) return '夜深了'
+  if (hour < 12) return '上午好'
+  if (hour < 18) return '下午好'
+  return '晚上好'
+})
+
 const openAction = (action) => emit('open', { tool: action.tool, feature: action.id || action.feature })
 const toggleActionFavorite = (action) => toggleFavorite(actionKey(action))
 </script>
@@ -39,15 +47,15 @@ const toggleActionFavorite = (action) => toggleFavorite(actionKey(action))
     <div class="home-inner">
       <section class="hero">
         <div class="eyebrow">
-          <el-icon><Lock /></el-icon>本地优先 · 文件默认不离开电脑
+          <el-icon><Lock /></el-icon>全程本地处理，文件不离开电脑
         </div>
         <div class="hero-row">
           <div>
-            <h1>从一个动作开始，<span>批量完成工作。</span></h1>
-            <p>图片、PDF、Word、Excel 与文件整理汇集在同一个任务工作台。</p>
+            <h1>{{ greeting }}，<span>欢迎使用工具箱。</span></h1>
+            <p>图片、PDF、Word、Excel 与文件整理，全部在本机完成。</p>
           </div>
           <button class="search-command" type="button" @click="emit('search')">
-            <el-icon :size="19"><Search /></el-icon><span>搜索功能或动作</span><kbd>⌘ K</kbd>
+            <el-icon :size="19"><Search /></el-icon><span>搜索工具或功能，例如「压缩」</span><kbd>⌘ K</kbd>
           </button>
         </div>
       </section>
@@ -143,6 +151,7 @@ const toggleActionFavorite = (action) => toggleFavorite(actionKey(action))
   border-radius: 20px;
   background: linear-gradient(135deg, var(--ppx-bg-surface), color-mix(in srgb, var(--accent) 7%, var(--ppx-bg-surface)));
   box-shadow: var(--ppx-shadow-sm);
+  animation: ppx-fade-in-up 0.32s ease both;
 }
 .eyebrow {
   display: flex;
@@ -200,6 +209,7 @@ kbd {
 }
 .section {
   margin-top: 30px;
+  animation: ppx-fade-in-up 0.32s ease 0.08s both;
 }
 .section-head {
   display: flex;
@@ -222,6 +232,30 @@ kbd {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
+}
+.action-grid .action-card {
+  animation: ppx-fade-in-up 0.28s ease both;
+}
+.action-grid .action-card:nth-child(2) {
+  animation-delay: 0.03s;
+}
+.action-grid .action-card:nth-child(3) {
+  animation-delay: 0.06s;
+}
+.action-grid .action-card:nth-child(4) {
+  animation-delay: 0.09s;
+}
+.action-grid .action-card:nth-child(5) {
+  animation-delay: 0.12s;
+}
+.action-grid .action-card:nth-child(6) {
+  animation-delay: 0.15s;
+}
+.action-grid .action-card:nth-child(7) {
+  animation-delay: 0.18s;
+}
+.action-grid .action-card:nth-child(8) {
+  animation-delay: 0.21s;
 }
 .action-card {
   position: relative;
@@ -338,6 +372,7 @@ kbd {
   grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
   gap: 14px;
   margin-top: 28px;
+  animation: ppx-fade-in-up 0.32s ease 0.16s both;
 }
 .panel {
   border: 1px solid var(--ppx-glass-border);

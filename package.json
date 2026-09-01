@@ -1,7 +1,7 @@
 {
   "name": "tools",
   "private": true,
-  "version": "2.6.1",
+  "version": "2.7.0",
   "description": "本地优先的图片、文档、表格与文件批处理桌面工作台",
   "author": "jdassd <jdassd@163.com>",
   "scripts": {

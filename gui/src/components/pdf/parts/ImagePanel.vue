@@ -2,7 +2,7 @@
   <section class="panel">
     <header>
       <h4>输出每页高清图片</h4>
-      <p>适合二次排版、打印或导入图像软件</p>
+      <p>逐页导出为图片，方便二次排版或打印</p>
     </header>
     <el-form :model="form" label-width="110px">
       <el-form-item label="源 PDF">

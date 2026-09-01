@@ -4,7 +4,7 @@
       <section v-if="state.locked" class="panel lock-panel">
         <header>
           <h4>敏感功能访问确认</h4>
-          <p>公章生成涉及企业及个人敏感信息，请输入访问密码后继续操作。</p>
+          <p>生成的印章可能用于正式文件，进入前请输入访问密码。</p>
         </header>
         <el-form label-width="110px">
           <el-form-item label="访问密码">
@@ -33,7 +33,7 @@
       <section v-else class="panel config-panel">
         <header>
           <h4>模板与文字</h4>
-          <p>目前提供圆形企业公章模板，可自由调整内容与样式</p>
+          <p>内置圆形企业公章模板，文字与样式都可以调整</p>
         </header>
         <el-form :model="state.form" label-width="110px" class="form-grid">
           <el-form-item label="模板">
@@ -61,7 +61,7 @@
 
         <header class="mt40">
           <h4>细节参数</h4>
-          <p>按需微调尺⼨、描边、字体与星徽</p>
+          <p>调整尺寸、描边、字体与五角星参数</p>
         </header>
         <div class="param-grid">
           <div class="param-card">

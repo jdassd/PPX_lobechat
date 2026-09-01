@@ -267,9 +267,9 @@ const exportTasks = (format) => {
   <div class="task-page">
     <header class="page-head">
       <div>
-        <span class="eyebrow">V2.5 可观测批处理</span>
+        <span class="eyebrow">处理记录</span>
         <h1>任务中心</h1>
-        <p>队列、失败诊断与全部输出资产保存在本机；用趋势和方法可靠性快速发现瓶颈。</p>
+        <p>队列、失败原因和输出文件都保存在本机；趋势与成功率统计帮你了解处理是否稳定。</p>
       </div>
       <div class="head-actions">
         <el-button :type="queuePaused ? 'success' : 'warning'" plain @click="toggleQueue"
@@ -327,7 +327,7 @@ const exportTasks = (format) => {
       <article class="insight-card trend-card">
         <header>
           <div>
-            <strong>近 7 天处理趋势</strong><span>共识别 {{ outputCount }} 个输出资产</span>
+            <strong>近 7 天处理趋势</strong><span>共 {{ outputCount }} 个输出文件</span>
           </div>
           <el-tag effect="plain">本地统计</el-tag>
         </header>

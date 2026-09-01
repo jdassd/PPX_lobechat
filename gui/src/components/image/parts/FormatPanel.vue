@@ -120,7 +120,7 @@ watch(
   <section class="panel">
     <header>
       <h4>批量格式转换</h4>
-      <p>支持更多常见图片格式互转，实际可用格式会随当前环境自动适配</p>
+      <p>常见图片格式互转，可用格式随当前环境自动适配</p>
     </header>
     <FileSelector
       label="源文件"

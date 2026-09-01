@@ -16,11 +16,11 @@ const capabilityItems = computed(() => Object.values(state.capabilities || {}))
 
 const capabilityFor = (tool) => (tool.capability ? state.capabilities?.[tool.capability] : null)
 const repairGuide = {
-  ocr: 'OCR 随完整安装包提供。开发环境请重新运行 pnpm run init；安装版请下载安装完整包。',
-  ffmpeg: '请安装 FFmpeg，并确保 ffmpeg 与 ffprobe 可以从 PATH 调用。完成后返回此页重新检测。',
+  ocr: 'OCR 随完整安装包提供。开发环境请重新运行 pnpm run init；安装版请下载完整安装包。',
+  ffmpeg: '请安装 FFmpeg，并确保 ffmpeg 与 ffprobe 能被系统识别。安装完成后回到本页重新检测。',
   libreoffice: '请安装 LibreOffice。PPX 会自动检测 soffice，用于 Word 真实分页。',
   flyingmouse: '完整安装包已内置 FlyingMouse Format。若组件缺失，请重新安装；开发环境请运行 pnpm run prepare:flyingmouse。',
-  system: '系统高级诊断只在 Windows 上提供；其他平台仍可使用全部文档与文件工具。'
+  system: '系统高级诊断仅在 Windows 上提供，其他平台不受影响。'
 }
 
 const repairCapability = async (item) => {
@@ -34,7 +34,7 @@ const repairCapability = async (item) => {
 
 const toggle = (tool, value) => {
   setToolEnabled(tool.id, value)
-  ElMessage.success(value ? `已启用${tool.name}` : `已隐藏${tool.name}`)
+  ElMessage.success(value ? `已启用${tool.name}` : `已停用${tool.name}`)
 }
 
 const reset = () => {
@@ -51,7 +51,7 @@ onMounted(() => loadCapabilities())
       <div>
         <span class="eyebrow">按需启用</span>
         <h1>工具与能力</h1>
-        <p>核心文档能力始终可用；媒体、协作和系统模块可按需开启，减少界面与安装负担。</p>
+        <p>核心文档工具始终可用；媒体、协作、系统等模块可按需开启，侧栏只显示你需要的功能。</p>
       </div>
       <div class="head-actions">
         <el-button :loading="state.loading" @click="loadCapabilities(true)"
@@ -61,13 +61,13 @@ onMounted(() => loadCapabilities())
       </div>
     </header>
 
-    <el-alert class="safety-note" type="success" :closable="false" show-icon title="v2.0 已移除强力粉碎和任意启动命令" description="软件安装目录的永久删除不再向前端或公共 API 暴露；启动项页面调整为只读诊断。" />
+    <el-alert class="safety-note" type="success" :closable="false" show-icon title="已移除强力粉碎和任意启动命令" description="为安全起见，不再提供安装目录的永久删除；启动项页面改为只读诊断。" />
 
     <section class="capability-section">
       <div class="section-title">
         <div>
           <h2>本机能力</h2>
-          <p>外部组件缺失时，相关模块会给出明确提示，不影响其他工具。</p>
+          <p>外部组件缺失时会在对应模块给出提示，不影响其他工具。</p>
         </div>
         <el-tag v-if="state.platform" effect="plain">{{ state.platform }}</el-tag>
       </div>

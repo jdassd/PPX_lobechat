@@ -3,7 +3,7 @@
    ======================================== */
 
 /* 引入阿里字体图标 */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@500;600;700&family=Noto+Serif+SC:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@500;600;700&display=swap');
 @import "./iconfont/iconfont.css";
 
 /* ========================================
@@ -29,11 +29,12 @@
   --ppx-row-h: 40px;
 
   /* ???? - Atelier Paper */
+  /* 背景 */
   --ppx-bg-deep: #f4f5f7;
   --ppx-bg-base: #f7f8fa;
   --ppx-bg-elevated: #ffffff;
   --ppx-bg-surface: #ffffff;
-  --ppx-bg-ink: #17130f;
+  --ppx-bg-ink: #101114;
   --ppx-bg-inset: #f1f2f5;
   --ppx-bg-hover: rgba(0, 0, 0, 0.04);
   --ppx-bg-active: rgba(var(--accent-rgb), 0.10);
@@ -44,36 +45,23 @@
   --ppx-glass-border: rgba(17, 20, 24, 0.09);
   --ppx-glass-border-hover: rgba(17, 20, 24, 0.16);
 
-  /* ??? */
+  /* 强调色别名（兼容旧引用） */
   --ppx-neon-blue: var(--accent);
-  --ppx-neon-purple: #f97316;
-  --ppx-neon-pink: #f59e0b;
-  --ppx-neon-cyan: #22c1dc;
-  --ppx-neon-green: #84cc16;
-  --ppx-neon-orange: #ea580c;
 
-  /* ??? */
+  /* 渐变 */
   --ppx-gradient-primary: linear-gradient(135deg, var(--accent) 0%, rgba(var(--accent-rgb), 0.82) 100%);
-  --ppx-gradient-subtle: linear-gradient(135deg, rgba(249, 115, 22, 0.12) 0%, rgba(14, 165, 164, 0.12) 100%);
-  --ppx-gradient-glow: radial-gradient(ellipse at center, rgba(249, 115, 22, 0.18) 0%, transparent 70%);
+  --ppx-gradient-subtle: linear-gradient(135deg, rgba(var(--accent-rgb), 0.10) 0%, rgba(var(--accent-rgb), 0.04) 100%);
 
-  /* ??? */
+  /* 文字 */
   --ppx-text-primary: #1a1d21;
   --ppx-text-secondary: #4a4f57;
   --ppx-text-muted: #868b94;
   --ppx-text-disabled: #aab0b8;
 
-  /* ??? */
-  --ppx-success: #16a34a;
-  --ppx-warning: #f59e0b;
-  --ppx-danger: #dc2626;
-  --ppx-info: #0ea5a4;
-
-  /* ?? */
+  /* 阴影 */
   --ppx-shadow-sm: 0 1px 2px rgba(17, 20, 24, 0.05), 0 1px 3px rgba(17, 20, 24, 0.05);
   --ppx-shadow-md: 0 4px 14px rgba(17, 20, 24, 0.08);
   --ppx-shadow-lg: 0 18px 48px rgba(17, 20, 24, 0.16);
-  --ppx-shadow-glow: 0 0 40px rgba(249, 115, 22, 0.2);
 
   /* ?? */
   --ppx-radius-xs: 8px;
@@ -144,14 +132,14 @@
 :root {
   color-scheme: light;
 
-  /* Element Plus ????? */
+  /* Element Plus 主色系（以蓝色强调色统一） */
   --el-color-primary: var(--ppx-neon-blue);
-  --el-color-primary-light-3: rgba(14, 165, 164, 0.7);
-  --el-color-primary-light-5: rgba(14, 165, 164, 0.45);
-  --el-color-primary-light-7: rgba(14, 165, 164, 0.25);
-  --el-color-primary-light-8: rgba(14, 165, 164, 0.18);
-  --el-color-primary-light-9: rgba(14, 165, 164, 0.12);
-  --el-color-primary-dark-2: #0b8b8a;
+  --el-color-primary-light-3: rgba(var(--accent-rgb), 0.7);
+  --el-color-primary-light-5: rgba(var(--accent-rgb), 0.45);
+  --el-color-primary-light-7: rgba(var(--accent-rgb), 0.25);
+  --el-color-primary-light-8: rgba(var(--accent-rgb), 0.18);
+  --el-color-primary-light-9: rgba(var(--accent-rgb), 0.12);
+  --el-color-primary-dark-2: #1d4fd8;
 
   --el-color-success: var(--ppx-success);
   --el-color-warning: var(--ppx-warning);
@@ -194,12 +182,12 @@
   --el-box-shadow-lighter: 0 2px 12px rgba(44, 36, 29, 0.12);
   --el-box-shadow-dark: var(--ppx-shadow-lg);
 
-  /* ?? */
-  --el-overlay-color: rgba(21, 16, 12, 0.45);
-  --el-overlay-color-light: rgba(21, 16, 12, 0.3);
-  --el-overlay-color-lighter: rgba(21, 16, 12, 0.2);
-  --el-mask-color: rgba(21, 16, 12, 0.4);
-  --el-mask-color-extra-light: rgba(21, 16, 12, 0.2);
+  /* 遮罩（中性灰） */
+  --el-overlay-color: rgba(17, 20, 24, 0.45);
+  --el-overlay-color-light: rgba(17, 20, 24, 0.3);
+  --el-overlay-color-lighter: rgba(17, 20, 24, 0.2);
+  --el-mask-color: rgba(17, 20, 24, 0.4);
+  --el-mask-color-extra-light: rgba(17, 20, 24, 0.2);
 
   /* ?? */
   --el-border-radius-base: var(--ppx-radius-sm);
@@ -289,14 +277,14 @@ body,
     }
 
     &.is-plain {
-      background: rgba(14, 165, 164, 0.08);
-      border: 1px solid rgba(14, 165, 164, 0.35);
+      background: rgba(var(--accent-rgb), 0.08);
+      border: 1px solid rgba(var(--accent-rgb), 0.35);
       color: var(--ppx-neon-blue);
       box-shadow: none;
 
       &:hover {
-        background: rgba(14, 165, 164, 0.15);
-        box-shadow: 0 0 20px rgba(14, 165, 164, 0.2);
+        background: rgba(var(--accent-rgb), 0.15);
+        box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.2);
       }
     }
   }
@@ -356,7 +344,7 @@ body,
   }
 
   &--primary {
-    background: rgba(14, 165, 164, 0.15);
+    background: rgba(var(--accent-rgb), 0.12);
     color: var(--ppx-neon-blue);
   }
 
@@ -498,7 +486,7 @@ body,
 
     &.is-selected {
       color: var(--ppx-neon-blue);
-      background: rgba(14, 165, 164, 0.1);
+      background: rgba(var(--accent-rgb), 0.1);
     }
   }
 }
@@ -718,6 +706,69 @@ body,
 }
 
 /* ========================================
+   全局交互反馈
+   ======================================== */
+
+/* 键盘聚焦态统一为蓝色环 */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.55);
+  outline-offset: 1px;
+}
+
+/* 视图切换过渡（App.vue 工具区） */
+.view-enter-active,
+.view-leave-active {
+  transition:
+    opacity var(--ppx-transition-normal),
+    transform var(--ppx-transition-normal);
+}
+
+.view-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.view-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+/* 命令面板过渡 */
+.cp-enter-active,
+.cp-leave-active {
+  transition: opacity 0.18s ease;
+}
+
+.cp-enter-active .cp-box,
+.cp-leave-active .cp-box {
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s cubic-bezier(0.34, 1.4, 0.5, 1);
+}
+
+.cp-enter-from,
+.cp-leave-to {
+  opacity: 0;
+}
+
+.cp-enter-from .cp-box,
+.cp-leave-to .cp-box {
+  opacity: 0;
+  transform: scale(0.97);
+}
+
+/* 尊重系统减弱动效设置 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ========================================
    毛玻璃组件类
    ======================================== */
 .ppx-glass {
@@ -852,8 +903,8 @@ body,
   display: inline-flex;
   align-items: center;
   padding: 6px 12px;
-  background: rgba(14, 165, 164, 0.12);
-  border: 1px solid rgba(14, 165, 164, 0.25);
+  background: rgba(var(--accent-rgb), 0.12);
+  border: 1px solid rgba(var(--accent-rgb), 0.25);
   border-radius: 8px;
   color: var(--ppx-neon-blue);
   font-size: 13px;
@@ -896,8 +947,8 @@ body,
     transition: all var(--ppx-transition-fast);
 
     &:hover {
-      background: rgba(14, 165, 164, 0.15);
-      border-color: rgba(14, 165, 164, 0.3);
+      background: rgba(var(--accent-rgb), 0.15);
+      border-color: rgba(var(--accent-rgb), 0.3);
     }
   }
 }
@@ -933,8 +984,8 @@ body,
   }
 
   .el-radio-button__original-radio:checked + .el-radio-button__inner {
-    background: rgba(14, 165, 164, 0.15);
-    border-color: rgba(14, 165, 164, 0.3);
+    background: rgba(var(--accent-rgb), 0.15);
+    border-color: rgba(var(--accent-rgb), 0.3);
     color: var(--ppx-neon-blue);
     box-shadow: none;
   }
@@ -1051,7 +1102,7 @@ body,
     }
 
     &.is-active {
-      background: rgba(14, 165, 164, 0.15);
+      background: rgba(var(--accent-rgb), 0.15);
       color: var(--ppx-neon-blue);
     }
   }
@@ -1107,7 +1158,7 @@ body,
 
 /* 加载遮罩 */
 .el-loading-mask {
-  background: rgba(21, 16, 12, 0.25);
+  background: rgba(17, 20, 24, 0.25);
   backdrop-filter: var(--ppx-blur-sm);
 }
 
@@ -1157,7 +1208,7 @@ body,
 
     &:hover {
       border-color: var(--ppx-neon-blue);
-      background: rgba(14, 165, 164, 0.08);
+      background: rgba(var(--accent-rgb), 0.08);
     }
 
     .el-upload__text {

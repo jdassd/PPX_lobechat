@@ -8,7 +8,7 @@ export const TOOLS = [
   {
     id: 'conversion',
     name: '转换中心',
-    desc: '全格式 · 批量 · 本地',
+    desc: '图片 / Office / PDF / 音视频互转',
     icon: markRaw(Refresh),
     group: 'office',
     hue: '#0c9c8f',
@@ -27,7 +27,7 @@ export const TOOLS = [
   {
     id: 'image',
     name: '图片处理',
-    desc: '压缩 · 编辑 · OCR',
+    desc: '压缩 · 水印 · 裁剪 · OCR',
     icon: markRaw(PictureFilled),
     group: 'office',
     hue: '#2b6fff',
@@ -47,7 +47,7 @@ export const TOOLS = [
   {
     id: 'pdf',
     name: 'PDF 工具',
-    desc: '编辑 · OCR · 安全',
+    desc: '压缩 · 拆分 · OCR · 安全',
     icon: markRaw(Files),
     group: 'office',
     hue: '#e0533d',
@@ -128,7 +128,7 @@ export const TOOLS = [
   {
     id: 'workflow',
     name: '自动化工作流',
-    desc: '编排 · 定时 · 目录监听',
+    desc: '串联工具 · 定时执行 · 目录监听',
     icon: markRaw(Connection),
     group: 'automation',
     hue: '#8b5cf6',
@@ -153,7 +153,7 @@ export const TOOLS = [
   {
     id: 'text',
     name: '文本工具',
-    desc: 'JSON · Diff · JWT',
+    desc: '格式化 · 差异比较 · 编码',
     icon: markRaw(Edit),
     group: 'more',
     hue: '#7c5cff',
@@ -177,7 +177,7 @@ export const TOOLS = [
   {
     id: 'seal',
     name: '印章图片生成',
-    desc: '图形设计 · PNG 导出',
+    desc: '圆形 / 椭圆印章 · PNG 导出',
     icon: markRaw(Stamp),
     group: 'more',
     hue: '#d6342f',
@@ -201,7 +201,7 @@ export const TOOLS = [
   {
     id: 'mindmap',
     name: '思维导图（实验性）',
-    desc: '本机服务 · 局域网协作',
+    desc: '思维导图 · 局域网协作',
     icon: markRaw(Share),
     group: 'advanced',
     hue: '#8a5cf5',

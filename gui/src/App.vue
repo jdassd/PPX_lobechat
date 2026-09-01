@@ -216,7 +216,7 @@ const toggleTheme = () => {
       <template #left>
         <div class="logo-area">
           <img class="logo-image" src="/logo.png" alt="" />
-          <span class="logo-label">多功能工具箱 <small>2.6.1</small></span>
+          <span class="logo-label">多功能工具箱 <small>2.7.0</small></span>
         </div>
       </template>
       <template #right>
@@ -254,11 +254,13 @@ const toggleTheme = () => {
         </header>
 
         <div class="tool-content">
-          <HomeLauncher v-if="active === 'home'" @open="go" @search="cmdOpen = true" @modules="go('modules')" @tasks="go('tasks')" />
-          <TaskCenter v-else-if="active === 'tasks'" @open="go" />
-          <ModuleCenter v-else-if="active === 'modules'" @open="go" />
-          <component :is="activeView" v-else-if="activeView" :initial-tab="activeFeature" />
-          <el-empty v-else description="该模块暂不可用" />
+          <transition name="view" mode="out-in">
+            <HomeLauncher v-if="active === 'home'" @open="go" @search="cmdOpen = true" @modules="go('modules')" @tasks="go('tasks')" />
+            <TaskCenter v-else-if="active === 'tasks'" @open="go" />
+            <ModuleCenter v-else-if="active === 'modules'" @open="go" />
+            <component :is="activeView" v-else-if="activeView" :initial-tab="activeFeature" />
+            <el-empty v-else description="该模块暂不可用" />
+          </transition>
         </div>
       </main>
     </div>

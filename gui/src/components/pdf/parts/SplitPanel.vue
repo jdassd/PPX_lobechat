@@ -1,8 +1,8 @@
 <template>
   <section class="panel">
     <header>
-      <h4>拆分模式一：按固定页数拆分</h4>
-      <p>每 N 页拆分成一个文件，适合按章节或分页导出多个 PDF</p>
+      <h4>按固定页数拆分</h4>
+      <p>每 N 页拆成一个文件，按章节批量导出</p>
     </header>
     <el-form :model="form" label-width="110px">
       <el-form-item label="源 PDF">

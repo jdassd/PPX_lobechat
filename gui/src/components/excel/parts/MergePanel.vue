@@ -1,8 +1,8 @@
 <template>
   <section class="panel">
     <header>
-      <h4>独立合并工具</h4>
-      <p>将多个分表统一导出为一个 Excel，方便生成主表</p>
+      <h4>合并为单个 Excel</h4>
+      <p>把多个表合并成一个 Excel，方便汇总</p>
     </header>
     <div class="subpanel">
       <div class="subpanel-head">

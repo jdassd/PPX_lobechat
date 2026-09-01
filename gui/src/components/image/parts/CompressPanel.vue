@@ -107,7 +107,7 @@ const runCompress = async () => {
   <section class="panel">
     <header>
       <h4>体积压缩</h4>
-      <p>质量或目标大小两种模式，适合分享或归档</p>
+      <p>按质量或目标体积压缩，文件更小、清晰度可控</p>
     </header>
     <FileSelector
       label="图片列表"

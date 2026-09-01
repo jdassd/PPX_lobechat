@@ -588,7 +588,7 @@ watch(
   <section class="panel crop-panel">
     <header>
       <h4>图片裁剪</h4>
-      <p>拖动选区调整位置，拖动边角改变大小，也可以使用证件照、固定尺寸和比例预设</p>
+      <p>拖动选区调整位置与大小，支持证件照、固定尺寸和比例预设</p>
     </header>
 
     <FileSelector label="源图片" description="每次处理一张图片，支持当前环境可读取的图片格式" :files="selectedFiles" :removable="true" button-text="选择图片" @select="selectImage" @remove="clearImage" />

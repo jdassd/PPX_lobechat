@@ -87,32 +87,34 @@ const onKey = (event) => {
 
 <template>
   <teleport to="body">
-    <div v-if="modelValue" class="cp-scrim" @click="close">
-      <div class="cp-box" role="dialog" aria-modal="true" aria-label="搜索功能" @click.stop>
-        <div class="cp-head">
-          <el-icon :size="19" color="var(--ppx-text-muted)"><Search /></el-icon>
-          <input ref="inputRef" v-model="q" class="cp-input" aria-label="搜索工具和功能" placeholder="搜索工具或具体动作，例如「OCR」「合并 PDF」" @keydown="onKey" />
-          <kbd>ESC</kbd>
-        </div>
-        <div class="cp-list" role="listbox" aria-label="搜索结果">
-          <div v-if="!filtered.length" class="cp-empty">没有匹配项</div>
-          <button v-for="(item, index) in filtered" :key="item.key" class="cp-item" :class="{ on: index === idx }" role="option" :aria-selected="index === idx" @mouseenter="idx = index" @click="choose(item)">
-            <span class="cp-ico" :style="{ background: item.hue + '1f', color: item.hue }">
-              <el-icon :size="18"><component :is="item.icon" /></el-icon>
-            </span>
-            <span class="cp-meta"
-              ><b>{{ item.name }}</b
-              ><small>{{ item.desc }}</small></span
-            >
-            <el-icon v-if="item.favorite" class="cp-favorite" :size="14"><StarFilled /></el-icon>
-            <el-icon v-if="index === idx" :size="15" color="var(--accent)"><ArrowRight /></el-icon>
-          </button>
-        </div>
-        <div class="cp-foot">
-          <span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>↵</kbd> 打开</span>
+    <transition name="cp">
+      <div v-if="modelValue" class="cp-scrim" @click="close">
+        <div class="cp-box" role="dialog" aria-modal="true" aria-label="搜索功能" @click.stop>
+          <div class="cp-head">
+            <el-icon :size="19" color="var(--ppx-text-muted)"><Search /></el-icon>
+            <input ref="inputRef" v-model="q" class="cp-input" aria-label="搜索工具和功能" placeholder="搜索工具或具体动作，例如「OCR」「合并 PDF」" @keydown="onKey" />
+            <kbd>ESC</kbd>
+          </div>
+          <div class="cp-list" role="listbox" aria-label="搜索结果">
+            <div v-if="!filtered.length" class="cp-empty">没有匹配项</div>
+            <button v-for="(item, index) in filtered" :key="item.key" class="cp-item" :class="{ on: index === idx }" role="option" :aria-selected="index === idx" @mouseenter="idx = index" @click="choose(item)">
+              <span class="cp-ico" :style="{ background: item.hue + '1f', color: item.hue }">
+                <el-icon :size="18"><component :is="item.icon" /></el-icon>
+              </span>
+              <span class="cp-meta"
+                ><b>{{ item.name }}</b
+                ><small>{{ item.desc }}</small></span
+              >
+              <el-icon v-if="item.favorite" class="cp-favorite" :size="14"><StarFilled /></el-icon>
+              <el-icon v-if="index === idx" :size="15" color="var(--accent)"><ArrowRight /></el-icon>
+            </button>
+          </div>
+          <div class="cp-foot">
+            <span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>↵</kbd> 打开</span>
+          </div>
         </div>
       </div>
-    </div>
+    </transition>
   </teleport>
 </template>
 

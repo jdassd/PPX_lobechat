@@ -147,7 +147,7 @@ onMounted(refreshHealth)
         <div class="two-panels">
           <section class="panel-card">
             <h3>创建完整备份</h3>
-            <p>包含本地任务、工作流、文档索引、数据库和界面偏好；逐文件记录 SHA-256，不读取浏览器密码或环境变量。</p>
+            <p>备份本地任务、工作流、文档索引、数据库与界面偏好，逐文件记录 SHA-256，不读取浏览器密码或环境变量。</p>
             <el-form label-position="top">
               <el-form-item label="保存目录（留空则保存到应用数据目录）"
                 ><el-input v-model="backup.outputDir"
@@ -162,7 +162,7 @@ onMounted(refreshHealth)
           </section>
           <section class="panel-card">
             <h3>恢复备份</h3>
-            <p>先校验路径、清单、大小、重复条目与内容摘要，再在下次启动前恢复；当前数据会自动生成恢复前备份。</p>
+            <p>先校验路径、清单与内容摘要，再于下次启动时恢复；恢复前会自动为当前数据留一份备份。</p>
             <el-button @click="chooseBackup">选择并校验备份</el-button>
             <dl v-if="restore.manifest" class="manifest">
               <div>
@@ -192,8 +192,8 @@ onMounted(refreshHealth)
       <el-tab-pane label="诊断报告" name="diagnostics">
         <section class="panel-card diagnostics-card">
           <div>
-            <h3>生成隐私安全的诊断报告</h3>
-            <p>报告包含版本、系统、可选模块状态以及最近任务的状态摘要；不会收集文件正文、任务参数、密码、令牌或环境变量。</p>
+            <h3>诊断报告</h3>
+            <p>报告包含版本、系统、模块状态和最近任务的摘要；不收集文件正文、密码、令牌或环境变量。</p>
           </div>
           <el-form label-position="top">
             <el-form-item label="输出目录"

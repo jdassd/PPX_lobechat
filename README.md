@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Vue-3.0+-4FC08D?style=flat-square&logo=vue.js&logoColor=white" alt="Vue 3" />
   <img src="https://img.shields.io/badge/Python-3.10-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.10" />
   <img src="https://img.shields.io/badge/Pywebview-5.0+-FFD43B?style=flat-square&logo=python&logoColor=blue" alt="Pywebview" />
-  <img src="https://img.shields.io/badge/version-2.6.1-2b6fff?style=flat-square" alt="Version 2.6.1" />
+  <img src="https://img.shields.io/badge/version-2.7.0-2b6fff?style=flat-square" alt="Version 2.7.0" />
   <img src="https://img.shields.io/badge/License-AGPL--3.0-green?style=flat-square" alt="License" />
 </p>
 
@@ -20,13 +20,13 @@
 
 ## 📖 简介
 
-**PPX 2.6.1** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
+**PPX 2.7.0** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
 
-2.6 系列新增内置 FlyingMouse Format 的转换中心，将原先分散在图片、PDF 和视频工具中的格式转换收拢为统一的本地批处理流程，同时延续“动作 → 持久任务 → 可恢复结果”的可观测闭环。
+2.7 重新设计工作台首页、功能导航和工具面板，统一视觉层级与交互反馈，让常用工具更容易找到，也让批处理状态与说明更清晰。
 
 ## ✨ 主要功能
 
-PPX 2.6.1 的核心能力包括：
+PPX 2.7.0 的核心能力包括：
 
 ### 📄 文档与数据
 

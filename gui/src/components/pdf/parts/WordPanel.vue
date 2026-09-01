@@ -2,7 +2,7 @@
   <section class="panel">
     <header>
       <h4>转换为可编辑 Word 文档</h4>
-      <p>按页提取文本并生成 .docx，适合再次排版编辑</p>
+      <p>按页提取文本并生成 .docx，可在 Word 中继续编辑</p>
     </header>
     <el-form :model="form" label-width="120px">
       <el-form-item label="源 PDF">

@@ -1,8 +1,8 @@
 <template>
   <section class="panel">
     <header>
-      <h4>拆分模式二：按页码拆分 / 摘取</h4>
-      <p>通过页码区间或自定义页码列表摘取页面，生成一份新的 PDF 摘录</p>
+      <h4>按页码摘取页面</h4>
+      <p>按页码区间或列表摘取页面，生成一份新 PDF</p>
     </header>
     <el-form :model="form" label-width="110px">
       <el-form-item label="源 PDF">

@@ -2,7 +2,7 @@
   <section class="panel">
     <header>
       <h4>模拟扫描件效果</h4>
-      <p>自动添加纸纹、微倾角和杂点，便于归档或走传统流程</p>
+      <p>自动添加纸纹、轻微倾斜和杂点，模拟真实扫描</p>
     </header>
     <el-form :model="form" label-width="110px">
       <el-form-item label="源 PDF">
