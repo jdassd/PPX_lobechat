@@ -169,9 +169,10 @@ class DesktopBridgeTests(unittest.TestCase):
         empty = self.api.pdf_page_workbench({"filePath": str(source), "pageOrder": []})
         self.assertNotEqual(empty["code"], 0)
 
+    @mock.patch.dict(os.environ, {'PYTHONIOENCODING': 'cp1252', 'PYTHONUTF8': '0'})
     def test_partial_batch_only_retries_failed_input(self):
-        good = self.root / "good.png"
-        missing = self.root / "missing.png"
+        good = self.root / "图像.png"
+        missing = self.root / "重试.png"
         Image.new("RGBA", (80, 40), (50, 120, 200, 80)).save(good)
         submitted = self.api.task_submit(
             {

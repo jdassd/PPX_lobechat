@@ -126,9 +126,11 @@ class FileTool:
 
     def _collect_filtered_files(self, directory: Path, filters: Dict, ensure_non_empty: bool = True) -> List[Path]:
         if filters.get('retry_inputs') is not None:
-            files = [Path(raw).resolve() for raw in filters['retry_inputs']]
-            for path in files:
-                path.relative_to(directory.resolve())
+            root = directory.resolve()
+            # Validate using canonical paths, then retain the caller's directory
+            # spelling for relative paths and retry identities (macOS /var,
+            # Windows short names, and directory links can alias the same root).
+            files = [directory / Path(raw).resolve().relative_to(root) for raw in filters['retry_inputs']]
         else:
             files = [
                 path

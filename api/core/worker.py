@@ -116,6 +116,12 @@ def worker_main():
                     raise RuntimeError('处理进程缺少宿主通信管道')
                 stream = os.fdopen(msvcrt.open_osfhandle(handle, flag), mode, encoding='utf-8', buffering=1)
                 setattr(sys, name, stream)
+    # Pipes use the same UTF-8 protocol in source and frozen builds, regardless
+    # of the host locale (Windows CI commonly defaults to cp1252).
+    for name in ('stdin', 'stdout', 'stderr'):
+        stream = getattr(sys, name)
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8', errors='replace')
     sink = sys.stdout
 
     def send(kind, **data):

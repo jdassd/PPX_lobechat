@@ -73,6 +73,9 @@ class RefactorIntegrityTests(unittest.TestCase):
     def test_directory_retry_uses_only_failed_original_inputs(self):
         source, target = self.root / 'inputs', self.root / 'outputs'
         source.mkdir()
+        # Exercise a noncanonical directory spelling on every platform, as well
+        # as native /var aliases and Windows short temp paths on CI.
+        source = source / '..' / 'inputs'
         for name in ('good.txt', 'blocked.txt'):
             (source / name).write_text(name, encoding='utf-8')
         original_copy = shutil.copy2

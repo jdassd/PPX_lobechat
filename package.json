@@ -81,7 +81,7 @@
     "format:py:macos": "node ./pyapp/package/python.js -m ruff format .",
     "format:py:windows": "node ./pyapp/package/python.js -m ruff format .",
     "test": "run-script-os",
-    "test:e2e": "node ./pyapp/package/python.js tests/e2e/workspace_flow.py",
+    "test:e2e": "pnpm -C ./gui run build && node ./pyapp/package/python.js tests/e2e/workspace_flow.py",
     "test:linux": "node ./pyapp/package/python.js -m unittest discover -s tests -v",
     "test:macos": "node ./pyapp/package/python.js -m unittest discover -s tests -v",
     "test:windows": "node ./pyapp/package/python.js -m unittest discover -s tests -v"

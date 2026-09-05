@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -23,6 +24,22 @@ from web_collection_flow import verify_web_collection
 from api.api import API
 from api.core.context import stop_process
 from pyapp.config.config import Config
+
+
+@contextmanager
+def browser_evidence(context, page, report_dir, errors):
+    context.tracing.start(screenshots=True, snapshots=True, sources=True)
+    try:
+        yield
+    except Exception:
+        page.screenshot(path=str(report_dir / 'failure.png'), full_page=True)
+        (report_dir / 'failure.json').write_text(json.dumps({
+            'errors': errors, 'body': page.locator('body').inner_text()
+        }, ensure_ascii=False, indent=2), encoding='utf-8')
+        context.tracing.stop(path=str(report_dir / 'failure-trace.zip'))
+        raise
+    else:
+        context.tracing.stop()
 
 
 def main():
@@ -49,6 +66,7 @@ def main():
             [
                 "node",
                 str(ROOT / "gui/node_modules/vite/bin/vite.js"),
+                "preview",
                 "--host",
                 "127.0.0.1",
                 "--port",
@@ -70,17 +88,22 @@ def main():
                 if server.poll() is not None:
                     raise RuntimeError("Vite failed to start")
                 time.sleep(0.1)
-            with sync_playwright() as playwright:
+            with sync_playwright() as playwright, ExitStack() as evidence:
                 browser_options = {"headless": True}
                 edge = Path("C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe")
-                if edge.exists():
+                if edge.exists() and os.environ.get('PPX_E2E_BROWSER') != 'chromium':
                     browser_options["executable_path"] = str(edge)
                 browser = playwright.chromium.launch(**browser_options)
                 context = browser.new_context(viewport={"width": 1440, "height": 1000})
                 page = context.new_page()
                 page.set_default_timeout(15000)
                 errors = []
-                page.on("pageerror", lambda error: errors.append(str(error)))
+                evidence.enter_context(browser_evidence(context, page, report_dir, errors))
+                def record_error(error):
+                    errors.append(str(error))
+                    print('BROWSER ERROR: ' + str(error), flush=True)
+
+                page.on("pageerror", record_error)
 
                 def dispatch(_source, method, args):
                     if method == "system_pyCreateFileDialog":
@@ -236,6 +259,7 @@ def main():
                                'two-step workflow via forms', 'pause only blocks new tasks', 'cancel queued task',
                                'browser collection detail retry without duplicate rows']
                 }, indent=2), encoding='utf-8')
+                evidence.close()
                 browser.close()
                 print(
                     "PASS: draft retention, restart configuration, real processing, partial failure, retry only failed input, output validation, scoped result handoff, 1000-page PDF editing/undo/reorder/export, two-step workflow via forms, queue pause/cancel, zero page errors"
