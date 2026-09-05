@@ -6,6 +6,8 @@ import zipfile
 from pathlib import Path
 from unittest import mock
 
+from api.core.outputs import output_asset
+from api.core.store import StateStore
 from api.maintenance import MaintenanceMixin
 from api.tasks import TaskMixin
 from api.utils.error_handler import api_error, api_success
@@ -18,7 +20,10 @@ class ObservableTaskApi(TaskMixin):
         options = options or {}
         if options.get('fail'):
             return api_error('文件不存在：missing.txt')
-        return api_success('done', files=options.get('outputs') or [])
+        # New task producers publish the explicit asset contract; legacy inference
+        # is confined to importing records made by previous application versions.
+        return api_success('done', outputAssets=[output_asset(item['path'] if isinstance(item, dict) else item)
+                                                for item in options.get('outputs') or []])
 
 
 class PortableWorkflowApi(WorkflowMixin):
@@ -71,7 +76,8 @@ class ObservableTaskTests(unittest.TestCase):
             self.assertEqual(preview['removableIds'], [failed_id])
             self.assertEqual(removed['removedIds'], [failed_id])
             self.assertEqual([item['id'] for item in remaining['tasks']], [success_id])
-            self.assertTrue((root / 'tasks' / 'history.bak').is_file())
+            stored = StateStore(root).load('tasks', root / 'tasks' / 'history.json', {})
+            self.assertEqual([item['id'] for item in stored['tasks']], [success_id])
 
 
 class WorkflowPortabilityTests(unittest.TestCase):

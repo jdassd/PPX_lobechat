@@ -28,10 +28,7 @@
         </div>
       </el-form-item>
       <el-form-item label="自定义页码">
-        <el-input
-          v-model="form.pageSpec"
-          placeholder="可选，例如：1-3,5"
-        />
+        <el-input v-model="form.pageSpec" placeholder="可选，例如：1-3,5" />
       </el-form-item>
       <el-form-item label="输出目录">
         <div class="field-row">
@@ -43,29 +40,25 @@
         <el-checkbox v-model="form.saveFile">保存为 .txt</el-checkbox>
       </el-form-item>
       <el-form-item>
-      <el-button type="primary" :loading="shared.loading" @click="runExtractText">开始提取</el-button>
+        <el-button type="primary" :loading="shared.loading" @click="runExtractText">开始提取</el-button>
       </el-form-item>
     </el-form>
     <div v-if="form.preview" class="result-block">
       <p class="result-title">文本预览</p>
-      <el-input
-        v-model="form.preview"
-        type="textarea"
-        :rows="8"
-        readonly
-      />
+      <el-input v-model="form.preview" type="textarea" :rows="8" readonly />
     </div>
   </section>
 </template>
 
 <script setup>
-import { inject, reactive } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { inject } from 'vue'
 import { ElMessage } from 'element-plus'
 
 const { callApi, pickPdf, pickDir } = inject('pdfApi')
 const shared = inject('pdfShared')
 
-const form = reactive({
+const form = useDraft('pdf/parts/ExtractTextPanel/form', {
   file: null,
   mode: 'plain',
   startPage: 1,

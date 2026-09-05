@@ -1,5 +1,7 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import ImageEffectPreview from '../../shared/ImageEffectPreview.vue'
+import { mergeFileQueue, useDraft } from '../../../utils/workspace'
+import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
@@ -15,7 +17,7 @@ const props = defineProps({
 
 const loading = ref(false)
 
-const form = reactive({
+const form = useDraft('image/parts/CompressPanel/form', {
   files: [],
   mode: 'quality',
   quality: 80,
@@ -37,7 +39,7 @@ const selectImages = async () => {
   if (!ensurePyReady()) return
   const files = await callApiRaw('system_pyCreateFileDialog', props.supportedFormats.imageFilter)
   if (files?.length) {
-    form.files = files
+    form.files = mergeFileQueue(form.files, files)
   }
 }
 
@@ -109,13 +111,7 @@ const runCompress = async () => {
       <h4>体积压缩</h4>
       <p>按质量或目标体积压缩，文件更小、清晰度可控</p>
     </header>
-    <FileSelector
-      label="图片列表"
-      :files="form.files"
-      :removable="true"
-      @select="selectImages"
-      @remove="removeFile"
-    />
+    <FileSelector label="图片列表" v-model:files="form.files" :removable="true" @select="selectImages" @remove="removeFile" />
     <el-form :model="form" label-width="120px" class="form-block">
       <el-form-item label="压缩模式">
         <el-radio-group v-model="form.mode">
@@ -139,6 +135,7 @@ const runCompress = async () => {
         <el-button type="primary" :loading="loading" @click="runCompress">开始压缩</el-button>
       </el-form-item>
     </el-form>
+    <ImageEffectPreview method="image_batch_compress" :options="form" />
     <ResultTable
       v-if="form.result.length"
       title="压缩结果"

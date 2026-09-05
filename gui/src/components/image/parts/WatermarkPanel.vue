@@ -1,5 +1,7 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import ImageEffectPreview from '../../shared/ImageEffectPreview.vue'
+import { mergeFileQueue, useDraft } from '../../../utils/workspace'
+import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
@@ -15,7 +17,7 @@ const props = defineProps({
 
 const loading = ref(false)
 
-const form = reactive({
+const form = useDraft('image/parts/WatermarkPanel/form', {
   files: [],
   watermarkType: 'text',
   text: '',
@@ -45,7 +47,7 @@ const selectImages = async () => {
   if (!ensurePyReady()) return
   const files = await callApiRaw('system_pyCreateFileDialog', props.supportedFormats.imageFilter)
   if (files?.length) {
-    form.files = files
+    form.files = mergeFileQueue(form.files, files)
   }
 }
 
@@ -145,13 +147,7 @@ const runWatermark = async () => {
       <h4>批量添加水印</h4>
       <p>支持文字与图片水印，九宫格定位与透明度控制</p>
     </header>
-    <FileSelector
-      label="待处理图片"
-      :files="form.files"
-      :removable="true"
-      @select="selectImages"
-      @remove="removeFile"
-    />
+    <FileSelector label="待处理图片" v-model:files="form.files" :removable="true" @select="selectImages" @remove="removeFile" />
     <el-form :model="form" label-width="110px" class="form-block">
       <el-form-item label="水印类型">
         <el-radio-group v-model="form.watermarkType">
@@ -161,12 +157,7 @@ const runWatermark = async () => {
       </el-form-item>
       <template v-if="form.watermarkType === 'text'">
         <el-form-item label="文字内容">
-          <el-input
-            v-model="form.text"
-            placeholder="输入水印文字，可换行"
-            type="textarea"
-            :rows="3"
-          />
+          <el-input v-model="form.text" placeholder="输入水印文字，可换行" type="textarea" :rows="3" />
         </el-form-item>
         <div class="watermark-config">
           <el-form-item label="字号">
@@ -197,30 +188,15 @@ const runWatermark = async () => {
       </template>
       <el-form-item label="平铺 / 间距">
         <div class="field-row field-row--wrap">
-          <el-switch
-            v-model="form.tile"
-            active-text="按间距平铺"
-            inactive-text="单个水印"
-          />
-          <el-input-number
-            v-model="form.tileSpacing"
-            :min="20"
-            :max="600"
-            :step="10"
-            :disabled="!form.tile"
-          />
+          <el-switch v-model="form.tile" active-text="按间距平铺" inactive-text="单个水印" />
+          <el-input-number v-model="form.tileSpacing" :min="20" :max="600" :step="10" :disabled="!form.tile" />
           <span>px</span>
         </div>
       </el-form-item>
       <el-form-item label="旋转角度">
-        <el-slider
-          v-model="form.rotation"
-          :min="-90"
-          :max="90"
-          :step="1"
-          show-input
-        />
-      </el-form-item>              <el-form-item label="位置">
+        <el-slider v-model="form.rotation" :min="-90" :max="90" :step="1" show-input />
+      </el-form-item>
+      <el-form-item label="位置">
         <el-select v-model="form.position" style="width: 220px">
           <el-option label="左上角" value="top-left" />
           <el-option label="右上角" value="top-right" />
@@ -239,12 +215,8 @@ const runWatermark = async () => {
         <el-button type="primary" :loading="loading" @click="runWatermark">开始处理</el-button>
       </el-form-item>
     </el-form>
-    <ResultTable
-      v-if="form.result.length"
-      title="输出文件"
-      :items="form.result.map((path) => ({ path }))"
-      :columns="[{ label: '文件路径', prop: 'path' }]"
-    >
+    <ImageEffectPreview method="image_add_watermark" :options="form" />
+    <ResultTable v-if="form.result.length" title="输出文件" :items="form.result.map((path) => ({ path }))" :columns="[{ label: '文件路径', prop: 'path' }]">
       <template #actions>
         <el-button text type="primary" @click="openDir">打开目录</el-button>
       </template>

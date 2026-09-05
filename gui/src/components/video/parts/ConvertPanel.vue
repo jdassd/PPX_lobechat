@@ -1,5 +1,7 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import VideoInspection from '../../shared/VideoInspection.vue'
+import { useDraft } from '../../../utils/workspace'
+import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
@@ -7,7 +9,7 @@ const videoFilter = ['视频文件 (*.mp4;*.mov;*.avi;*.mkv;*.webm)']
 
 const loading = ref(false)
 
-const form = reactive({
+const form = useDraft('video/parts/ConvertPanel/form', {
   file: null,
   targetFormat: 'mp4',
   qualityPreset: 'medium',
@@ -55,7 +57,11 @@ const runConvert = async () => {
   }
   loading.value = true
   try {
-    const { ok, data: res, message } = await pyCall('video_format_convert', {
+    const {
+      ok,
+      data: res,
+      message
+    } = await pyCall('video_format_convert', {
       filePath: form.file.path,
       targetFormat: form.targetFormat,
       qualityPreset: form.qualityPreset,
@@ -118,12 +124,8 @@ const runConvert = async () => {
         <el-button type="primary" :loading="loading" @click="runConvert">开始转换</el-button>
       </el-form-item>
     </el-form>
-    <el-alert
-      v-if="form.result"
-      type="success"
-      :closable="false"
-      show-icon
-    >
+    <VideoInspection :file="form.file" />
+    <el-alert v-if="form.result" type="success" :closable="false" show-icon>
       <template #title>
         已生成：<a class="link" @click.prevent="openFile(form.result)">{{ form.result }}</a>
       </template>

@@ -1,5 +1,6 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, hasPyApi } from '@/utils/pyapi'
 
@@ -9,7 +10,7 @@ const loading = ref(false)
 
 let replaceRuleSeed = 1
 
-const state = reactive({
+const state = useDraft('text/parts/ReplacePanel/state', {
   content: '',
   rules: [
     {
@@ -63,7 +64,11 @@ const runReplace = async () => {
   }
   loading.value = true
   try {
-    const { ok, data: res, message } = await pyCall('text_batch_replace', {
+    const {
+      ok,
+      data: res,
+      message
+    } = await pyCall('text_batch_replace', {
       content: state.content,
       rules
     })
@@ -98,14 +103,7 @@ const runReplace = async () => {
           <el-checkbox v-model="rule.enabled">启用</el-checkbox>
           <el-checkbox v-model="rule.regex">正则</el-checkbox>
           <el-checkbox v-model="rule.caseSensitive" :disabled="rule.regex">区分大小写</el-checkbox>
-          <el-input-number
-            v-model="rule.limit"
-            :min="0"
-            :max="999"
-            :step="1"
-            size="small"
-            style="width: 120px"
-          />
+          <el-input-number v-model="rule.limit" :min="0" :max="999" :step="1" size="small" style="width: 120px" />
           <el-button size="small" text type="danger" @click="removeReplaceRule(index)">移除</el-button>
         </div>
         <el-input v-model="rule.search" placeholder="查找内容（支持正则）" />
@@ -113,24 +111,13 @@ const runReplace = async () => {
       </div>
     </div>
     <div class="text-grid">
-      <el-input
-        v-model="state.content"
-        type="textarea"
-        :rows="8"
-        placeholder="输入原始文本"
-      />
+      <el-input v-model="state.content" type="textarea" :rows="8" placeholder="输入原始文本" />
       <div class="text-grid-actions">
         <el-button type="primary" :loading="loading" @click="runReplace">执行</el-button>
       </div>
       <PreviewPanel title="输出" :content="state.result" />
     </div>
-    <el-table
-      v-if="state.report.length"
-      :data="state.report"
-      border
-      size="small"
-      style="margin-top: 16px"
-    >
+    <el-table v-if="state.report.length" :data="state.report" border size="small" style="margin-top: 16px">
       <el-table-column type="index" width="60" label="#" />
       <el-table-column prop="search" label="查找" show-overflow-tooltip />
       <el-table-column prop="replacement" label="替换为" show-overflow-tooltip />

@@ -20,17 +20,9 @@
             <el-radio-button label="standard">标清</el-radio-button>
             <el-radio-button label="custom">自定义</el-radio-button>
           </el-radio-group>
-          <el-input-number
-            v-model="form.dpi"
-            :min="96"
-            :max="600"
-            :step="10"
-            :disabled="form.dpiPreset !== 'custom'"
-          />
+          <el-input-number v-model="form.dpi" :min="96" :max="600" :step="10" :disabled="form.dpiPreset !== 'custom'" />
         </div>
-        <p class="dpi-hint">
-          DPI 越高，导出图片越清晰，文件体积也会更大。推荐：超清 400 DPI，高清 300 DPI，标清 200 DPI。
-        </p>
+        <p class="dpi-hint">DPI 越高，导出图片越清晰，文件体积也会更大。推荐：超清 400 DPI，高清 300 DPI，标清 200 DPI。</p>
       </el-form-item>
       <el-form-item label="图片格式">
         <el-select v-model="form.format" style="width: 160px">
@@ -49,26 +41,14 @@
         </div>
       </el-form-item>
       <el-form-item>
-        <el-button
-          type="primary"
-          :loading="shared.loading"
-          @click="runConvertImages"
-        >
-          开始转换
-        </el-button>
+        <el-button type="primary" :loading="shared.loading" @click="runConvertImages"> 开始转换 </el-button>
       </el-form-item>
     </el-form>
     <div v-if="form.result.length" class="result-block">
       <p class="result-title">已生成图片</p>
       <el-scrollbar max-height="160px">
         <div class="result-list">
-          <el-tag
-            v-for="file in form.result"
-            :key="file"
-            type="info"
-            effect="plain"
-            @click="openPath(file)"
-          >
+          <el-tag v-for="file in form.result" :key="file" type="info" effect="plain" @click="openPath(file)">
             {{ file }}
           </el-tag>
         </div>
@@ -78,7 +58,8 @@
 </template>
 
 <script setup>
-import { inject, reactive, watch } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { inject, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 
 const { callApi, openPath, pickPdf, pickDir } = inject('pdfApi')
@@ -90,7 +71,7 @@ const toImageDpiPresetMap = {
   standard: 200
 }
 
-const form = reactive({
+const form = useDraft('pdf/parts/ImagePanel/form', {
   file: null,
   outputDir: '',
   dpiPreset: 'ultra',

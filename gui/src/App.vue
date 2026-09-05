@@ -1,35 +1,41 @@
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref, watchEffect } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watchEffect } from 'vue'
+import WorkspacePresets from './components/shared/WorkspacePresets.vue'
+import ResultActions from './components/shared/ResultActions.vue'
+import { currentIncomingAssets as incomingAssets, clearIncomingFiles, workspaceTool } from './utils/workspace'
+import { loadOperationCatalog, tasks } from './utils/taskCenter'
 import { List, Moon, Search, SetUp, Sunny } from '@element-plus/icons-vue'
 
 import { toolById } from './config/tools'
 import { pushRecent } from './utils/recent'
 import BtnUpdate from './components/BtnUpdate.vue'
 import CommandPalette from './components/CommandPalette.vue'
-import HomeLauncher from './components/home/HomeLauncher.vue'
-import ModuleCenter from './components/ModuleCenter.vue'
+const HomeLauncher = defineAsyncComponent(() => import('./components/home/HomeLauncher.vue'))
+const ModuleCenter = defineAsyncComponent(() => import('./components/ModuleCenter.vue'))
 import Sidebar from './components/Sidebar.vue'
-import TaskCenter from './components/TaskCenter.vue'
+const TaskCenter = defineAsyncComponent(() => import('./components/TaskCenter.vue'))
 import WindowResizeHandles from './components/WindowResizeHandles.vue'
 import WindowTitleBar from './components/WindowTitleBar.vue'
 
-import ExcelTool from './components/excel/ExcelTool.vue'
-import ConversionCenter from './components/conversion/ConversionCenter.vue'
-import DocumentTool from './components/document/DocumentTool.vue'
-import FileTool from './components/file/FileTool.vue'
-import ImageTool from './components/image/ImageTool.vue'
-import MindMapTool from './components/mindmap/MindMapTool.vue'
-import MaintenanceTool from './components/maintenance/MaintenanceTool.vue'
-import PdfTool from './components/pdf/PdfTool.vue'
-import SealTool from './components/seal/SealTool.vue'
-import SystemCenter from './components/system/SystemCenter.vue'
-import TextTool from './components/text/TextTool.vue'
-import VideoTool from './components/video/VideoTool.vue'
-import WebAutoTool from './components/webauto/WebAutoTool.vue'
-import WordTool from './components/word/WordTool.vue'
-import WorkflowTool from './components/workflow/WorkflowTool.vue'
+const ExcelTool = defineAsyncComponent(() => import('./components/excel/ExcelTool.vue'))
+const ConversionCenter = defineAsyncComponent(() => import('./components/conversion/ConversionCenter.vue'))
+const DocumentTool = defineAsyncComponent(() => import('./components/document/DocumentTool.vue'))
+const FileTool = defineAsyncComponent(() => import('./components/file/FileTool.vue'))
+const ImageTool = defineAsyncComponent(() => import('./components/image/ImageTool.vue'))
+const MaintenanceTool = defineAsyncComponent(() => import('./components/maintenance/MaintenanceTool.vue'))
+const PdfTool = defineAsyncComponent(() => import('./components/pdf/PdfTool.vue'))
+const SealTool = defineAsyncComponent(() => import('./components/seal/SealTool.vue'))
+const SystemCenter = defineAsyncComponent(() => import('./components/system/SystemCenter.vue'))
+const TextTool = defineAsyncComponent(() => import('./components/text/TextTool.vue'))
+const VideoTool = defineAsyncComponent(() => import('./components/video/VideoTool.vue'))
+const WebAutoTool = defineAsyncComponent(() => import('./components/webauto/WebAutoTool.vue'))
+const WordTool = defineAsyncComponent(() => import('./components/word/WordTool.vue'))
+const WorkflowTool = defineAsyncComponent(() => import('./components/workflow/WorkflowTool.vue'))
 
 const VIEWS = {
+  home: HomeLauncher,
+  tasks: TaskCenter,
+  modules: ModuleCenter,
   conversion: ConversionCenter,
   image: ImageTool,
   pdf: PdfTool,
@@ -40,7 +46,6 @@ const VIEWS = {
   video: VideoTool,
   file: FileTool,
   webauto: WebAutoTool,
-  mindmap: MindMapTool,
   maintenance: MaintenanceTool,
   seal: SealTool,
   workflow: WorkflowTool,
@@ -48,6 +53,9 @@ const VIEWS = {
 }
 
 const active = ref('home')
+watchEffect(() => {
+  workspaceTool.value = active.value
+})
 const activeFeature = ref('')
 const collapsed = ref(localStorage.getItem('ppx-sidebar-collapsed') === '1')
 const cmdOpen = ref(false)
@@ -55,7 +63,12 @@ const theme = ref(localStorage.getItem('ppx-theme') || 'light')
 const density = ref(localStorage.getItem('ppx-density') || 'regular')
 
 const activeTool = computed(() => toolById(active.value))
-const activeView = computed(() => VIEWS[active.value])
+const activeView = computed(() => VIEWS[active.value] || HomeLauncher)
+const latestOutputs = computed(() => tasks.value.find((task) => task.tool === active.value && task.outputs?.length)?.outputs || [])
+onMounted(() => {
+  if (window.pywebview?.api) loadOperationCatalog()
+  else window.addEventListener('pywebviewready', loadOperationCatalog, { once: true })
+})
 
 const LEGACY_CONVERSION_ROUTES = {
   'image:convert': { tool: 'conversion', feature: 'universal' },
@@ -205,6 +218,10 @@ const routeLaunchFiles = async () => {
 
 onMounted(routeLaunchFiles)
 
+const onNavigate = (event) => go(event.detail)
+onMounted(() => window.addEventListener('ppx-navigate', onNavigate))
+onUnmounted(() => window.removeEventListener('ppx-navigate', onNavigate))
+
 const toggleTheme = () => {
   theme.value = theme.value === 'dark' ? 'light' : 'dark'
 }
@@ -216,7 +233,7 @@ const toggleTheme = () => {
       <template #left>
         <div class="logo-area">
           <img class="logo-image" src="/logo.png" alt="" />
-          <span class="logo-label">多功能工具箱 <small>2.7.0</small></span>
+          <span class="logo-label">多功能工具箱 <small>2.8.0</small></span>
         </div>
       </template>
       <template #right>
@@ -250,16 +267,17 @@ const toggleTheme = () => {
             <div class="tool-name">{{ activeTool.name }}</div>
             <div class="tool-desc">{{ activeTool.desc }}</div>
           </div>
+          <WorkspacePresets :tool="active" />
+          <ResultActions :assets="latestOutputs" />
           <el-tag v-if="activeTool.badge" class="tool-badge" size="small" effect="plain">{{ activeTool.badge }}</el-tag>
         </header>
 
         <div class="tool-content">
+          <el-alert v-if="incomingAssets.length" :title="`已带入 ${incomingAssets.length} 个结果；点击此工具的选择文件按钮即可使用`" type="info" show-icon @close="clearIncomingFiles" />
           <transition name="view" mode="out-in">
-            <HomeLauncher v-if="active === 'home'" @open="go" @search="cmdOpen = true" @modules="go('modules')" @tasks="go('tasks')" />
-            <TaskCenter v-else-if="active === 'tasks'" @open="go" />
-            <ModuleCenter v-else-if="active === 'modules'" @open="go" />
-            <component :is="activeView" v-else-if="activeView" :initial-tab="activeFeature" />
-            <el-empty v-else description="该模块暂不可用" />
+            <KeepAlive>
+              <component :is="activeView" :key="active" :initial-tab="activeFeature" @open="go" @search="cmdOpen = true" @modules="go('modules')" @tasks="go('tasks')" />
+            </KeepAlive>
           </transition>
         </div>
       </main>

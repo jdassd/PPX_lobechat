@@ -1,4 +1,5 @@
 <script setup>
+import { useDraft } from '../../../utils/workspace'
 import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
@@ -54,7 +55,7 @@ const previewHostRef = ref(null)
 const loading = ref(false)
 const previewLoading = ref(false)
 
-const form = reactive({
+const form = useDraft('image/parts/CropPanel/form', {
   file: null,
   previewUrl: '',
   imageWidth: 0,

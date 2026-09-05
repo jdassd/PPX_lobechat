@@ -49,7 +49,7 @@ class TaskQueueTests(unittest.TestCase):
 
             self.assertEqual(task['status'], 'success')
             self.assertEqual(task['result']['output'], 'V2.3')
-            self.assertTrue((Path(directory) / 'tasks' / 'history.json').is_file())
+            self.assertTrue((Path(directory) / 'workbench.sqlite3').is_file())
 
 
 class WorkflowTests(unittest.TestCase):

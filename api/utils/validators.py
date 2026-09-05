@@ -11,6 +11,8 @@ from typing import Iterable, List, Sequence
 
 def ensure_file_path(path: str | Path, allow_empty: bool = False) -> Path:
     """确保文件存在"""
+    if isinstance(path, dict):
+        path = path.get('path')
     if not path:
         if allow_empty:
             return Path()

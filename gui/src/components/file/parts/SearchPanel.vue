@@ -1,5 +1,6 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
@@ -7,7 +8,7 @@ import ResultTable from '../../shared/ResultTable.vue'
 
 const loading = ref(false)
 
-const state = reactive({
+const state = useDraft('file/parts/SearchPanel/state', {
   directory: '',
   keyword: '',
   extensions: '',
@@ -50,7 +51,11 @@ const runSearch = async () => {
       .split(',')
       .map((item) => item.trim().replace('.', ''))
       .filter(Boolean)
-    const { ok, data: res, message } = await pyCall('file_search', {
+    const {
+      ok,
+      data: res,
+      message
+    } = await pyCall('file_search', {
       directory: state.directory,
       keyword: state.keyword,
       extensions,
@@ -89,10 +94,7 @@ const runSearch = async () => {
         <el-input v-model="state.keyword" placeholder="支持模糊匹配" clearable />
       </el-form-item>
       <el-form-item label="扩展名">
-        <el-input
-          v-model="state.extensions"
-          placeholder="以逗号分隔，如：pdf,jpg,docx"
-        />
+        <el-input v-model="state.extensions" placeholder="以逗号分隔，如：pdf,jpg,docx" />
       </el-form-item>
       <el-form-item label="大小 (B)">
         <div class="field-row">
@@ -120,9 +122,7 @@ const runSearch = async () => {
       ]"
     >
       <template #actions>
-        <el-button text type="primary" @click="openPath(state.directory)">
-          打开目录
-        </el-button>
+        <el-button text type="primary" @click="openPath(state.directory)"> 打开目录 </el-button>
       </template>
     </ResultTable>
   </section>

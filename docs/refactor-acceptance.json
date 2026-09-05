@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "version": "2.8.0",
+  "note": "发布决定与验收状态分开记录；未验证项目保持 pending，不因发版改为 passed。",
+  "release": {
+    "tag": "v2.8.0",
+    "allowPendingAcceptance": true,
+    "reason": "用户明确要求直接升级为 v2.8.0 并推送标签触发 GitHub 正式发版；发布说明保留未完成验收项。"
+  },
+  "phases": {
+    "1": { "status": "pending", "evidence": "" },
+    "2": { "status": "pending", "evidence": "" },
+    "3": { "status": "pending", "evidence": "" },
+    "4": { "status": "pending", "evidence": "" },
+    "5": { "status": "pending", "evidence": "" },
+    "6": { "status": "pending", "evidence": "" }
+  },
+  "platforms": {
+    "windows": {},
+    "macos": {},
+    "linux": {}
+  }
+}

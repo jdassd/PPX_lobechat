@@ -13,6 +13,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import time
 import uuid
 import zipfile
@@ -20,6 +21,10 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Dict, Iterable, List, Tuple
+
+from api.core.context import checkpoint, iter_progress, publish_output, record_inputs, record_item, run_process
+from api.core.journal import save_manifest
+from api.core.outputs import atomic_output, output_asset, write_output
 
 try:
     import py7zr
@@ -93,6 +98,7 @@ class FileTool:
             'start_time': float(options.get('modifiedStart') or 0),
             'end_time': float(options.get('modifiedEnd') or 0),
             'recursive': bool(options.get('recursive', True)),
+            'retry_inputs': options.get('_retryInputs'),
         }
 
     def _match_common_filters(self, path: Path, filters: Dict) -> bool:
@@ -119,13 +125,19 @@ class FileTool:
         return True
 
     def _collect_filtered_files(self, directory: Path, filters: Dict, ensure_non_empty: bool = True) -> List[Path]:
-        files = [
-            path
-            for path in self._iter_files(directory, recursive=filters['recursive'])
-            if self._match_common_filters(path, filters)
-        ]
+        if filters.get('retry_inputs') is not None:
+            files = [Path(raw).resolve() for raw in filters['retry_inputs']]
+            for path in files:
+                path.relative_to(directory.resolve())
+        else:
+            files = [
+                path
+                for path in self._iter_files(directory, recursive=filters['recursive'])
+                if self._match_common_filters(path, filters)
+            ]
         if ensure_non_empty and not files:
             raise ValueError('未匹配到任何文件')
+        record_inputs(files)
         return files
 
     def _search_with_fd(self, directory: Path, filters: Dict, limit: int):
@@ -187,10 +199,12 @@ class FileTool:
                 break
         return matched
 
-    def _hash_file(self, path: Path, chunk_size: int = 1024 * 1024) -> str:
-        hasher = hashlib.md5()
+    @staticmethod
+    def _hash_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
+        hasher = hashlib.sha256()
         with path.open('rb') as handler:
             for chunk in iter(lambda: handler.read(chunk_size), b''):
+                checkpoint()
                 hasher.update(chunk)
         return hasher.hexdigest()
 
@@ -357,45 +371,49 @@ class FileTool:
             suffix = f'.{fmt}'
             dest = output_dir / f'{filename}{suffix}'
 
-            if fmt == 'zip':
-                password = str(opts.get('password') or '').strip()
-                if password:
-                    # 使用 7-Zip 创建带密码的 ZIP（ZipCrypto），兼容常见解压工具
-                    seven_zip = shutil.which('7z') or shutil.which('7za') or shutil.which('7zz')
-                    if not seven_zip:
-                        raise OSError('未检测到 7-Zip，暂不支持 ZIP 密码压缩，请改用 7Z 格式或安装 7-Zip')
-                    common_root = os.path.commonpath([str(path.parent) for path in items])
-                    rel_paths = [os.path.relpath(str(path), common_root) for path in items]
-                    cmd = [
-                        seven_zip,
-                        'a',
-                        '-tzip',
-                        '-y',
-                        f'-p{password}',
-                        '-mem=ZipCrypto',
-                        str(dest),
-                    ] + rel_paths
-                    proc = subprocess.run(cmd, cwd=common_root, capture_output=True, text=True)
-                    if proc.returncode != 0:
-                        stderr = proc.stderr.strip() or '调用 7-Zip 创建带密码 ZIP 失败'
-                        raise RuntimeError(stderr)
+            with atomic_output(dest) as (temporary, dest):
+                if fmt == 'zip':
+                    password = str(opts.get('password') or '').strip()
+                    if password:
+                        # 使用 7-Zip 创建带密码的 ZIP（ZipCrypto），兼容常见解压工具
+                        seven_zip = shutil.which('7z') or shutil.which('7za') or shutil.which('7zz')
+                        if not seven_zip:
+                            raise OSError('未检测到 7-Zip，暂不支持 ZIP 密码压缩，请改用 7Z 格式或安装 7-Zip')
+                        common_root = os.path.commonpath([str(path.parent) for path in items])
+                        rel_paths = [os.path.relpath(str(path), common_root) for path in items]
+                        cmd = [
+                            seven_zip,
+                            'a',
+                            '-tzip',
+                            '-y',
+                            f'-p{password}',
+                            '-mem=ZipCrypto',
+                            str(temporary),
+                        ] + rel_paths
+                        proc = subprocess.run(cmd, cwd=common_root, capture_output=True, text=True)
+                        if proc.returncode != 0:
+                            stderr = proc.stderr.strip() or '调用 7-Zip 创建带密码 ZIP 失败'
+                            raise RuntimeError(stderr)
+                    else:
+                        compression = zipfile.ZIP_DEFLATED
+                        with zipfile.ZipFile(temporary, 'w', compression=compression, compresslevel=6) as handler:
+                            for path in iter_progress(items):
+                                if path.is_dir():
+                                    for file_path in path.rglob('*'):
+                                        checkpoint()
+                                        if file_path.resolve() in {temporary.resolve(), dest.resolve()}:
+                                            continue
+                                        if file_path.is_file():
+                                            handler.write(file_path, file_path.relative_to(path.parent))
+                                else:
+                                    handler.write(path, arcname=path.name)
                 else:
-                    compression = zipfile.ZIP_DEFLATED
-                    with zipfile.ZipFile(dest, 'w', compression=compression, compresslevel=6) as handler:
-                        for path in items:
-                            if path.is_dir():
-                                for file_path in path.rglob('*'):
-                                    if file_path.is_file():
-                                        handler.write(file_path, file_path.relative_to(path.parent))
-                            else:
-                                handler.write(path, arcname=path.name)
-            else:
-                if py7zr is None:
-                    raise ImportError('缺少 py7zr 依赖，请运行 pip install py7zr')
-                password = opts.get('password') or None
-                with py7zr.SevenZipFile(dest, 'w', password=password) as handler:
-                    for path in items:
-                        handler.writeall(path, arcname=path.name)
+                    if py7zr is None:
+                        raise ImportError('缺少 py7zr 依赖，请运行 pip install py7zr')
+                    password = opts.get('password') or None
+                    with py7zr.SevenZipFile(temporary, 'w', password=password) as handler:
+                        for path in iter_progress(items):
+                            handler.writeall(path, arcname=path.name)
             return api_success('压缩完成', file=str(dest))
         except Exception as exc:
             return api_error(f'压缩失败：{exc}')
@@ -408,22 +426,34 @@ class FileTool:
             target_dir = Path(opts.get('targetDir') or archive.parent / 'extract')
             target_dir.mkdir(parents=True, exist_ok=True)
             suffix = archive.suffix.lower()
-            if suffix == '.zip':
-                with zipfile.ZipFile(archive, 'r') as handler:
-                    password = opts.get('password')
-                    pwd = password.encode('utf-8') if password else None
-                    self._validate_archive_members(target_dir, (item.filename for item in handler.infolist()))
-                    handler.extractall(target_dir, pwd=pwd)
-            elif suffix == '.7z':
-                if py7zr is None:
-                    raise ImportError('缺少 py7zr 依赖，请运行 pip install py7zr')
-                with py7zr.SevenZipFile(archive, 'r', password=opts.get('password') or None) as handler:
-                    self._validate_archive_members(target_dir, handler.getnames())
-                    handler.extractall(target_dir)
-            else:
-                raise ValueError('当前仅支持解压 ZIP / 7Z')
-            files = [str(path) for path in target_dir.rglob('*') if path.is_file()]
-            return api_success('解压完成', outputDir=str(target_dir), files=files[:50])
+            files = []
+            with tempfile.TemporaryDirectory(prefix='.ppx-extract-', dir=target_dir) as staging:
+                staging_path = Path(staging)
+                if suffix == '.zip':
+                    with zipfile.ZipFile(archive, 'r') as handler:
+                        password = opts.get('password')
+                        pwd = password.encode('utf-8') if password else None
+                        self._validate_archive_members(staging_path, (item.filename for item in handler.infolist()))
+                        for member in iter_progress(handler.infolist(), '正在验证并解压'):
+                            if (member.external_attr >> 16) & 0o170000 == 0o120000:
+                                raise ValueError('压缩包包含符号链接，未提取')
+                            handler.extract(member, staging_path, pwd=pwd)
+                elif suffix == '.7z':
+                    if py7zr is None:
+                        raise ImportError('缺少 py7zr 依赖')
+                    with py7zr.SevenZipFile(archive, 'r', password=opts.get('password') or None) as handler:
+                        self._validate_archive_members(staging_path, handler.getnames())
+                        handler.extractall(staging_path)
+                else:
+                    raise ValueError('当前仅支持解压 ZIP / 7Z')
+                for path in iter_progress(list(staging_path.rglob('*')), '正在提交解压结果'):
+                    self._safe_child(staging_path, path)
+                    if path.is_symlink():
+                        raise ValueError('压缩包包含符号链接，未提交')
+                    if path.is_file():
+                        final = write_output(target_dir / path.relative_to(staging_path), lambda dest: shutil.copy2(path, dest), allow_empty=True)
+                        files.append(str(final))
+            return api_success('解压完成', outputDir=str(target_dir), files=files, outputAssets=[output_asset(path) for path in files])
         except Exception as exc:
             return api_error(f'解压失败：{exc}')
 
@@ -440,23 +470,37 @@ class FileTool:
             copied = 0
             skipped = 0
             total_bytes = 0
-            for path in files:
+            assets, failures, preview = [], [], []
+            for path in iter_progress(files, '正在复制文件'):
                 relative = path.relative_to(source_dir)
                 dest = target_dir / relative
-                dest.parent.mkdir(parents=True, exist_ok=True)
                 if dest.exists() and conflict_policy != 'overwrite':
                     skipped += 1
+                    preview.append({'from': str(path), 'to': str(dest), 'action': 'skip', 'reason': '目标已存在'})
+                    record_item(path, 'skipped', '目标已存在')
                     continue
-                shutil.copy2(path, dest)
-                copied += 1
-                total_bytes += path.stat().st_size
+                preview.append({'from': str(path), 'to': str(dest), 'action': 'copy', 'reason': '已有同名文件时生成副本'})
+                if opts.get('dryRun'):
+                    continue
+                try:
+                    dest = write_output(dest, lambda target: shutil.copy2(path, target), allow_empty=True)
+                    assets.append(output_asset(dest))
+                    copied += 1
+                    total_bytes += path.stat().st_size
+                    record_item(path, 'success', outputs=[assets[-1]])
+                except Exception as exc:
+                    checkpoint()
+                    failures.append({'input': str(path), 'error': str(exc)})
+                    record_item(path, 'failed', str(exc))
             return api_success(
-                '复制完成',
+                '复制预演完成' if opts.get('dryRun') else f'复制完成：{copied} 个成功，{len(failures)} 个失败，{skipped} 个跳过',
                 copied=copied,
                 skipped=skipped,
                 size=total_bytes,
                 sizeText=format_bytes(total_bytes),
                 outputDir=str(target_dir),
+                outputAssets=assets, failures=failures, preview=preview, dryRun=bool(opts.get('dryRun')),
+                partial=bool(failures and copied), code=0 if copied or opts.get('dryRun') or not failures else -1,
             )
         except Exception as exc:
             return api_error(f'批量复制失败：{exc}')
@@ -482,29 +526,40 @@ class FileTool:
             recycle_dir.mkdir(parents=True, exist_ok=True)
             total_size = 0
             manifest_items = []
-            for path in files:
-                file_size = path.stat().st_size
-                total_size += file_size
+            manifest = {'schemaVersion': 2, 'id': batch_id, 'directory': str(directory), 'createdAt': time.time(), 'items': manifest_items}
+            manifest_path = recycle_dir / 'manifest.json'
+            save_manifest(manifest_path, manifest)
+            failures = []
+            for path in iter_progress(files, '正在移入回收目录'):
                 target = recycle_dir / path.relative_to(directory)
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.move(str(path), str(target))
-                manifest_items.append({'original': str(path), 'recycled': str(target), 'size': file_size})
-            manifest = {
-                'schemaVersion': 1,
-                'id': batch_id,
-                'directory': str(directory),
-                'createdAt': time.time(),
-                'items': manifest_items,
-            }
-            (recycle_dir / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
+                record = {'original': str(path), 'recycled': str(target), 'size': 0, 'status': 'pending'}
+                manifest_items.append(record)
+                try:
+                    file_size = path.stat().st_size
+                    record['size'] = file_size
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    save_manifest(manifest_path, manifest)
+                    shutil.move(str(path), str(target))
+                    record['status'] = 'done'
+                    total_size += file_size
+                    publish_output(target)
+                    record_item(path, 'success', outputs=[output_asset(target)])
+                except Exception as exc:
+                    checkpoint()
+                    record['status'] = 'failed'
+                    failures.append({'input': str(path), 'error': str(exc)})
+                    record_item(path, 'failed', str(exc))
+                finally:
+                    save_manifest(manifest_path, manifest)
             payload = {
                 'id': batch_id,
-                'deleted': len(files),
+                'deleted': sum(item['status'] == 'done' for item in manifest_items),
                 'size': total_size,
                 'sizeText': format_bytes(total_size),
+                'failures': failures, 'partial': bool(failures and any(item['status'] == 'done' for item in manifest_items)),
             }
             payload['recycleDir'] = str(recycle_dir)
-            return api_success('已移入回收目录', **payload)
+            return api_success('已移入回收目录', code=0 if payload['deleted'] or not failures else -1, **payload)
         except Exception as exc:
             return api_error(f'批量删除失败：{exc}')
 
@@ -522,35 +577,47 @@ class FileTool:
             dry_run = bool(opts.get('dryRun', False))
             renamed = []
             skipped = []
-            for offset, path in enumerate(files):
-                index = start_index + offset
-                new_name = self._build_new_name(path, rule, params, index)
-                dest = path.with_name(new_name)
-                if dest == path:
-                    skipped.append(str(path))
-                    continue
-                if dest.exists() and dest != path:
-                    # v2.0 禁止覆盖已有文件，避免批量改名造成不可恢复的数据丢失。
-                    skipped.append(str(path))
-                    continue
-                renamed.append({'from': str(path), 'to': str(dest)})
-                if not dry_run:
-                    path.rename(dest)
-            transaction_id = ''
-            if not dry_run and renamed:
-                transaction_id = f'{int(time.time())}-{uuid.uuid4().hex[:8]}'
-                history_dir = directory / '.ppx_history' / 'rename'
-                history_dir.mkdir(parents=True, exist_ok=True)
-                manifest = {
-                    'schemaVersion': 1,
-                    'id': transaction_id,
-                    'directory': str(directory),
-                    'createdAt': time.time(),
-                    'mappings': renamed,
-                }
-                (history_dir / f'{transaction_id}.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
+            transaction_id = f'{int(time.time())}-{uuid.uuid4().hex[:8]}' if not dry_run else ''
+            history_dir = directory / '.ppx_history' / 'rename'
+            manifest = {'schemaVersion': 2, 'id': transaction_id, 'directory': str(directory), 'createdAt': time.time(), 'mappings': []}
+            manifest_path = history_dir / f'{transaction_id}.json'
+            failures = []
+            planned = set()
+            for offset, path in enumerate(iter_progress(files, '正在重命名')):
+                record = None
+                try:
+                    original_order = opts.get('_inputOrder') or {}
+                    index = start_index + int(original_order.get(str(path), offset))
+                    new_name = self._build_new_name(path, rule, params, index)
+                    dest = path.with_name(new_name)
+                    if dest == path or dest.exists() or os.path.normcase(str(dest)) in planned:
+                        skipped.append(str(path))
+                        record_item(path, 'skipped', '名称未改变' if dest == path else '目标已存在')
+                        continue
+                    record = {'from': str(path), 'to': str(dest), 'signature': self._hash_file(path) if not dry_run else None, 'status': 'pending'}
+                    planned.add(os.path.normcase(str(dest)))
+                    if not dry_run:
+                        manifest['mappings'].append(record)
+                        save_manifest(manifest_path, manifest)
+                        dest = write_output(dest, lambda target: shutil.copy2(path, target), allow_empty=True)
+                        record['to'] = str(dest)
+                        save_manifest(manifest_path, manifest)
+                        path.unlink()
+                        record['status'] = 'done'
+                        record_item(path, 'success', outputs=[output_asset(dest)])
+                    renamed.append(record)
+                except Exception as exc:
+                    checkpoint()
+                    if record:
+                        record['status'] = 'failed'
+                    failures.append({'input': str(path), 'error': str(exc)})
+                    record_item(path, 'failed', str(exc))
+                finally:
+                    if not dry_run and record:
+                        save_manifest(manifest_path, manifest)
             message = '重命名预览' if dry_run else '重命名完成'
-            return api_success(message, renamed=renamed, skipped=skipped, dryRun=dry_run, transactionId=transaction_id)
+            return api_success(message, renamed=renamed, skipped=skipped, dryRun=dry_run, transactionId=transaction_id,
+                               failures=failures, partial=bool(failures and renamed), code=0 if renamed or not failures else -1)
         except Exception as exc:
             return api_error(f'批量改名失败：{exc}')
 
@@ -627,16 +694,17 @@ class FileTool:
             conflict_policy = str(opts.get('conflictPolicy') or 'rename').lower()
             restored = []
             skipped = []
-            remaining = []
-            for item in manifest.get('items') or []:
+            remaining = list(manifest.get('items') or [])
+            failures = []
+            for item in iter_progress(list(remaining), '正在恢复文件'):
                 source = self._safe_child(batch_dir, Path(item.get('recycled') or ''))
                 target = self._safe_child(directory, Path(item.get('original') or ''))
                 if not source.is_file():
+                    remaining.remove(item)
                     continue
                 if target.exists():
                     if conflict_policy == 'skip':
                         skipped.append(str(target))
-                        remaining.append(item)
                         continue
                     index = 1
                     while True:
@@ -646,14 +714,31 @@ class FileTool:
                             break
                         index += 1
                 target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.move(str(source), str(target))
-                restored.append({'from': str(source), 'to': str(target)})
+                try:
+                    item['restoreTarget'] = str(target)
+                    save_manifest(batch_dir / 'manifest.json', manifest)
+                    target = write_output(target, lambda dest: shutil.copy2(source, dest), allow_empty=True)
+                    source.unlink()
+                    remaining.remove(item)
+                    restored.append({'from': str(source), 'to': str(target)})
+                except Exception as exc:
+                    checkpoint()
+                    failures.append({'input': str(source), 'error': str(exc)})
+                finally:
+                    manifest['items'] = remaining
+                    save_manifest(batch_dir / 'manifest.json', manifest)
             if remaining:
                 manifest['items'] = remaining
-                (batch_dir / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
+                save_manifest(batch_dir / 'manifest.json', manifest)
             else:
-                shutil.rmtree(batch_dir, ignore_errors=False)
-            return api_success('文件恢复完成', restored=restored, skipped=skipped, restoredCount=len(restored))
+                (batch_dir / 'manifest.json').unlink(missing_ok=True)
+                for folder in sorted([batch_dir, *(p for p in batch_dir.rglob('*') if p.is_dir())], key=lambda p: len(p.parts), reverse=True):
+                    try:
+                        folder.rmdir()
+                    except OSError:
+                        pass
+            return api_success('文件恢复完成', restored=restored, skipped=skipped, restoredCount=len(restored), failures=failures,
+                               partial=bool(failures and restored), code=0 if restored or not failures else -1)
         except Exception as exc:
             return api_error(f'恢复失败：{exc}')
 
@@ -698,19 +783,61 @@ class FileTool:
             manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
             restored = []
             skipped = []
-            for mapping in reversed(manifest.get('mappings') or []):
+            remaining = list(manifest.get('mappings') or [])
+            for mapping in iter_progress(list(reversed(remaining)), '正在撤销重命名'):
                 source = self._safe_child(directory, Path(mapping.get('to') or ''))
                 target = self._safe_child(directory, Path(mapping.get('from') or ''))
-                if not source.exists() or target.exists():
+                if not source.exists() and target.exists():
+                    remaining.remove(mapping)
+                    continue
+                if not source.exists() or target.exists() or (mapping.get('signature') and self._hash_file(source) != mapping['signature']):
                     skipped.append({'from': str(source), 'to': str(target)})
                     continue
                 source.rename(target)
+                remaining.remove(mapping)
+                manifest['mappings'] = remaining
+                save_manifest(manifest_path, manifest)
+                publish_output(target)
                 restored.append({'from': str(source), 'to': str(target)})
             if not skipped:
                 manifest_path.unlink()
             return api_success('批量重命名已撤销', restored=restored, skipped=skipped, restoredCount=len(restored))
         except Exception as exc:
             return api_error(f'撤销重命名失败：{exc}')
+
+    def file_classify_undo(self, options: Dict | None = None):
+        """Undo recorded classification; preserve files edited since processing."""
+        try:
+            opts = self._validate(options)
+            directory = ensure_directory(opts.get('directory'), auto_create=False)
+            transaction = str(opts.get('transactionId') or '')
+            if not transaction or Path(transaction).name != transaction:
+                raise ValueError('分类事务编号无效')
+            manifest_path = directory / '.ppx_history' / 'classify' / f'{transaction}.json'
+            manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+            target_root = Path(manifest['targetDir'])
+            restored, skipped = [], []
+            for record in iter_progress(manifest['mappings'], '正在撤销分类'):
+                if record.get('status') == 'undone':
+                    continue
+                source = self._safe_child(target_root, Path(record['to']))
+                target = self._safe_child(directory, Path(record['from']))
+                if not source.is_file() or not record.get('signature') or self._hash_file(source) != record['signature']:
+                    skipped.append(record)
+                    continue
+                if manifest['operation'] == 'move':
+                    if target.exists():
+                        skipped.append(record)
+                        continue
+                    target = write_output(target, lambda dest: shutil.copy2(source, dest), allow_empty=True)
+                    restored.append({'from': str(source), 'to': str(target)})
+                source.unlink()
+                record['status'] = 'undone'
+                save_manifest(manifest_path, manifest)
+            return api_success('分类撤销完成；已修改或冲突的文件保留', restored=restored, skipped=skipped,
+                               restoredCount=len(restored), outputAssets=[output_asset(item['to']) for item in restored])
+        except Exception as exc:
+            return api_error(f'分类撤销失败：{exc}')
 
     def file_deduplicate(self, options: Dict | None = None):
         """文件去重"""
@@ -861,51 +988,71 @@ class FileTool:
                         return label
                 return ext.upper() or fallback_label
 
-            def resolve_conflict(dest: Path) -> Path:
-                if not dest.exists():
-                    return dest
-                if conflict_policy == 'overwrite':
-                    if not dry_run:
-                        dest.unlink()
-                    return dest
-                index = 1
-                while True:
-                    candidate = dest.with_name(f'{dest.stem}_{index}{dest.suffix}')
-                    if not candidate.exists():
-                        return candidate
+            planned = set()
+            failures = []
+            transaction_id = f'{int(time.time())}-{uuid.uuid4().hex[:8]}'
+            manifest_path = directory / '.ppx_history' / 'classify' / f'{transaction_id}.json'
+            manifest = {'schemaVersion': 2, 'id': transaction_id, 'directory': str(directory), 'targetDir': str(target_dir), 'operation': operation, 'mappings': []}
+            for path in iter_progress(files, '正在分类文件'):
+                if target_root != directory_root and target_root in path.resolve().parents:
+                    record_item(path, 'skipped', '跳过本工具输出目录')
+                    continue
+                try:
+                    stat = path.stat()
+                    safe_label = self._sanitize_category_name(resolve_category(path, stat))
+                    signature = self._hash_file(path) if not dry_run else None
+                    base = target_dir / safe_label / path.name
+                except Exception as exc:
+                    checkpoint()
+                    failures.append({'input': str(path), 'error': str(exc)})
+                    record_item(path, 'failed', str(exc))
+                    continue
+                dest = base
+                index = 2
+                if conflict_policy == 'skip' and dest.exists():
+                    record_item(path, 'skipped', '目标已存在')
+                    continue
+                while dest.exists() or os.path.normcase(str(dest)) in planned:
+                    dest = base.with_name(f'{base.stem}_{index}{base.suffix}')
                     index += 1
-
-            for path in files:
-                stat = path.stat()
-                resolved_path = path.resolve()
-                if operation == 'move' and target_root != directory_root and target_root in resolved_path.parents:
-                    continue
-                label = resolve_category(path, stat)
-                safe_label = self._sanitize_category_name(label)
-                dest_dir = target_dir / safe_label
-                dest = dest_dir / path.name
-                dest = resolve_conflict(dest)
-                if dest == path:
-                    continue
-                operations.append({'from': str(path), 'to': str(dest), 'category': safe_label})
-                categories[safe_label] += 1
-                total_size += stat.st_size
+                planned.add(os.path.normcase(str(dest)))
+                record = {'from': str(path), 'to': str(dest), 'category': safe_label, 'status': 'pending',
+                          'signature': signature}
                 if dry_run:
-                    continue
-                dest_dir.mkdir(parents=True, exist_ok=True)
-                if operation == 'copy':
-                    shutil.copy2(path, dest)
+                    operations.append(record)
                 else:
-                    shutil.move(str(path), str(dest))
+                    manifest['mappings'].append(record)
+                    save_manifest(manifest_path, manifest)
+                    try:
+                        dest = write_output(dest, lambda target: shutil.copy2(path, target), allow_empty=True)
+                        record['to'] = str(dest)
+                        record['signature'] = self._hash_file(dest)
+                        save_manifest(manifest_path, manifest)
+                        if operation == 'move':
+                            path.unlink()
+                        record['status'] = 'done'
+                        operations.append(record)
+                        record_item(path, 'success', outputs=[output_asset(dest)])
+                    except Exception as exc:
+                        checkpoint()
+                        record['status'] = 'failed'
+                        failures.append({'input': str(path), 'error': str(exc)})
+                        record_item(path, 'failed', str(exc))
+                    finally:
+                        save_manifest(manifest_path, manifest)
+                if dry_run or record['status'] == 'done':
+                    categories[safe_label] += 1
+                    total_size += stat.st_size
 
             summary['processed'] = len(operations)
             summary['totalBytes'] = total_size
             summary['totalSize'] = format_bytes(total_size)
 
             payload = {
-                'summary': summary,
+                'summary': summary, 'transactionId': transaction_id, 'failures': failures,
+                'partial': bool(failures and operations), 'code': 0 if operations or not failures else -1,
                 'categories': [{'label': label, 'count': count} for label, count in categories.most_common()],
-                'operations': operations[: min(len(operations), 80)],
+                'operations': operations,
                 'outputDir': str(target_dir),
                 'dryRun': dry_run,
             }

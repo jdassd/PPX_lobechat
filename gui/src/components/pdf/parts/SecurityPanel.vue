@@ -1,11 +1,12 @@
 <script setup>
-import { inject, reactive, ref } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { inject, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 
 const { callApi, pickPdf, pickDir, openPath } = inject('pdfApi')
 const shared = inject('pdfShared')
 const output = ref('')
-const form = reactive({
+const form = useDraft('pdf/parts/SecurityPanel/form', {
   filePath: '',
   sourcePassword: '',
   outputDir: '',

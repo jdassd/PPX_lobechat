@@ -9,9 +9,11 @@ Description: Word(.docx) 工具相关 API —— 拆分(多文件)、切割(保�
   .docx 没有原生的“页”概念（页由排版引擎实时计算）。本模块通过调用本机
   LibreOffice 将文档转换为 PDF，得到与 Word 基本一致的真实分页，再用 PyMuPDF
   解析每个内容块所落的页码，建立“内容块 → 页码”映射。真正的拆分/切割始终在
-  原始文档上以“复制后删除多余元素”的方式完成，因此 100% 保留原文档格式。
+  原始文档上以“复制后删除多余元素”的方式完成，尽可能保留原文档格式；跨页内容块在边界不完整时拒绝裁切。
 '''
 
+import base64
+import copy
 import re
 import shutil
 import subprocess
@@ -28,6 +30,8 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docxcompose.composer import Composer
 
+from api.core.context import checkpoint, iter_progress, run_process
+from api.core.outputs import atomic_output, write_output
 from api.utils.validators import ensure_output_directory
 
 _MARKER_RE = re.compile(r'PPXMK(\d+)Z')
@@ -51,10 +55,13 @@ class WordTool():
     def _timestamp(self) -> str:
         return datetime.now().strftime('%Y%m%d_%H%M%S')
 
-    def _compose_output_path(self, directory: str, filename: str) -> str:
-        if directory and filename:
-            safe_dir = Path(directory)
+    def _compose_output_path(self, directory: str, filename: str, source: Path, suffix: str) -> str:
+        if directory or filename:
+            safe_dir = Path(directory) if directory else source.parent
             safe_dir.mkdir(parents=True, exist_ok=True)
+            filename = filename or f'{source.stem}_{suffix}_{self._timestamp()}.docx'
+            if Path(filename).name != filename:
+                raise ValueError('输出文件名不能包含目录分隔符')
             safe_name = filename if filename.lower().endswith('.docx') else f'{filename}.docx'
             return str(safe_dir / safe_name)
         return ''
@@ -104,8 +111,10 @@ class WordTool():
         '''按文档顺序返回正文中的段落(w:p)与表格(w:tbl)元素，忽略结尾的 sectPr。'''
         blocks = []
         for child in document.element.body.iterchildren():
-            if child.tag in (qn('w:p'), qn('w:tbl')):
+            if child.tag == qn('w:p'):
                 blocks.append(child)
+            elif child.tag == qn('w:tbl'):
+                blocks.extend(child.findall(qn('w:tr')))
         return blocks
 
     def _has_page_break(self, paragraph_el) -> bool:
@@ -161,17 +170,83 @@ class WordTool():
                 segments.append(range(start, end))
         return segments
 
-    def _write_segment(self, source: Path, dest: Path, keep_indices) -> None:
-        '''复制源文件后裁剪正文，仅保留指定下标的内容块，最大限度保留样式/图片/页眉页脚。'''
-        shutil.copyfile(source, dest)
-        doc = Document(str(dest))
-        blocks = self._content_blocks(doc)
-        keep = set(keep_indices)
-        body = doc.element.body
+    @staticmethod
+    def _section_properties(blocks, body):
+        boundaries = []
+        inherited = {}
         for index, block in enumerate(blocks):
-            if index not in keep:
-                body.remove(block)
-        doc.save(str(dest))
+            section = block.find('./' + qn('w:pPr') + '/' + qn('w:sectPr')) if block.tag == qn('w:p') else None
+            if section is not None:
+                boundaries.append((index, section))
+        final = body.find(qn('w:sectPr'))
+        if final is not None:
+            boundaries.append((len(blocks) - 1, final))
+        mapping, start = {}, 0
+        for section_index, (end, properties) in enumerate(boundaries):
+            properties = copy.deepcopy(properties)
+            for reference in list(properties):
+                if reference.tag in {qn('w:headerReference'), qn('w:footerReference')}:
+                    inherited[(reference.tag, reference.get(qn('w:type')))] = copy.deepcopy(reference)
+            explicit = {(reference.tag, reference.get(qn('w:type'))) for reference in properties}
+            for key, reference in inherited.items():
+                if key not in explicit:
+                    properties.insert(0, copy.deepcopy(reference))
+            for index in range(start, end + 1):
+                mapping[index] = (section_index, properties)
+            start = end + 1
+        return mapping
+
+    def _write_segment(self, source: Path, dest: Path, keep_indices) -> Path:
+        '''复制源文件后裁剪正文，仅保留指定下标的内容块，最大限度保留样式/图片/页眉页脚。'''
+        checkpoint()
+        with atomic_output(dest) as (temporary, final):
+            shutil.copyfile(source, temporary)
+            doc = Document(str(temporary))
+            blocks = self._content_blocks(doc)
+            keep = set(keep_indices)
+            body = doc.element.body
+            section_map = self._section_properties(blocks, body)
+            for table in body.findall(qn('w:tbl')):
+                rows = table.findall(qn('w:tr'))
+                if any(index in keep and block in rows for index, block in enumerate(blocks)):
+                    for index, block in enumerate(blocks):
+                        if block in rows and block.find('./' + qn('w:trPr') + '/' + qn('w:tblHeader')) is not None:
+                            keep.add(index)
+            for index, block in enumerate(blocks):
+                if index not in keep:
+                    block.getparent().remove(block)
+            for table in list(body.findall(qn('w:tbl'))):
+                if not table.findall(qn('w:tr')):
+                    body.remove(table)
+            retained = [(index, block) for index, block in enumerate(blocks) if index in keep]
+            for _, block in retained:
+                if block.tag == qn('w:p'):
+                    section = block.find('./' + qn('w:pPr') + '/' + qn('w:sectPr'))
+                    if section is not None:
+                        section.getparent().remove(section)
+            existing = body.find(qn('w:sectPr'))
+            if existing is not None:
+                body.remove(existing)
+            for position, (index, block) in enumerate(retained):
+                section_index, properties = section_map[index]
+                is_last = position == len(retained) - 1
+                if not is_last and section_map[retained[position + 1][0]][0] == section_index:
+                    continue
+                if is_last:
+                    body.append(copy.deepcopy(properties))
+                else:
+                    if block.tag == qn('w:tr'):
+                        paragraph = OxmlElement('w:p')
+                        block.getparent().addnext(paragraph)
+                    else:
+                        paragraph = block
+                    p_pr = paragraph.find(qn('w:pPr'))
+                    if p_pr is None:
+                        p_pr = OxmlElement('w:pPr')
+                        paragraph.insert(0, p_pr)
+                    p_pr.append(copy.deepcopy(properties))
+            doc.save(str(temporary))
+        return final
 
     # --- 真实分页(LibreOffice + PyMuPDF) ------------------------------
 
@@ -194,12 +269,19 @@ class WordTool():
                 return candidate
         raise RuntimeError('未检测到 LibreOffice，按页码功能需要先安装 LibreOffice')
 
-    def _insert_marker(self, block, index: int) -> None:
+    def _insert_marker(self, block, index: int, at_end=False) -> None:
         '''在内容块起始处插入一个 1pt 的唯一标记 run，仅用于分页定位。'''
+        if block.tag == qn('w:tr'):
+            for cell in block.findall(qn('w:tc')):
+                paragraphs = cell.findall('.//' + qn('w:p'))
+                if paragraphs:
+                    self._insert_marker(paragraphs[-1] if at_end else paragraphs[0], index, at_end)
+            return
         if block.tag == qn('w:p'):
             target_p = block
-        elif block.tag == qn('w:tbl'):
-            target_p = block.find('.//' + qn('w:p'))
+        elif block.tag in (qn('w:tbl'), qn('w:tr')):
+            paragraphs = block.findall('.//' + qn('w:p'))
+            target_p = (paragraphs[-1] if at_end else paragraphs[0]) if paragraphs else None
             if target_p is None:
                 return
         else:
@@ -216,6 +298,9 @@ class WordTool():
         text.set(qn('xml:space'), 'preserve')
         text.text = token
         run.append(text)
+        if at_end:
+            target_p.append(run)
+            return
         pPr = target_p.find(qn('w:pPr'))
         if pPr is not None:
             pPr.addnext(run)
@@ -223,6 +308,7 @@ class WordTool():
             target_p.insert(0, run)
 
     def _convert_to_pdf(self, soffice: str, src_docx: Path, out_dir: Path) -> Path:
+        out_dir.mkdir(parents=True, exist_ok=True)
         profile = out_dir / 'lo_profile'
         cmd = [
             soffice, '--headless', '--norestore', '--invisible', '--nologo',
@@ -230,7 +316,7 @@ class WordTool():
             '--convert-to', 'pdf', '--outdir', str(out_dir), str(src_docx)
         ]
         try:
-            subprocess.run(cmd, check=True, capture_output=True, timeout=180)
+            run_process(cmd, check=True, capture_output=True, text=False, timeout=180)
         except subprocess.TimeoutExpired:
             raise RuntimeError('LibreOffice 转换超时')
         except subprocess.CalledProcessError as exc:
@@ -241,39 +327,91 @@ class WordTool():
             raise RuntimeError('LibreOffice 未生成 PDF')
         return pdf
 
-    def _paginate(self, source: Path) -> Tuple[List[int], int]:
-        '''计算每个内容块所落页码。返回 (page_of_block, total_pages)，下标与 _content_blocks 对齐。'''
+    def _paginate(self, source):
+        spans, total = self._page_spans(source)
+        return [start for start, _ in spans], total
+
+    def _page_spans(self, source):
         soffice = self._locate_soffice()
         with tempfile.TemporaryDirectory() as td:
             tmp = Path(td)
             marked = tmp / 'marked.docx'
-            shutil.copyfile(source, marked)
-            doc = Document(str(marked))
+            doc = Document(str(source))
             blocks = self._content_blocks(doc)
-            block_count = len(blocks)
+            control_only = {index for index, block in enumerate(blocks)
+                            if block.tag == qn('w:p') and (self._has_page_break(block) or self._has_section_break(block))
+                            and not any(node.text for node in block.iter(qn('w:t')))
+                            and not list(block.iter(qn('w:drawing')))}
             for index, block in enumerate(blocks):
-                self._insert_marker(block, index)
+                self._insert_marker(block, index * 2)
+                self._insert_marker(block, index * 2 + 1, at_end=True)
             doc.save(str(marked))
-
             pdf = self._convert_to_pdf(soffice, marked, tmp)
-            token_page: Dict[int, int] = {}
-            with fitz.open(str(pdf)) as pdoc:
+            original_pdf = self._convert_to_pdf(soffice, source, tmp / 'original')
+            token_page = {}
+            with fitz.open(str(pdf)) as pdoc, fitz.open(str(original_pdf)) as original:
                 total_pages = pdoc.page_count
+                if total_pages != original.page_count:
+                    raise ValueError('定位标记影响分页，请改用结构拆分或 PDF 页面工具')
                 for pno in range(total_pages):
-                    text = pdoc.load_page(pno).get_text('text')
+                    checkpoint()
+                    text = pdoc[pno].get_text('text')
+                    normalized = re.sub(r'\s+', '', _MARKER_RE.sub('', text))
+                    if normalized != re.sub(r'\s+', '', original[pno].get_text('text')):
+                        raise ValueError(f'第 {pno + 1} 页无法可靠定位，请改用结构拆分或 PDF 页面工具')
                     for match in _MARKER_RE.finditer(text):
-                        idx = int(match.group(1))
-                        if idx not in token_page:
-                            token_page[idx] = pno + 1
+                        token = int(match.group(1))
+                        block = blocks[token // 2]
+                        repeated_header = block.tag == qn('w:tr') and block.find('./' + qn('w:trPr') + '/' + qn('w:tblHeader')) is not None
+                        if token % 2 and not repeated_header:
+                            token_page[token] = max(token_page.get(token, 1), pno + 1)
+                        else:
+                            token_page.setdefault(token, pno + 1)
+            spans = []
+            for index in range(len(blocks)):
+                if index in control_only:
+                    spans.append((0, 0))
+                    continue
+                if index * 2 not in token_page or index * 2 + 1 not in token_page:
+                    raise ValueError(f'无法定位第 {index + 1} 个内容块，请使用结构拆分')
+                spans.append((token_page[index * 2], token_page[index * 2 + 1]))
+            return spans, max(total_pages, 1)
 
-        # 标记未命中的块（如文本框内/空块）按文档顺序沿用上一个已知页码
-        page_of_block: List[int] = []
-        last = 1
-        for index in range(block_count):
-            if index in token_page:
-                last = token_page[index]
-            page_of_block.append(last)
-        return page_of_block, max(total_pages, 1)
+    def _indices_for_pages(self, spans, selected):
+        keep = []
+        for index, (start, end) in enumerate(spans):
+            occupied = set(range(start, end + 1))
+            if occupied.intersection(selected):
+                if not occupied.issubset(selected):
+                    raise ValueError(f'第 {index + 1} 个段落或表格行跨越 {start}–{end} 页；请包含完整内容块，或用 PDF 页面工具精确裁切')
+                keep.append(index)
+        return keep
+
+    def word_preview(self, options=None):
+        try:
+            opts = options or {}
+            source = self._ensure_word_file(opts.get('filePath', ''))
+            doc = Document(str(source))
+            blocks = self._content_blocks(doc)
+            offset, limit = max(0, int(opts.get('offset') or 0)), min(50, max(1, int(opts.get('limit') or 20)))
+            outline = [{'index': index, 'kind': 'tableRow' if block.tag == qn('w:tr') else 'paragraph',
+                        'text': ''.join(node.text or '' for node in block.iter(qn('w:t')))[:500], 'style': self._style_id_of(block),
+                        'sectionBreak': self._has_section_break(block)}
+                       for index, block in enumerate(blocks[offset:offset + limit], offset)]
+            result = {'code': 0, 'msg': '结构预览完成', 'blocks': outline, 'blockCount': len(blocks),
+                      'sectionCount': len(doc.sections), 'pages': []}
+            if opts.get('renderPages'):
+                with tempfile.TemporaryDirectory() as temp:
+                    pdf = self._convert_to_pdf(self._locate_soffice(), source, Path(temp))
+                    with fitz.open(pdf) as document:
+                        result['pageCount'] = document.page_count
+                        page_start = max(0, int(opts.get('pageOffset') or 0))
+                        for index in range(page_start, min(page_start + 6, document.page_count)):
+                            pixmap = document[index].get_pixmap(matrix=fitz.Matrix(0.8, 0.8), alpha=False)
+                            result['pages'].append({'page': index + 1, 'preview': 'data:image/png;base64,' + base64.b64encode(pixmap.tobytes('png')).decode()})
+            return result
+        except Exception as exc:
+            return {'code': -1, 'msg': f'预览失败：{exc}'}
 
     # --- 对外 API ----------------------------------------------------
 
@@ -314,12 +452,12 @@ class WordTool():
 
             extra_msg = ''
             if mode == 'pages':
-                page_of_block, total_pages = self._paginate(source)
+                spans, total_pages = self._page_spans(source)
                 segments = []
                 start_page = 1
                 while start_page <= total_pages:
                     end_page = min(start_page + pages_per_file - 1, total_pages)
-                    idxs = [i for i, pg in enumerate(page_of_block) if start_page <= pg <= end_page]
+                    idxs = self._indices_for_pages(spans, set(range(start_page, end_page + 1)))
                     if idxs:
                         segments.append(idxs)
                     start_page = end_page + 1
@@ -363,9 +501,9 @@ class WordTool():
                 base_name = base_name[:-5]
 
             exported: List[str] = []
-            for part, segment in enumerate(segments, start=1):
+            for part, segment in enumerate(iter_progress(segments, '正在拆分 Word'), start=1):
                 dest = out_dir / f'{base_name}_part{part:03}.docx'
-                self._write_segment(source, dest, segment)
+                dest = self._write_segment(source, dest, segment)
                 exported.append(str(dest))
 
             return {
@@ -389,7 +527,7 @@ class WordTool():
             source = self._ensure_word_file(opts.get('filePath', ''))
             mode = str(opts.get('mode') or 'range').lower()
 
-            page_of_block, total_pages = self._paginate(source)
+            spans, total_pages = self._page_spans(source)
 
             if mode == 'range':
                 start = max(1, int(opts.get('startPage') or 1))
@@ -405,15 +543,15 @@ class WordTool():
                 target_pages = set(pages)
                 suffix = 'custom'
 
-            keep = [i for i, pg in enumerate(page_of_block) if pg in target_pages]
+            keep = self._indices_for_pages(spans, target_pages)
             if not keep:
                 raise ValueError('指定页码范围内没有内容')
 
             output_path = opts.get('outputPath') or self._compose_output_path(
-                opts.get('outputDir', ''), opts.get('outputName', '')
+                opts.get('outputDir', ''), opts.get('outputName', ''), source, suffix
             )
             dest = self._resolve_output_path(source, output_path, suffix)
-            self._write_segment(source, dest, keep)
+            dest = self._write_segment(source, dest, keep)
 
             return {
                 'code': 0,
@@ -442,17 +580,17 @@ class WordTool():
                 raise ValueError('请至少选择 2 个 Word 文件')
 
             output_path = opts.get('outputPath') or self._compose_output_path(
-                opts.get('outputDir', ''), opts.get('outputName', '')
+                opts.get('outputDir', ''), opts.get('outputName', ''), paths[0], 'merged'
             )
             dest = self._resolve_output_path(paths[0], output_path, 'merged')
 
             master = Document(str(paths[0]))
             composer = Composer(master)
-            for extra in paths[1:]:
+            for extra in iter_progress(paths[1:], '正在合并 Word'):
                 if page_break:
                     master.add_page_break()
                 composer.append(Document(str(extra)))
-            composer.save(str(dest))
+            dest = write_output(dest, lambda target: composer.save(str(target)))
 
             return {
                 'code': 0,

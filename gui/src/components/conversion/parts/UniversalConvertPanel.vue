@@ -1,4 +1,5 @@
 <script setup>
+import { fileIdentity, useDraft } from '../../../utils/workspace'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ArrowRight, Delete, FolderOpened, Loading, Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
@@ -21,8 +22,11 @@ const loading = ref(false)
 const dropActive = ref(false)
 let analysisSequence = 0
 const analysis = reactive({ loading: false, error: '', items: [], mixed: false })
-const form = reactive({
+const form = useDraft('conversion/parts/UniversalConvertPanel/form', {
   targetFormat: '',
+  targetScope: 'common',
+  targetsByExtension: {},
+  targetsByFile: {},
   outputDir: '',
   compressionLevel: '6',
   videoCodec: 'h264',
@@ -92,7 +96,11 @@ const targetOptions = computed(() => targets.value.map((value) => ({ value, labe
 const showCompression = computed(() => form.targetFormat === 'zip')
 const showVideoCodec = computed(() => ['mp4', 'mov', 'mkv'].includes(form.targetFormat))
 const hasAdvancedOptions = computed(() => showCompression.value || showVideoCodec.value)
-const canRun = computed(() => props.engine.available && files.value.length && form.targetFormat && !analysis.loading && !loading.value)
+const optionsFor = (extension) => analysis.items.find((item) => item.extension === extension)?.targets || []
+const targetFor = (file) => (form.targetScope === 'file' ? form.targetsByFile[filePath(file)] : form.targetScope === 'extension' ? form.targetsByExtension[extensionOf(file)] : form.targetFormat)
+const canRun = computed(() => props.engine.available && files.value.length && files.value.every((file) => optionsFor(extensionOf(file)).includes(targetFor(file))) && !analysis.loading && !loading.value)
+const targetPage = ref(1)
+const targetFiles = computed(() => files.value.slice((targetPage.value - 1) * 20, targetPage.value * 20))
 
 const normalizeFile = (item) => {
   const path = typeof item === 'string' ? item : item?.path
@@ -157,10 +165,17 @@ const analyzeFiles = async () => {
     analysis.items = payload.items || []
     analysis.mixed = Boolean(payload.mixed)
     targets.value = payload.commonTargets || []
+    for (const item of analysis.items) {
+      const available = item.targets || []
+      if (!available.includes(form.targetsByExtension[item.extension])) form.targetsByExtension[item.extension] = available.includes(readPreferences()[item.extension]) ? readPreferences()[item.extension] : available[0] || ''
+    }
+    for (const file of files.value) {
+      const available = optionsFor(extensionOf(file))
+      if (!available.includes(form.targetsByFile[filePath(file)])) form.targetsByFile[filePath(file)] = form.targetsByExtension[extensionOf(file)] || ''
+    }
     if (!targets.value.length) {
-      analysis.error = '这些文件没有共同的目标格式，请按同类文件分批转换。'
+      form.targetScope = 'extension'
       form.targetFormat = ''
-      return
     }
     chooseRememberedTarget()
   } catch (error) {
@@ -178,7 +193,7 @@ const addFiles = async (items = []) => {
   const combined = [...files.value, ...normalized]
   const seen = new Set()
   files.value = combined.filter((item) => {
-    const identity = filePath(item).toLowerCase()
+    const identity = fileIdentity(filePath(item))
     if (!identity || seen.has(identity)) return false
     seen.add(identity)
     return true
@@ -254,6 +269,7 @@ const runConversion = async () => {
     const { ok, data, message } = await callApi('format_center_convert', {
       files: files.value.map(filePath),
       targetFormat: form.targetFormat,
+      targets: Object.fromEntries(files.value.map((file) => [filePath(file), targetFor(file)])),
       outputDir: form.outputDir,
       compressionLevel: form.compressionLevel,
       videoCodec: form.videoCodec
@@ -307,8 +323,8 @@ onUnmounted(() => window.removeEventListener('ppx-open-files', onLaunchFiles))
     <header class="page-intro">
       <div>
         <span class="eyebrow">全格式工作台</span>
-        <h2>把不同文件，送往同一个目标。</h2>
-        <p>支持图片、文本、Office / WPS、PDF、音频、视频、电子书与压缩包；目标格式会按所选文件实时收敛。</p>
+        <h2>为每组文件设置合适的目标。</h2>
+        <p>支持统一设置、按源格式分组或逐文件配置；同名输出自动编号，保留源文件。</p>
       </div>
       <el-tag :type="engine.available ? 'success' : 'warning'" effect="plain">{{ engine.loading ? '检测引擎' : engine.available ? '本地引擎已就绪' : '需要连接引擎' }}</el-tag>
     </header>
@@ -322,7 +338,7 @@ onUnmounted(() => window.removeEventListener('ppx-open-files', onLaunchFiles))
       <section class="step-block source-step">
         <div class="step-head">
           <span class="step-index">01</span>
-          <div><b>添加源文件</b><small>可混合选择；转换中心只显示所有文件共有的目标格式</small></div>
+          <div><b>添加源文件</b><small>可混合选择，分别指定目标格式</small></div>
           <div class="step-actions">
             <el-button v-if="files.length" text :disabled="loading" @click="clearFiles"
               ><el-icon><Delete /></el-icon>清空</el-button
@@ -363,6 +379,14 @@ onUnmounted(() => window.removeEventListener('ppx-open-files', onLaunchFiles))
         <el-alert v-if="analysis.error" class="analysis-alert" type="warning" :closable="false" :title="analysis.error" />
         <div class="option-grid">
           <label class="option-field">
+            <span>目标设置方式</span>
+            <el-radio-group v-model="form.targetScope">
+              <el-radio-button label="common" :disabled="!targets.length">统一</el-radio-button>
+              <el-radio-button label="extension">按格式分组</el-radio-button>
+              <el-radio-button label="file">逐文件</el-radio-button>
+            </el-radio-group>
+          </label>
+          <label v-if="form.targetScope === 'common'" class="option-field">
             <span>目标格式</span>
             <el-select v-model="form.targetFormat" filterable :loading="analysis.loading" :disabled="!files.length || Boolean(analysis.error)" placeholder="选择共同目标格式">
               <el-option v-for="item in targetOptions" :key="item.value" :label="item.label" :value="item.value" />
@@ -379,6 +403,29 @@ onUnmounted(() => window.removeEventListener('ppx-open-files', onLaunchFiles))
             </div>
           </label>
         </div>
+
+        <div v-if="form.targetScope === 'extension'" class="option-grid">
+          <label v-for="extension in sourceExtensions" :key="extension" class="option-field">
+            <span>{{ extension.toUpperCase() }} 文件的目标</span>
+            <el-select v-model="form.targetsByExtension[extension]" filterable placeholder="选择目标格式">
+              <el-option v-for="target in optionsFor(extension)" :key="target" :value="target" :label="formatLabels[target] || target.toUpperCase()" />
+            </el-select>
+          </label>
+        </div>
+        <template v-if="form.targetScope === 'file'">
+          <el-table :data="targetFiles" row-key="path">
+            <el-table-column label="文件路径" min-width="240"
+              ><template #default="{ row }">{{ filePath(row) }}</template></el-table-column
+            >
+            <el-table-column label="目标格式" width="200"
+              ><template #default="{ row }">
+                <el-select v-model="form.targetsByFile[filePath(row)]" filterable placeholder="选择目标格式">
+                  <el-option v-for="target in optionsFor(extensionOf(row))" :key="target" :value="target" :label="formatLabels[target] || target.toUpperCase()" />
+                </el-select> </template
+            ></el-table-column>
+          </el-table>
+          <el-pagination v-model:current-page="targetPage" :page-size="20" :total="files.length" layout="prev, pager, next, total" />
+        </template>
 
         <button v-if="hasAdvancedOptions" class="advanced-toggle" type="button" :aria-expanded="form.advanced" @click="form.advanced = !form.advanced">
           <span>{{ form.advanced ? '收起高级选项' : '显示此格式的高级选项' }}</span

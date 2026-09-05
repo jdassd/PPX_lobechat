@@ -42,6 +42,7 @@
         <el-button type="primary" :loading="shared.loading" @click="runCut">开始切割</el-button>
       </el-form-item>
     </el-form>
+    <WordPreview :file="form.file" />
     <div v-if="form.output" class="result-block">
       <p class="result-title">输出文件</p>
       <el-scrollbar max-height="120px">
@@ -54,13 +55,15 @@
 </template>
 
 <script setup>
-import { inject, reactive, ref } from 'vue'
+import WordPreview from '../../shared/WordPreview.vue'
+import { useDraft } from '../../../utils/workspace'
+import { inject, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 
 const { callApi, openPath, pickDocx, pickDir } = inject('wordApi')
 const shared = inject('wordShared')
 
-const form = reactive({
+const form = useDraft('word/parts/CutPanel/form', {
   file: null,
   mode: 'range',
   startPage: 1,

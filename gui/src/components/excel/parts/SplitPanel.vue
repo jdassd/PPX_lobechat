@@ -1,5 +1,6 @@
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 
 import FileSelector from '@/components/shared/FileSelector.vue'
@@ -8,7 +9,7 @@ import { callApi, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
 const excelFilter = ['Excel 文件 (*.xlsx;*.xlsm;*.xltx;*.xltm)']
 const loading = ref(false)
-const form = reactive({ file: null, sheet: '', sheets: [], schema: [], schemaText: '', delimiter: '|', column: '', minRows: 1, limit: 0, emptyLabel: '未分类', outputDir: '', groups: [], files: [] })
+const form = useDraft('excel/parts/SplitPanel/form', { file: null, sheet: '', sheets: [], schema: [], schemaText: '', delimiter: '|', column: '', minRows: 1, limit: 0, emptyLabel: '未分类', outputDir: '', groups: [], files: [] })
 const selected = computed(() => (form.file ? [form.file] : []))
 const resultRows = computed(() => form.groups.map((item, index) => ({ ...item, file: form.files[index] || '' })))
 

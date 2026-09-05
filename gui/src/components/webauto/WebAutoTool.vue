@@ -3,20 +3,10 @@
      通过顶部步骤条带用户走完：环境准备 → 点选内容 → 配置字段 → 导出设置 → 运行结果。
      全部后端调用走 @/utils/pyapi 封装；所有定时器在 onUnmounted 清理。 -->
 <script setup>
-import { reactive, ref, computed, onUnmounted } from 'vue'
+import { useDraft } from '../../utils/workspace'
+import { reactive, ref, computed, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import {
-  Monitor,
-  Pointer,
-  Setting,
-  Download,
-  VideoPlay,
-  CircleClose,
-  Files,
-  FolderOpened,
-  Loading,
-  CircleCheck
-} from '@element-plus/icons-vue'
+import { Monitor, Pointer, Setting, Download, VideoPlay, CircleClose, Files, FolderOpened, Loading, CircleCheck } from '@element-plus/icons-vue'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
 /* ============================================================
@@ -26,10 +16,25 @@ const STEP = {
   ENV: 0, // 环境准备
   PICK: 1, // 选择网页内容
   FIELDS: 2, // 配置字段与翻页
-  EXPORT: 3, // 导出设置
-  RUN: 4 // 运行与结果
+  RUN: 3, // 正式采集
+  EXPORT: 4 // 检查和导出
 }
 const activeStep = ref(STEP.ENV)
+const sample = ref(null)
+const sampling = ref(false)
+const validateSample = async () => {
+  sampling.value = true
+  try {
+    const response = await pyCall('webauto_collect_preview', buildCollectOptions())
+    if (!response.ok) return ElMessage.error(response.message)
+    sample.value = response.data
+    ElMessage.success('已读取当前页的前 10 条样本，请核对字段')
+  } catch (error) {
+    ElMessage.error(error.message)
+  } finally {
+    sampling.value = false
+  }
+}
 
 /* ============================================================
  * 字段类型下拉（面向小白：把 href/src 翻译成人话）
@@ -327,7 +332,7 @@ const cancelPick = async () => {
 /* ============================================================
  * 步骤 2 —— 配置字段与翻页（本地可编辑的配置中心）
  * ============================================================ */
-const config = reactive({
+const config = useDraft('webauto/WebAutoTool/config', {
   url: '',
   container: '',
   fields: [], // [{name, selector, attr}]
@@ -337,6 +342,13 @@ const config = reactive({
 })
 
 // 把后端 pick_finish 的 config 灌进本地状态
+watch(
+  config,
+  () => {
+    sample.value = null
+  },
+  { deep: true }
+)
 const applyConfig = (cfg) => {
   config.url = cfg.url || pick.url || ''
   config.container = cfg.container || ''
@@ -346,10 +358,7 @@ const applyConfig = (cfg) => {
     selector: f.selector || '',
     attr: f.attr || ''
   }))
-  const pg =
-    typeof cfg.pagination === 'string'
-      ? { enabled: !!cfg.pagination, selector: cfg.pagination }
-      : cfg.pagination || {}
+  const pg = typeof cfg.pagination === 'string' ? { enabled: !!cfg.pagination, selector: cfg.pagination } : cfg.pagination || {}
   config.pagination = {
     enabled: !!pg.enabled,
     selector: pg.selector || '',
@@ -377,7 +386,10 @@ const removeDetailField = (idx) => {
 
 // 详情页“用哪个链接字段进入” —— 只取链接类字段
 const linkFieldOptions = computed(() =>
-  config.fields.filter((f) => f.attr === 'href').map((f) => f.name).filter(Boolean)
+  config.fields
+    .filter((f) => f.attr === 'href')
+    .map((f) => f.name)
+    .filter(Boolean)
 )
 
 // 校验字段配置
@@ -397,13 +409,14 @@ const goExport = () => {
     ElMessage.warning('开启了详情页采集，请选择用哪个链接进入详情页')
     return
   }
-  activeStep.value = STEP.EXPORT
+  if (!sample.value?.rows?.length) return ElMessage.warning('请先验证采集样本')
+  activeStep.value = STEP.RUN
 }
 
 /* ============================================================
  * 步骤 3 —— 导出设置
  * ============================================================ */
-const exportCfg = reactive({
+const exportCfg = useDraft('webauto/WebAutoTool/exportCfg', {
   format: 'excel', // 'excel' | 'word'
   outputDir: '',
   fileName: '采集结果'
@@ -421,18 +434,23 @@ const selectOutputDir = async () => {
 
 const exportValid = computed(() => !!exportCfg.outputDir && !!exportCfg.fileName.trim())
 
-const goRun = () => {
+const goRun = async () => {
   if (!exportValid.value) {
     ElMessage.warning('请填写输出目录和文件名')
     return
   }
-  activeStep.value = STEP.RUN
+  const response = await pyCall('webauto_export', { resultId: run.resultId, format: exportCfg.format, outputDir: exportCfg.outputDir, fileName: exportCfg.fileName })
+  if (!response.ok) return ElMessage.error(response.message)
+  run.outputPath = response.data.outputPath
+  ElMessage.success('结果已导出')
 }
 
 /* ============================================================
  * 步骤 4 —— 运行与结果
  * ============================================================ */
 const run = reactive({
+  requestedAt: 0,
+  resultId: '',
   starting: false,
   running: false,
   stopping: false,
@@ -461,11 +479,7 @@ const buildCollectOptions = () => ({
     fields: config.detail.fields.map((f) => ({ id: f.id, name: f.name.trim(), attr: f.attr }))
   },
   limit: config.limit,
-  export: {
-    format: exportCfg.format,
-    outputDir: exportCfg.outputDir,
-    fileName: exportCfg.fileName.trim()
-  }
+  export: {}
 })
 
 const startRun = async () => {
@@ -481,19 +495,25 @@ const startRun = async () => {
   run.columns = []
   run.rows = []
   run.outputPath = ''
+  run.requestedAt = Date.now()
+  run.running = true
+  pollRun()
   try {
-    const { ok, message } = await pyCall('webauto_collect_start', buildCollectOptions())
+    const { ok, message, data } = await pyCall('webauto_collect', buildCollectOptions())
     if (!ok) {
       ElMessage.error(message || '启动采集失败')
       return
     }
-    run.running = true
+    if (data) Object.assign(run, { resultId: data.resultId || '', total: data.total || 0, rows: data.rows || [], columns: data.columns || [], done: true, success: !data.partial && ok, outputPath: data.outputPath || '' })
+    run.running = false
     run.stopping = false
-    pollRun()
+    clearTimer('run')
   } catch (e) {
     ElMessage.error(e?.message || '启动采集失败')
   } finally {
     run.starting = false
+    run.running = false
+    clearTimer('run')
   }
 }
 
@@ -503,12 +523,14 @@ const pollRun = () => {
     try {
       const { ok, data } = await pyCall('webauto_run_status')
       if (!ok || !data) return
+      if (Number(data.createdAt || 0) * 1000 < run.requestedAt - 1000) return
       run.running = !!data.running
       const isStopping = !!data.stopping
       run.page = data.page || 0
       run.total = data.total || 0
       if (Array.isArray(data.columns)) run.columns = data.columns
       if (Array.isArray(data.rows)) run.rows = data.rows
+      if (data.resultId) run.resultId = data.resultId
       if (data.error) run.error = data.error
       if (data.done) {
         const wasStopping = run.stopping || isStopping
@@ -519,7 +541,7 @@ const pollRun = () => {
         run.success = !!data.success
         run.outputPath = data.outputPath || ''
         if (run.success) {
-          ElMessage.success(wasStopping ? '采集已停止，已导出当前结果' : '采集完成！')
+          ElMessage.success(wasStopping ? '采集已停止，当前结果已保留，可继续导出' : '采集完成，请检查并导出结果')
         } else {
           ElMessage.error(run.error || '采集失败')
         }
@@ -579,9 +601,9 @@ const closeSession = async () => {
 const STEPS_META = [
   { title: '准备环境', desc: '下载浏览器内核' },
   { title: '点选内容', desc: '在网页上点要采集的部分' },
-  { title: '核对字段', desc: '改字段名、设置翻页' },
-  { title: '导出设置', desc: '存成 Excel / Word' },
-  { title: '开始采集', desc: '运行并查看结果' }
+  { title: '样本验证', desc: '核对字段与前 10 条数据' },
+  { title: '正式采集', desc: '执行并检查结果' },
+  { title: '导出结果', desc: '存成 Excel / Word' }
 ]
 
 // 步骤切换时停止无关轮询
@@ -620,14 +642,7 @@ checkEnv()
 
         <template v-else>
           <!-- 依赖没装好 -->
-          <el-alert
-            v-if="env.checked && !env.ready"
-            type="warning"
-            :closable="false"
-            show-icon
-            title="还缺少必要的程序组件"
-            description="请先在命令行运行 pnpm run init 安装依赖后再使用本功能。"
-          />
+          <el-alert v-if="env.checked && !env.ready" type="warning" :closable="false" show-icon title="还缺少必要的程序组件" description="请先在命令行运行 pnpm run init 安装依赖后再使用本功能。" />
 
           <!-- 需要下载浏览器内核 -->
           <div v-else class="wa-card">
@@ -647,45 +662,20 @@ checkEnv()
                   <el-option v-for="s in displaySources" :key="s.id" :label="s.name" :value="s.id" />
                 </el-select>
               </div>
-              <el-input
-                v-if="env.source === 'custom'"
-                v-model="env.customHost"
-                class="mt8"
-                placeholder="镜像地址，如 https://cdn.npmmirror.com/binaries/playwright"
-                :disabled="env.installing"
-                clearable
-              />
+              <el-input v-if="env.source === 'custom'" v-model="env.customHost" class="mt8" placeholder="镜像地址，如 https://cdn.npmmirror.com/binaries/playwright" :disabled="env.installing" clearable />
               <p class="muted hint mt8">国内用户建议选「npmmirror」镜像；若某个来源下载失败，换一个再试即可。</p>
             </div>
 
             <template v-if="env.installing || env.progress >= 0">
-              <el-progress
-                :percentage="env.progress < 0 ? 100 : env.progress"
-                :indeterminate="env.progress < 0"
-                :duration="2"
-                :stroke-width="14"
-                :status="env.installError ? 'exception' : undefined"
-              />
+              <el-progress :percentage="env.progress < 0 ? 100 : env.progress" :indeterminate="env.progress < 0" :duration="2" :stroke-width="14" :status="env.installError ? 'exception' : undefined" />
               <p class="muted hint">{{ installProgressText }}</p>
             </template>
 
-            <el-alert
-              v-if="env.installError"
-              type="error"
-              :closable="false"
-              show-icon
-              :title="env.installError"
-              class="mt"
-            />
+            <el-alert v-if="env.installError" type="error" :closable="false" show-icon :title="env.installError" class="mt" />
 
             <div class="wa-actions">
-              <el-button
-                type="primary"
-                :icon="Download"
-                :loading="env.installing"
-                @click="startInstall"
-              >
-                {{ env.installing ? '正在下载…' : (env.installError ? '重新下载' : '开始下载') }}
+              <el-button type="primary" :icon="Download" :loading="env.installing" @click="startInstall">
+                {{ env.installing ? '正在下载…' : env.installError ? '重新下载' : '开始下载' }}
               </el-button>
               <el-button :icon="Loading" plain :disabled="env.installing" @click="checkEnv">重新检测</el-button>
             </div>
@@ -700,15 +690,7 @@ checkEnv()
           <p class="muted">输入网址，点下面的按钮会自动打开一个浏览器，你只要用鼠标点选页面上想要的内容即可。</p>
           <div class="field-row mt">
             <el-input v-model="pick.url" placeholder="例如：https://example.com/list" clearable :disabled="pick.active" />
-            <el-button
-              type="primary"
-              :icon="Pointer"
-              :loading="pick.starting"
-              :disabled="pick.active"
-              @click="startPick"
-            >
-              打开浏览器开始点选
-            </el-button>
+            <el-button type="primary" :icon="Pointer" :loading="pick.starting" :disabled="pick.active" @click="startPick"> 打开浏览器开始点选 </el-button>
           </div>
         </div>
 
@@ -726,7 +708,9 @@ checkEnv()
         <!-- 实时点选状态 -->
         <div v-if="pick.active" class="wa-card mt">
           <div class="wa-card-head between">
-            <h4 class="row-center"><el-icon class="spin" :size="16"><Loading /></el-icon>&nbsp;正在点选中…</h4>
+            <h4 class="row-center">
+              <el-icon class="spin" :size="16"><Loading /></el-icon>&nbsp;正在点选中…
+            </h4>
             <div>
               <el-button :icon="CircleClose" plain @click="cancelPick">取消</el-button>
               <el-button type="success" :icon="CircleCheck" :loading="pick.finishing" @click="finishPick">完成选取</el-button>
@@ -736,9 +720,7 @@ checkEnv()
           <!-- 列表块 -->
           <div class="pick-block">
             <span class="pick-label">已识别列表块：</span>
-            <el-tag v-if="pick.state?.container" type="success" effect="light">
-              共找到 {{ containerCount }} 条相似内容
-            </el-tag>
+            <el-tag v-if="pick.state?.container" type="success" effect="light"> 共找到 {{ containerCount }} 条相似内容 </el-tag>
             <el-tag v-else type="info" effect="plain">还没点选 —— 请先点一条列表内容</el-tag>
           </div>
 
@@ -764,9 +746,7 @@ checkEnv()
           <div v-if="pickDetailActive" class="pick-block">
             <span class="pick-label">详情页字段：</span>
             <template v-if="pickDetailFields.length">
-              <el-tag v-for="f in pickDetailFields" :key="'d-' + f.id" class="pick-tag" type="warning" effect="light">
-                {{ f.name || '未命名' }}（{{ attrLabel(f.attr) }}）
-              </el-tag>
+              <el-tag v-for="f in pickDetailFields" :key="'d-' + f.id" class="pick-tag" type="warning" effect="light"> {{ f.name || '未命名' }}（{{ attrLabel(f.attr) }}） </el-tag>
             </template>
             <el-tag v-else type="info" effect="plain">还没选</el-tag>
           </div>
@@ -896,14 +876,16 @@ checkEnv()
 
         <div class="wa-actions end">
           <el-button @click="goStep(STEP.PICK)">上一步</el-button>
-          <el-button type="primary" :icon="Setting" @click="goExport">下一步：导出设置</el-button>
+          <el-button :loading="sampling" @click="validateSample">读取样本并检查</el-button>
+          <el-button type="primary" :icon="Setting" @click="goExport">下一步：正式采集</el-button>
         </div>
+        <el-table v-if="sample" :data="sample.rows" max-height="300"><el-table-column v-for="column in sample.columns" :key="column" :prop="column" :label="column" min-width="160" /></el-table>
       </section>
 
       <!-- ============ 步骤 3：导出设置 ============ -->
       <section v-show="activeStep === STEP.EXPORT" class="wa-step">
         <div class="wa-card">
-          <h4>第三步：采集结果存成什么</h4>
+          <h4>第四步：导出已核对的采集结果</h4>
           <el-form label-width="120px" class="mt">
             <el-form-item label="保存格式">
               <el-radio-group v-model="exportCfg.format">
@@ -926,8 +908,9 @@ checkEnv()
         </div>
 
         <div class="wa-actions end">
-          <el-button @click="goStep(STEP.FIELDS)">上一步</el-button>
-          <el-button type="primary" :icon="VideoPlay" @click="goRun">下一步：开始采集</el-button>
+          <el-button @click="goStep(STEP.RUN)">返回检查结果</el-button>
+          <el-button type="primary" :icon="VideoPlay" @click="goRun">导出结果</el-button>
+          <el-button v-if="run.outputPath" @click="callApiRaw('system_pyOpenFile', run.outputPath)">打开导出文件</el-button>
         </div>
       </section>
 
@@ -937,23 +920,10 @@ checkEnv()
           <div class="wa-card-head between">
             <h4>第四步：开始采集</h4>
             <div>
-              <el-button
-                v-if="!run.running && !run.stopping"
-                type="primary"
-                :icon="VideoPlay"
-                :loading="run.starting"
-                @click="startRun"
-              >
+              <el-button v-if="!run.running && !run.stopping" type="primary" :icon="VideoPlay" :loading="run.starting" @click="startRun">
                 {{ run.done ? '重新采集' : '开始采集' }}
               </el-button>
-              <el-button
-                v-else
-                type="danger"
-                :icon="CircleClose"
-                :loading="run.stopping"
-                :disabled="run.stopping"
-                @click="stopRun"
-              >
+              <el-button v-else type="danger" :icon="CircleClose" :loading="run.stopping" :disabled="run.stopping" @click="stopRun">
                 {{ run.stopping ? '正在停止' : '停止' }}
               </el-button>
             </div>
@@ -966,17 +936,12 @@ checkEnv()
             </el-tag>
             <el-tag v-else-if="run.done && run.success" type="success" effect="light">已完成</el-tag>
             <el-tag v-else-if="run.done" type="danger" effect="light">已结束</el-tag>
-            <span class="muted">已采集 <b>{{ run.total }}</b> 条 · 第 <b>{{ run.page }}</b> 页</span>
+            <span class="muted"
+              >已采集 <b>{{ run.total }}</b> 条 · 第 <b>{{ run.page }}</b> 页</span
+            >
           </div>
 
-          <el-alert
-            v-if="run.error"
-            type="error"
-            :closable="false"
-            show-icon
-            :title="run.error"
-            class="mt"
-          />
+          <el-alert v-if="run.error" type="error" :closable="false" show-icon :title="run.error" class="mt" />
 
           <!-- 完成后的导出文件 -->
           <div v-if="run.done && run.success && run.outputPath" class="wa-result mt">
@@ -990,23 +955,8 @@ checkEnv()
         <!-- 结果预览 -->
         <div class="wa-card mt">
           <h4>结果预览</h4>
-          <el-table
-            v-if="run.columns.length"
-            :data="run.rows"
-            border
-            size="small"
-            height="360"
-            class="mt"
-            empty-text="暂无数据"
-          >
-            <el-table-column
-              v-for="col in run.columns"
-              :key="col"
-              :prop="col"
-              :label="col"
-              min-width="140"
-              show-overflow-tooltip
-            />
+          <el-table v-if="run.columns.length" :data="run.rows" border size="small" height="360" class="mt" empty-text="暂无数据">
+            <el-table-column v-for="col in run.columns" :key="col" :prop="col" :label="col" min-width="140" show-overflow-tooltip />
           </el-table>
           <div v-else class="wa-empty">
             <el-icon :size="26"><Files /></el-icon>
@@ -1015,10 +965,9 @@ checkEnv()
         </div>
 
         <div class="wa-actions between">
-          <el-button @click="goStep(STEP.EXPORT)">上一步</el-button>
-          <el-button v-if="pick.active" type="warning" plain :icon="CircleClose" @click="closeSession">
-            完成并关闭浏览器
-          </el-button>
+          <el-button @click="goStep(STEP.FIELDS)">返回样本验证</el-button>
+          <el-button v-if="run.total && !run.running" type="primary" @click="goStep(STEP.EXPORT)">检查完成，导出结果</el-button>
+          <el-button v-if="pick.active" type="warning" plain :icon="CircleClose" @click="closeSession"> 完成并关闭浏览器 </el-button>
         </div>
       </section>
     </div>

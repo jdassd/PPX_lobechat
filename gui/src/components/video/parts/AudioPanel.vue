@@ -1,5 +1,7 @@
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import VideoInspection from '../../shared/VideoInspection.vue'
+import { useDraft } from '../../../utils/workspace'
+import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
@@ -7,7 +9,7 @@ const videoFilter = ['视频文件 (*.mp4;*.mov;*.avi;*.mkv;*.webm)']
 
 const loading = ref(false)
 
-const form = reactive({
+const form = useDraft('video/parts/AudioPanel/form', {
   file: null,
   audioFormat: 'mp3',
   quality: 'medium',
@@ -137,7 +139,11 @@ const loadVideoPreview = async () => {
   const path = file.path || file.filename
   if (!path) return
   try {
-    const { ok, data: res, message } = await pyCall('video_preview', {
+    const {
+      ok,
+      data: res,
+      message
+    } = await pyCall('video_preview', {
       filePath: path
     })
     if (ok && res.preview) {
@@ -190,7 +196,11 @@ const runAudio = async () => {
   }
   loading.value = true
   try {
-    const { ok, data: res, message } = await pyCall('video_extract_audio', {
+    const {
+      ok,
+      data: res,
+      message
+    } = await pyCall('video_extract_audio', {
       filePath: form.file.path,
       audioFormat: form.audioFormat,
       quality: form.quality,
@@ -219,23 +229,8 @@ const runAudio = async () => {
       <p>输出 MP3 / WAV / AAC / FLAC，支持质量预设与时间截取</p>
     </header>
     <div v-if="form.file" class="video-preview-block">
-      <video
-        ref="audioVideoRef"
-        class="video-preview"
-        :src="form.previewUrl"
-        controls
-        @loadedmetadata="onAudioLoadedMetadata"
-      />
-      <el-slider
-        v-if="form.duration"
-        v-model="audioRange"
-        :min="0"
-        :max="form.duration"
-        :step="1"
-        range
-        class="video-range-slider"
-        @change="onAudioRangeChange"
-      />
+      <video ref="audioVideoRef" class="video-preview" :src="form.previewUrl" controls @loadedmetadata="onAudioLoadedMetadata" />
+      <el-slider v-if="form.duration" v-model="audioRange" :min="0" :max="form.duration" :step="1" range class="video-range-slider" @change="onAudioRangeChange" />
       <div v-if="form.duration" class="video-range-meta">
         <span>开始：{{ form.start || '00:00:00' }}</span>
         <span>结束：{{ form.end || '视频末尾' }}</span>
@@ -280,12 +275,8 @@ const runAudio = async () => {
         <el-button type="primary" :loading="loading" @click="runAudio">提取音频</el-button>
       </el-form-item>
     </el-form>
-    <el-alert
-      v-if="form.result"
-      type="success"
-      :closable="false"
-      show-icon
-    >
+    <VideoInspection :file="form.file" />
+    <el-alert v-if="form.result" type="success" :closable="false" show-icon>
       <template #title>
         已输出：<a class="link" @click.prevent="openFile(form.result)">{{ form.result }}</a>
       </template>

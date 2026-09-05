@@ -1,5 +1,6 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
@@ -7,7 +8,7 @@ import ResultTable from '../../shared/ResultTable.vue'
 
 const loading = ref(false)
 
-const archive = reactive({
+const archive = useDraft('file/parts/ArchivePanel/archive', {
   items: [],
   format: 'zip',
   archiveName: '',
@@ -16,7 +17,7 @@ const archive = reactive({
   result: ''
 })
 
-const extract = reactive({
+const extract = useDraft('file/parts/ArchivePanel/extract', {
   archiveFile: null,
   targetDir: '',
   password: '',
@@ -88,7 +89,11 @@ const runCompress = async () => {
   }
   loading.value = true
   try {
-    const { ok, data: res, message } = await pyCall('file_compress', {
+    const {
+      ok,
+      data: res,
+      message
+    } = await pyCall('file_compress', {
       items: archive.items.map((item) => item.path || item),
       format: archive.format,
       archiveName: archive.archiveName,
@@ -116,7 +121,11 @@ const runExtract = async () => {
   }
   loading.value = true
   try {
-    const { ok, data: res, message } = await pyCall('file_decompress', {
+    const {
+      ok,
+      data: res,
+      message
+    } = await pyCall('file_decompress', {
       archiveFile: extract.archiveFile.path || extract.archiveFile,
       targetDir: extract.targetDir,
       password: extract.password
@@ -148,13 +157,7 @@ const runExtract = async () => {
           <el-button size="small" @click="addArchiveFiles">添加文件</el-button>
           <el-button size="small" @click="addArchiveFolder">添加文件夹</el-button>
         </div>
-        <el-table
-          v-if="archive.items.length"
-          :data="archive.items"
-          size="small"
-          border
-          style="margin-top: 10px"
-        >
+        <el-table v-if="archive.items.length" :data="archive.items" size="small" border style="margin-top: 10px">
           <el-table-column type="index" width="50" label="#" />
           <el-table-column prop="filename" label="名称" />
           <el-table-column label="类型" width="100">
@@ -192,12 +195,7 @@ const runExtract = async () => {
             <el-button type="primary" :loading="loading" @click="runCompress">开始压缩</el-button>
           </el-form-item>
         </el-form>
-        <el-alert
-          v-if="archive.result"
-          type="success"
-          :closable="false"
-          show-icon
-        >
+        <el-alert v-if="archive.result" type="success" :closable="false" show-icon>
           <template #title>
             已生成：
             <a class="link" @click.prevent="openPath(archive.result)">{{ archive.result }}</a>
@@ -227,13 +225,7 @@ const runExtract = async () => {
             <el-button type="primary" :loading="loading" @click="runExtract">开始解压</el-button>
           </el-form-item>
         </el-form>
-        <ResultTable
-          v-if="extract.files.length"
-          title="部分解压文件"
-          :items="extract.files.map((path) => ({ path }))"
-          :columns="[{ label: '文件路径', prop: 'path' }]"
-          :max-height="200"
-        />
+        <ResultTable v-if="extract.files.length" title="部分解压文件" :items="extract.files.map((path) => ({ path }))" :columns="[{ label: '文件路径', prop: 'path' }]" :max-height="200" />
       </div>
     </div>
   </section>

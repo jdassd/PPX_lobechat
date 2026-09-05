@@ -1,11 +1,12 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
 const loading = ref(false)
 
-const state = reactive({
+const state = useDraft('file/parts/DedupPanel/state', {
   directory: '',
   extensions: '',
   recursive: true,
@@ -51,7 +52,11 @@ const runDedup = async () => {
   }
   loading.value = true
   try {
-    const { ok, data: res, message } = await pyCall('file_deduplicate', {
+    const {
+      ok,
+      data: res,
+      message
+    } = await pyCall('file_deduplicate', {
       directory: state.directory,
       mode: state.mode,
       extensions: parseExtensions(state.extensions || ''),
@@ -101,22 +106,11 @@ const runDedup = async () => {
         <el-button type="primary" :loading="loading" @click="runDedup">开始扫描</el-button>
       </el-form-item>
     </el-form>
-    <el-descriptions
-      v-if="state.summary"
-      :column="2"
-      border
-      size="small"
-    >
+    <el-descriptions v-if="state.summary" :column="2" border size="small">
       <el-descriptions-item label="重复分组">{{ state.summary.totalGroups }}</el-descriptions-item>
       <el-descriptions-item label="可释放空间">{{ state.summary.spaceSaved }}</el-descriptions-item>
     </el-descriptions>
-    <el-table
-      v-if="state.result.length"
-      :data="state.result"
-      border
-      size="small"
-      style="margin-top: 12px"
-    >
+    <el-table v-if="state.result.length" :data="state.result" border size="small" style="margin-top: 12px">
       <el-table-column label="重复文件">
         <template #default="scope">
           <ul class="dedup-list">

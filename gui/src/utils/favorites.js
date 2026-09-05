@@ -6,7 +6,7 @@ const KEY = 'ppx-favorite-tools'
 export function getFavorites() {
   try {
     const ids = JSON.parse(localStorage.getItem(KEY) || '[]')
-    return Array.isArray(ids) ? ids.filter((id) => typeof id === 'string') : []
+    return Array.isArray(ids) ? ids.filter((id) => typeof id === 'string' && !id.startsWith('mindmap')) : []
   } catch {
     return []
   }

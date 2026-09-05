@@ -1,5 +1,7 @@
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import VideoInspection from '../../shared/VideoInspection.vue'
+import { useDraft } from '../../../utils/workspace'
+import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
@@ -7,7 +9,7 @@ const videoFilter = ['视频文件 (*.mp4;*.mov;*.avi;*.mkv;*.webm)']
 
 const loading = ref(false)
 
-const form = reactive({
+const form = useDraft('video/parts/CutPanel/form', {
   file: null,
   start: '00:00:00',
   end: '',
@@ -16,6 +18,8 @@ const form = reactive({
   duration: 0,
   rangeStart: 0,
   rangeEnd: 0,
+  previewStart: 0,
+  segment: false,
   previewUrl: ''
 })
 
@@ -79,7 +83,7 @@ const cutRange = computed({
 const onCutLoadedMetadata = () => {
   const video = cutVideoRef.value
   if (!video) return
-  const duration = Number.isFinite(video.duration) ? video.duration : 0
+  const duration = form.duration || (Number.isFinite(video.duration) ? video.duration : 0)
   form.duration = duration
   const start = parseTimeToSeconds(form.start)
   const endRaw = parseTimeToSeconds(form.end)
@@ -90,7 +94,7 @@ const onCutLoadedMetadata = () => {
 
 const onCutRangeChange = (val) => {
   if (!cutVideoRef.value || !Array.isArray(val) || !val.length) return
-  cutVideoRef.value.currentTime = val[0] || 0
+  if (!form.segment) cutVideoRef.value.currentTime = val[0] || 0
 }
 
 watch(
@@ -135,11 +139,20 @@ const loadVideoPreview = async () => {
   const path = file.path || file.filename
   if (!path) return
   try {
-    const { ok, data: res, message } = await pyCall('video_preview', {
-      filePath: path
+    const {
+      ok,
+      data: res,
+      message
+    } = await pyCall('video_preview', {
+      filePath: path,
+      start: form.start,
+      duration: 15
     })
     if (ok && res.preview) {
       form.previewUrl = res.preview
+      form.duration = res.duration || 0
+      form.previewStart = res.previewStart || 0
+      form.segment = !!res.segment
     } else {
       form.previewUrl = ''
       if (message) {
@@ -188,7 +201,11 @@ const runCut = async () => {
   }
   loading.value = true
   try {
-    const { ok, data: res, message } = await pyCall('video_cut', {
+    const {
+      ok,
+      data: res,
+      message
+    } = await pyCall('video_cut', {
       filePath: form.file.path,
       start: form.start,
       end: form.end,
@@ -212,26 +229,13 @@ const runCut = async () => {
   <section class="panel">
     <header>
       <h4>截取片段</h4>
-      <p>按起止时间截取，无需重新编码</p>
+      <p>按起止时间精确截取，重新编码后保存为副本</p>
     </header>
     <div v-if="form.file" class="video-preview-block">
-      <video
-        ref="cutVideoRef"
-        class="video-preview"
-        :src="form.previewUrl"
-        controls
-        @loadedmetadata="onCutLoadedMetadata"
-      />
-      <el-slider
-        v-if="form.duration"
-        v-model="cutRange"
-        :min="0"
-        :max="form.duration"
-        :step="1"
-        range
-        class="video-range-slider"
-        @change="onCutRangeChange"
-      />
+      <p v-if="form.segment">当前预览从 {{ secondsToTime(form.previewStart) }} 起的最多 15 秒；滑块设置使用完整视频时长。</p>
+      <el-button size="small" @click="loadVideoPreview">预览所选起点后的片段</el-button>
+      <video ref="cutVideoRef" class="video-preview" :src="form.previewUrl" controls @loadedmetadata="onCutLoadedMetadata" />
+      <el-slider v-if="form.duration" v-model="cutRange" :min="0" :max="form.duration" :step="1" range class="video-range-slider" @change="onCutRangeChange" />
       <div v-if="form.duration" class="video-range-meta">
         <span>开始：{{ form.start || '00:00:00' }}</span>
         <span>结束：{{ form.end || '视频末尾' }}</span>
@@ -261,12 +265,8 @@ const runCut = async () => {
         <el-button type="primary" :loading="loading" @click="runCut">截取</el-button>
       </el-form-item>
     </el-form>
-    <el-alert
-      v-if="form.result"
-      type="success"
-      :closable="false"
-      show-icon
-    >
+    <VideoInspection :file="form.file" />
+    <el-alert v-if="form.result" type="success" :closable="false" show-icon>
       <template #title>
         输出文件：<a class="link" @click.prevent="openFile(form.result)">{{ form.result }}</a>
       </template>

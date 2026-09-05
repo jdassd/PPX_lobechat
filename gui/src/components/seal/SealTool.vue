@@ -8,24 +8,12 @@
         </header>
         <el-form label-width="110px">
           <el-form-item label="访问密码">
-            <el-input
-              v-model="state.password"
-              type="password"
-              autocomplete="off"
-              placeholder="请输入访问密码"
-              show-password
-              @keyup.enter="unlockSeal"
-            />
+            <el-input v-model="state.password" type="password" autocomplete="off" placeholder="请输入访问密码" show-password @keyup.enter="unlockSeal" />
           </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="unlockSeal">解锁公章生成</el-button>
           </el-form-item>
-          <el-alert
-            v-if="state.passwordError"
-            type="error"
-            :closable="false"
-            show-icon
-          >
+          <el-alert v-if="state.passwordError" type="error" :closable="false" show-icon>
             {{ state.passwordError }}
           </el-alert>
         </el-form>
@@ -39,6 +27,7 @@
           <el-form-item label="模板">
             <el-radio-group v-model="state.template">
               <el-radio-button label="round">圆形公章</el-radio-button>
+              <el-radio-button label="ellipse">椭圆公章</el-radio-button>
             </el-radio-group>
           </el-form-item>
           <el-form-item label="上环文字">
@@ -161,12 +150,8 @@
           <el-empty v-else description="尚未生成预览" />
         </div>
         <el-descriptions :column="1" border size="small" class="meta">
-          <el-descriptions-item label="画布尺寸">
-            {{ canvasSize }} px
-          </el-descriptions-item>
-          <el-descriptions-item label="颜色 / 透明度">
-            {{ state.form.color }} / {{ state.form.alpha }}
-          </el-descriptions-item>
+          <el-descriptions-item label="画布尺寸"> {{ canvasSize }} px </el-descriptions-item>
+          <el-descriptions-item label="颜色 / 透明度"> {{ state.form.color }} / {{ state.form.alpha }} </el-descriptions-item>
           <el-descriptions-item label="最近输出">
             <template v-if="state.resultPath">
               <el-link type="primary" @click="openOutput">{{ state.resultPath }}</el-link>
@@ -180,7 +165,8 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive } from 'vue'
+import { useDraft } from '../../utils/workspace'
+import { computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
@@ -214,7 +200,7 @@ const makeDefaultForm = () => ({
   texturePath: ''
 })
 
-const state = reactive({
+const state = useDraft('seal/SealTool/state', {
   template: 'round',
   form: makeDefaultForm(),
   preview: '',
@@ -282,7 +268,7 @@ const callSealApi = async (mode) => {
   if (!ensurePyReady()) return null
   state.loading = true
   try {
-    const { ok, data: res, message } = await pyCall('seal_generate', buildPayload(mode))
+    const { ok, data: res, message } = await pyCall(mode === 'preview' ? 'seal_generate_preview' : 'seal_generate', buildPayload(mode))
     if (ok) {
       if (res.preview) {
         state.preview = res.preview
@@ -460,12 +446,13 @@ const resetDefaults = () => {
   justify-content: center;
   padding: 20px;
   margin-bottom: 18px;
-  background-image: linear-gradient(45deg, var(--ppx-glass-bg) 25%, transparent 25%),
-                    linear-gradient(-45deg, var(--ppx-glass-bg) 25%, transparent 25%),
-                    linear-gradient(45deg, transparent 75%, var(--ppx-glass-bg) 75%),
-                    linear-gradient(-45deg, transparent 75%, var(--ppx-glass-bg) 75%);
+  background-image: linear-gradient(45deg, var(--ppx-glass-bg) 25%, transparent 25%), linear-gradient(-45deg, var(--ppx-glass-bg) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--ppx-glass-bg) 75%), linear-gradient(-45deg, transparent 75%, var(--ppx-glass-bg) 75%);
   background-size: 20px 20px;
-  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  background-position:
+    0 0,
+    0 10px,
+    10px -10px,
+    -10px 0px;
 }
 
 .preview-box {

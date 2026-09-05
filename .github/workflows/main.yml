@@ -84,6 +84,21 @@ jobs:
       - name: 运行 Python 单元测试
         run: pnpm run test
 
+      - name: 安装浏览器测试运行时
+        run: node pyapp/package/python.js -m playwright install --with-deps chromium
+
+      - name: 验证完整工作区流程
+        run: pnpm run test:e2e
+
+      - name: 上传验证证据
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Verification_${{ runner.os }}
+          retention-days: 7
+          if-no-files-found: ignore
+          path: build/verification/*
+
       - name: 开始打包
         run: pnpm run build
 
@@ -111,10 +126,13 @@ jobs:
         with:
           path: packages
 
+      - name: 检查完整重构正式版发布门槛
+        run: node pyapp/package/verifyRelease.js
+
       - name: 收集产物列表
         id: artifacts
         run: |
-          FILE_LIST=$(find packages -type f -print)
+          FILE_LIST=$(find packages/Setup_* -type f -print)
           if [ -z "$FILE_LIST" ]; then
             echo "未找到可上传的文件" >&2
             exit 1

@@ -26,17 +26,10 @@
         </div>
       </el-form-item>
       <el-form-item v-else label="页码列表">
-        <el-input
-          v-model="form.pageSpec"
-          placeholder="示例：1-3,5,8；支持用分号或换行分隔多个区间"
-          type="textarea"
-          :rows="3"
-        />
+        <el-input v-model="form.pageSpec" placeholder="示例：1-3,5,8；支持用分号或换行分隔多个区间" type="textarea" :rows="3" />
       </el-form-item>
       <el-form-item v-if="form.mode === 'custom'">
-        <el-checkbox v-model="form.multi">
-          按多个区间分别导出多个 PDF 文件
-        </el-checkbox>
+        <el-checkbox v-model="form.multi"> 按多个区间分别导出多个 PDF 文件 </el-checkbox>
       </el-form-item>
       <el-form-item label="输出目录">
         <div class="field-row">
@@ -48,26 +41,14 @@
         <el-input v-model="form.outputName" placeholder="例如：摘录.pdf" />
       </el-form-item>
       <el-form-item>
-        <el-button
-          type="primary"
-          :loading="shared.loading"
-          @click="runCut"
-        >
-          生成新 PDF
-        </el-button>
+        <el-button type="primary" :loading="shared.loading" @click="runCut"> 生成新 PDF </el-button>
       </el-form-item>
     </el-form>
     <div v-if="form.output || form.outputs.length" class="result-block">
       <p class="result-title">生成文件</p>
       <el-scrollbar max-height="120px">
         <div class="result-list">
-          <el-tag
-            v-for="file in (form.outputs.length ? form.outputs : [form.output])"
-            :key="file"
-            type="success"
-            effect="light"
-            @click="openPath(file)"
-          >
+          <el-tag v-for="file in form.outputs.length ? form.outputs : [form.output]" :key="file" type="success" effect="light" @click="openPath(file)">
             {{ file }}
           </el-tag>
         </div>
@@ -77,13 +58,14 @@
 </template>
 
 <script setup>
-import { inject, reactive } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { inject } from 'vue'
 import { ElMessage } from 'element-plus'
 
 const { callApi, openPath, pickPdf, pickDir } = inject('pdfApi')
 const shared = inject('pdfShared')
 
-const form = reactive({
+const form = useDraft('pdf/parts/CutPanel/form', {
   file: null,
   outputDir: '',
   outputName: '摘录.pdf',
@@ -127,8 +109,7 @@ const runCut = async () => {
     endPage: form.endPage,
     pageSpec: form.pageSpec
   }
-  const useMulti =
-    form.mode === 'custom' && form.multi && form.pageSpec.trim().length > 0
+  const useMulti = form.mode === 'custom' && form.multi && form.pageSpec.trim().length > 0
   const apiName = useMulti ? 'pdf_multi_cut' : 'pdf_cut'
   const res = await callApi(apiName, payload)
   if (res) {

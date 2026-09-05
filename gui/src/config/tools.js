@@ -1,6 +1,6 @@
 // v2.6 工具注册表：导航、首页、命令面板和模块中心共享同一份元数据。
 import { markRaw } from 'vue'
-import { Connection, Cpu, Document, Edit, Files, FolderOpened, HomeFilled, Monitor, PictureFilled, Refresh, Share, Stamp, Tickets, VideoPlay } from '@element-plus/icons-vue'
+import { Connection, Cpu, Document, Edit, Files, FolderOpened, HomeFilled, Monitor, PictureFilled, Refresh, Stamp, Tickets, VideoPlay } from '@element-plus/icons-vue'
 
 const feature = (id, label, keywords = [], options = {}) => ({ id, label, keywords, ...options })
 
@@ -17,12 +17,7 @@ export const TOOLS = [
     capability: 'flyingmouse',
     badge: '内置 FlyingMouse',
     points: ['图片、Office、PDF、音视频互转', '混合批量与目标格式记忆', '图片合成 PDF 与 PDF 合并'],
-    features: [
-      feature('universal', '通用格式转换', ['格式', '转换', 'Office', '音频', '视频'], { featured: true }),
-      feature('images-pdf', '图片合成 PDF', ['图片转 PDF', '装订'], { featured: true }),
-      feature('merge-pdf', 'PDF 合并', ['组合 PDF']),
-      feature('engine', '转换引擎与许可', ['FlyingMouse', '依赖', '运行时'])
-    ]
+    features: [feature('universal', '通用格式转换', ['格式', '转换', 'Office', '音频', '视频'], { featured: true }), feature('images-pdf', '图片合成 PDF', ['图片转 PDF', '装订'], { featured: true }), feature('merge-pdf', 'PDF 合并', ['组合 PDF']), feature('engine', '转换引擎与许可', ['FlyingMouse', '依赖', '运行时'])]
   },
   {
     id: 'image',
@@ -34,15 +29,7 @@ export const TOOLS = [
     locked: true,
     defaultEnabled: true,
     points: ['批量压缩与水印', '裁剪、拼接与批量命名', '本地图片文字识别'],
-    features: [
-      feature('compress', '批量压缩图片', ['质量', '目标大小'], { featured: true }),
-      feature('crop', '图片裁剪', ['尺寸', '比例']),
-      feature('watermark', '批量添加水印', ['文字水印', '图片水印']),
-      feature('rotate', '旋转与翻转', ['旋转', '镜像', '翻转']),
-      feature('concat', '图片拼接', ['长图', '网格', '横向', '纵向']),
-      feature('rename', '图片批量命名', ['重命名', '序号', '预演']),
-      feature('ocr', '图片 OCR 文字识别', ['扫描', '识别文字'], { featured: true })
-    ]
+    features: [feature('compress', '批量压缩图片', ['质量', '目标大小'], { featured: true }), feature('crop', '图片裁剪', ['尺寸', '比例']), feature('watermark', '批量添加水印', ['文字水印', '图片水印']), feature('rotate', '旋转与翻转', ['旋转', '镜像', '翻转']), feature('concat', '图片拼接', ['长图', '网格', '横向', '纵向']), feature('rename', '图片批量命名', ['重命名', '序号', '预演']), feature('ocr', '图片 OCR 文字识别', ['扫描', '识别文字'], { featured: true })]
   },
   {
     id: 'pdf',
@@ -197,19 +184,6 @@ export const TOOLS = [
     badge: '跨平台',
     points: ['核心环境与可选能力检查', '完整本地备份与安全恢复', '隐私安全的诊断报告'],
     features: [feature('health', '应用健康检查', ['诊断', '依赖', '环境'], { featured: true }), feature('backup', '备份与恢复', ['迁移', '数据', '设置'], { featured: true }), feature('diagnostics', '生成诊断报告', ['日志', '支持'])]
-  },
-  {
-    id: 'mindmap',
-    name: '思维导图（实验性）',
-    desc: '思维导图 · 局域网协作',
-    icon: markRaw(Share),
-    group: 'advanced',
-    hue: '#8a5cf5',
-    defaultEnabled: false,
-    experimental: true,
-    badge: '可选服务',
-    points: ['多结构导图', '本机或远程服务', '团队协作'],
-    features: [feature('mindmap', '打开思维导图', ['组织架构', '时间轴', '鱼骨图'])]
   },
   {
     id: 'system',

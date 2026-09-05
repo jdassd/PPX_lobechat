@@ -1,13 +1,18 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import VideoInspection from '../../shared/VideoInspection.vue'
+import FileSelector from '../../shared/FileSelector.vue'
+import { mergeFileQueue, useDraft } from '../../../utils/workspace'
+import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
 const videoFilter = ['视频文件 (*.mp4;*.mov;*.avi;*.mkv;*.webm)']
 
 const loading = ref(false)
+const inspection = ref(null)
+const inspecting = ref(false)
 
-const form = reactive({
+const form = useDraft('video/parts/ConcatPanel/form', {
   files: [],
   reencode: false,
   targetFormat: 'mp4',
@@ -28,24 +33,27 @@ const selectConcatFiles = async () => {
   if (!ensurePyReady()) return
   const files = await callApiRaw('system_pyCreateFileDialog', videoFilter)
   if (files?.length) {
-    form.files.push(...files)
+    form.files = mergeFileQueue(form.files, files)
   }
 }
 
-const clearConcatFiles = () => {
-  form.files = []
-}
-
-const removeConcatFile = (index) => {
-  form.files.splice(index, 1)
-}
-
-const moveConcatFile = (index, direction) => {
-  const target = index + direction
-  if (target < 0 || target >= form.files.length) return
-  const temp = form.files[index]
-  form.files[index] = form.files[target]
-  form.files[target] = temp
+watch(
+  () => form.files.map((file) => file.path || file).join('\n'),
+  () => {
+    inspection.value = null
+  }
+)
+const inspectConcat = async () => {
+  inspecting.value = true
+  try {
+    const response = await pyCall('video_concat_preview', { files: form.files.map((file) => file.path || file) })
+    if (!response.ok) throw new Error(response.message)
+    inspection.value = response.data
+  } catch (error) {
+    ElMessage.error(error.message)
+  } finally {
+    inspecting.value = false
+  }
 }
 
 const selectDir = async () => {
@@ -69,7 +77,11 @@ const runConcat = async () => {
   }
   loading.value = true
   try {
-    const { ok, data: res, message } = await pyCall('video_concat', {
+    const {
+      ok,
+      data: res,
+      message
+    } = await pyCall('video_concat', {
       files: form.files.map((file) => file.path || file),
       reencode: form.reencode,
       targetFormat: form.targetFormat,
@@ -96,37 +108,9 @@ const runConcat = async () => {
       <h4>多视频拼接</h4>
       <p>支持直接无损合并或重新编码输出，保持自定义排序</p>
     </header>
-    <div class="field-row">
-      <el-button @click="selectConcatFiles">添加视频文件</el-button>
-      <el-button text type="danger" :disabled="!form.files.length" @click="clearConcatFiles">
-        清空
-      </el-button>
-    </div>
-    <el-table
-      v-if="form.files.length"
-      :data="form.files"
-      border
-      size="small"
-      style="margin: 16px 0"
-    >
-      <el-table-column type="index" width="50" label="#" />
-      <el-table-column label="文件名" prop="filename" show-overflow-tooltip />
-      <el-table-column label="路径" show-overflow-tooltip>
-        <template #default="scope">
-          {{ scope.row.path }}
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="160">
-        <template #default="scope">
-          <el-button text size="small" @click="moveConcatFile(scope.$index, -1)">上移</el-button>
-          <el-button text size="small" @click="moveConcatFile(scope.$index, 1)">下移</el-button>
-          <el-button text size="small" type="danger" @click="removeConcatFile(scope.$index)">移除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-    <el-alert v-else type="info" :closable="false" show-icon>
-      <template #title>请选择至少两个视频文件</template>
-    </el-alert>
+    <FileSelector v-model:files="form.files" label="待拼接视频" description="按列表顺序拼接，可拖动调整顺序" @select="selectConcatFiles" />
+    <el-button :loading="inspecting" :disabled="form.files.length < 2" @click="inspectConcat">检查拼接兼容性</el-button>
+    <el-alert v-if="inspection" :type="inspection.compatible ? 'success' : 'warning'" :title="inspection.msg" :closable="false" />
     <el-form :model="form" label-width="140px" class="form-block">
       <el-form-item label="输出格式">
         <div class="field-row">
@@ -135,10 +119,7 @@ const runConcat = async () => {
             <el-option label="MOV" value="mov" />
             <el-option label="MKV" value="mkv" />
           </el-select>
-          <el-switch
-            v-model="form.reencode"
-            active-text="重新编码（兼容不同参数）"
-          />
+          <el-switch v-model="form.reencode" active-text="重新编码（兼容不同参数）" />
         </div>
       </el-form-item>
       <el-form-item v-if="form.reencode" label="编码预设">
@@ -155,22 +136,11 @@ const runConcat = async () => {
         </div>
       </el-form-item>
       <el-form-item>
-        <el-button
-          type="primary"
-          :loading="loading"
-          :disabled="form.files.length < 2"
-          @click="runConcat"
-        >
-          开始合成
-        </el-button>
+        <el-button type="primary" :loading="loading" :disabled="form.files.length < 2" @click="runConcat"> 开始合成 </el-button>
       </el-form-item>
     </el-form>
-    <el-alert
-      v-if="form.result"
-      type="success"
-      :closable="false"
-      show-icon
-    >
+    <VideoInspection :file="form.files[0]" />
+    <el-alert v-if="form.result" type="success" :closable="false" show-icon>
       <template #title>
         已输出：<a class="link" @click.prevent="openFile(form.result)">{{ form.result }}</a>
       </template>

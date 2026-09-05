@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import math
 import os
@@ -14,10 +15,14 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
+from api.core.context import TaskCancelled, TaskContext, checkpoint, current_context, report_progress, task_context
+from api.core.store import StateStore
+from api.core.worker import ISOLATED_PREFIXES, run_in_worker
 from api.utils.error_handler import api_error, api_success
 from pyapp.config.config import Config
 
 WORKFLOW_METHODS = {
+    'format_center_convert', 'format_center_images_to_pdf', 'format_center_merge_pdfs',
     'image_format_convert', 'image_batch_compress', 'image_crop', 'image_add_watermark',
     'image_rotate_flip', 'image_concat', 'image_batch_rename', 'image_to_pdf', 'ocr_image',
     'pdf_convert_to_images', 'pdf_convert_to_scan', 'pdf_compress', 'pdf_merge', 'pdf_split',
@@ -33,7 +38,6 @@ WORKFLOW_METHODS = {
 }
 
 _BINDING = re.compile(r'\{\{\s*([a-zA-Z_][\w]*(?:\.[\w-]+)*)\s*\}\}')
-_MAX_RUNS = 80
 _MAX_STEP_RETRIES = 5
 _MAX_RETRY_DELAY_SECONDS = 300
 _MAX_BUNDLE_BYTES = 2 * 1024 * 1024
@@ -167,35 +171,36 @@ class WorkflowMixin:
             store_dir = Path(Config.appDataDir) / 'workflows'
             store_dir.mkdir(parents=True, exist_ok=True)
             self._workflow_store_path = store_dir / 'workflows.json'
+            self._workflow_store = StateStore(Config.appDataDir)
             self._workflow_lock = threading.RLock()
             self._workflow_stop_event = threading.Event()
             self._workflow_thread = None
             self._workflow_watch_state: Dict[str, Dict[str, Any]] = {}
             self._workflow_data = self._workflow_load()
+            self._workflow_generated_paths = set(self._workflow_data.get('generatedPaths', []))
             self._workflow_ready = True
 
     def _workflow_load(self) -> Dict[str, Any]:
         empty = {'schemaVersion': 1, 'workflows': [], 'schedules': [], 'watches': [], 'runs': []}
-        try:
-            payload = json.loads(self._workflow_store_path.read_text(encoding='utf-8'))
-        except (OSError, ValueError, TypeError):
-            return empty
+        payload = self._workflow_store.load('workflows', self._workflow_store_path, empty)
         if not isinstance(payload, dict):
             return empty
         for key in ('workflows', 'schedules', 'watches', 'runs'):
             if not isinstance(payload.get(key), list):
                 payload[key] = []
         payload['schemaVersion'] = 1
-        payload['runs'] = payload['runs'][:_MAX_RUNS]
+        interrupted = False
+        for run in payload['runs']:
+            if run.get('status') == 'running':
+                run.update(status='interrupted', endedAt=time.time())
+                interrupted = True
+        if interrupted:
+            self._workflow_store.save('workflows', payload)
         return payload
 
     def _workflow_persist_locked(self) -> None:
-        temp = self._workflow_store_path.with_suffix('.tmp')
-        with temp.open('w', encoding='utf-8') as handle:
-            json.dump(self._workflow_data, handle, ensure_ascii=False, indent=2)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temp, self._workflow_store_path)
+        self._workflow_data['generatedPaths'] = sorted(getattr(self, '_workflow_generated_paths', set()))[-10000:]
+        self._workflow_store.save('workflows', self._workflow_data)
 
     @staticmethod
     def _workflow_validate_steps(steps: Any) -> List[Dict[str, Any]]:
@@ -500,28 +505,67 @@ class WorkflowMixin:
     def _workflow_result_ok(result: Any) -> bool:
         return isinstance(result, dict) and (result.get('code') == 0 or result.get('success') is True)
 
-    def _workflow_execute_step(self, step: Dict[str, Any], context: Dict[str, Any]):
+    def _workflow_execute_step(self, step: Dict[str, Any], context: Dict[str, Any], previous=None):
         step_started = time.time()
         attempts = []
         result: Any = None
         ok = False
+        canceled = False
         try:
             args = _resolve(step['args'], context)
+            if previous and isinstance(args, dict):
+                from api.operations import OPERATIONS
+                descriptor = OPERATIONS.get(step['method'])
+                batch_key = descriptor.batchKey if descriptor else None
+                if step['method'] == 'format_center_convert':
+                    batch_key = 'files'
+                completed = {item.get('input') for item in previous.get('itemResults', []) if item.get('status') in {'success', 'skipped'}}
+                if batch_key and isinstance(args.get(batch_key), list):
+                    args[batch_key] = [item for item in args[batch_key] if (item.get('path') if isinstance(item, dict) else item) not in completed]
+                elif step['method'] in {'file_batch_copy', 'file_batch_delete', 'file_batch_rename', 'file_auto_classify'} and previous.get('inputItems'):
+                    args['_retryInputs'] = [path for path in previous['inputItems'] if path not in completed]
+                    args['_inputOrder'] = {path: index for index, path in enumerate(previous['inputItems'])}
             handler = getattr(self, step['method'], None)
             if step['method'] not in WORKFLOW_METHODS or not callable(handler):
                 raise ValueError(f'步骤方法不可用：{step["method"]}')
             retry_count = int(step.get('retryCount') or 0)
             retry_delay = float(step.get('retryDelaySeconds') or 0)
             for attempt_index in range(retry_count + 1):
+                checkpoint()
                 attempt_started = time.time()
                 try:
-                    result = handler(args)
+                    parent_context = current_context() or TaskContext()
+
+                    def report_step(payload):
+                        asset = payload.get('outputAsset')
+                        if asset:
+                            if not any(item['path'] == asset['path'] for item in parent_context.outputs):
+                                parent_context.outputs.append(asset)
+                            with self._workflow_lock:
+                                self._workflow_generated_paths.add(str(Path(asset['path']).resolve()))
+                                self._workflow_persist_locked()
+                        parent_context.emit(**payload)
+
+                    child_context = TaskContext(cancel=parent_context.cancel, callback=report_step)
+                    if getattr(self, '_host', None) and step['method'].startswith(ISOLATED_PREFIXES):
+                        result = run_in_worker(step['method'], [args], child_context)
+                    else:
+                        with task_context(child_context):
+                            result = handler(args)
+                    if isinstance(result, dict):
+                        result.setdefault('itemResults', child_context.item_results)
+                        result.setdefault('inputItems', child_context.input_items)
+                    checkpoint()
+                    for asset in result.get('outputAssets', []) if isinstance(result, dict) else []:
+                        self._workflow_generated_paths.add(str(Path(asset['path']).resolve()))
                     ok = self._workflow_result_ok(result)
                     message = (
                         str(result.get('msg') or result.get('message') or '')
                         if isinstance(result, dict)
                         else ''
                     )
+                except TaskCancelled:
+                    raise
                 except Exception as exc:
                     result = {'code': -1, 'msg': str(exc)}
                     ok = False
@@ -536,7 +580,17 @@ class WorkflowMixin:
                 if ok:
                     break
                 if attempt_index < retry_count and retry_delay:
-                    time.sleep(retry_delay)
+                    active_context = current_context()
+                    if active_context:
+                        active_context.cancel.wait(retry_delay)
+                        checkpoint()
+                    else:
+                        time.sleep(retry_delay)
+        except TaskCancelled as exc:
+            canceled = True
+            result = {'code': -1, 'msg': str(exc), 'errorCode': 'CANCELED'}
+            attempts.append({'attempt': len(attempts) + 1, 'status': 'canceled', 'message': str(exc),
+                             'startedAt': step_started, 'endedAt': time.time()})
         except Exception as exc:
             result = {'code': -1, 'msg': str(exc)}
             attempts.append({
@@ -552,11 +606,17 @@ class WorkflowMixin:
             if isinstance(result, dict)
             else ''
         )
+        if previous and isinstance(result, dict):
+            from api.operations import enrich_result
+            retained = [asset for asset in previous.get('outputAssets', []) if Path(asset['path']).exists()]
+            result['outputAssets'] = list({asset['path']: asset for asset in [*retained, *result.get('outputAssets', [])]}.values())
+            result['itemResults'] = list({item['input']: item for item in [*previous.get('itemResults', []), *result.get('itemResults', [])] if item.get('input')}.values())
+            result = enrich_result(step['method'], result)
         step_run = {
             'id': step['id'],
             'name': step['name'],
             'method': step['method'],
-            'status': 'success' if ok else 'failed',
+            'status': 'canceled' if canceled else 'partial' if ok and result.get('partial') else 'success' if ok else 'failed',
             'message': message,
             'startedAt': step_started,
             'endedAt': time.time(),
@@ -577,6 +637,20 @@ class WorkflowMixin:
             workflow = _copy(workflow)
         if not workflow.get('enabled', True):
             return api_error('工作流已停用')
+        signature = hashlib.sha256(json.dumps(workflow['steps'], sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+        resume_steps = {}
+        if options.get('_resumeRunId'):
+            with self._workflow_lock:
+                previous_run = self._workflow_find(self._workflow_data['runs'], options['_resumeRunId'])
+                previous_run = _copy(previous_run) if previous_run else None
+            if not previous_run or previous_run.get('workflowId') != workflow_id:
+                return api_error('找不到可重试的工作流记录')
+            if previous_run.get('stepsSignature') != signature:
+                return api_error('工作流步骤已修改，请使用当前版本重新运行')
+            resume_steps = {step['id']: step for step in previous_run.get('steps', [])}
+            if any(not Path(asset['path']).exists() for step in resume_steps.values() if step['status'] == 'success'
+                   for asset in step.get('result', {}).get('outputAssets', [])):
+                return api_error('先前成功步骤的结果已移动或删除，请重新运行工作流')
 
         input_data = options.get('input') or {}
         watch_data = options.get('watch') or {}
@@ -593,25 +667,47 @@ class WorkflowMixin:
             'startedAt': started_at,
             'endedAt': None,
             'steps': [],
+            'stepsSignature': signature,
         }
         with self._workflow_lock:
             self._workflow_data['runs'].insert(0, _copy(run))
-            self._workflow_data['runs'] = self._workflow_data['runs'][:_MAX_RUNS]
             self._workflow_persist_locked()
 
         context = {'input': _copy(input_data), 'watch': _copy(watch_data), 'steps': {}}
+        if current_context():
+            current_context().emit(workflowRunId=run_id)
         failed = False
+        partial = False
         try:
-            for step in workflow['steps']:
-                step_run, result, ok = self._workflow_execute_step(step, context)
+            for step_index, step in enumerate(workflow['steps']):
+                report_progress(step_index, len(workflow['steps']), f'执行步骤：{step["name"]}')
+                previous = resume_steps.get(step['id'])
+                if previous and previous['status'] == 'success':
+                    step_run, result, ok = {**previous, 'reused': True}, _copy(previous['result']), True
+                else:
+                    step_run, result, ok = self._workflow_execute_step(step, context, previous.get('result') if previous else None)
                 context['steps'][step['id']] = _copy(result)
                 run['steps'].append(step_run)
+                with self._workflow_lock:
+                    stored = self._workflow_find(self._workflow_data['runs'], run_id)
+                    if stored:
+                        stored.update(_copy(run))
+                    self._workflow_persist_locked()
+                checkpoint()
+                partial = partial or step_run['status'] == 'partial'
                 if not ok:
                     failed = True
                     if step['onError'] != 'continue':
                         break
+        except TaskCancelled:
+            failed = True
+            run['status'] = 'canceled'
+        except Exception:
+            failed = True
+            raise
         finally:
-            run['status'] = 'failed' if failed else 'success'
+            partial = partial or (failed and any(step['status'] in {'success', 'partial'} for step in run['steps']))
+            run['status'] = 'canceled' if run['status'] == 'canceled' else 'partial' if partial else 'failed' if failed else 'success'
             run['endedAt'] = time.time()
             with self._workflow_lock:
                 stored = self._workflow_find(self._workflow_data['runs'], run_id)
@@ -620,9 +716,14 @@ class WorkflowMixin:
                     stored.update(_copy(run))
                 self._workflow_persist_locked()
 
+        assets = list({asset['path']: asset for step in run['steps'] for asset in step.get('result', {}).get('outputAssets', [])}.values())
+        if run['status'] == 'canceled':
+            return api_error('工作流已取消，已完成的结果已保留', run=_copy(run), context=context, outputAssets=assets, errorCode='CANCELED')
+        if partial:
+            return api_success('工作流部分成功，请查看步骤记录', run=_copy(run), context=context, outputAssets=assets, partial=True)
         if failed:
-            return api_error('工作流执行失败，请查看步骤记录', run=_copy(run), context=context)
-        return api_success('工作流执行完成', run=_copy(run), context=context)
+            return api_error('工作流执行失败，请查看步骤记录', run=_copy(run), context=context, outputAssets=assets)
+        return api_success('工作流执行完成', run=_copy(run), context=context, outputAssets=assets)
 
     def workflow_schedule_save(self, options: Dict | None = None):
         try:
@@ -801,6 +902,8 @@ class WorkflowMixin:
         try:
             paths = directory.glob(pattern)
             for path in paths:
+                if any(part.startswith('.') or part in {'node_modules', '__pycache__'} for part in path.relative_to(directory).parts):
+                    continue
                 if not path.is_file():
                     continue
                 if extensions and path.suffix.lower().lstrip('.') not in extensions:
@@ -834,6 +937,7 @@ class WorkflowMixin:
             if not watch.get('enabled'):
                 continue
             current = self._workflow_scan(watch)
+            current = {path: signature for path, signature in current.items() if path not in self._workflow_generated_paths}
             state = self._workflow_watch_state.get(watch['id'])
             if state is None:
                 self._workflow_watch_state[watch['id']] = {'snapshot': current, 'pending': {}}

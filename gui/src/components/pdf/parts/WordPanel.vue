@@ -26,9 +26,7 @@
         </div>
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" :loading="shared.loading" @click="runPdfToWord">
-          转换为 Word
-        </el-button>
+        <el-button type="primary" :loading="shared.loading" @click="runPdfToWord"> 转换为 Word </el-button>
       </el-form-item>
     </el-form>
     <div v-if="form.output" class="result-block">
@@ -41,13 +39,14 @@
 </template>
 
 <script setup>
-import { inject, reactive } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { inject } from 'vue'
 import { ElMessage } from 'element-plus'
 
 const { callApi, openPath, pickPdf, pickDir } = inject('pdfApi')
 const shared = inject('pdfShared')
 
-const form = reactive({
+const form = useDraft('pdf/parts/WordPanel/form', {
   file: null,
   textMode: 'plain',
   outputDir: '',

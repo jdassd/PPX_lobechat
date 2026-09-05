@@ -1,4 +1,5 @@
 <script setup>
+import { useDraft } from '../../utils/workspace'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { callApi, callApiRaw } from '@/utils/pyapi'
@@ -9,11 +10,36 @@ const loading = ref(false)
 const indexing = ref(false)
 const searching = ref(false)
 const status = reactive({ documents: 0, freshDocuments: 0, staleDocuments: 0, missingDocuments: 0, staleSamples: [], sourceBytes: 0, databaseBytes: 0, updatedAt: 0, extensions: [] })
-const indexForm = reactive({ directories: [], files: [], recursive: true, rebuild: false, prune: false })
-const searchForm = reactive({ query: '', extension: '', directory: '', limit: 50 })
+const indexForm = useDraft('document/DocumentTool/indexForm', { directories: [], files: [], recursive: true, rebuild: false, prune: false, ocr: false })
+const searchForm = useDraft('document/DocumentTool/searchForm', { query: '', extension: '', directory: '', limit: 50 })
 const results = ref([])
-const tableForm = reactive({ filePath: '', outputDir: '', outputName: '', outputFormat: 'xlsx', pageSpec: '', dpi: 220, columnTolerance: 0 })
+const hitPreview = ref(null)
+const locate = async (item, location) => {
+  if (location.page) {
+    const response = await callApi('pdf_page_preview', { filePath: item.path, pageNumbers: [location.page] })
+    if (!response.ok) return ElMessage.error(response.message)
+    hitPreview.value = response.data
+  } else ElMessage.info(location.sheet ? `${location.sheet}，第 ${location.row} 行` : location.paragraph ? `正文第 ${location.paragraph} 段（含表格段落）` : `第 ${location.line} 行`)
+}
+const tableForm = useDraft('document/DocumentTool/tableForm', { filePath: '', outputDir: '', outputName: '', outputFormat: 'xlsx', pageSpec: '', dpi: 220, columnTolerance: 0, autoRotate: false, rotation: 0 })
 const tableResult = ref(null)
+const tablePage = ref(1)
+const tableRowPage = ref(1)
+const currentTable = computed(() => tableResult.value?.tables?.[tablePage.value - 1])
+const tableColumnCount = computed(() => Math.max(1, ...(currentTable.value?.rows || []).map((row) => row.length)))
+const exportCorrected = async () => {
+  loading.value = true
+  try {
+    const response = await callApi('ocr_table', { ...tableForm, tables: tableResult.value.tables, saveFile: true })
+    if (!response.ok) return ElMessage.error(response.message)
+    tableResult.value = { ...response.data, tables: tableResult.value.tables }
+    ElMessage.success('已导出核对后的表格')
+  } catch (error) {
+    ElMessage.error(error.message)
+  } finally {
+    loading.value = false
+  }
+}
 
 const formatBytes = (bytes) => {
   const value = Number(bytes || 0)
@@ -131,9 +157,11 @@ const recognizeTable = async () => {
   if (!tableForm.filePath) return ElMessage.warning('请先选择图片或 PDF')
   loading.value = true
   try {
-    const response = await callApi('ocr_table', { ...tableForm })
+    const response = await callApi('ocr_table', { ...tableForm, saveFile: false })
     if (!response.ok) return ElMessage.error(response.message || '识别失败')
     tableResult.value = response.data
+    tablePage.value = 1
+    tableRowPage.value = 1
     ElMessage.success(response.message || '表格识别完成')
   } catch (error) {
     ElMessage.error(error?.message || '识别失败')
@@ -183,6 +211,10 @@ onMounted(refreshStatus)
                   ><span v-else>{{ part.text }}</span></template
                 >
               </p>
+              <div>
+                <el-button v-for="(location, index) in item.locations || []" :key="index" text size="small" :disabled="item.missing || item.stale" @click="locate(item, location)">{{ location.page ? `第 ${location.page} 页${location.ocr ? ' · OCR' : ''}` : location.sheet ? `${location.sheet} · 行 ${location.row}` : location.paragraph ? `段落 ${location.paragraph}` : `行 ${location.line}` }}</el-button
+                ><el-tag v-if="item.truncated" type="warning">仅索引前 200 万字符</el-tag>
+              </div>
               <small>{{ item.path }} · {{ formatBytes(item.size) }}</small>
             </div>
             <div class="result-actions"><el-button type="primary" text :disabled="item.missing" @click="openPath(item.path)">打开</el-button><el-button type="danger" text @click="removeResult(item.path)">移出索引</el-button></div>
@@ -239,7 +271,7 @@ onMounted(refreshStatus)
             </div>
             <el-empty v-if="!indexForm.files.length" :image-size="48" description="可按需添加单个文档" />
           </div>
-          <div class="index-options"><el-checkbox v-model="indexForm.recursive">包含子目录</el-checkbox><el-checkbox v-model="indexForm.prune">移除目录中已不存在文件的旧记录</el-checkbox><el-checkbox v-model="indexForm.rebuild">重建全部索引</el-checkbox></div>
+          <div class="index-options"><el-checkbox v-model="indexForm.recursive">包含子目录</el-checkbox><el-checkbox v-model="indexForm.prune">移除目录中已不存在文件的旧记录</el-checkbox><el-checkbox v-model="indexForm.rebuild">重新提取所选范围</el-checkbox><el-checkbox v-model="indexForm.ocr">扫描 PDF 使用 OCR</el-checkbox></div>
           <div class="footer-actions"><el-button type="danger" plain @click="clearIndex">清空索引</el-button><el-button type="primary" :loading="indexing" @click="buildIndex">更新索引</el-button></div>
         </section>
       </el-tab-pane>
@@ -253,12 +285,13 @@ onMounted(refreshStatus)
             </div>
             <el-button @click="chooseTableFile">选择文件</el-button>
           </div>
-          <el-alert title="适合有清晰行列对齐的表格；复杂合并单元格建议导出后人工校正。" type="info" :closable="false" show-icon />
+          <el-alert title="先识别，再逐页核对并修改单元格，最后导出。低置信度文字会标黄；合并单元格需人工整理。" type="info" :closable="false" show-icon />
           <el-form label-position="top" class="table-form">
             <div class="two-columns">
               <el-form-item label="源文件"><el-input v-model="tableForm.filePath" /></el-form-item><el-form-item label="PDF 页码（图片可留空）"><el-input v-model="tableForm.pageSpec" placeholder="例如 1-3,5；留空为全部" /></el-form-item>
             </div>
             <div class="three-columns">
+              <el-form-item label="方向校正"><el-checkbox v-model="tableForm.autoRotate">比较四个方向（较慢）</el-checkbox></el-form-item>
               <el-form-item label="输出格式"
                 ><el-select v-model="tableForm.outputFormat"><el-option label="Excel" value="xlsx" /><el-option label="CSV" value="csv" /><el-option label="JSON" value="json" /><el-option label="全部" value="all" /></el-select
               ></el-form-item>
@@ -272,16 +305,37 @@ onMounted(refreshStatus)
                 ></el-form-item
               ><el-form-item label="输出名称"><el-input v-model="tableForm.outputName" /></el-form-item>
             </div>
-            <div class="footer-actions"><el-button type="primary" :loading="loading" @click="recognizeTable">开始识别</el-button><el-button v-if="tableResult?.output" @click="openPath(tableResult.output)">打开结果</el-button></div>
+            <div class="footer-actions"><el-button type="primary" :loading="loading" @click="recognizeTable">识别并检查表格</el-button><el-button v-if="tableResult?.tables?.length" type="success" :loading="loading" @click="exportCorrected">导出已核对的表格</el-button><el-button v-if="tableResult?.output" @click="openPath(tableResult.output)">打开结果</el-button></div>
           </el-form>
+          <div v-if="currentTable">
+            <el-pagination v-model:current-page="tablePage" :page-size="1" :total="tableResult.tables.length" layout="prev, pager, next, total" @current-change="tableRowPage = 1" />
+            <p>源第 {{ currentTable.page }} 页 · 方向校正 {{ currentTable.rotation || 0 }}° · {{ currentTable.uncertain?.length || 0 }} 处低置信度内容</p>
+            <el-button size="small" @click="currentTable.rows.push(Array(tableColumnCount).fill(''))">添加行</el-button>
+            <el-button size="small" @click="currentTable.rows.forEach((row) => row.push(''))">添加列</el-button>
+            <el-table :data="currentTable.rows.slice((tableRowPage - 1) * 30, tableRowPage * 30)" max-height="450" border>
+              <el-table-column v-for="column in tableColumnCount" :key="column" :label="'列 ' + column" min-width="160">
+                <template #default="scope"><el-input v-model="scope.row[column - 1]" :class="{ uncertain: (currentTable.uncertain || []).some((text) => String(scope.row[column - 1] || '').includes(text)) }" /></template>
+              </el-table-column>
+              <el-table-column label="操作" width="75"
+                ><template #default="scope"><el-button text type="danger" @click="currentTable.rows.splice((tableRowPage - 1) * 30 + scope.$index, 1)">删除行</el-button></template></el-table-column
+              >
+            </el-table>
+            <el-pagination v-model:current-page="tableRowPage" :page-size="30" :total="currentTable.rows.length" layout="prev, pager, next, total" />
+          </div>
           <el-result v-if="tableResult" icon="success" :title="`${tableResult.rowCount} 行 × ${tableResult.columnCount} 列`" :sub-title="tableResult.outputDir" />
         </section>
       </el-tab-pane>
     </el-tabs>
+    <el-dialog :model-value="Boolean(hitPreview)" title="命中页预览" width="min(800px, 90vw)" @close="hitPreview = null">
+      <el-image v-for="page in hitPreview?.pages || []" :key="page.page" :src="page.preview || page.image" style="width: 100%" />
+    </el-dialog>
   </div>
 </template>
 
 <style scoped>
+.uncertain :deep(.el-input__wrapper) {
+  background: var(--el-color-warning-light-8);
+}
 .document-tool {
   height: 100%;
   overflow: auto;

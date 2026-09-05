@@ -38,7 +38,7 @@ function run(cmd) {
 // 缓存恢复的 venv 可能因基础解释器路径变动而失效，做一次可用性自检
 function venvUsable() {
   if (!fs.existsSync(path.join(root, pyBin))) return false
-  const res = spawnSync(pyBin, ['-c', 'import sys'], { cwd: root, shell: true, stdio: 'ignore' })
+  const res = spawnSync(pyBin, ['-c', 'import sys; assert sys.version_info[:2] == (3, 10)'], { cwd: root, windowsHide: true, stdio: 'ignore' })
   return res.status === 0
 }
 
@@ -57,7 +57,7 @@ if (venvUsable()) {
     fs.rmSync(path.join(root, venvDir), { recursive: true, force: true })
   }
   console.log('\n[init:ci] 创建虚拟环境并安装 Python 依赖（默认 PyPI 源）。')
-  run(isWin ? `py -3.10 -m venv ${venvDir}` : `python3 -m venv ${venvDir}`)
+  run(isWin ? `py -3.10 -m venv ${venvDir}` : `python3.10 -m venv ${venvDir}`)
   run(`${pyBin} -m pip install --upgrade pip`)
   run(`${pipBin} install -r pyapp/requirements.txt`)
   run(`${pipBin} install -r pyapp/requirements-dev.txt`)

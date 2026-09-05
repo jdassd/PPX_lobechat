@@ -1,5 +1,6 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { mergeFileQueue, useDraft } from '../../../utils/workspace'
+import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 
 import FileSelector from '@/components/shared/FileSelector.vue'
@@ -7,7 +8,7 @@ import { callApi, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
 const props = defineProps({ supportedFormats: { type: Object, required: true } })
 const loading = ref(false)
-const form = reactive({ files: [], direction: 'horizontal', columns: 2, spacing: 0, align: 'center', background: '#ffffff', outputFormat: 'png', quality: 90, outputName: '', outputDir: '', result: '' })
+const form = useDraft('image/parts/ConcatPanel/form', { files: [], direction: 'horizontal', columns: 2, spacing: 0, align: 'center', background: '#ffffff', outputFormat: 'png', quality: 90, outputName: '', outputDir: '', result: '' })
 const ready = () => {
   if (hasPyApi()) return true
   ElMessage.warning('该功能需在桌面客户端中使用')
@@ -16,7 +17,7 @@ const ready = () => {
 const selectFiles = async () => {
   if (!ready()) return
   const files = await callApiRaw('system_pyCreateFileDialog', props.supportedFormats.imageFilter)
-  if (files?.length) form.files = files
+  if (files?.length) form.files = mergeFileQueue(form.files, files)
 }
 const selectDir = async () => {
   if (!ready()) return
@@ -49,7 +50,7 @@ const openPath = (path) => path && callApiRaw('system_pyOpenFile', path)
       <h4>图片拼接</h4>
       <p>按横向、纵向或网格布局生成一张长图</p>
     </header>
-    <FileSelector label="图片列表" :files="form.files" removable @select="selectFiles" @remove="removeFile" />
+    <FileSelector label="图片列表" v-model:files="form.files" removable @select="selectFiles" @remove="removeFile" />
     <el-form :model="form" label-width="120px" class="form-block">
       <el-form-item label="布局"
         ><el-radio-group v-model="form.direction"><el-radio-button label="horizontal">横向</el-radio-button><el-radio-button label="vertical">纵向</el-radio-button><el-radio-button label="grid">网格</el-radio-button></el-radio-group></el-form-item

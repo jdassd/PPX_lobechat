@@ -1,5 +1,7 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import VideoInspection from '../../shared/VideoInspection.vue'
+import { useDraft } from '../../../utils/workspace'
+import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
@@ -7,7 +9,7 @@ const videoFilter = ['视频文件 (*.mp4;*.mov;*.avi;*.mkv;*.webm)']
 
 const loading = ref(false)
 
-const form = reactive({
+const form = useDraft('video/parts/CompressPanel/form', {
   file: null,
   mode: 'preset',
   bitrate: '1500k',
@@ -55,7 +57,11 @@ const runCompress = async () => {
   }
   loading.value = true
   try {
-    const { ok, data: res, message } = await pyCall('video_compress', {
+    const {
+      ok,
+      data: res,
+      message
+    } = await pyCall('video_compress', {
       filePath: form.file.path,
       mode: form.mode,
       bitrate: form.bitrate,
@@ -132,12 +138,8 @@ const runCompress = async () => {
         <el-button type="primary" :loading="loading" @click="runCompress">开始压缩</el-button>
       </el-form-item>
     </el-form>
-    <el-alert
-      v-if="form.result"
-      type="success"
-      :closable="false"
-      show-icon
-    >
+    <VideoInspection :file="form.file" />
+    <el-alert v-if="form.result" type="success" :closable="false" show-icon>
       <template #title>
         已输出：<a class="link" @click.prevent="openFile(form.result)">{{ form.result }}</a>
       </template>

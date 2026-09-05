@@ -1,4 +1,5 @@
 <script setup>
+import { useDraft } from '../../utils/workspace'
 import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { DocumentChecked, FolderOpened, Picture, Upload } from '@element-plus/icons-vue'
@@ -14,8 +15,8 @@ const props = defineProps({
 })
 
 const loading = ref(false)
-const result = reactive({ preview: '', outputs: [], lineCount: 0, pageCount: 0, confidence: 0 })
-const form = reactive({ file: null, outputDir: '', pageSpec: '', dpi: 220, outputMode: props.sourceType === 'pdf' ? 'both' : 'text' })
+const result = reactive({ preview: '', outputs: [], lineCount: 0, pageCount: 0, confidence: 0, uncertain: [] })
+const form = useDraft(`${props.sourceType}/ocr/form`, { file: null, outputDir: '', pageSpec: '', dpi: 220, outputMode: props.sourceType === 'pdf' ? 'both' : 'text', autoRotate: false, rotation: 0 })
 
 const isPdf = computed(() => props.sourceType === 'pdf')
 const selectedPath = computed(() => form.file?.path || form.file || '')
@@ -69,6 +70,8 @@ const run = async () => {
   try {
     const payload = {
       filePath: selectedPath.value,
+      autoRotate: form.autoRotate,
+      rotation: form.rotation,
       outputDir: form.outputDir,
       saveFile: true,
       pageSpec: form.pageSpec,
@@ -86,6 +89,7 @@ const run = async () => {
     result.lineCount = data.lineCount || 0
     result.pageCount = data.pageCount || 0
     result.confidence = Math.round((data.averageConfidence || 0) * 100)
+    result.uncertain = (data.lines || (data.pages || []).flatMap((page) => page.lines.map((line) => ({ ...line, page: page.page })))).filter((line) => line.lowConfidence)
     ElMessage.success(response.message || 'OCR 识别完成')
   } catch (error) {
     ElMessage.error(error?.message || 'OCR 识别失败')
@@ -116,6 +120,9 @@ const run = async () => {
     </button>
 
     <el-form :model="form" label-width="104px" class="form-block">
+      <el-form-item label="方向校正"
+        ><el-checkbox v-model="form.autoRotate">比较四个方向（较慢）</el-checkbox><el-select v-if="!form.autoRotate" v-model="form.rotation" style="width: 140px"><el-option v-for="angle in [0, 90, 180, 270]" :key="angle" :value="angle" :label="angle + '°'" /></el-select
+      ></el-form-item>
       <template v-if="isPdf">
         <el-form-item label="识别页码"><el-input v-model="form.pageSpec" placeholder="留空识别全部，例如 1-3,5" /></el-form-item>
         <el-form-item label="清晰度">
@@ -145,6 +152,13 @@ const run = async () => {
         <b>识别结果</b><span>{{ result.pageCount ? `${result.pageCount} 页 · ` : '' }}{{ result.lineCount }} 行 · 平均置信度 {{ result.confidence }}%</span>
       </div>
       <el-input v-if="result.preview" :model-value="result.preview" type="textarea" :rows="9" readonly />
+      <el-collapse v-if="result.uncertain.length"
+        ><el-collapse-item :title="`${result.uncertain.length} 行低置信度内容，请核对原文`"
+          ><p v-for="(line, index) in result.uncertain.slice(0, 100)" :key="index">
+            <el-tag type="warning" size="small">{{ Math.round(line.score * 100) }}%</el-tag> {{ line.page ? `第 ${line.page} 页` : '' }} {{ line.text }}
+          </p></el-collapse-item
+        ></el-collapse
+      >
       <div v-if="result.outputs.length" class="outputs">
         <el-button v-for="path in result.outputs" :key="path" plain @click="openOutput(path)"
           ><el-icon><FolderOpened /></el-icon>&nbsp;打开 {{ path.split(/[\\/]/).pop() }}</el-button

@@ -29,9 +29,8 @@ PPX 是一个跨平台桌面工具箱应用，基于 **Vue 3 + Python + Pywebvie
 │   ├── text.py           # 文本工具
 │   ├── video.py          # 视频工具
 │   ├── file.py           # 文件工具
-│   └── mindmap/          # 思维导图（内嵌 FastAPI 协作服务，见下文）
-├── static/
-│   └── mindmap/          # 思维导图前端构建产物（已提交，随打包携带）
+│   └── core/             # 任务上下文、处理进程、SQLite 状态库与原子输出
+├── static/               # 应用静态资源
 ├── pyapp/                # Python 应用配置和打包
 │   ├── config/           # 配置文件（Config 类）
 │   ├── db/               # 数据库层（支持 JSON/SQLite）
@@ -43,30 +42,16 @@ PPX 是一个跨平台桌面工具箱应用，基于 **Vue 3 + Python + Pywebvie
 ```
 
 ### API 架构
-- `api/api.py` 中的 `API` 类通过多重继承聚合所有功能模块：
-  ```python
-  class API(System, Storage, PDF, Excel, Seal, ImageTool, TextTool, VideoTool, FileTool):
-  ```
+- `api/api.py` 的 `API` 通过独立服务实例委托公开方法，服务私有辅助方法互相隔离。
+- `api/operation_catalog.json` 声明动作参数，`api/operations.py` 定义明确的结果资产契约。
+- `api/core/worker.py` 用独立进程执行阻塞处理，`api/core/context.py` 传递取消与进度。
 - 前端通过 `window.pywebview.api.<methodname>()` 调用 Python 方法
 - API 类在 `main.py` 中实例化并注入到 Pywebview 窗口
 
-### 思维导图模块（api/mindmap + static/mindmap）
-- 由同级仓库 `../mind-map`（MindMapJdassd，基于 SimpleMindMap 的定制版）集成而来：
-  完整思维导图应用（多结构/多主题/富文本/图片图标公式/多格式导入导出/演示模式）
-  + 团队协作（JWT 认证、团队与权限、邀请、节点编辑锁、编辑者历史）
-- 后端 `api/mindmap/`：vendored 自 `../mind-map/server/app`（FastAPI + SQLAlchemy async + SQLite），
-  桌面化改造：Redis 节点锁替换为进程内存实现（`api/mindmap/redis.py`）、配置经环境变量在导入前注入
-  （`DATA_DIR`/`DATABASE_URL`/`JWT_SECRET`/`MINDMAP_STATIC_DIR`）、启动时 create_all 建表（无 alembic）
-- 运行方式：`api/mindmap/tool.py` 的 `MindMapTool` 混入 `API` 类，
-  `mindmap_start()` 在后台 daemon 线程启动 uvicorn（首选端口 8323，占用则顺延），
-  数据库位于 `Config.appDataDir/mindmap/smm.db`，JWT 密钥持久化在同目录 jwt.secret，
-  工具页 `gui/src/components/mindmap/MindMapTool.vue` 用 iframe 加载
-- 协作模型：整文档 JSON 存储（`mind_maps.data`），前端 2s 轮询锁接口并对比 `updated_at` 拉取远端变更，
-  节点锁 60s TTL + 30s 客户端续期；局域网协作 `mindmap_start(lan=True)` 绑定 0.0.0.0，
-  队友浏览器直连；工具页也支持「远程服务器」模式
-- 前端产物 `static/mindmap/`（index.html + dist/，已提交）：源码在 `../mind-map/web`（Vue 2 + vue-cli 4），
-  修改后在该仓库 `npm run build`（Node 17+ 需 `NODE_OPTIONS=--openssl-legacy-provider`），
-  再把生成的根目录 `index.html` 与 `dist/` 拷入 `static/mindmap/`
+### 已退役模块的数据保护
+- 思维导图的入口、服务和打包资源已移除，不接入替代项目。
+- 用户应用数据目录中的原导图数据库和文件保留，不能随代码清理删除。
+- 前端只清理旧导图收藏与导航记录。任务、工作流迁移到 SQLite 时保留旧 JSON 与迁移备份。
 
 ### 配置系统
 - `pyapp/config/config.py` 中的 `Config` 类管理所有配置

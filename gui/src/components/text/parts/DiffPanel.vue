@@ -1,12 +1,13 @@
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 
 import PreviewPanel from '../../shared/PreviewPanel.vue'
 import { callApi, hasPyApi } from '@/utils/pyapi'
 
 const loading = ref(false)
-const state = reactive({
+const state = useDraft('text/parts/DiffPanel/state', {
   left: '',
   right: '',
   mode: 'lines',

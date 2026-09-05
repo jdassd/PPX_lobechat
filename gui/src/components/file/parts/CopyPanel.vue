@@ -1,11 +1,12 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
 const loading = ref(false)
 
-const state = reactive({
+const state = useDraft('file/parts/CopyPanel/state', {
   sourceDir: '',
   targetDir: '',
   keyword: '',
@@ -52,7 +53,11 @@ const runCopy = async () => {
   }
   loading.value = true
   try {
-    const { ok, data: res, message } = await pyCall('file_batch_copy', {
+    const {
+      ok,
+      data: res,
+      message
+    } = await pyCall('file_batch_copy', {
       sourceDir: state.sourceDir,
       targetDir: state.targetDir,
       keyword: state.keyword,
@@ -110,12 +115,7 @@ const runCopy = async () => {
         <el-button type="primary" :loading="loading" @click="runCopy">开始复制</el-button>
       </el-form-item>
     </el-form>
-    <el-descriptions
-      v-if="state.result"
-      :column="3"
-      border
-      size="small"
-    >
+    <el-descriptions v-if="state.result" :column="3" border size="small">
       <el-descriptions-item label="已复制">{{ state.result.copied }}</el-descriptions-item>
       <el-descriptions-item label="跳过">{{ state.result.skipped }}</el-descriptions-item>
       <el-descriptions-item label="总大小">{{ state.result.sizeText }}</el-descriptions-item>

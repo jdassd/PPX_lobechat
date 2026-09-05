@@ -9,6 +9,17 @@ Description: 生成客户端主程序
 usage: 运行前，请确保本机已经搭建Python3开发环境，且已经安装 pywebview 模块。
 '''
 
+import sys
+
+if __name__ == '__main__' and '--operation-worker' in sys.argv:
+    from api.core.worker import worker_main
+    worker_main()
+    raise SystemExit(0)
+
+if __name__ == '__main__' and '--desktop-smoke' in sys.argv:
+    from pyapp.package.desktopSmoke import main as desktop_smoke
+    raise SystemExit(desktop_smoke())
+
 import argparse
 import json
 import mimetypes
@@ -33,6 +44,10 @@ db = DB()    # 数据库类
 api = API()    # 本地接口
 
 cfg.init()
+_restore_result = api.maintenance_apply_pending_restore()
+Config.startupRestoreResult = _restore_result
+if _restore_result.get('code') != 0:
+    print(f'[Restore] {_restore_result.get("msg", "恢复失败，已保留恢复记录")}')
 
 # 创建窗口前不能读取 webview.screens：pywebview 会据此初始化默认 GUI，
 # 使 --cef 之后的 gui='cef' 失效。先使用稳定的初始尺寸，窗口显示后再适配屏幕。
@@ -47,12 +62,6 @@ _window_state_restored = False
 
 def on_shown():
     # print('程序启动')
-    try:
-        restore_result = api.maintenance_apply_pending_restore()
-        if isinstance(restore_result, dict) and restore_result.get('restored'):
-            print(f'[Restore] {restore_result.get("msg", "备份恢复完成")}')
-    except Exception as err:
-        print(f'[Restore] 应用待恢复备份失败: {err}')
     db.init()    # 初始化数据库
     try:
         api.workflow_start()
@@ -73,10 +82,6 @@ def on_closing(window=None):
         api.workflow_stop()
     except Exception as err:
         print(f'[Shutdown] 停止自动化服务失败: {err}')
-    try:
-        api.mindmap_stop()
-    except Exception as err:
-        print(f'[Shutdown] 停止思维导图服务失败: {err}')
     try:
         api.task_shutdown()
     except Exception as err:

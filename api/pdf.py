@@ -19,6 +19,8 @@ import fitz  # PyMuPDF
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 from PyPDF2 import PdfReader, PdfWriter
 
+from api.core.context import checkpoint, iter_progress, record_inputs, record_item
+from api.core.outputs import atomic_output, output_asset, write_output
 from api.utils.validators import ensure_output_directory
 
 
@@ -68,6 +70,13 @@ class PDF():
 
     def _timestamp(self) -> str:
         return datetime.now().strftime('%Y%m%d_%H%M%S')
+
+    @staticmethod
+    def _write_pdf(writer, dest):
+        with atomic_output(dest) as (temporary, final):
+            with temporary.open('wb') as handle:
+                writer.write(handle)
+        return final
 
     def _pil_from_pixmap(self, pixmap: fitz.Pixmap) -> Image.Image:
         if pixmap.alpha:
@@ -284,6 +293,29 @@ class PDF():
 
         return ''
 
+    @staticmethod
+    def _export_page_files(source, count, options, export_page):
+        pages = options.get('_retryPageNumbers')
+        pages = [int(page) for page in pages] if pages is not None else list(range(1, count + 1))
+        if any(page < 1 or page > count for page in pages):
+            raise ValueError('重试页码超出当前文档范围，请重新检查源文件')
+        record_inputs([f'{source}#page={page}' for page in pages])
+        exported, failures, items = [], [], []
+        for page in iter_progress(pages, '正在处理 PDF 页面'):
+            identity = f'{source}#page={page}'
+            try:
+                dest = export_page(page - 1)
+                assets = [output_asset(dest)]
+                exported.append(str(dest))
+                record_item(identity, 'success', outputs=assets)
+                items.append({'input': identity, 'status': 'success', 'outputs': assets})
+            except Exception as exc:
+                checkpoint()
+                record_item(identity, 'failed', str(exc))
+                failures.append({'input': identity, 'error': str(exc), 'errorCode': 'PAGE_EXPORT_FAILED'})
+                items.append({'input': identity, 'status': 'failed', 'message': str(exc), 'outputs': []})
+        return exported, failures, items
+
     def pdf_convert_to_images(self, options: Dict = None):
         '''PDF 转高清图片'''
         try:
@@ -300,28 +332,29 @@ class PDF():
             zoom = dpi / 72
             matrix = fitz.Matrix(zoom, zoom)
 
-            exported: List[str] = []
             with fitz.open(source) as doc:
                 total_pages = doc.page_count
                 limit = total_pages if max_pages <= 0 else min(total_pages, max_pages)
-                for index in range(limit):
+                def export_page(index):
                     page = doc.load_page(index)
                     filename = f'{source.stem}_p{index + 1:03}.{fmt}'
                     dest = out_dir / filename
                     if fmt == 'svg':
                         svg_text = page.get_svg_image(matrix=matrix)
-                        dest.write_text(svg_text, encoding='utf-8')
+                        dest = write_output(dest, lambda target: target.write_text(svg_text, encoding='utf-8'))
                     else:
                         pix = page.get_pixmap(matrix=matrix, alpha=False)
                         image = self._pil_from_pixmap(pix)
                         save_kwargs = {'quality': 95} if fmt in ('jpg', 'jpeg', 'webp') else {}
-                        image.save(dest, format=self._raster_image_formats[fmt], **save_kwargs)
-                    exported.append(str(dest))
+                        dest = write_output(dest, lambda target: image.save(target, format=self._raster_image_formats[fmt], **save_kwargs))
+                    return dest
+                exported, failures, items = self._export_page_files(source, limit, opts, export_page)
 
             return {
-                'code': 0,
-                'msg': f'已导出 {len(exported)} 张图片',
+                'code': 0 if exported or not failures else -1,
+                'msg': f'已导出 {len(exported)} 张图片，{len(failures)} 页失败',
                 'files': exported,
+                'failures': failures, 'itemResults': items, 'partial': bool(exported and failures),
                 'outputDir': str(out_dir)
             }
         except Exception as exc:
@@ -347,9 +380,8 @@ class PDF():
             zoom = dpi / 72
             matrix = fitz.Matrix(zoom, zoom)
 
-            exported: List[str] = []
             with fitz.open(source) as doc:
-                for index in range(doc.page_count):
+                def export_page(index):
                     page = doc.load_page(index)
                     pix = page.get_pixmap(matrix=matrix, alpha=False)
                     image = self._pil_from_pixmap(pix)
@@ -357,13 +389,15 @@ class PDF():
                     filename = f'{source.stem}_scan_{index + 1:03}.{fmt}'
                     dest = out_dir / filename
                     save_kwargs = {'quality': 95} if fmt in ('jpg', 'jpeg') else {}
-                    scanned.save(dest, **save_kwargs)
-                    exported.append(str(dest))
+                    dest = write_output(dest, lambda target: scanned.save(target, **save_kwargs))
+                    return dest
+                exported, failures, items = self._export_page_files(source, doc.page_count, opts, export_page)
 
             return {
-                'code': 0,
-                'msg': f'扫描件效果已生成 {len(exported)} 张',
+                'code': 0 if exported or not failures else -1,
+                'msg': f'扫描件效果已生成 {len(exported)} 张，{len(failures)} 页失败',
                 'files': exported,
+                'failures': failures, 'itemResults': items, 'partial': bool(exported and failures),
                 'outputDir': str(out_dir)
             }
         except Exception as exc:
@@ -417,8 +451,7 @@ class PDF():
             if merged_pages == 0:
                 raise ValueError('未选择有效的页码')
 
-            with dest.open('wb') as fp:
-                writer.write(fp)
+            dest = self._write_pdf(writer, dest)
 
             return {
                 'code': 0,
@@ -451,8 +484,7 @@ class PDF():
                 for page in range(start, end):
                     writer.add_page(reader.pages[page])
                 dest = out_dir / f'{source.stem}_part{part:03}.pdf'
-                with dest.open('wb') as fp:
-                    writer.write(fp)
+                dest = self._write_pdf(writer, dest)
                 exported.append(str(dest))
                 part += 1
 
@@ -502,8 +534,7 @@ class PDF():
 
             suffix = 'range' if mode == 'range' else 'custom'
             dest = self._resolve_output_path(source, output_path, suffix)
-            with dest.open('wb') as fp:
-                writer.write(fp)
+            dest = self._write_pdf(writer, dest)
 
             return {'code': 0, 'msg': f'已导出 {len(targets)} 页', 'output': str(dest)}
         except Exception as exc:
@@ -563,8 +594,7 @@ class PDF():
                         writer.add_page(reader.pages[idx])
                 filename = f'{base_name}_part{index:02}.pdf'
                 dest = out_dir / filename
-                with dest.open('wb') as fp:
-                    writer.write(fp)
+                dest = self._write_pdf(writer, dest)
                 exported.append(str(dest))
 
             return {
@@ -628,7 +658,7 @@ class PDF():
 
                 if result_doc.page_count == 0:
                     raise ValueError('压缩失败：生成页面为空')
-                result_doc.save(str(dest))
+                dest = write_output(dest, lambda target: result_doc.save(str(target)))
             finally:
                 result_doc.close()
 
@@ -686,8 +716,7 @@ class PDF():
                 if not filename.lower().endswith('.txt'):
                     filename = f'{filename}.txt'
                 dest = out_dir / filename
-                with dest.open('w', encoding='utf-8') as handler:
-                    handler.write(joined)
+                dest = write_output(dest, lambda target: target.write_text(joined, encoding='utf-8'))
                 output_path = str(dest)
             return {
                 'code': 0,
@@ -785,7 +814,7 @@ class PDF():
                             pix = fitz.Pixmap(fitz.csRGB, pix)
                         filename = f'{source.stem}_p{page_no}_{idx}.{img_format}'
                         dest = out_dir / filename
-                        pix.save(dest)
+                        dest = write_output(dest, lambda target: pix.save(target))
                         exported.append(str(dest))
                         pix = None
             return {
@@ -804,14 +833,19 @@ class PDF():
             opts = self._validate_payload(options)
             source = self._ensure_pdf_file(opts.get('filePath', ''))
             password = str(opts.get('password') or '')
-            max_pages = max(1, min(int(opts.get('maxPages') or 200), 500))
+            max_pages = max(1, min(int(opts.get('limit') or opts.get('maxPages') or 48), 500))
+            offset = max(0, int(opts.get('offset') or 0))
             width = max(96, min(int(opts.get('width') or 180), 480))
             pages = []
             with fitz.open(source) as doc:
                 if doc.needs_pass and not doc.authenticate(password):
                     raise ValueError('PDF 已加密，请输入正确密码')
                 total_pages = doc.page_count
-                for index in range(min(total_pages, max_pages)):
+                requested = opts.get('pageNumbers')
+                indices = [int(page) - 1 for page in requested[:max_pages]] if isinstance(requested, list) else list(range(offset, min(total_pages, offset + max_pages)))
+                for index in indices:
+                    if not 0 <= index < total_pages:
+                        raise ValueError('预览页码超出范围')
                     page = doc.load_page(index)
                     scale = width / max(page.rect.width, 1)
                     pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
@@ -830,6 +864,9 @@ class PDF():
                 'pageCount': total_pages,
                 'loadedCount': len(pages),
                 'truncated': total_pages > len(pages),
+                'offset': offset,
+                'hasMore': offset + max_pages < total_pages,
+                'sourceSignature': f'{source.stat().st_size}:{source.stat().st_mtime_ns}',
             }
         except Exception as exc:
             return {'code': -1, 'msg': f'读取页面失败：{exc}'}
@@ -840,6 +877,9 @@ class PDF():
             opts = self._validate_payload(options)
             source = self._ensure_pdf_file(opts.get('filePath', ''))
             password = str(opts.get('password') or '')
+            signature = opts.get('sourceSignature')
+            if signature and signature != f'{source.stat().st_size}:{source.stat().st_mtime_ns}':
+                raise ValueError('源文件已改变，请重新载入预览后再生成')
             output_path = opts.get('outputPath') or self._compose_output_path(
                 opts.get('outputDir', ''), opts.get('outputName', '')
             )
@@ -852,6 +892,8 @@ class PDF():
                     raise ValueError('PDF 已加密，请输入正确密码')
                 total = doc.page_count
                 raw_order = opts.get('pageOrder')
+                if raw_order == []:
+                    raise ValueError('不能删除全部页面')
                 if isinstance(raw_order, list) and raw_order:
                     order = []
                     for value in raw_order:
@@ -900,7 +942,7 @@ class PDF():
                         )
 
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                doc.save(str(dest), garbage=4, deflate=True, deflate_images=True, deflate_fonts=True)
+                dest = write_output(dest, lambda target: doc.save(str(target), garbage=4, deflate=True, deflate_images=True, deflate_fonts=True))
             return {
                 'code': 0,
                 'msg': f'页面处理完成，共保留 {len(order)} 页',
@@ -994,7 +1036,7 @@ class PDF():
                         'user_pw': user_password,
                     })
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                doc.save(str(dest), **save_options)
+                dest = write_output(dest, lambda target: doc.save(str(target), **save_options))
 
             actions = []
             if watermark:

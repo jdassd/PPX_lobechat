@@ -35,22 +35,14 @@
         </div>
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" :loading="shared.loading" @click="runExtractImages">
-          开始提取
-        </el-button>
+        <el-button type="primary" :loading="shared.loading" @click="runExtractImages"> 开始提取 </el-button>
       </el-form-item>
     </el-form>
     <div v-if="form.result.length" class="result-block">
       <p class="result-title">输出图片（部分）</p>
       <el-scrollbar max-height="160px">
         <div class="result-list">
-          <el-tag
-            v-for="file in form.result"
-            :key="file"
-            type="info"
-            effect="plain"
-            @click="openPath(file)"
-          >
+          <el-tag v-for="file in form.result" :key="file" type="info" effect="plain" @click="openPath(file)">
             {{ file }}
           </el-tag>
         </div>
@@ -60,13 +52,14 @@
 </template>
 
 <script setup>
-import { inject, reactive } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { inject } from 'vue'
 import { ElMessage } from 'element-plus'
 
 const { callApi, openPath, pickPdf, pickDir } = inject('pdfApi')
 const shared = inject('pdfShared')
 
-const form = reactive({
+const form = useDraft('pdf/parts/ExtractImagesPanel/form', {
   file: null,
   startPage: 1,
   endPage: 1,

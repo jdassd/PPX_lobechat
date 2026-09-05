@@ -1,11 +1,12 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { callApi, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
 const loading = ref(false)
-const state = reactive({ directory: '', batches: [], olderThanDays: 30 })
+const state = useDraft('file/parts/RecyclePanel/state', { directory: '', batches: [], olderThanDays: 30 })
 const ready = () => {
   if (hasPyApi()) return true
   ElMessage.warning('该功能需在桌面客户端中使用')

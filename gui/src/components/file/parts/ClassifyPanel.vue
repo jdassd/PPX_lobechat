@@ -1,11 +1,20 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
 const loading = ref(false)
+const transactionId = ref('')
+const undo = async () => {
+  const response = await pyCall('file_classify_undo', { directory: state.directory, transactionId: transactionId.value })
+  if (response.ok) {
+    ElMessage.success(response.message)
+    if (!response.data.skipped?.length) transactionId.value = ''
+  } else ElMessage.error(response.message)
+}
 
-const state = reactive({
+const state = useDraft('file/parts/ClassifyPanel/state', {
   directory: '',
   targetDir: '',
   mode: 'type',
@@ -49,7 +58,11 @@ const runClassify = async () => {
   }
   loading.value = true
   try {
-    const { ok, data: res, message } = await pyCall('file_auto_classify', {
+    const {
+      ok,
+      data: res,
+      message
+    } = await pyCall('file_auto_classify', {
       directory: state.directory,
       targetDir: state.targetDir,
       mode: state.mode,
@@ -60,6 +73,7 @@ const runClassify = async () => {
     if (ok) {
       state.summary = res.summary
       state.result = res.operations || []
+      if (!res.dryRun) transactionId.value = res.transactionId || ''
       state.categories = res.categories || []
       if (res.outputDir) {
         state.targetDir = res.outputDir
@@ -91,11 +105,7 @@ const runClassify = async () => {
       </el-form-item>
       <el-form-item label="目标目录">
         <div class="field-row">
-          <el-input
-            v-model="state.targetDir"
-            placeholder="留空则在源目录创建 _classified"
-            readonly
-          />
+          <el-input v-model="state.targetDir" placeholder="留空则在源目录创建 _classified" readonly />
           <el-button @click="selectClassifyTarget">选择</el-button>
         </div>
       </el-form-item>
@@ -111,9 +121,7 @@ const runClassify = async () => {
           <el-radio-button label="copy">复制</el-radio-button>
           <el-radio-button label="move">移动</el-radio-button>
         </el-radio-group>
-        <el-checkbox v-model="state.recursive" style="margin-left: 12px">
-          包含子目录
-        </el-checkbox>
+        <el-checkbox v-model="state.recursive" style="margin-left: 12px"> 包含子目录 </el-checkbox>
       </el-form-item>
       <el-form-item label="冲突策略">
         <el-select v-model="state.conflictPolicy" style="width: 200px">
@@ -125,6 +133,7 @@ const runClassify = async () => {
         <el-button type="primary" :loading="loading" @click="runClassify">执行分类</el-button>
       </el-form-item>
     </el-form>
+    <el-button v-if="transactionId" @click="undo">撤销本次分类</el-button>
     <div v-if="state.summary" class="stats-panel">
       <el-descriptions :column="3" border size="small">
         <el-descriptions-item label="匹配文件">
@@ -138,23 +147,11 @@ const runClassify = async () => {
         </el-descriptions-item>
       </el-descriptions>
     </div>
-    <el-table
-      v-if="state.categories.length"
-      :data="state.categories"
-      border
-      size="small"
-      style="margin-top: 16px"
-    >
+    <el-table v-if="state.categories.length" :data="state.categories" border size="small" style="margin-top: 16px">
       <el-table-column prop="label" label="分类" />
       <el-table-column prop="count" label="数量" width="140" />
     </el-table>
-    <el-table
-      v-if="state.result.length"
-      :data="state.result.slice(0, 60)"
-      border
-      size="small"
-      style="margin-top: 16px"
-    >
+    <el-table v-if="state.result.length" :data="state.result.slice(0, 60)" border size="small" style="margin-top: 16px">
       <el-table-column prop="category" label="分类" width="140" />
       <el-table-column prop="from" label="源文件" show-overflow-tooltip />
       <el-table-column prop="to" label="目标地址" show-overflow-tooltip />

@@ -8,12 +8,17 @@ from __future__ import annotations
 import base64
 import json
 import mimetypes
+import queue
 import shutil
 import subprocess
+import tempfile
+import threading
 import time
 from pathlib import Path
 from typing import Dict
 
+from api.core.context import checkpoint, report_progress, run_process, stop_process
+from api.core.outputs import atomic_output
 from api.utils import (
     api_error,
     api_success,
@@ -55,11 +60,82 @@ class VideoTool:
             return api_error(f'视频功能缺少运行环境：{", ".join(missing)}', available=False, missing=missing)
         return api_success('FFmpeg 环境已就绪', available=True, ffmpegPath=ffmpeg, ffprobePath=ffprobe)
 
-    def _run(self, args):
-        process = subprocess.run(args, capture_output=True, text=True)
-        if process.returncode != 0:
-            stderr = process.stderr.strip() or 'FFmpeg 执行失败'
-            raise RuntimeError(stderr)
+    def _run(self, args, duration_hint=None):
+        requested = [args[index + 1] for index, value in enumerate(args[:-1]) if value in {'-c:v', '-c:a'} and args[index + 1] != 'copy']
+        if requested:
+            available = run_process([args[0], '-hide_banner', '-encoders'], text=True, timeout=15)
+            encoders = {line.split()[1] for line in available.stdout.splitlines() if len(line.split()) > 1}
+            missing = [encoder for encoder in requested if encoder not in encoders]
+            if missing:
+                raise ValueError('当前 FFmpeg 缺少编码器：' + ', '.join(missing))
+        source = Path(args[args.index('-i') + 1]) if '-i' in args else None
+        duration = self._probe_duration(source) if source and source.suffix != '.txt' else 0
+        if duration_hint is not None:
+            duration = duration_hint
+        if '-t' in args:
+            duration = parse_timespan(args[args.index('-t') + 1])[0]
+        with atomic_output(Path(args[-1])) as (temporary, final):
+            command = [*args[:-1], '-progress', 'pipe:1', '-nostats', str(temporary)]
+            lines = queue.Queue()
+            errors = []
+            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                       encoding='utf-8', errors='replace', creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+            def read_lines():
+                for line in process.stdout:
+                    lines.put(line.strip())
+            def read_errors():
+                for line in process.stderr:
+                    errors.append(line.rstrip())
+                    del errors[:-60]
+            readers = [threading.Thread(target=read_lines, daemon=True), threading.Thread(target=read_errors, daemon=True)]
+            for reader in readers:
+                reader.start()
+            started = time.monotonic()
+            try:
+                while process.poll() is None or not lines.empty():
+                    checkpoint()
+                    if time.monotonic() - started > 7200:
+                        raise TimeoutError('视频处理超过两小时，请分段处理')
+                    try:
+                        line = lines.get(timeout=0.1)
+                    except queue.Empty:
+                        continue
+                    if line.startswith('out_time_us='):
+                        try:
+                            seconds = int(line.partition('=')[2]) / 1_000_000
+                            report_progress(max(0, seconds), duration, f'已处理 {max(0, seconds):.1f} 秒' + (f' / {duration:.1f} 秒' if duration else ''))
+                        except ValueError:
+                            pass
+                if process.wait() != 0:
+                    raise RuntimeError('\n'.join(errors[-12:]) or 'FFmpeg 执行失败')
+                checked = self._inspect(temporary)
+                if not checked.get('streams'):
+                    raise RuntimeError('FFmpeg 未生成有效媒体流')
+            finally:
+                if process.poll() is None:
+                    stop_process(process)
+                for reader in readers:
+                    reader.join(timeout=1)
+                process.stdout.close()
+                process.stderr.close()
+        return final
+
+    def _inspect(self, source):
+        process = run_process([self._require_ffprobe(), '-v', 'error', '-show_format', '-show_streams', '-of', 'json', str(source)],
+                              capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=30)
+        if process.returncode:
+            raise ValueError(process.stderr.strip() or '无法读取视频编码信息')
+        return json.loads(process.stdout)
+
+    def video_inspect(self, options=None):
+        try:
+            source = ensure_file_path((options or {}).get('filePath'))
+            info = self._inspect(source)
+            encoders = run_process([self._require_ffmpeg(), '-hide_banner', '-encoders'], capture_output=True, text=True, timeout=15)
+            return api_success('媒体检查完成', streams=info.get('streams', []), format=info.get('format', {}),
+                               encoders=[line.split()[1] for line in encoders.stdout.splitlines() if len(line.split()) > 1 and line.strip()[0:1] in {'V', 'A'}])
+        except Exception as exc:
+            return api_error(f'媒体检查失败：{exc}', errorCode='MEDIA_INSPECTION_FAILED')
 
     def _probe_duration(self, file_path: Path) -> float:
         try:
@@ -73,7 +149,7 @@ class VideoTool:
             '-of', 'default=noprint_wrappers=1:nokey=1',
             str(file_path),
         ]
-        process = subprocess.run(cmd, capture_output=True, text=True)
+        process = run_process(cmd, capture_output=True, text=True, timeout=30)
         if process.returncode != 0:
             return 0.0
         try:
@@ -121,8 +197,19 @@ class VideoTool:
             max_bytes = max(1 * 1024 * 1024, min(max_bytes, 64 * 1024 * 1024))
 
             file_size = source.stat().st_size
-            if file_size > max_bytes:
-                return api_error('视频文件过大，暂不支持内嵌预览，请通过系统默认的视频播放器查看。')
+            original_duration = self._probe_duration(source)
+            start = parse_timespan(opts.get('start') or 0)[0]
+            preview_duration = max(1, min(30, float(opts.get('duration') or 15)))
+            if file_size > max_bytes or opts.get('start') is not None or source.suffix.lower() not in {'.mp4', '.webm'}:
+                if original_duration and start >= original_duration:
+                    raise ValueError('预览起点超出视频时长')
+                with tempfile.TemporaryDirectory(prefix='ppx-video-preview-') as temporary:
+                    preview_path = self._run([self._require_ffmpeg(), '-y', '-ss', str(start), '-i', str(source), '-t', str(preview_duration),
+                                              '-vf', 'scale=min(960\\,iw):-2', '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '28',
+                                              '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', str(Path(temporary) / 'preview.mp4')])
+                    data = preview_path.read_bytes()
+                return api_success('片段预览已生成', preview='data:video/mp4;base64,' + base64.b64encode(data).decode('ascii'),
+                                   size=len(data), duration=original_duration, previewStart=start, previewDuration=min(preview_duration, max(0, original_duration - start)), segment=True)
 
             mime, _ = mimetypes.guess_type(source.name)
             if not mime or not mime.startswith('video/'):
@@ -131,7 +218,7 @@ class VideoTool:
             data = source.read_bytes()
             encoded = base64.b64encode(data).decode('ascii')
             url = f'data:{mime};base64,{encoded}'
-            return api_success('视频预览生成成功', preview=url, size=len(data))
+            return api_success('视频预览生成成功', preview=url, size=len(data), duration=original_duration, previewStart=0, segment=False)
         except Exception as exc:
             return api_error(f'视频预览失败：{exc}')
 
@@ -159,20 +246,23 @@ class VideoTool:
             else:
                 crf_map = {'high': 18, 'medium': 22, 'low': 28}
                 crf = crf_map.get(quality_preset, 22)
-                vcodec = opts.get('videoCodec') or 'libx264'
-                acodec = opts.get('audioCodec') or 'aac'
+                vcodec = opts.get('videoCodec') or ('libvpx-vp9' if target_format == 'webm' else 'libx264')
+                acodec = opts.get('audioCodec') or ('libopus' if target_format == 'webm' else 'aac')
+                if target_format == 'webm' and (vcodec not in {'libvpx', 'libvpx-vp9', 'libaom-av1', 'libsvtav1'} or acodec not in {'libopus', 'libvorbis'}):
+                    raise ValueError('WebM 需要 VP8/VP9/AV1 视频及 Opus/Vorbis 音频，请调整编码器')
                 preset = str(opts.get('preset', 'medium') or 'medium')
                 args = [
                     ffmpeg,
                     '-y',
                     '-i', str(source),
                     '-c:v', vcodec,
-                    '-preset', preset,
                     '-crf', str(crf),
                     '-c:a', acodec,
                     str(dest),
                 ]
-            self._run(args)
+                if vcodec in {'libx264', 'libx265'}:
+                    args[-1:-1] = ['-preset', preset]
+            dest = self._run(args)
             return api_success('格式转换完成', file=str(dest))
         except Exception as exc:
             return api_error(f'格式转换失败：{exc}')
@@ -184,7 +274,7 @@ class VideoTool:
             source = ensure_file_path(opts.get('filePath'))
             ffmpeg = self._require_ffmpeg()
             mode = opts.get('mode', 'preset')
-            dest = self._prepare_output(source, opts, 'compress', source.suffix or '.mp4')
+            dest = self._prepare_output(source, opts, 'compress', '.mp4')
             args = [ffmpeg, '-y', '-i', str(source)]
 
             if mode == 'bitrate':
@@ -194,7 +284,7 @@ class VideoTool:
                 target_mb = float(opts.get('targetSizeMB') or 20)
                 duration = self._probe_duration(source)
                 if duration <= 0:
-                    duration = 60.0
+                    raise ValueError('无法读取视频时长，不能按目标大小计算码率')
                 bitrate_kbps = max(200, int((target_mb * 8192) / duration))
                 bitrate = f'{bitrate_kbps}k'
                 args += ['-b:v', bitrate, '-bufsize', bitrate, '-maxrate', bitrate, '-c:a', 'aac']
@@ -205,7 +295,7 @@ class VideoTool:
                 args += ['-c:v', 'libx264', '-preset', opts.get('ffPreset', 'medium'), '-crf', str(crf), '-c:a', 'aac']
 
             args.append(str(dest))
-            self._run(args)
+            dest = self._run(args)
             return api_success('压缩完成', file=str(dest))
         except Exception as exc:
             return api_error(f'压缩失败：{exc}')
@@ -216,23 +306,25 @@ class VideoTool:
             opts = self._validate(options)
             source = ensure_file_path(opts.get('filePath'))
             ffmpeg = self._require_ffmpeg()
-            start_seconds, start_label = parse_timespan(opts.get('start') or 0)
-            end_seconds, end_label = parse_timespan(opts.get('end') or 0)
+            start_seconds, _ = parse_timespan(opts.get('start') or 0)
+            end_seconds, _ = parse_timespan(opts.get('end') or 0)
             if end_seconds and end_seconds <= start_seconds:
                 raise ValueError('结束时间必须大于开始时间')
-            dest = self._prepare_output(source, opts, 'clip', source.suffix or '.mp4')
+            source_duration = self._probe_duration(source)
+            if source_duration > 0 and (start_seconds >= source_duration or end_seconds > source_duration + 0.1):
+                raise ValueError('截取范围超出视频时长')
+            dest = self._prepare_output(source, opts, 'clip', source.suffix if opts.get('fastCopy') else '.mp4')
             args = [
                 ffmpeg,
                 '-y',
-                '-ss', start_label,
+                '-ss', str(start_seconds),
                 '-i', str(source),
             ]
             if end_seconds:
                 duration = end_seconds - start_seconds
-                _, duration_label = parse_timespan(duration)
-                args += ['-t', duration_label]
-            args += ['-c', 'copy', str(dest)]
-            self._run(args)
+                args += ['-t', str(duration)]
+            args += (['-c', 'copy'] if opts.get('fastCopy') else ['-c:v', 'libx264', '-preset', 'medium', '-crf', '20', '-c:a', 'aac']) + [str(dest)]
+            dest = self._run(args)
             return api_success('截取完成', file=str(dest))
         except Exception as exc:
             return api_error(f'截取失败：{exc}')
@@ -266,10 +358,29 @@ class VideoTool:
             if audio_format not in {'wav'}:
                 args += ['-b:a', bitrate_map.get(quality, '192k')]
             args.append(str(dest))
-            self._run(args)
+            dest = self._run(args)
             return api_success('音频提取完成', file=str(dest))
         except Exception as exc:
             return api_error(f'音频提取失败：{exc}')
+
+    def _concat_sources(self, files):
+        profiles = [self._inspect(path) for path in files]
+        keys = ('codec_type', 'codec_name', 'profile', 'width', 'height', 'pix_fmt', 'r_frame_rate',
+                'time_base', 'sample_rate', 'channels', 'channel_layout')
+        signatures = [tuple(tuple(stream.get(key) for key in keys) for stream in info.get('streams', [])
+                            if stream.get('codec_type') in {'video', 'audio'}) for info in profiles]
+        if any(not any(stream.get('codec_type') == 'video' for stream in info.get('streams', [])) for info in profiles):
+            raise ValueError('拼接输入必须包含视频画面')
+        return profiles, all(signature == signatures[0] for signature in signatures)
+
+    def video_concat_preview(self, options=None):
+        try:
+            files = ensure_files_payload({'files': (options or {}).get('files') or []})
+            profiles, compatible = self._concat_sources(files)
+            return api_success('可直接拼接' if compatible else '编码或画面参数不同，请开启重编码拼接',
+                               compatible=compatible, files=[{'path': str(path), 'streams': info['streams']} for path, info in zip(files, profiles, strict=True)])
+        except Exception as exc:
+            return api_error(f'拼接检查失败：{exc}')
 
     def video_concat(self, options: Dict | None = None):
         """多视频合成"""
@@ -283,10 +394,15 @@ class VideoTool:
                 raise ValueError('至少需要两个视频文件')
             ffmpeg = self._require_ffmpeg()
             reencode = bool(opts.get('reencode', False))
+            profiles, compatible = self._concat_sources(files)
+            if not reencode and not compatible:
+                raise ValueError('输入视频的编码、尺寸、帧率或音轨不同，请开启重编码拼接')
+            durations = [float(info.get('format', {}).get('duration') or 0) for info in profiles]
             base = files[0]
             target_format = str(opts.get('targetFormat') or base.suffix or '.mp4').lstrip('.')
             dest = self._prepare_output(base, opts, 'concat', target_format)
-            manifest = dest.with_suffix('.concat.txt')
+            with tempfile.NamedTemporaryFile(prefix='.ppx-concat-', suffix='.txt', dir=dest.parent, delete=False) as handle:
+                manifest = Path(handle.name)
             try:
                 with manifest.open('w', encoding='utf-8') as handler:
                     for path in files:
@@ -300,19 +416,47 @@ class VideoTool:
                     '-i', str(manifest),
                 ]
                 if reencode:
-                    vcodec = opts.get('videoCodec') or 'libx264'
-                    acodec = opts.get('audioCodec') or 'aac'
+                    if any(duration <= 0 for duration in durations):
+                        raise ValueError('无法确认全部输入的时长，请先修复或转换异常视频')
+                    video = next(stream for stream in profiles[0]['streams'] if stream.get('codec_type') == 'video')
+                    width, height = int(video['width']) // 2 * 2, int(video['height']) // 2 * 2
+                    fps = video.get('avg_frame_rate') or video.get('r_frame_rate') or '30'
+                    if fps in {'0/0', '0'}:
+                        fps = '30'
+                    audio = any(any(stream.get('codec_type') == 'audio' for stream in info['streams']) for info in profiles)
+                    args = [ffmpeg, '-y']
+                    filters, inputs = [], []
+                    for index, path in enumerate(files):
+                        args += ['-i', str(path)]
+                        filters.append(f'[{index}:v:0]scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps},setpts=PTS-STARTPTS[v{index}]')
+                        inputs.append(f'[v{index}]')
+                        if audio:
+                            if any(stream.get('codec_type') == 'audio' for stream in profiles[index]['streams']):
+                                filters.append(f'[{index}:a:0]aresample=48000,aformat=channel_layouts=stereo,apad,atrim=duration={durations[index]},asetpts=PTS-STARTPTS[a{index}]')
+                            else:
+                                filters.append(f'anullsrc=r=48000:cl=stereo,atrim=duration={durations[index]}[a{index}]')
+                            inputs.append(f'[a{index}]')
+                    filters.append(''.join(inputs) + f'concat=n={len(files)}:v=1:a={1 if audio else 0}[v]' + ('[a]' if audio else ''))
+                    args += ['-filter_complex', ';'.join(filters), '-map', '[v]']
+                    if audio:
+                        args += ['-map', '[a]']
+                    vcodec = opts.get('videoCodec') or ('libvpx-vp9' if target_format == 'webm' else 'libx264')
+                    acodec = opts.get('audioCodec') or ('libopus' if target_format == 'webm' else 'aac')
                     crf = opts.get('crf')
                     try:
                         crf_value = int(crf) if crf is not None else 22
                     except (TypeError, ValueError):
                         crf_value = 22
                     preset = opts.get('preset', 'medium')
-                    args += ['-c:v', vcodec, '-preset', preset, '-crf', str(crf_value), '-c:a', acodec]
+                    args += ['-c:v', vcodec, '-crf', str(crf_value), '-pix_fmt', 'yuv420p']
+                    if vcodec in {'libx264', 'libx265'}:
+                        args += ['-preset', preset]
+                    if audio:
+                        args += ['-c:a', acodec]
                 else:
                     args += ['-c', 'copy']
                 args.append(str(dest))
-                self._run(args)
+                dest = self._run(args, duration_hint=sum(durations))
             finally:
                 if manifest.exists():
                     manifest.unlink()

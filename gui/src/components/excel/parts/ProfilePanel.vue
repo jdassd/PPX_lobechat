@@ -1,5 +1,6 @@
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 
 import FileSelector from '@/components/shared/FileSelector.vue'
@@ -8,7 +9,7 @@ import { callApi, callApiRaw, hasPyApi } from '@/utils/pyapi'
 const excelFilter = ['Excel 文件 (*.xlsx;*.xlsm;*.xltx;*.xltm)']
 const loading = ref(false)
 const exporting = ref(false)
-const form = reactive({ file: null, sheet: '', sheets: [], schemaText: '', delimiter: '|', summary: null, profiles: [], outputDir: '', output: '' })
+const form = useDraft('excel/parts/ProfilePanel/form', { file: null, sheet: '', sheets: [], schemaText: '', delimiter: '|', summary: null, profiles: [], outputDir: '', output: '' })
 const files = computed(() => (form.file ? [form.file] : []))
 const rows = computed(() => form.profiles.map((item) => ({ ...item, blankText: `${Math.round((item.blankRatio || 0) * 100)}%`, topText: (item.topValues || []).map((entry) => `${entry.value} (${entry.count})`).join('、'), rangeText: item.numeric && Object.keys(item.numeric).length ? `${item.numeric.min} ~ ${item.numeric.max}，均值 ${item.numeric.avg}` : '' })))
 

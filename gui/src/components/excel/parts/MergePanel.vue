@@ -12,32 +12,24 @@
         </div>
         <div class="field-row">
           <el-button size="small" @click="selectExcel('mergeTables', true)">选择文件</el-button>
-          <el-button
-            size="small"
-            text
-            type="danger"
-            @click="clearList('mergeTables')"
-            :disabled="!merge.tables.length"
-          >
-            清空
-          </el-button>
+          <el-button size="small" text type="danger" @click="clearList('mergeTables')" :disabled="!merge.tables.length"> 清空 </el-button>
         </div>
       </div>
-      <el-table
-        v-if="merge.tables.length"
-        :data="merge.tables"
-        size="small"
-        border
-      >
+      <el-table v-if="merge.tables.length" :data="merge.tables" size="small" border>
+        <el-table-column type="expand">
+          <template #default="scope">
+            <el-form inline style="padding: 16px">
+              <el-form-item v-for="column in merge.tables[0]?.columns || []" :key="column" :label="'目标字段：' + column">
+                <el-select :model-value="scope.row.fieldMapping[column] || column" @update:model-value="scope.row.fieldMapping[column] = $event"><el-option v-for="source in scope.row.columns" :key="source" :value="source" :label="source" /></el-select>
+              </el-form-item>
+            </el-form>
+          </template>
+        </el-table-column>
         <el-table-column type="index" width="50" label="#" />
-        <el-table-column prop="filename" label="文件名" />
+        <el-table-column prop="path" label="文件（展开设置字段映射）" min-width="220" show-overflow-tooltip />
         <el-table-column label="工作表" width="220">
           <template #default="scope">
-            <el-input
-              v-model="scope.row.sheet"
-              size="small"
-              placeholder="留空使用默认工作表"
-            />
+            <el-input v-model="scope.row.sheet" size="small" placeholder="留空使用默认工作表" />
           </template>
         </el-table-column>
         <el-table-column label="操作" width="80">
@@ -60,9 +52,7 @@
       </el-form-item>
     </el-form>
     <div class="actions">
-      <el-button type="primary" :loading="loading" @click="runMergeTables">
-        开始合并
-      </el-button>
+      <el-button type="primary" :loading="loading" @click="runMergeTables"> 开始合并 </el-button>
     </div>
     <div v-if="merge.result" class="result-block">
       <p class="result-title">输出结果</p>

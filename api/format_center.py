@@ -10,9 +10,12 @@ import re
 import shutil
 import signal
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
+from api.core.context import checkpoint, current_context, iter_progress, run_process
+from api.core.outputs import output_asset, write_output
 from api.utils.error_handler import api_error, api_success
 from pyapp.config.config import Config
 
@@ -228,26 +231,22 @@ def _run_cli(runtime: Dict[str, Any], arguments: List[str], timeout: int) -> Dic
 
     process = None
     try:
-        process = subprocess.Popen(
+        process = run_process(
             command,
             cwd=runtime.get('cwd') or None,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             encoding='utf-8',
             errors='replace',
             env=environment,
             creationflags=_creation_flags(),
             start_new_session=platform.system() != 'Windows',
+            timeout=timeout,
         )
-        stdout, stderr = process.communicate(timeout=timeout)
+        stdout, stderr = process.stdout, process.stderr
     except subprocess.TimeoutExpired as exc:
-        if process is not None:
-            _terminate_process_tree(process)
         raise FlyingMouseRuntimeError('转换引擎执行超时，请减少单次文件数量后重试', 'ENGINE_TIMEOUT') from exc
     except OSError as exc:
-        if process is not None:
-            _terminate_process_tree(process)
         raise FlyingMouseRuntimeError(f'无法启动 FlyingMouse Format：{exc}', 'ENGINE_START_FAILED') from exc
 
     output = _json_line(stdout)
@@ -279,17 +278,17 @@ def _options_dict(options: Dict[str, Any] | None) -> Dict[str, Any]:
     return options
 
 
-def _input_files(options: Dict[str, Any], minimum: int = 1) -> List[Path]:
+def _input_files(options: Dict[str, Any], minimum: int = 1, check_exists=True) -> List[Path]:
     raw_files = options.get('files') or options.get('fileList') or []
     if isinstance(raw_files, (str, os.PathLike)):
         raw_files = [raw_files]
     if not isinstance(raw_files, list):
         raise ValueError('文件列表格式错误')
-    if len(raw_files) > 200:
-        raise ValueError('单次最多处理 200 个文件，请分批转换')
+    if len(raw_files) > 10000:
+        raise ValueError('单次最多处理 10000 个文件，请分批转换')
     paths: List[Path] = []
     seen = set()
-    for item in raw_files[:200]:
+    for item in raw_files:
         raw = item.get('path') if isinstance(item, dict) else item
         if not isinstance(raw, (str, os.PathLike)):
             continue
@@ -297,7 +296,7 @@ def _input_files(options: Dict[str, Any], minimum: int = 1) -> List[Path]:
         identity = os.path.normcase(str(path))
         if identity in seen:
             continue
-        if not path.is_file():
+        if check_exists and not path.is_file():
             raise FileNotFoundError(f'源文件不存在：{path}')
         seen.add(identity)
         paths.append(path)
@@ -353,6 +352,20 @@ def _conversion_payload(result: Dict[str, Any], output_dir: Path, message: str) 
         warnings=warnings,
         engine={'name': ENGINE_NAME, 'author': ENGINE_AUTHOR, 'license': ENGINE_LICENSE},
     )
+
+
+def _commit_engine_outputs(result, staging, output_dir):
+    outputs = []
+    for item in result.get('outputs') or []:
+        source = Path(item['path']).resolve()
+        relative = source.relative_to(Path(staging).resolve())
+        if not source.is_file():
+            raise ValueError('转换引擎没有生成有效输出文件')
+        final = write_output(Path(output_dir) / relative, lambda target: shutil.copy2(source, target))
+        outputs.append({**item, 'path': str(final)})
+    if not outputs:
+        raise ValueError('转换引擎未提供任何输出文件')
+    return {**result, 'outputs': outputs}
 
 
 class FormatCenterMixin:
@@ -419,7 +432,7 @@ class FormatCenterMixin:
             items = []
             for extension in extensions:
                 item = _run_cli(runtime, ['targets', extension], _QUERY_TIMEOUT)
-                items.append(item)
+                items.append({**item, 'extension': extension})
             common_targets = list(items[0].get('targets') or [])
             for item in items[1:]:
                 allowed = set(item.get('targets') or [])
@@ -439,39 +452,52 @@ class FormatCenterMixin:
     def format_center_convert(self, options: Dict[str, Any] | None = None):
         try:
             opts = _options_dict(options)
-            files = _input_files(opts)
-            target = _target_format(opts)
+            files = _input_files(opts, check_exists=False)
+            targets = opts.get('targets') or {}
+            if not isinstance(targets, dict):
+                raise ValueError('目标格式映射必须是对象')
             output_dir = _output_directory(opts)
             runtime = discover_flyingmouse_runtime()
-            common_arguments = ['--to', target, '--output-dir', str(output_dir)]
-
-            compression_level = str(opts.get('compressionLevel') or '').strip()
-            if target == 'zip' and compression_level in {'0', '1', '6', '9'}:
-                common_arguments.extend(['--compression-level', compression_level])
-            video_codec = str(opts.get('videoCodec') or '').strip().lower()
-            if video_codec in {'h264', 'h265', 'av1'}:
-                common_arguments.extend(['--video-codec', video_codec])
             # FlyingMouse 的桌面界面允许批量中的单项失败后继续。CLI 的多文件模式会在
             # 首个错误处退出，因此适配层逐项调用并汇总，保留已经成功的输出。
             outputs = []
             failures = []
-            for source in files:
+            item_results = []
+            for source in iter_progress(files):
                 try:
-                    result = _run_cli(runtime, ['convert', str(source), *common_arguments], _CONVERSION_TIMEOUT)
-                    if isinstance(result.get('outputs'), list):
-                        outputs.extend(result['outputs'])
-                except FlyingMouseRuntimeError as exc:
-                    failures.append({'input': str(source), 'error': str(exc), 'errorCode': exc.error_code})
+                    if not source.is_file():
+                        raise FileNotFoundError(f'源文件不存在：{source}')
+                    target = _target_format({'targetFormat': targets.get(str(source), targets.get(source.suffix.lower().lstrip('.'), opts.get('targetFormat')))})
+                    with tempfile.TemporaryDirectory(prefix='.ppx-convert-', dir=output_dir) as staging:
+                        arguments = ['convert', str(source), '--to', target, '--output-dir', staging]
+                        compression_level = str(opts.get('compressionLevel') or '')
+                        if target == 'zip' and compression_level in {'0', '1', '6', '9'}:
+                            arguments.extend(['--compression-level', compression_level])
+                        video_codec = str(opts.get('videoCodec') or '').lower()
+                        if video_codec in {'h264', 'h265', 'av1'}:
+                            arguments.extend(['--video-codec', video_codec])
+                        result = _commit_engine_outputs(_run_cli(runtime, arguments, _CONVERSION_TIMEOUT), staging, output_dir)
+                    outputs.extend(result['outputs'])
+                    item = {'input': str(source), 'status': 'success', 'outputAssets': [output_asset(x['path']) for x in result['outputs']]}
+                except Exception as exc:
+                    checkpoint()
+                    failure = {'input': str(source), 'error': str(exc), 'errorCode': getattr(exc, 'error_code', 'CONVERSION_FAILED')}
+                    failures.append(failure)
+                    item = {**failure, 'status': 'failed', 'outputAssets': []}
+                item_results.append(item)
+                context = current_context()
+                if context:
+                    context.emit(itemResults=list(item_results))
 
             if not outputs:
                 first_error = failures[0]['error'] if failures else '转换引擎没有生成输出文件'
-                return api_error(first_error, failures=failures, outputDir=str(output_dir))
+                return api_error(first_error, failures=failures, itemResults=item_results, outputDir=str(output_dir))
 
             succeeded = len(outputs)
             failed = len(failures)
             message = f'已转换 {succeeded} 个文件' if not failed else f'已转换 {succeeded} 个文件，{failed} 个失败'
             response = _conversion_payload({'outputs': outputs}, output_dir, message)
-            response.update({'failures': failures, 'partial': bool(failures)})
+            response.update({'failures': failures, 'partial': bool(failures), 'itemResults': item_results})
             return response
         except FlyingMouseRuntimeError as exc:
             return api_error(str(exc), errorCode=exc.error_code)
@@ -483,11 +509,12 @@ class FormatCenterMixin:
             opts = _options_dict(options)
             files = _input_files(opts)
             output_dir = _output_directory(opts)
-            output_path = _pdf_output_path(opts, output_dir)
             runtime = discover_flyingmouse_runtime()
-            arguments = ['images-to-pdf', *(str(path) for path in files)]
-            arguments.extend(['--output', str(output_path)] if output_path else ['--output-dir', str(output_dir)])
-            result = _run_cli(runtime, arguments, _CONVERSION_TIMEOUT)
+            with tempfile.TemporaryDirectory(prefix='.ppx-convert-', dir=output_dir) as staging:
+                output_path = _pdf_output_path(opts, Path(staging))
+                arguments = ['images-to-pdf', *(str(path) for path in files)]
+                arguments.extend(['--output', str(output_path)] if output_path else ['--output-dir', staging])
+                result = _commit_engine_outputs(_run_cli(runtime, arguments, _CONVERSION_TIMEOUT), staging, output_dir)
             return _conversion_payload(result, output_dir, f'已将 {len(files)} 张图片合成为 PDF')
         except FlyingMouseRuntimeError as exc:
             return api_error(str(exc), errorCode=exc.error_code)
@@ -501,11 +528,12 @@ class FormatCenterMixin:
             if any(path.suffix.lower() != '.pdf' for path in files):
                 return api_error('PDF 合并只支持 PDF 文件')
             output_dir = _output_directory(opts)
-            output_path = _pdf_output_path(opts, output_dir)
             runtime = discover_flyingmouse_runtime()
-            arguments = ['merge-pdfs', *(str(path) for path in files)]
-            arguments.extend(['--output', str(output_path)] if output_path else ['--output-dir', str(output_dir)])
-            result = _run_cli(runtime, arguments, _CONVERSION_TIMEOUT)
+            with tempfile.TemporaryDirectory(prefix='.ppx-convert-', dir=output_dir) as staging:
+                output_path = _pdf_output_path(opts, Path(staging))
+                arguments = ['merge-pdfs', *(str(path) for path in files)]
+                arguments.extend(['--output', str(output_path)] if output_path else ['--output-dir', staging])
+                result = _commit_engine_outputs(_run_cli(runtime, arguments, _CONVERSION_TIMEOUT), staging, output_dir)
             return _conversion_payload(result, output_dir, f'已合并 {len(files)} 个 PDF')
         except FlyingMouseRuntimeError as exc:
             return api_error(str(exc), errorCode=exc.error_code)

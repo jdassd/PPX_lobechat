@@ -1,12 +1,13 @@
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 
 import PreviewPanel from '../../shared/PreviewPanel.vue'
 import { callApi, hasPyApi } from '@/utils/pyapi'
 
 const loading = ref(false)
-const state = reactive({ token: '', result: null })
+const state = useDraft('text/parts/JwtPanel/state', { token: '', result: null })
 
 const headerText = computed(() => JSON.stringify(state.result?.header || {}, null, 2))
 const payloadText = computed(() => JSON.stringify(state.result?.payload || {}, null, 2))

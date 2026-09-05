@@ -7,6 +7,8 @@ const SENSITIVE_KEY = /(password|passwd|secret|token|cookie|authorization|api[_-
 
 // 仅将真正产生结果、改变文件或执行较重分析的调用送入持久任务队列。
 export const TASK_METHODS = {
+  webauto_collect: ['webauto', '', '网页正式采集'],
+  webauto_export: ['webauto', '', '导出采集结果'],
   format_center_convert: ['conversion', 'universal', '通用格式转换'],
   format_center_images_to_pdf: ['conversion', 'images-pdf', '图片合成 PDF'],
   format_center_merge_pdfs: ['conversion', 'merge-pdf', '合并 PDF'],
@@ -107,10 +109,11 @@ const readTasks = () => {
 
 export const tasks = ref(readTasks())
 export const queuePaused = ref(false)
-export const runningTasks = computed(() => tasks.value.filter((item) => ['queued', 'running'].includes(item.status)))
+export const runningTasks = computed(() => tasks.value.filter((item) => ['queued', 'running', 'canceling'].includes(item.status)))
 export const recentTasks = computed(() => tasks.value.slice(0, 6))
 
 const persist = () => {
+  if (window.pywebview?.api?.task_submit) return
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks.value.slice(0, MAX_TASKS)))
   } catch {
@@ -129,6 +132,7 @@ const isPathLike = (value) => {
 
 export const extractOutputs = (data) => {
   if (!data || typeof data !== 'object') return []
+  if (Array.isArray(data.outputAssets)) return data.outputAssets
   const paths = []
   const add = (value) => {
     if (isPathLike(value)) {
@@ -206,9 +210,9 @@ export const settleApiTask = (id, result, error) => {
   })
 }
 
-export const hydrateBackendTasks = (backendTasks = [], paused = false) => {
+export const hydrateBackendTasks = (backendTasks = [], paused) => {
   if (!Array.isArray(backendTasks)) return
-  queuePaused.value = Boolean(paused)
+  if (paused !== undefined) queuePaused.value = Boolean(paused)
   const mapped = backendTasks.map((task) => {
     const meta = TASK_METHODS[task.method] || ['advanced', '', task.method]
     const [tool, feature, label] = meta
@@ -222,16 +226,17 @@ export const hydrateBackendTasks = (backendTasks = [], paused = false) => {
       endedAt: toMilliseconds(task.endedAt),
       output: outputs[0]?.path || '',
       outputs,
-      progress: Number(task.progress || 0)
+      progress: task.progress === null ? null : Number(task.progress || 0)
     }
   })
   const backendIds = new Set(mapped.map((item) => item.id))
   tasks.value = [...mapped, ...tasks.value.filter((item) => !backendIds.has(item.id))].slice(0, MAX_TASKS)
   persist()
+  return mapped
 }
 
 export const clearFinishedTasks = () => {
-  tasks.value = tasks.value.filter((item) => ['queued', 'running'].includes(item.status))
+  tasks.value = tasks.value.filter((item) => ['queued', 'running', 'canceling'].includes(item.status))
   persist()
 }
 
@@ -239,4 +244,70 @@ export const removeTasksByIds = (ids = []) => {
   const removed = new Set(ids)
   tasks.value = tasks.value.filter((item) => !removed.has(item.id))
   persist()
+}
+
+const terminal = new Set(['success', 'partial', 'failed', 'canceled', 'interrupted'])
+const observers = new Map()
+let syncTimer = null
+let syncing = false
+let syncFailures = 0
+
+async function syncObservedTasks() {
+  if (syncing) return
+  const api = window.pywebview?.api
+  if (!api || !observers.size) return
+  syncing = true
+  try {
+    const response = api.task_sync ? await api.task_sync({ ids: [...observers.keys()] }) : await api.task_list({ limit: 1000 })
+    if (response.code !== 0) throw new Error(response.msg || '任务同步失败')
+    syncFailures = 0
+    hydrateBackendTasks(response.tasks, response.paused)
+    for (const task of response.tasks || []) {
+      if (!terminal.has(task.status)) continue
+      for (const listener of observers.get(task.id) || []) listener.resolve(task)
+      observers.delete(task.id)
+    }
+  } catch (error) {
+    syncFailures += 1
+    if (syncFailures >= 10) {
+      for (const listeners of observers.values()) for (const listener of listeners) listener.reject(new Error(`暂时无法同步任务，请在任务中心检查：${error.message}`))
+      observers.clear()
+    }
+  } finally {
+    syncing = false
+    if (observers.size) syncTimer = setTimeout(syncObservedTasks, 500)
+    else syncTimer = null
+  }
+}
+
+export function observeTask(id) {
+  return new Promise((resolve, reject) => {
+    observers.set(id, [...(observers.get(id) || []), { resolve, reject }])
+    if (!syncTimer && !syncing) syncTimer = setTimeout(syncObservedTasks, 0)
+  })
+}
+
+export async function loadOperationCatalog() {
+  const api = window.pywebview?.api
+  if (!api?.operations_list) return []
+  try {
+    const response = await api.operations_list()
+    const catalog = response.operations || []
+    for (const item of catalog) TASK_METHODS[item.id] = [item.tool, item.feature, item.label]
+    if (api.task_import_legacy) {
+      const legacy = readTasks()
+      if (legacy.length && localStorage.getItem('ppx-task-migration-v1') !== 'done') {
+        const migrated = await api.task_import_legacy({ tasks: legacy })
+        if (migrated.code === 0) localStorage.setItem('ppx-task-migration-v1', 'done')
+      }
+      const history = await api.task_list({ pageSize: 200 })
+      if (history.code === 0) {
+        tasks.value = []
+        hydrateBackendTasks(history.tasks, history.paused)
+      }
+    }
+    return catalog
+  } catch {
+    return []
+  }
 }

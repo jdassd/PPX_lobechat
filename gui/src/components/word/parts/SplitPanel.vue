@@ -46,17 +46,12 @@
         <el-button type="primary" :loading="shared.loading" @click="runSplit">开始拆分</el-button>
       </el-form-item>
     </el-form>
+    <WordPreview :file="form.file" />
     <div v-if="form.result.length" class="result-block">
       <p class="result-title">拆分结果</p>
       <el-scrollbar max-height="160px">
         <div class="result-list">
-          <el-tag
-            v-for="file in form.result"
-            :key="file"
-            type="info"
-            effect="plain"
-            @click="openPath(file)"
-          >
+          <el-tag v-for="file in form.result" :key="file" type="info" effect="plain" @click="openPath(file)">
             {{ file }}
           </el-tag>
         </div>
@@ -66,13 +61,15 @@
 </template>
 
 <script setup>
-import { inject, reactive, ref, watch } from 'vue'
+import WordPreview from '../../shared/WordPreview.vue'
+import { useDraft } from '../../../utils/workspace'
+import { inject, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 
 const { callApi, openPath, pickDocx, pickDir } = inject('wordApi')
 const shared = inject('wordShared')
 
-const form = reactive({
+const form = useDraft('word/parts/SplitPanel/form', {
   file: null,
   mode: 'pages',
   pagesPerFile: 1,

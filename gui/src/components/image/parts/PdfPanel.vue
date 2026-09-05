@@ -1,5 +1,6 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { mergeFileQueue, useDraft } from '../../../utils/workspace'
+import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
@@ -14,7 +15,7 @@ const props = defineProps({
 
 const loading = ref(false)
 
-const form = reactive({
+const form = useDraft('image/parts/PdfPanel/form', {
   files: [],
   pageSize: 'a4',
   customWidth: 2480,
@@ -39,7 +40,7 @@ const selectImages = async () => {
   if (!ensurePyReady()) return
   const files = await callApiRaw('system_pyCreateFileDialog', props.supportedFormats.imageFilter)
   if (files?.length) {
-    form.files = files
+    form.files = mergeFileQueue(form.files, files)
   }
 }
 
@@ -102,13 +103,7 @@ const runImagePdf = async () => {
       <h4>合成 PDF</h4>
       <p>拖入多张图片，设置纸张与排版后输出 PDF</p>
     </header>
-    <FileSelector
-      label="图片列表"
-      :files="form.files"
-      :removable="true"
-      @select="selectImages"
-      @remove="removeFile"
-    />
+    <FileSelector label="图片列表" v-model:files="form.files" :removable="true" @select="selectImages" @remove="removeFile" />
     <el-form :model="form" label-width="120px" class="form-block">
       <el-form-item label="页面尺寸">
         <el-select v-model="form.pageSize" style="width: 220px">
@@ -149,12 +144,7 @@ const runImagePdf = async () => {
         <el-button type="primary" :loading="loading" @click="runImagePdf">生成 PDF</el-button>
       </el-form-item>
     </el-form>
-    <el-alert
-      v-if="form.result"
-      type="success"
-      :closable="false"
-      show-icon
-    >
+    <el-alert v-if="form.result" type="success" :closable="false" show-icon>
       <template #title>
         已输出：
         <a class="link" @click.prevent="openPath(form.result)">{{ form.result }}</a>

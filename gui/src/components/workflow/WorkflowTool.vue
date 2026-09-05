@@ -2,6 +2,8 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { callApi, callApiRaw } from '@/utils/pyapi'
+import { loadOperationCatalog } from '@/utils/taskCenter'
+import OperationForm from '../shared/OperationForm.vue'
 
 const props = defineProps({ initialTab: { type: String, default: '' } })
 
@@ -12,6 +14,30 @@ const running = ref(false)
 const workflows = ref([])
 const templates = ref([])
 const methods = ref([])
+const catalog = ref([])
+const descriptor = (method) => catalog.value.find((item) => item.id === method)
+const methodLabel = (method) => descriptor(method)?.label || method
+const inputFieldsFor = (steps) => {
+  const fields = new Map()
+  for (const step of steps || []) {
+    let args = step.args || {}
+    try {
+      if (step.argsText) args = JSON.parse(step.argsText)
+    } catch {
+      continue
+    }
+    for (const [key, value] of Object.entries(args)) {
+      const match = typeof value === 'string' && /^\{\{input\.([\w-]+)\}\}$/.exec(value)
+      if (match) fields.set(match[1], { ...(descriptor(step.method)?.fields.find((field) => field.name === key) || { type: 'text', label: key }), name: match[1] })
+    }
+  }
+  return [...fields.values()]
+}
+const inputFields = computed(() => inputFieldsFor(editor.steps))
+const workflowInputFields = (id) => inputFieldsFor(workflows.value.find((item) => item.id === id)?.steps)
+const changeMethod = (step) => {
+  step.argsText = JSON.stringify(Object.fromEntries((descriptor(step.method)?.fields || []).filter((field) => field.default !== null && field.default !== undefined && field.default !== '').map((field) => [field.name, field.default])), null, 2)
+}
 const schedules = ref([])
 const watches = ref([])
 const runs = ref([])
@@ -20,6 +46,8 @@ const runInput = ref('{}')
 const runQuery = ref('')
 const runStatus = ref('all')
 const runTrigger = ref('all')
+const runPage = ref(1)
+const runLabels = { success: '成功', partial: '部分成功', failed: '失败', running: '运行中', canceled: '已取消', interrupted: '已中断' }
 const triggerActionId = ref('')
 const bundleBusy = ref(false)
 const bundleOutput = ref('')
@@ -43,6 +71,10 @@ const filteredRuns = computed(() => {
     if (!keyword) return true
     return `${run.workflowName || ''} ${run.workflowId || ''} ${run.trigger || ''}`.toLowerCase().includes(keyword)
   })
+})
+const pagedRuns = computed(() => filteredRuns.value.slice((runPage.value - 1) * 20, runPage.value * 20))
+watch([runQuery, runStatus, runTrigger], () => {
+  runPage.value = 1
 })
 
 const formatTime = (value) => {
@@ -88,7 +120,8 @@ const loadEditor = (workflow) => {
 const refresh = async (keepSelection = true) => {
   loading.value = true
   try {
-    const [listResponse, templateResponse, methodResponse] = await Promise.all([callApi('workflow_list'), callApi('workflow_templates'), callApi('workflow_methods')])
+    const [listResponse, templateResponse, methodResponse, operations] = await Promise.all([callApi('workflow_list'), callApi('workflow_templates'), callApi('workflow_methods'), loadOperationCatalog()])
+    catalog.value = operations
     if (!listResponse.ok) throw new Error(listResponse.message || '读取工作流失败')
     workflows.value = listResponse.data.workflows || []
     schedules.value = listResponse.data.schedules || []
@@ -124,7 +157,11 @@ const useTemplate = async (template) => {
 
 const addStep = () => {
   const index = editor.steps.length + 1
-  editor.steps.push({ id: `step-${index}`, name: `步骤 ${index}`, method: methods.value[0] || '', argsText: '{}', onError: 'stop', retryCount: 0, retryDelaySeconds: 1 })
+  let sequence = index
+  while (editor.steps.some((step) => step.id === `step-${sequence}`)) sequence += 1
+  const step = { id: `step-${sequence}`, name: `步骤 ${index}`, method: methods.value[0] || '', argsText: '{}', onError: 'stop', retryCount: 0, retryDelaySeconds: 1 }
+  changeMethod(step)
+  editor.steps.push(step)
 }
 
 const moveStep = (index, offset) => {
@@ -153,6 +190,10 @@ const saveWorkflow = async () => {
   }
   saving.value = true
   try {
+    for (const step of steps) {
+      const validation = await callApi('operations_validate', { method: step.method, args: step.args })
+      if (!validation.ok) throw new Error(`${step.name}：${validation.message}`)
+    }
     const response = await callApi('workflow_save', {
       id: editor.id,
       name: editor.name,
@@ -429,9 +470,7 @@ onMounted(() => refresh(false))
             <div class="editor-top">
               <div>
                 <h3>{{ editor.id ? '编辑工作流' : '新建工作流' }}</h3>
-                <p>
-                  步骤按顺序执行；使用 <code v-pre>{{ input.filePath }}</code> 或 <code v-pre>{{steps.step-1.output}}</code> 引用数据。
-                </p>
+                <p>按顺序添加工具，为每一步选择文件和参数；需要串联时，从“引用前一步结果”选择来源。</p>
               </div>
               <el-switch v-model="editor.enabled" active-text="启用" />
             </div>
@@ -452,15 +491,15 @@ onMounted(() => refresh(false))
                     <div class="step-row">
                       <el-input v-model="step.id" placeholder="步骤 ID" />
                       <el-input v-model="step.name" placeholder="步骤名称" />
-                      <el-select v-model="step.method" filterable placeholder="选择能力">
-                        <el-option v-for="method in methods" :key="method" :label="method" :value="method" />
+                      <el-select v-model="step.method" filterable placeholder="选择能力" @change="changeMethod(step)">
+                        <el-option v-for="method in methods" :key="method" :label="methodLabel(method)" :value="method" />
                       </el-select>
                       <el-select v-model="step.onError" class="error-select">
                         <el-option label="失败即停止" value="stop" />
                         <el-option label="失败后继续" value="continue" />
                       </el-select>
                     </div>
-                    <el-input v-model="step.argsText" type="textarea" :rows="5" resize="vertical" placeholder="步骤参数 JSON" />
+                    <OperationForm v-model="step.argsText" :fields="descriptor(step.method)?.fields || []" :previous="editor.steps.slice(0, index)" />
                     <div class="step-policy">
                       <span>失败自动重试</span>
                       <el-input-number v-model="step.retryCount" :min="0" :max="5" size="small" />
@@ -478,8 +517,8 @@ onMounted(() => refresh(false))
               </div>
               <el-button plain class="add-step" @click="addStep">+ 添加步骤</el-button>
 
-              <el-form-item label="运行输入 JSON" class="run-input">
-                <el-input v-model="runInput" type="textarea" :rows="5" resize="vertical" />
+              <el-form-item label="运行输入" class="run-input">
+                <OperationForm v-model="runInput" :fields="inputFields" />
               </el-form-item>
               <div class="editor-actions">
                 <el-button v-if="editor.id" type="danger" plain @click="removeWorkflow">删除</el-button>
@@ -504,7 +543,7 @@ onMounted(() => refresh(false))
                 <el-form-item label="名称"><el-input v-model="scheduleForm.name" placeholder="例如：每小时整理" /></el-form-item>
                 <el-form-item label="间隔（分钟）"><el-input-number v-model="scheduleForm.intervalMinutes" :min="1" :max="525600" /></el-form-item>
               </div>
-              <el-form-item label="输入 JSON"><el-input v-model="scheduleForm.input" type="textarea" :rows="4" /></el-form-item>
+              <el-form-item label="运行输入"><OperationForm v-model="scheduleForm.input" :fields="workflowInputFields(scheduleForm.workflowId)" /></el-form-item>
               <el-button type="primary" @click="saveSchedule">创建定时任务</el-button>
             </el-form>
           </el-card>
@@ -525,7 +564,7 @@ onMounted(() => refresh(false))
                 <el-form-item label="稳定等待（秒）"><el-input-number v-model="watchForm.debounceSeconds" :min="1" :max="3600" /></el-form-item>
               </div>
               <el-form-item><el-checkbox v-model="watchForm.recursive">包含子目录</el-checkbox></el-form-item>
-              <el-form-item label="附加输入 JSON"><el-input v-model="watchForm.input" type="textarea" :rows="3" /></el-form-item>
+              <el-form-item label="附加输入"><OperationForm v-model="watchForm.input" :fields="workflowInputFields(watchForm.workflowId)" /></el-form-item>
               <el-button type="primary" @click="saveWatch">创建目录监听</el-button>
             </el-form>
           </el-card>
@@ -582,7 +621,10 @@ onMounted(() => refresh(false))
           <el-select v-model="runStatus">
             <el-option label="全部状态" value="all" />
             <el-option label="成功" value="success" />
+            <el-option label="部分成功" value="partial" />
             <el-option label="失败" value="failed" />
+            <el-option label="已取消" value="canceled" />
+            <el-option label="已中断" value="interrupted" />
             <el-option label="运行中" value="running" />
           </el-select>
           <el-select v-model="runTrigger">
@@ -593,10 +635,10 @@ onMounted(() => refresh(false))
           </el-select>
         </div>
         <el-collapse class="run-list">
-          <el-collapse-item v-for="run in filteredRuns" :key="run.id" :name="run.id">
+          <el-collapse-item v-for="run in pagedRuns" :key="run.id" :name="run.id">
             <template #title>
               <div class="run-title">
-                <el-tag :type="run.status === 'success' ? 'success' : run.status === 'running' ? 'warning' : 'danger'" size="small">{{ run.status }}</el-tag>
+                <el-tag :type="run.status === 'success' ? 'success' : ['running', 'partial'].includes(run.status) ? 'warning' : 'danger'" size="small">{{ runLabels[run.status] || run.status }}</el-tag>
                 <strong>{{ run.workflowName || run.workflowId }}</strong>
                 <span>{{ run.trigger }}</span>
                 <time>{{ formatTime(run.startedAt) }}</time>
@@ -618,6 +660,7 @@ onMounted(() => refresh(false))
           </el-collapse-item>
         </el-collapse>
         <el-empty v-if="!filteredRuns.length" :description="runs.length ? '没有符合筛选条件的运行记录' : '还没有运行记录'" />
+        <el-pagination v-model:current-page="runPage" :page-size="20" :total="filteredRuns.length" layout="total, prev, pager, next" />
       </el-tab-pane>
     </el-tabs>
   </div>

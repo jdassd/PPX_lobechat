@@ -10,6 +10,7 @@ import json
 import os
 import platform
 import shutil
+import sqlite3
 import sys
 import tempfile
 import time
@@ -86,23 +87,36 @@ class MaintenanceMixin:
             files = []
             total_bytes = 0
             temp_target = target.with_name(f".{target.name}.{uuid.uuid4().hex}.tmp")
-            with zipfile.ZipFile(temp_target, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
+            with tempfile.TemporaryDirectory(prefix='ppx-backup-snapshot-') as snapshot_dir, zipfile.ZipFile(temp_target, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
                 for path in app_data.rglob("*"):
                     if not path.is_file() or path.is_symlink():
                         continue
                     relative = path.relative_to(app_data)
                     if self._maintenance_is_excluded(relative):
                         continue
-                    try:
-                        if path.resolve() == target.resolve():
-                            continue
-                        checksum = self._maintenance_sha256_file(path)
-                        archive.write(path, f"data/{relative.as_posix()}")
-                        size = path.stat().st_size
-                        files.append({"path": relative.as_posix(), "size": size, "sha256": checksum})
-                        total_bytes += size
-                    except OSError:
+                    if path.resolve() in {target.resolve(), temp_target.resolve()} or path.name.endswith(('-wal', '-shm', '-journal', '.tmp')):
                         continue
+                    snapshot = Path(snapshot_dir) / 'snapshot'
+                    with path.open('rb') as header:
+                        is_sqlite = header.read(16) == b'SQLite format 3\x00'
+                    if is_sqlite:
+                        snapshot.unlink(missing_ok=True)
+                        source_db = sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True, timeout=30)
+                        destination_db = sqlite3.connect(snapshot)
+                        try:
+                            source_db.backup(destination_db)
+                            if destination_db.execute('PRAGMA quick_check').fetchone()[0] != 'ok':
+                                raise ValueError(f'数据库一致性检查失败：{relative}')
+                        finally:
+                            destination_db.close()
+                            source_db.close()
+                    else:
+                        shutil.copyfile(path, snapshot)
+                    checksum = self._maintenance_sha256_file(snapshot)
+                    archive.write(snapshot, f"data/{relative.as_posix()}")
+                    size = snapshot.stat().st_size
+                    files.append({"path": relative.as_posix(), "size": size, "sha256": checksum, 'snapshot': 'sqlite-backup' if is_sqlite else 'file-copy'})
+                    total_bytes += size
                 archive.writestr(_FRONTEND_STATE, frontend_bytes)
                 manifest = {
                     "schemaVersion": 2,
@@ -280,15 +294,68 @@ class MaintenanceMixin:
                         staged.parent.mkdir(parents=True, exist_ok=True)
                         with archive.open(info) as source_handle, staged.open("wb") as target_handle:
                             shutil.copyfileobj(source_handle, target_handle)
-                for staged in staging.rglob("*"):
-                    if not staged.is_file():
-                        continue
-                    relative = staged.relative_to(staging)
-                    destination = app_data / relative
-                    destination.parent.mkdir(parents=True, exist_ok=True)
-                    temp_destination = destination.with_name(f"{destination.name}.{uuid.uuid4().hex}.restore")
-                    shutil.copy2(staged, temp_destination)
-                    os.replace(temp_destination, destination)
+                # Backups from before the SQLite migration contain only JSON task /
+                # workflow stores. Invalidate those namespaces in a staged snapshot
+                # so startup imports the restored records, rather than ignoring them.
+                current_state = app_data / 'workbench.sqlite3'
+                staged_state = staging / 'workbench.sqlite3'
+                legacy_namespaces = [namespace for namespace, relative in (
+                    ('tasks', 'tasks/history.json'), ('workflows', 'workflows/workflows.json'))
+                    if (staging / relative).is_file()]
+                if current_state.is_file() and not staged_state.exists() and legacy_namespaces:
+                    current_db = sqlite3.connect(current_state.as_uri() + '?mode=ro', uri=True, timeout=30)
+                    staged_db = sqlite3.connect(staged_state)
+                    try:
+                        current_db.backup(staged_db)
+                        for namespace in legacy_namespaces:
+                            staged_db.execute('DELETE FROM state_meta WHERE namespace=?', (namespace,))
+                            staged_db.execute('DELETE FROM state_records WHERE namespace=?', (namespace,))
+                        staged_db.commit()
+                    finally:
+                        staged_db.close()
+                        current_db.close()
+                rollback = restore_dir / f'rollback-{uuid.uuid4().hex}'
+                rollback.mkdir()
+                replaced = []
+                rollback_safe_to_remove = False
+                try:
+                    staged_files = [path for path in staging.rglob('*') if path.is_file()]
+                    for staged in staged_files:
+                        relative = staged.relative_to(staging)
+                        destination = app_data / relative
+                        destination.resolve().relative_to(app_data)
+                        destination.parent.mkdir(parents=True, exist_ok=True)
+                        previous = rollback / relative
+                        existed = destination.exists()
+                        if existed:
+                            previous.parent.mkdir(parents=True, exist_ok=True)
+                            shutil.copy2(destination, previous)
+                        with staged.open('rb') as source_handle:
+                            is_sqlite = source_handle.read(16) == b'SQLite format 3\x00'
+                        if is_sqlite:
+                            for suffix in ('-wal', '-shm', '-journal'):
+                                sidecar = destination.with_name(destination.name + suffix)
+                                if sidecar.exists():
+                                    old_sidecar = rollback / sidecar.relative_to(app_data)
+                                    old_sidecar.parent.mkdir(parents=True, exist_ok=True)
+                                    shutil.copy2(sidecar, old_sidecar)
+                                    replaced.append((sidecar, old_sidecar, True))
+                                    sidecar.unlink()
+                        replaced.append((destination, previous, existed))
+                        os.replace(staged, destination)
+                    rollback_safe_to_remove = True
+                except Exception:
+                    for destination, previous, existed in reversed(replaced):
+                        if existed and previous.exists():
+                            os.replace(previous, destination)
+                        elif not existed:
+                            destination.unlink(missing_ok=True)
+                    rollback_safe_to_remove = True
+                    raise
+                finally:
+                    # This directory is created exclusively for this transaction.
+                    if rollback_safe_to_remove:
+                        shutil.rmtree(rollback)
             marker_path.unlink(missing_ok=True)
             archive_path.unlink(missing_ok=True)
             return api_success(
@@ -323,6 +390,10 @@ class MaintenanceMixin:
                 },
             ]
             capability_values = capabilities.get("capabilities", {}) if isinstance(capabilities, dict) else {}
+            restore_result = getattr(Config, 'startupRestoreResult', {})
+            if restore_result.get('code', 0) != 0:
+                checks.append({'id': 'restore', 'name': '上次恢复', 'ok': False, 'detail': restore_result.get('msg')})
+            core_count = len(checks)
             for item in capability_values.values():
                 checks.append(
                     {
@@ -334,7 +405,7 @@ class MaintenanceMixin:
                 )
             return api_success(
                 "健康检查完成",
-                healthy=all(item["ok"] for item in checks[:3]),
+                healthy=all(item["ok"] for item in checks[:core_count]),
                 checks=checks,
                 appVersion=Config.appVersion,
                 platform=Config.appSystem,

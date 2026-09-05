@@ -1,5 +1,6 @@
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { computed, ref } from 'vue'
 import { FolderOpened, Loading, Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
@@ -19,7 +20,7 @@ const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'avif', '
 const files = ref([])
 const results = ref([])
 const loading = ref(false)
-const form = reactive({ outputDir: '', outputName: '' })
+const form = useDraft('conversion/parts/PdfBatchPanel/form', { outputDir: '', outputName: '' })
 
 const isMerge = computed(() => props.mode === 'pdf')
 const title = computed(() => (isMerge.value ? '把多份 PDF，收进一个文件。' : '按你的顺序，把图片装订成 PDF。'))

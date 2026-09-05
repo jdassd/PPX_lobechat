@@ -1,5 +1,7 @@
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import TaskItemResults from './shared/TaskItemResults.vue'
+import { computed, onActivated, onDeactivated, onUnmounted, reactive, ref, watch } from 'vue'
+import ResultActions from './shared/ResultActions.vue'
 import { CircleCheck, CircleClose, Clock, CopyDocument, Download, FolderOpened, Loading, RefreshRight, Search, VideoPause, VideoPlay, WarningFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -13,6 +15,8 @@ const statusFilter = ref('all')
 const toolFilter = ref('all')
 const page = ref(1)
 const pageSize = ref(20)
+const serverRecords = ref(null)
+const serverTotal = ref(0)
 const selectedIds = ref([])
 const backendStats = ref(null)
 const refreshing = ref(false)
@@ -47,12 +51,13 @@ const filteredTasks = computed(() => {
   })
 })
 const pagedTasks = computed(() => {
+  if (serverRecords.value) return serverRecords.value.map((record) => tasks.value.find((task) => task.id === record.id) || record)
   const offset = (page.value - 1) * pageSize.value
   return filteredTasks.value.slice(offset, offset + pageSize.value)
 })
 const selectedTasks = computed(() => tasks.value.filter((task) => selectedIds.value.includes(task.id)))
-const selectedActive = computed(() => selectedTasks.value.filter((task) => ['queued', 'running'].includes(task.status)))
-const selectedRetryable = computed(() => selectedTasks.value.filter((task) => ['failed', 'interrupted', 'canceled'].includes(task.status) && task.retryable !== false))
+const selectedActive = computed(() => selectedTasks.value.filter((task) => ['queued', 'running', 'canceling'].includes(task.status)))
+const selectedRetryable = computed(() => selectedTasks.value.filter((task) => ['partial', 'failed', 'interrupted', 'canceled'].includes(task.status) && task.retryable !== false))
 const allVisibleSelected = computed(() => pagedTasks.value.length > 0 && pagedTasks.value.every((task) => selectedIds.value.includes(task.id)))
 const dailyInsights = computed(() => backendStats.value?.daily || [])
 const maxDailyTotal = computed(() => Math.max(1, ...dailyInsights.value.map((item) => Number(item.total || 0))))
@@ -66,6 +71,8 @@ const cleanupCandidates = computed(() => {
 })
 
 const statusMeta = {
+  partial: { label: '部分成功', type: 'warning', icon: WarningFilled },
+  canceling: { label: '取消中', type: 'warning', icon: Loading },
   queued: { label: '排队中', type: 'info', icon: Clock },
   running: { label: '处理中', type: 'primary', icon: Loading },
   success: { label: '已完成', type: 'success', icon: CircleCheck },
@@ -104,9 +111,10 @@ const refreshTasks = async (notify = false) => {
   if (refreshing.value) return
   refreshing.value = true
   try {
-    const result = await callApi('task_list', { limit: 200 })
+    const result = await callApi('task_list', { page: page.value, pageSize: pageSize.value, query: query.value, status: statusFilter.value === 'all' ? '' : statusFilter.value, tool: toolFilter.value === 'all' ? '' : toolFilter.value })
     if (result.ok) {
-      hydrateBackendTasks(result.data.tasks || [], result.data.paused)
+      serverRecords.value = hydrateBackendTasks(result.data.tasks || [], result.data.paused)
+      serverTotal.value = result.data.total || 0
       backendStats.value = result.data.stats || null
       const knownIds = new Set(tasks.value.map((task) => task.id))
       selectedIds.value = selectedIds.value.filter((id) => knownIds.has(id))
@@ -119,9 +127,12 @@ const refreshTasks = async (notify = false) => {
   }
 }
 
-onMounted(() => {
+onActivated(() => {
   refreshTasks()
-  refreshTimer = window.setInterval(() => refreshTasks(), 1200)
+  refreshTimer = window.setInterval(() => refreshTasks(), 5000)
+})
+onDeactivated(() => {
+  if (refreshTimer) window.clearInterval(refreshTimer)
 })
 onUnmounted(() => {
   if (refreshTimer) window.clearInterval(refreshTimer)
@@ -129,10 +140,13 @@ onUnmounted(() => {
 
 watch([query, statusFilter, toolFilter, pageSize], () => {
   page.value = 1
+  refreshTasks()
 })
+watch(page, () => refreshTasks())
 watch(
   () => filteredTasks.value.length,
   (total) => {
+    if (serverRecords.value) return
     page.value = Math.min(page.value, Math.max(1, Math.ceil(total / pageSize.value)))
   }
 )
@@ -392,8 +406,10 @@ const exportTasks = (format) => {
           </div>
           <p class="task-meta">{{ toolById(task.tool)?.name || task.tool }} · {{ featureById(task.tool, task.feature)?.label || task.feature }} · {{ formatTime(task.startedAt) }} · {{ duration(task) }}</p>
           <p class="task-message">{{ task.message }}</p>
+          <small v-if="task.total && ['queued', 'running', 'canceling'].includes(task.status)">已处理 {{ task.current || 0 }} / {{ task.total }}</small>
+          <TaskItemResults :task="task" />
           <el-alert v-if="task.diagnosis" class="task-diagnosis" :title="task.diagnosis.title" :description="task.diagnosis.suggestion" :type="task.diagnosis.category === 'canceled' ? 'info' : 'warning'" :closable="false" show-icon />
-          <el-progress v-if="['queued', 'running'].includes(task.status)" :percentage="Number(task.progress || 0)" :stroke-width="5" :show-text="false" class="task-progress" />
+          <el-progress v-if="['queued', 'running', 'canceling'].includes(task.status)" :percentage="task.progress === null ? 100 : Number(task.progress || 0)" :indeterminate="task.progress === null" :stroke-width="5" :show-text="false" class="task-progress" />
           <div v-if="task.outputs?.length" class="task-assets">
             <div v-for="asset in task.outputs.slice(0, 4)" :key="asset.path" class="asset-row">
               <el-icon><FolderOpened /></el-icon>
@@ -406,12 +422,12 @@ const exportTasks = (format) => {
                 ><el-icon><CopyDocument /></el-icon>复制路径</el-button
               >
             </div>
-            <small v-if="task.outputs.length > 4" class="more-assets">另有 {{ task.outputs.length - 4 }} 个输出，可在导出记录中查看完整路径</small>
+            <ResultActions :assets="task.outputs" />
           </div>
         </div>
         <div class="task-actions">
-          <el-button v-if="['queued', 'running'].includes(task.status)" text type="danger" @click="cancelTask(task)">取消</el-button>
-          <el-button v-else-if="['failed', 'interrupted', 'canceled'].includes(task.status) && task.retryable !== false" text type="primary" @click="retryTask(task)"
+          <el-button v-if="['queued', 'running', 'canceling'].includes(task.status)" text type="danger" @click="cancelTask(task)">取消</el-button>
+          <el-button v-else-if="['partial', 'failed', 'interrupted', 'canceled'].includes(task.status) && task.retryable !== false" text type="primary" @click="retryTask(task)"
             ><el-icon><RefreshRight /></el-icon>重试</el-button
           >
           <el-button text @click="openTask(task)"
@@ -420,9 +436,10 @@ const exportTasks = (format) => {
         </div>
       </article>
     </section>
-    <div v-if="filteredTasks.length > pageSize" class="pagination-wrap">
-      <el-pagination v-model:current-page="page" v-model:page-size="pageSize" background layout="total, sizes, prev, pager, next" :page-sizes="[10, 20, 50, 100]" :total="filteredTasks.length" />
+    <div v-if="(serverRecords ? serverTotal : filteredTasks.length) > pageSize" class="pagination-wrap">
+      <el-pagination v-model:current-page="page" v-model:page-size="pageSize" background layout="total, sizes, prev, pager, next" :page-sizes="[10, 20, 50, 100]" :total="serverRecords ? serverTotal : filteredTasks.length" />
     </div>
+    <el-alert v-if="queuePaused" title="队列已暂停：新任务暂不启动，正在处理的任务会继续；需要停止当前任务时请点击取消。" type="info" :closable="false" />
 
     <el-dialog v-model="cleanupVisible" title="可控历史清理" width="min(560px, 92vw)" destroy-on-close>
       <el-alert title="清理只影响本机任务历史，不会删除已生成的输出文件。建议清理前先导出 JSON 留档。" type="warning" :closable="false" show-icon />
@@ -437,6 +454,7 @@ const exportTasks = (format) => {
         <el-form-item label="结束状态">
           <el-checkbox-group v-model="cleanupForm.statuses">
             <el-checkbox label="success">已完成</el-checkbox>
+            <el-checkbox label="partial">部分成功</el-checkbox>
             <el-checkbox label="failed">失败</el-checkbox>
             <el-checkbox label="interrupted">已中断</el-checkbox>
             <el-checkbox label="canceled">已取消</el-checkbox>

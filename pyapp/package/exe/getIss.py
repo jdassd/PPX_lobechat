@@ -8,6 +8,7 @@ LastEditTime: 2024-02-24 09:36:56
 Description: 生成 .iss exe安装包配置文件，需要用到 InnoSetup 软件。
 '''
 
+import argparse
 import os
 import sys
 
@@ -33,8 +34,15 @@ rootDir = os.path.dirname(pyappDir)
 if 'generate_logo_icons' in globals() and generate_logo_icons is not None:
     generate_logo_icons()
 
-buildDir = os.path.join(rootDir, 'build').replace('\\', '/')
-logoPath = os.path.join(rootDir, 'pyapp', 'icon', 'logo.ico').replace('\\', '/')
+parser = argparse.ArgumentParser()
+parser.add_argument('--output-root', default=os.path.join(rootDir, 'build'))
+issDir = os.path.dirname(os.path.abspath(__file__))
+outputRoot = os.path.abspath(parser.parse_args().output_root)
+try:
+    buildDir = os.path.relpath(outputRoot, issDir).replace('\\', '/')
+except ValueError:
+    buildDir = outputRoot.replace('\\', '/')
+logoPath = os.path.relpath(os.path.join(rootDir, 'pyapp', 'icon', 'logo.ico'), issDir).replace('\\', '/')
 appISSID = Config.appISSID    # 安装包唯一GUID
 
 
@@ -106,61 +114,13 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
-[InstallDelete]
-; 安装前清理旧文件
-Type: filesandordirs; Name: "{app}\*"
-
-[Code]
-function GetUninstallString(): String;
-var
-  sUnInstPath: String;
-  sUnInstallString: String;
-begin
-  sUnInstPath := ExpandConstant('Software\Microsoft\Windows\CurrentVersion\Uninstall\{#emit SetupSetting("AppId")}_is1');
-  sUnInstallString := '';
-  if not RegQueryStringValue(HKLM, sUnInstPath, 'UninstallString', sUnInstallString) then
-    RegQueryStringValue(HKCU, sUnInstPath, 'UninstallString', sUnInstallString);
-  Result := sUnInstallString;
-end;
-
-function IsUpgrade(): Boolean;
-begin
-  Result := (GetUninstallString() <> '');
-end;
-
-function UnInstallOldVersion(): Integer;
-var
-  sUnInstallString: String;
-  iResultCode: Integer;
-begin
-  Result := 0;
-  sUnInstallString := GetUninstallString();
-  if sUnInstallString <> '' then begin
-    sUnInstallString := RemoveQuotes(sUnInstallString);
-    if Exec(sUnInstallString, '/SILENT /NORESTART /SUPPRESSMSGBOXES', '', SW_HIDE, ewWaitUntilTerminated, iResultCode) then
-      Result := 3
-    else
-      Result := 2;
-  end else
-    Result := 1;
-end;
-
-procedure CurStepChanged(CurStep: TSetupStep);
-begin
-  if (CurStep=ssInstall) then
-  begin
-    if (IsUpgrade()) then
-    begin
-      UnInstallOldVersion();
-    end;
-  end;
-end;
+; 使用 Inno Setup 的原位文件更新和卸载清单。
+; 不清空安装目录，也不在新版本文件写入前卸载旧版本。
 
 '''
 
 
 # 生成配置文件
-issDir = os.path.dirname(__file__)
 with open(os.path.join(issDir, 'InnoSetup.iss'), 'w+', encoding='utf-8-sig') as f:
     f.write(getIss())
 

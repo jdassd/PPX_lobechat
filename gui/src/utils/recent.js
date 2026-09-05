@@ -7,7 +7,7 @@ const MAX = 6
 export function getRecents() {
   try {
     const list = JSON.parse(localStorage.getItem(KEY) || '[]')
-    return Array.isArray(list) ? list : []
+    return Array.isArray(list) ? list.filter((item) => !String(item?.tool || '').startsWith('mindmap')) : []
   } catch {
     return []
   }

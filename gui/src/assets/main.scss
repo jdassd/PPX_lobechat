@@ -260,7 +260,7 @@ body,
   transition: all var(--ppx-transition-normal);
   letter-spacing: 0.2px;
 
-  &--primary {
+  &--primary:not(.is-text):not(.is-link) {
     background: var(--ppx-gradient-primary);
     border: none;
     box-shadow: var(--ppx-shadow-sm);

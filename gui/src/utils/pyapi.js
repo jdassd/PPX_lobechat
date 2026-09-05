@@ -33,15 +33,12 @@
  *   而用 res.ok 判断"调通了但业务失败"，与既有组件逻辑等价。
  */
 
-import { beginApiTask, isTaskMethod, settleApiTask, updateApiTask } from './taskCenter'
+import { beginApiTask, isTaskMethod, settleApiTask, observeTask, hydrateBackendTasks } from './taskCenter'
+import { consumeIncomingFiles, currentIncomingAssets, getDraft } from './workspace'
 
 // 轮询兜底间隔（毫秒）与默认超时（毫秒）
 const POLL_INTERVAL = 50
 const DEFAULT_TIMEOUT = 15000
-const TASK_POLL_INTERVAL = 240
-const TERMINAL_TASK_STATUSES = new Set(['success', 'failed', 'canceled', 'interrupted'])
-const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
-
 /**
  * 当前是否处于 pywebview 桌面环境。
  * @returns {boolean}
@@ -160,49 +157,31 @@ export async function callApi(method, ...args) {
   try {
     await whenPyReady()
     const api = window.pywebview.api
+    if (method.startsWith('excel_') && args[0]) args[0] = { ...(getDraft('excel/options') || {}), ...args[0] }
     if (typeof api[method] !== 'function') {
       throw new Error(`当前客户端缺少能力：${method}`)
     }
-    const shouldQueue = isTaskMethod(method) && !args[0]?.dryRun && typeof api.task_submit === 'function' && typeof api.task_get === 'function'
+    const previewOnly = args[0]?.dryRun || ['file_search', 'file_deduplicate', 'excel_column_profile'].includes(method) || (method === 'ocr_table' && args[0]?.saveFile === false) || (method === 'seal_generate' && args[0]?.mode !== 'export')
+    const shouldQueue = isTaskMethod(method) && !previewOnly && typeof api.task_submit === 'function' && typeof api.task_get === 'function'
     if (shouldQueue) {
       const submitted = normalizeResult(await api.task_submit({ method, args }))
       if (!submitted.ok) return submitted
       taskId = submitted.data.taskId
       beginApiTask(method, args, taskId)
-      let finished = false
-      while (!finished) {
-        const response = normalizeResult(await api.task_get({ id: taskId }))
-        if (!response.ok || !response.data.task) {
-          throw new Error(response.message || '无法读取任务状态')
-        }
-        const task = response.data.task
-        updateApiTask(taskId, {
-          status: task.status,
-          progress: Number(task.progress || 0),
-          message: task.message || '',
-          startedAt: task.startedAt ? Number(task.startedAt) * 1000 : undefined,
-          endedAt: task.endedAt ? Number(task.endedAt) * 1000 : null,
-          retryable: task.retryable !== false
-        })
-        finished = TERMINAL_TASK_STATUSES.has(task.status)
-        if (finished) {
-          if (task.status === 'canceled' || task.status === 'interrupted') {
-            return { ok: false, message: task.message || '任务已取消', data: task.result }
-          }
-          const result = normalizeResult(task.result)
-          settleApiTask(taskId, result)
-          return result
-        }
-        await delay(TASK_POLL_INTERVAL)
+      const task = await observeTask(taskId)
+      hydrateBackendTasks([task])
+      if (task.status === 'canceled' || task.status === 'interrupted') {
+        return { ok: false, message: task.message || '任务已取消', data: task.result }
       }
+      return normalizeResult(task.result)
     }
-    taskId = beginApiTask(method, args)
+    taskId = previewOnly ? null : beginApiTask(method, args)
     // 未进入队列的方法仍按原调用方式同步执行。
     const res = normalizeResult(await api[method](...args))
     settleApiTask(taskId, res)
     return res
   } catch (error) {
-    settleApiTask(taskId, null, error)
+    if (!window.pywebview?.api?.task_submit) settleApiTask(taskId, null, error)
     throw error
   }
 }
@@ -218,6 +197,7 @@ export async function callApi(method, ...args) {
  */
 export async function callApiRaw(method, ...args) {
   await whenPyReady()
+  if (method === 'system_pyCreateFileDialog' && currentIncomingAssets.value.length) return consumeIncomingFiles()
   const api = window.pywebview.api
   if (typeof api[method] !== 'function') {
     throw new Error(`当前客户端缺少能力：${method}`)

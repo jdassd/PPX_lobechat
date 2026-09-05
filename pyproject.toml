@@ -7,9 +7,9 @@
 # 文档：https://docs.astral.sh/ruff/
 # ============================================================
 [tool.ruff]
-# lint 基线保持 py39（CI 打包与本地 Windows 开发均为 Python 3.10，
+# lint 与开发、CI 打包统一为 Python 3.10，
 # 见 .github/workflows/main.yml 与 package.json initInstall:windows）
-target-version = "py39"
+target-version = "py310"
 
 # 放宽行长以匹配现有代码风格（项目含较多中文注释，行偏长）
 line-length = 120
@@ -61,6 +61,7 @@ ignore = [
     "UP035",  # 从 typing 导入已弃用别名
     "UP009",  # 缺少/冗余 utf-8 编码声明
     "UP039",  # 类定义多余的空括号
+    "UP038",  # isinstance 元组保持既有风格；不影响 Python 3.10 行为
 ]
 
 # 允许 ruff 自动修复的范围（本次不执行 --fix，仅为后续整改预设安全集）
@@ -82,7 +83,7 @@ indent-style = "space"
 #       这里采用最宽松配置，先能跑通；后续可逐步收紧。
 # ============================================================
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 
 # 第三方库（pywebview/fitz/openpyxl 等）多无类型存根，忽略其缺失导入
 ignore_missing_imports = true

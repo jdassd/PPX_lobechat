@@ -1,5 +1,6 @@
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { mergeFileQueue, useDraft } from '../../../utils/workspace'
+import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
@@ -15,7 +16,7 @@ const props = defineProps({
 
 const loading = ref(false)
 
-const form = reactive({
+const form = useDraft('image/parts/FormatPanel/form', {
   files: [],
   targetFormat: 'png',
   quality: 90,
@@ -37,7 +38,7 @@ const selectImages = async () => {
   if (!ensurePyReady()) return
   const files = await callApiRaw('system_pyCreateFileDialog', props.supportedFormats.imageFilter)
   if (files?.length) {
-    form.files = files
+    form.files = mergeFileQueue(form.files, files)
   }
 }
 
@@ -122,22 +123,11 @@ watch(
       <h4>批量格式转换</h4>
       <p>常见图片格式互转，可用格式随当前环境自动适配</p>
     </header>
-    <FileSelector
-      label="源文件"
-      :files="form.files"
-      :removable="true"
-      @select="selectImages"
-      @remove="removeFile"
-    />
+    <FileSelector label="源文件" v-model:files="form.files" :removable="true" @select="selectImages" @remove="removeFile" />
     <el-form :model="form" label-width="110px" class="form-block">
       <el-form-item label="目标格式">
         <el-select v-model="form.targetFormat" style="width: 200px">
-          <el-option
-            v-for="item in supportedFormats.convert"
-            :key="`convert-format-${item.value}`"
-            :label="item.label"
-            :value="item.value"
-          />
+          <el-option v-for="item in supportedFormats.convert" :key="`convert-format-${item.value}`" :label="item.label" :value="item.value" />
         </el-select>
       </el-form-item>
       <el-form-item label="画质 / 质量">
@@ -156,16 +146,9 @@ watch(
         <el-button type="primary" :loading="loading" @click="runFormatConvert">开始转换</el-button>
       </el-form-item>
     </el-form>
-    <ResultTable
-      v-if="form.result.length"
-      title="转换输出"
-      :items="form.result.map((path) => ({ path }))"
-      :columns="[{ label: '文件路径', prop: 'path' }]"
-    >
+    <ResultTable v-if="form.result.length" title="转换输出" :items="form.result.map((path) => ({ path }))" :columns="[{ label: '文件路径', prop: 'path' }]">
       <template #actions>
-        <el-button text type="primary" @click="openDir">
-          打开目录
-        </el-button>
+        <el-button text type="primary" @click="openDir"> 打开目录 </el-button>
       </template>
     </ResultTable>
   </section>

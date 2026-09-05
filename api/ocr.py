@@ -10,6 +10,8 @@ import threading
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence
 
+from api.core.context import checkpoint, iter_progress
+from api.core.outputs import atomic_output, write_output
 from api.utils.error_handler import api_success, safe_execute
 from pyapp.config.config import Config
 
@@ -95,17 +97,48 @@ class OcrMixin:
         boxes = list(boxes) if boxes is not None else [None] * len(texts)
         scores = list(scores) if scores is not None else [0] * len(texts)
         return [
-            {'box': boxes[index] if index < len(boxes) else None, 'text': str(text), 'score': float(scores[index] or 0)}
+            {'box': (boxes[index].tolist() if hasattr(boxes[index], 'tolist') else boxes[index]) if index < len(boxes) else None, 'text': str(text), 'score': float(scores[index] or 0)}
             for index, text in enumerate(texts)
             if str(text).strip()
         ]
 
     @classmethod
-    def _recognize(cls, image) -> List[Dict]:
+    def _recognize(cls, image, correct_line_direction=True) -> List[Dict]:
         import numpy as np
 
-        result = cls._get_ocr_engine()(np.asarray(image.convert('RGB')))
+        engine = cls._get_ocr_engine()
+        with cls._ocr_lock:
+            result = engine(np.asarray(image.convert('RGB')), use_cls=correct_line_direction)
         return cls._parse_result(result)
+
+    @classmethod
+    def _recognize_oriented(cls, image, options):
+        from PIL import ImageOps
+        oriented = ImageOps.exif_transpose(image)
+        explicit = int(options.get('rotation') or 0) % 360
+        angles = [explicit] if not options.get('autoRotate', False) else [0, 90, 180, 270]
+        candidates = []
+        for angle in angles:
+            checkpoint()
+            working = oriented.rotate(angle, expand=True) if angle else oriented
+            # Automatic line classification hides an upside-down page by rotating
+            # individual crops. Disable it while comparing page orientations.
+            lines = cls._recognize(working, correct_line_direction=not options.get('autoRotate', False))
+            score = 0
+            for line in lines:
+                box = line.get('box')
+                horizontal = 1
+                if box and len(box) >= 4:
+                    width = max(point[0] for point in box) - min(point[0] for point in box)
+                    height = max(point[1] for point in box) - min(point[1] for point in box)
+                    horizontal = min(1, width / max(1, height))
+                score += len(line['text']) * max(0, line['score']) ** 2 * horizontal
+            candidates.append((score, angle, working.size, lines))
+        _, angle, size, lines = max(candidates, key=lambda candidate: candidate[0])
+        threshold = max(0, min(1, float(options.get('confidenceThreshold', 0.8))))
+        for line in lines:
+            line['lowConfidence'] = line['score'] < threshold
+        return lines, angle, size
 
     @staticmethod
     def _summary(lines: Iterable[Dict]) -> Dict:
@@ -117,6 +150,8 @@ class OcrMixin:
             'preview': text[:4000],
             'lineCount': len(rows),
             'averageConfidence': round(average, 4),
+            'lines': rows,
+            'lowConfidenceCount': sum(row.get('lowConfidence', row['score'] < 0.8) for row in rows),
         }
 
     @staticmethod
@@ -153,14 +188,14 @@ class OcrMixin:
         opts = self._validate_options(options)
         source = self._source_path(opts, ('.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tif', '.tiff'))
         with Image.open(source) as image:
-            lines = self._recognize(image)
+            lines, rotation, _ = self._recognize_oriented(image, opts)
         summary = self._summary(lines)
         output = ''
         if bool(opts.get('saveFile', True)):
             target = self._unique_output(source, opts, 'ocr', '.txt')
-            target.write_text(summary['text'], encoding='utf-8')
+            target = write_output(target, lambda path: path.write_text(summary['text'], encoding='utf-8'))
             output = str(target)
-        return api_success('OCR 识别完成', output=output, **summary)
+        return api_success('OCR 识别完成', output=output, rotation=rotation, **summary)
 
     @staticmethod
     def _insert_searchable_text(page, lines: List[Dict], pixel_width: int, pixel_height: int) -> None:
@@ -206,14 +241,20 @@ class OcrMixin:
                 output_doc.insert_pdf(source_doc)
             page_results = []
             matrix = fitz.Matrix(dpi / 72, dpi / 72)
-            for page_index in pages:
+            for page_index in iter_progress(pages, '正在识别 PDF 页面'):
                 page = source_doc.load_page(page_index)
                 pixmap = page.get_pixmap(matrix=matrix, alpha=False)
                 image = Image.frombytes('RGB', (pixmap.width, pixmap.height), pixmap.samples)
-                lines = self._recognize(image)
-                page_results.append({'page': page_index + 1, 'lines': lines})
+                lines, rotation, _ = self._recognize_oriented(image, opts)
+                page_results.append({'page': page_index + 1, 'rotation': rotation, 'lines': lines})
                 if output_doc is not None:
-                    self._insert_searchable_text(output_doc.load_page(page_index), lines, pixmap.width, pixmap.height)
+                    mapped_lines = []
+                    for line in lines:
+                        points = []
+                        for x, y in line.get('box') or []:
+                            points.append([pixmap.width - y, x] if rotation == 90 else [pixmap.width - x, pixmap.height - y] if rotation == 180 else [y, pixmap.height - x] if rotation == 270 else [x, y])
+                        mapped_lines.append({**line, 'box': points})
+                    self._insert_searchable_text(output_doc.load_page(page_index), mapped_lines, pixmap.width, pixmap.height)
 
             text = '\n\n'.join(
                 f'--- 第 {item["page"]} 页 ---\n' + '\n'.join(line['text'] for line in item['lines'])
@@ -225,12 +266,12 @@ class OcrMixin:
             pdf_output = ''
             if mode in {'text', 'both'}:
                 text_target = self._unique_output(source, opts, 'ocr', '.txt')
-                text_target.write_text(text, encoding='utf-8')
+                text_target = write_output(text_target, lambda target: target.write_text(text, encoding='utf-8'))
                 text_output = str(text_target)
                 outputs.append(text_output)
             if output_doc is not None:
                 pdf_target = self._unique_output(source, opts, 'searchable', '.pdf')
-                output_doc.save(pdf_target, garbage=4, deflate=True)
+                pdf_target = write_output(pdf_target, lambda target: output_doc.save(target, garbage=4, deflate=True))
                 pdf_output = str(pdf_target)
                 outputs.append(pdf_output)
             return api_success(
@@ -243,6 +284,7 @@ class OcrMixin:
                 pageCount=len(pages),
                 lineCount=len(scores),
                 averageConfidence=round(sum(scores) / len(scores), 4) if scores else 0,
+                pages=page_results, lowConfidenceCount=sum(line.get('lowConfidence', False) for item in page_results for line in item['lines']),
             )
         finally:
             if output_doc is not None:
@@ -316,27 +358,40 @@ class OcrMixin:
         if output_format not in {'csv', 'xlsx', 'json', 'all'}:
             raise ValueError('输出格式仅支持 csv、xlsx、json 或 all')
         column_tolerance = max(0, float(opts.get('columnTolerance') or 0))
-        page_tables = []
+        page_tables = opts.get('tables') or []
 
-        if source.suffix.lower() == '.pdf':
+        if page_tables:
+            if not isinstance(page_tables, list) or len(page_tables) > 10000:
+                raise ValueError('表格页数据格式无效')
+            for item in page_tables:
+                if not isinstance(item, dict) or not isinstance(item.get('rows'), list):
+                    raise ValueError('每页必须包含 rows 列表')
+                for row in item['rows']:
+                    if not isinstance(row, list) or any(not isinstance(value, (str, int, float, bool, type(None))) for value in row):
+                        raise ValueError('表格单元格必须为文本或数值')
+        elif source.suffix.lower() == '.pdf':
             dpi = max(120, min(400, int(opts.get('dpi') or 220)))
             with fitz.open(source) as doc:
                 pages = self._parse_pages(str(opts.get('pageSpec') or ''), doc.page_count)
                 matrix = fitz.Matrix(dpi / 72, dpi / 72)
-                for page_index in pages:
+                for page_index in iter_progress(pages, '正在识别表格'):
                     page = doc.load_page(page_index)
                     pixmap = page.get_pixmap(matrix=matrix, alpha=False)
                     image = Image.frombytes('RGB', (pixmap.width, pixmap.height), pixmap.samples)
-                    lines = self._recognize(image)
-                    table = self._table_from_lines(lines, pixmap.width, column_tolerance)
-                    page_tables.append({'page': page_index + 1, 'rows': table})
+                    lines, rotation, size = self._recognize_oriented(image, opts)
+                    table = self._table_from_lines(lines, size[0], column_tolerance)
+                    page_tables.append({'page': page_index + 1, 'rows': table, 'rotation': rotation, 'uncertain': [line['text'] for line in lines if line['lowConfidence']]})
         else:
             with Image.open(source) as image:
-                lines = self._recognize(image)
-                page_tables.append({'page': 1, 'rows': self._table_from_lines(lines, image.width, column_tolerance)})
+                lines, rotation, size = self._recognize_oriented(image, opts)
+                page_tables.append({'page': 1, 'rows': self._table_from_lines(lines, size[0], column_tolerance), 'rotation': rotation, 'uncertain': [line['text'] for line in lines if line['lowConfidence']]})
 
         if not any(item['rows'] for item in page_tables):
             raise ValueError('未识别到可导出的表格内容')
+        if opts.get('saveFile') is False:
+            return api_success('表格已识别，请核对低置信度内容后导出', tables=page_tables, preview=page_tables,
+                               outputs=[], rowCount=sum(len(item['rows']) for item in page_tables),
+                               columnCount=max((len(row) for item in page_tables for row in item['rows']), default=0))
         output_dir_raw = opts.get('outputDir')
         output_dir = Path(str(output_dir_raw)).expanduser() if output_dir_raw else source.parent
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -351,9 +406,11 @@ class OcrMixin:
                 while target.exists() or target.is_symlink():
                     target = output_dir / f'{base_name}{suffix}_{index}.csv'
                     index += 1
-                with target.open('w', encoding='utf-8-sig', newline='') as handler:
-                    writer = csv.writer(handler)
-                    writer.writerows(item['rows'])
+                with atomic_output(target) as (temporary, final):
+                    with temporary.open('w', encoding='utf-8-sig', newline='') as handler:
+                        writer = csv.writer(handler)
+                        writer.writerows(item['rows'])
+                target = final
                 outputs.append(str(target))
 
         if output_format in {'xlsx', 'all'}:
@@ -364,15 +421,19 @@ class OcrMixin:
                 sheet = workbook.create_sheet(title=f'第{item["page"]}页')
                 for row in item['rows']:
                     sheet.append(row)
+                    for cell in sheet[sheet.max_row]:
+                        if isinstance(cell.value, str):
+                            cell.data_type = 's'
                 for column in sheet.columns:
                     width = min(60, max(10, max((len(str(cell.value or '')) for cell in column), default=8) + 2))
                     sheet.column_dimensions[column[0].column_letter].width = width
-            workbook.save(target)
+            target = write_output(target, lambda path: workbook.save(path))
+            workbook.close()
             outputs.append(str(target))
 
         if output_format in {'json', 'all'}:
             target = self._unique_output(source, {**opts, 'outputName': base_name}, 'table', '.json')
-            target.write_text(json.dumps(page_tables, ensure_ascii=False, indent=2), encoding='utf-8')
+            target = write_output(target, lambda path: path.write_text(json.dumps(page_tables, ensure_ascii=False, indent=2), encoding='utf-8'))
             outputs.append(str(target))
 
         row_count = sum(len(item['rows']) for item in page_tables)

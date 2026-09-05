@@ -1,11 +1,12 @@
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
 
 const loading = ref(false)
 
-const state = reactive({
+const state = useDraft('file/parts/RenamePanel/state', {
   directory: '',
   extensions: '',
   recursive: false,

@@ -1,5 +1,6 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, hasPyApi } from '@/utils/pyapi'
 
@@ -7,7 +8,7 @@ import PreviewPanel from '../../shared/PreviewPanel.vue'
 
 const loading = ref(false)
 
-const state = reactive({
+const state = useDraft('text/parts/DedupPanel/state', {
   content: '',
   operation: 'deduplicate',
   sortMethod: 'alpha',
@@ -31,7 +32,11 @@ const runDedup = async () => {
   if (!ensurePyReady()) return
   loading.value = true
   try {
-    const { ok, data: res, message } = await pyCall('text_deduplicate_sort', {
+    const {
+      ok,
+      data: res,
+      message
+    } = await pyCall('text_deduplicate_sort', {
       content: state.content,
       operation: state.operation,
       sortMethod: state.sortMethod,
@@ -82,12 +87,7 @@ const runDedup = async () => {
       </el-form-item>
     </el-form>
     <div class="text-grid">
-      <el-input
-        v-model="state.content"
-        type="textarea"
-        :rows="8"
-        placeholder="每行一个条目"
-      />
+      <el-input v-model="state.content" type="textarea" :rows="8" placeholder="每行一个条目" />
       <div class="text-grid-actions">
         <el-button type="primary" :loading="loading" @click="runDedup">执行</el-button>
       </div>
@@ -101,13 +101,7 @@ const runDedup = async () => {
         <el-descriptions-item label="移除行数">{{ state.stats.removedCount }}</el-descriptions-item>
       </el-descriptions>
     </div>
-    <el-table
-      v-if="state.frequency.length"
-      :data="state.frequency"
-      border
-      size="small"
-      style="margin-top: 16px"
-    >
+    <el-table v-if="state.frequency.length" :data="state.frequency" border size="small" style="margin-top: 16px">
       <el-table-column label="条目" prop="value" />
       <el-table-column label="次数" prop="count" width="100" />
     </el-table>

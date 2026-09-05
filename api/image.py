@@ -7,15 +7,21 @@ from __future__ import annotations
 
 import base64
 import io
+import json
 import math
 import shutil
+import tempfile
 import time
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple
 
 from PIL import Image, ImageColor, ImageDraw, ImageEnhance, ImageFont, ImageOps
 
+from api.core.context import checkpoint, iter_progress
+from api.core.journal import save_manifest
+from api.core.outputs import atomic_output, write_output
 from api.utils import (
     api_error,
     api_success,
@@ -23,6 +29,7 @@ from api.utils import (
     ensure_files_payload,
     format_bytes,
 )
+from pyapp.config.config import Config
 
 
 class ImageTool:
@@ -172,7 +179,7 @@ class ImageTool:
         if dpi and fmt in {'jpg', 'png', 'tiff'}:
             save_kwargs['dpi'] = (dpi, dpi)
 
-        image.save(dest, pil_format, **save_kwargs)
+        return write_output(dest, lambda target: image.save(target, pil_format, **save_kwargs))
 
     def _resolve_font(self, size: int, font_path: str | None) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
         candidates = []
@@ -307,6 +314,8 @@ class ImageTool:
             rewritten = []
             for file_path in files:
                 with Image.open(file_path) as image:
+                    image = ImageOps.exif_transpose(image)
+                    checkpoint()
                     dest_name = self._build_output_name(file_path, fmt, keep_name)
                     dest = output_dir / dest_name
                     if fmt == 'svg':
@@ -321,9 +330,9 @@ class ImageTool:
                             f'<image href="data:image/png;base64,{encoded}" '
                             f'width="{rgb.width}" height="{rgb.height}"/></svg>'
                         )
-                        dest.write_text(svg, encoding='utf-8')
+                        dest = write_output(dest, lambda target: target.write_text(svg, encoding='utf-8'))
                     else:
-                        self._save_image(image, dest, fmt, quality)
+                        dest = self._save_image(image, dest, fmt, quality)
                     rewritten.append(str(dest))
             return api_success(f'已转换 {len(rewritten)} 个文件', files=rewritten, outputDir=str(output_dir))
         except Exception as exc:
@@ -346,12 +355,15 @@ class ImageTool:
             reserved_destinations = set()
             for file_path in files:
                 with Image.open(file_path) as image:
+                    image = ImageOps.exif_transpose(image)
+                    checkpoint()
+                    transparent = 'A' in image.getbands() or 'transparency' in image.info
                     buffer = io.BytesIO()
                     if mode == 'size' and target_kb:
-                        for level in range(quality, 30, -5):
+                        for level in range(quality, 24, -5):
                             buffer.seek(0)
                             buffer.truncate(0)
-                            image.convert('RGB').save(buffer, 'JPEG', optimize=True, quality=level)
+                            image.convert('RGBA' if transparent else 'RGB').save(buffer, 'WEBP' if transparent else 'JPEG', quality=level)
                             size_kb = buffer.tell() / 1024
                             if size_kb <= target_kb:
                                 break
@@ -362,7 +374,7 @@ class ImageTool:
                         save_image = image
                     # Size-target compression is always encoded as JPEG, so its
                     # filename must not retain the source image's extension.
-                    dest_suffix = '.jpg' if mode == 'size' and target_kb else (
+                    dest_suffix = ('.webp' if transparent else '.jpg') if mode == 'size' and target_kb else (
                         file_path.suffix if file_path.suffix.lower() in {'.jpg', '.jpeg', '.png', '.webp'} else '.jpg'
                     )
                     dest = output_dir / f'{file_path.stem}_compress{dest_suffix}'
@@ -372,21 +384,51 @@ class ImageTool:
                         index += 1
                     reserved_destinations.add(dest)
                     if mode == 'size' and target_kb:
-                        with dest.open('wb') as handler:
-                            handler.write(save_bytes if save_bytes is not None else buffer.getvalue())
+                        dest = write_output(dest, lambda target: target.write_bytes(save_bytes if save_bytes is not None else buffer.getvalue()))
                     else:
-                        self._save_image(save_image, dest, dest_suffix.lstrip('.'), quality)
+                        dest = self._save_image(save_image, dest, dest_suffix.lstrip('.'), quality)
                     results.append({
                         'source': str(file_path),
                         'output': str(dest),
                         'originalSize': format_bytes(file_path.stat().st_size),
                         'compressedSize': format_bytes(dest.stat().st_size),
+                        'targetMet': not target_kb or dest.stat().st_size <= target_kb * 1024,
+                        'alphaPreserved': transparent and dest_suffix in {'.png', '.webp'},
                     })
             return api_success(f'已压缩 {len(results)} 个文件', items=results, outputDir=str(output_dir))
         except Exception as exc:
             return api_error(f'压缩失败：{exc}')
 
     # -------------------- Phase 2 功能 --------------------
+
+    def image_operation_preview(self, options=None):
+        """Render one input through the same processor used for export."""
+        try:
+            opts = self._validate(options)
+            method = opts.get('method')
+            if method not in {'image_batch_compress', 'image_add_watermark', 'image_rotate_flip', 'image_crop', 'image_format_convert'}:
+                raise ValueError('此操作不支持图片效果预览')
+            params = dict(opts.get('options') or {})
+            raw_files = params.get('files') or [params.get('file') or params.get('filePath')]
+            source = ensure_file_path(raw_files[0])
+            params.update(files=[str(source)], file=str(source))
+            params.pop('outputPath', None)
+            with tempfile.TemporaryDirectory(prefix='ppx-image-preview-') as directory:
+                params.update(outputDir=directory, outputName='preview')
+                result = getattr(self, method)(params)
+                if result.get('code') != 0:
+                    return result
+                outputs = list(Path(directory).glob('*'))
+                target = next((path for path in outputs if path.is_file()), None)
+                if target is None:
+                    raise ValueError('未生成可预览的图片')
+                before = self.image_preview({'file': str(source), 'maxSize': 1000})
+                after = self.image_preview({'file': str(target), 'maxSize': 1000})
+                return api_success('仅预览队列中的第一张图片；执行时应用到整个队列', before=before, after=after,
+                                   sourceBytes=source.stat().st_size, outputBytes=target.stat().st_size,
+                                   source=str(source), item=result.get('items', [None])[0])
+        except Exception as exc:
+            return api_error(f'效果预览失败：{exc}')
 
     def image_preview(self, options: Dict | None = None):
         """图片预览 - 返回 data URL，支持避免跨域的 file:/// 资源"""
@@ -521,7 +563,7 @@ class ImageTool:
                     composed = Image.alpha_composite(base, overlay)
                     fmt = file_path.suffix.lstrip('.').lower() or 'png'
                     dest = output_dir / f'{file_path.stem}_wm.{fmt}'
-                    self._save_image(composed, dest, fmt)
+                    dest = self._save_image(composed, dest, fmt)
                     results.append(str(dest))
 
             return api_success(f'已完成{len(results)} 个文件水印', files=results, outputDir=str(output_dir))
@@ -582,7 +624,7 @@ class ImageTool:
                 while dest.exists() or dest.is_symlink():
                     dest = output_dir / f'{source.stem}_crop_{index}{source.suffix}'
                     index += 1
-                self._save_image(
+                dest = self._save_image(
                     cropped,
                     dest,
                     source.suffix.lstrip('.') or 'png',
@@ -636,7 +678,7 @@ class ImageTool:
                     else:
                         processed = image.rotate(90, expand=True)
                     dest = output_dir / f'{file_path.stem}_{operation}{file_path.suffix}'
-                    self._save_image(processed, dest, file_path.suffix.lstrip('.') or 'png')
+                    dest = self._save_image(processed, dest, file_path.suffix.lstrip('.') or 'png')
                     results.append(str(dest))
             return api_success(f'已处理 {len(results)} 张图片', files=results, outputDir=str(output_dir))
         except Exception as exc:
@@ -684,7 +726,7 @@ class ImageTool:
                 filename = f'{filename}.pdf'
             dest = output_dir / filename
             first, rest = pages[0], pages[1:]
-            first.save(dest, 'PDF', save_all=bool(rest), append_images=rest)
+            dest = write_output(dest, lambda target: first.save(target, 'PDF', save_all=bool(rest), append_images=rest))
             return api_success('PDF 导出完成', file=str(dest), outputDir=str(output_dir), pages=len(pages))
         except Exception as exc:
             return api_error(f'导出 PDF 失败：{exc}')
@@ -762,7 +804,7 @@ class ImageTool:
             if not dest_name.lower().endswith(f'.{fmt}'):
                 dest_name = f'{dest_name}.{fmt}'
             dest = output_dir / dest_name
-            self._save_image(canvas, dest, fmt, quality)
+            dest = self._save_image(canvas, dest, fmt, quality)
             return api_success('图片拼接完成', file=str(dest), outputDir=str(output_dir))
         except Exception as exc:
             return api_error(f'拼接失败：{exc}')
@@ -785,7 +827,6 @@ class ImageTool:
                 override_ext = override_ext if override_ext.startswith('.') else f'.{override_ext}'
             dry_run = bool(opts.get('dryRun', True))
             copy_mode = bool(opts.get('copyMode', False))
-            conflict_policy = str(opts.get('conflictPolicy', 'skip')).lower()
             output_dir = opts.get('outputDir')
             target_dir = None
             if output_dir:
@@ -795,6 +836,11 @@ class ImageTool:
                 target_dir = self._prepare_output_dir(files, None, 'image_rename')
             operations: List[Dict[str, str]] = []
             skipped: List[str] = []
+            failures = []
+            planned = set()
+            transaction = uuid.uuid4().hex
+            manifest_path = Path(Config.appDataDir) / 'image-rename' / f'{transaction}.json'
+            manifest = {'id': transaction, 'schemaVersion': 1, 'copyMode': copy_mode, 'mappings': []}
             timestamp_cache = datetime.now().strftime(timestamp_fmt)
 
             def build_name(path: Path, number: int) -> str:
@@ -822,35 +868,78 @@ class ImageTool:
                     ext = override_ext
                 return base + ext
 
-            for offset, path in enumerate(files):
+            for offset, path in enumerate(iter_progress(files, '正在重命名图片')):
                 index = start_index + offset
                 new_name = build_name(path, index)
+                if Path(new_name).name != new_name:
+                    raise ValueError('文件名不能包含目录分隔符')
                 if target_dir:
                     dest = target_dir / new_name
                 else:
                     dest = path.with_name(new_name)
-                if dest.exists() and dest != path:
-                    if conflict_policy == 'overwrite' and not dry_run:
-                        dest.unlink()
-                    else:
-                        skipped.append(str(path))
-                        continue
-                operations.append({'from': str(path), 'to': str(dest)})
-                if dry_run:
+                if dest == path or dest.exists() or str(dest.resolve()) in planned:
+                    skipped.append(str(path))
                     continue
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                if copy_mode:
-                    shutil.copy2(path, dest)
-                else:
-                    path.rename(dest)
+                planned.add(str(dest.resolve()))
+                record = {'from': str(path), 'to': str(dest), 'status': 'pending'}
+                if dry_run:
+                    operations.append(record)
+                    continue
+                manifest['mappings'].append(record)
+                save_manifest(manifest_path, manifest)
+                try:
+                    from api.file import FileTool
+                    record['signature'] = FileTool._hash_file(path)
+                    save_manifest(manifest_path, manifest)
+                    dest = write_output(dest, lambda target: shutil.copy2(path, target), allow_empty=True)
+                    record['to'] = str(dest)
+                    save_manifest(manifest_path, manifest)
+                    if not copy_mode:
+                        path.unlink()
+                    record['status'] = 'done'
+                    operations.append(record)
+                except Exception as exc:
+                    checkpoint()
+                    record['status'] = 'failed'
+                    failures.append({'input': str(path), 'error': str(exc)})
+                finally:
+                    save_manifest(manifest_path, manifest)
             message = '重命名预览' if dry_run else '批量重命名完成'
             payload = {
                 'operations': operations,
                 'skipped': skipped,
                 'dryRun': dry_run,
+                'transactionId': transaction, 'failures': failures, 'partial': bool(operations and failures),
+                'code': 0 if operations or not failures else -1,
             }
             if target_dir:
                 payload['outputDir'] = str(target_dir)
             return api_success(message, **payload)
         except Exception as exc:
             return api_error(f'批量重命名失败：{exc}')
+
+    def image_batch_rename_undo(self, options=None):
+        try:
+            from api.file import FileTool
+            transaction = str((options or {}).get('transactionId') or '')
+            if not transaction or Path(transaction).name != transaction:
+                raise ValueError('事务编号无效')
+            manifest_path = Path(Config.appDataDir) / 'image-rename' / f'{transaction}.json'
+            manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+            restored, skipped = [], []
+            for record in iter_progress(manifest['mappings'], '正在撤销图片重命名'):
+                if record.get('status') == 'undone':
+                    continue
+                source, target = Path(record['to']), Path(record['from'])
+                if not source.is_file() or FileTool._hash_file(source) != record.get('signature') or (target.exists() and not manifest['copyMode']):
+                    skipped.append(record)
+                    continue
+                if not manifest['copyMode']:
+                    final = write_output(target, lambda dest: shutil.copy2(source, dest), allow_empty=True)
+                    restored.append(str(final))
+                source.unlink()
+                record['status'] = 'undone'
+                save_manifest(manifest_path, manifest)
+            return api_success('撤销完成；冲突或已修改的文件保留', files=restored, skipped=skipped)
+        except Exception as exc:
+            return api_error(f'撤销失败：{exc}')

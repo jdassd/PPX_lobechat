@@ -1,5 +1,6 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, hasPyApi } from '@/utils/pyapi'
 
@@ -7,7 +8,7 @@ import PreviewPanel from '../../shared/PreviewPanel.vue'
 
 const loading = ref(false)
 
-const state = reactive({
+const state = useDraft('text/parts/TransformPanel/state', {
   mode: 'upper',
   input: '',
   output: ''
@@ -25,7 +26,11 @@ const runTransform = async () => {
   if (!ensurePyReady()) return
   loading.value = true
   try {
-    const { ok, data: res, message } = await pyCall('text_case_transform', {
+    const {
+      ok,
+      data: res,
+      message
+    } = await pyCall('text_case_transform', {
       mode: state.mode,
       content: state.input
     })
@@ -64,12 +69,7 @@ const runTransform = async () => {
       </el-form-item>
     </el-form>
     <div class="text-grid">
-      <el-input
-        v-model="state.input"
-        type="textarea"
-        :rows="6"
-        placeholder="输入原始文本"
-      />
+      <el-input v-model="state.input" type="textarea" :rows="6" placeholder="输入原始文本" />
       <div class="text-grid-actions">
         <el-button type="primary" :loading="loading" @click="runTransform">转换</el-button>
       </div>

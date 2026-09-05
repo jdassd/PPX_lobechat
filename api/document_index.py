@@ -10,13 +10,17 @@ import sqlite3
 import threading
 import time
 import zipfile
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
 from xml.etree import ElementTree
 
 import fitz
 from openpyxl import load_workbook
+from PIL import Image
 
+from api.core.context import checkpoint, iter_progress
+from api.core.database import migrate_database
 from api.utils.error_handler import api_error, api_success
 from pyapp.config.config import Config
 
@@ -40,9 +44,7 @@ class DocumentIndexMixin:
             index_dir.mkdir(parents=True, exist_ok=True)
             self._document_index_path = index_dir / 'documents.sqlite3'
             self._document_index_lock = threading.RLock()
-            with self._document_index_connect() as connection:
-                connection.execute('PRAGMA journal_mode=WAL')
-                connection.execute('PRAGMA synchronous=NORMAL')
+            def initialize_schema(connection):
                 connection.execute(
                     '''CREATE TABLE IF NOT EXISTS documents (
                         path TEXT PRIMARY KEY,
@@ -55,12 +57,19 @@ class DocumentIndexMixin:
                     )'''
                 )
                 connection.execute('CREATE TABLE IF NOT EXISTS index_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
+                connection.execute('CREATE TABLE IF NOT EXISTS document_locations (path TEXT PRIMARY KEY, data TEXT NOT NULL)')
                 self._document_index_create_fts(connection)
-                connection.commit()
+            migrate_database(self._document_index_path, {1: initialize_schema})
             self._document_index_ready = True
 
+    @contextmanager
     def _document_index_connect(self):
-        return sqlite3.connect(str(self._document_index_path), timeout=30)
+        connection = sqlite3.connect(str(self._document_index_path), timeout=30)
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
 
     @staticmethod
     def _document_index_create_fts(connection) -> None:
@@ -130,6 +139,65 @@ class DocumentIndexMixin:
             return path.read_text(encoding='utf-8')
         except UnicodeDecodeError:
             return path.read_text(encoding='utf-8', errors='replace')
+
+    def _extract_located(self, path, options):
+        chunks, locations = [], []
+        length = 0
+        truncated = False
+        def append(text, **location):
+            nonlocal length, truncated
+            checkpoint()
+            available = _MAX_CONTENT_CHARS - length
+            if available <= 0:
+                truncated = True
+                return False
+            text = str(text)
+            if len(text) > available:
+                text = text[:available]
+                truncated = True
+            locations.append({'start': length, 'end': length + len(text), **location})
+            chunks.append(text)
+            length += len(text) + 1
+            return not truncated
+        extension = path.suffix.lower()
+        if extension == '.pdf':
+            with fitz.open(path) as document:
+                if document.needs_pass:
+                    raise ValueError('文档已加密，请先解密后建立索引')
+                for page_number, page in enumerate(document, 1):
+                    text = page.get_text('text') or ''
+                    used_ocr = bool(options.get('ocr') and not text.strip())
+                    if used_ocr:
+                        from api.ocr import OcrMixin
+                        pixmap = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5), alpha=False)
+                        with Image.frombytes('RGB', [pixmap.width, pixmap.height], pixmap.samples) as image:
+                            lines, _, _ = OcrMixin._recognize_oriented(image, {'autoRotate': True})
+                        text = '\n'.join(line['text'] for line in lines)
+                    if not append(text, page=page_number, ocr=used_ocr):
+                        break
+        elif extension in {'.xlsx', '.xlsm'}:
+            workbook = load_workbook(path, read_only=True, data_only=True)
+            try:
+                for sheet in workbook:
+                    for row_number, row in enumerate(sheet.iter_rows(values_only=True), 1):
+                        if not append('\t'.join('' if value is None else str(value) for value in row), sheet=sheet.title, row=row_number):
+                            break
+                    if truncated:
+                        break
+            finally:
+                workbook.close()
+        elif extension == '.docx':
+            from docx import Document
+            from docx.oxml.ns import qn
+            document = Document(path)
+            for index, paragraph in enumerate(document.element.body.iter(qn('w:p')), 1):
+                if not append(''.join(node.text or '' for node in paragraph.iter(qn('w:t'))), paragraph=index):
+                    break
+        else:
+            for index, line in enumerate(self._document_index_extract(path).splitlines(), 1):
+                if not append(line, line=index):
+                    break
+        return '\n'.join(chunks), {'locations': locations, 'truncated': truncated, 'ocr': bool(options.get('ocr'))}
 
     @staticmethod
     def _document_index_walk(directories: Iterable[Path], recursive: bool, extensions: set) -> Iterable[Path]:
@@ -217,47 +285,46 @@ class DocumentIndexMixin:
             skipped = 0
             failed = []
             with self._document_index_lock, self._document_index_connect() as connection:
-                if bool(options.get('rebuild', False)):
-                    connection.execute('DELETE FROM documents')
-                    connection.execute('DELETE FROM documents_fts')
-                existing = {
-                    row[0]: (row[1], row[2])
-                    for row in connection.execute('SELECT path, mtime_ns, size FROM documents')
-                }
-                for path in sorted(candidates):
-                    try:
-                        stat = path.stat()
-                        key = str(path)
-                        if existing.get(key) == (stat.st_mtime_ns, stat.st_size):
-                            skipped += 1
-                            continue
-                        content = self._document_index_extract(path)[:_MAX_CONTENT_CHARS]
-                        title = path.stem
+                existing = {row[0]: (row[1], row[2]) for row in connection.execute('SELECT path, mtime_ns, size FROM documents')}
+                located = {row[0]: json.loads(row[1]) for row in connection.execute('SELECT path, data FROM document_locations')}
+            for path in iter_progress(sorted(candidates), '正在建立文档索引'):
+                try:
+                    stat = path.stat()
+                    key = str(path)
+                    if not options.get('rebuild') and key in located and bool(located[key].get('ocr')) == bool(options.get('ocr')) and existing.get(key) == (stat.st_mtime_ns, stat.st_size):
+                        skipped += 1
+                        continue
+                    content, location_data = self._extract_located(path, options)
+                    after = path.stat()
+                    if (after.st_size, after.st_mtime_ns) != (stat.st_size, stat.st_mtime_ns):
+                        raise ValueError('文件在索引期间发生变化，请重试')
+                    with self._document_index_lock, self._document_index_connect() as connection:
                         connection.execute(
                             '''INSERT INTO documents(path, title, extension, content, mtime_ns, size, indexed_at)
                                VALUES (?, ?, ?, ?, ?, ?, ?)
                                ON CONFLICT(path) DO UPDATE SET title=excluded.title, extension=excluded.extension,
                                content=excluded.content, mtime_ns=excluded.mtime_ns, size=excluded.size,
                                indexed_at=excluded.indexed_at''',
-                            (key, title, path.suffix.lower(), content, stat.st_mtime_ns, stat.st_size, time.time()),
-                        )
+                            (key, path.stem, path.suffix.lower(), content, stat.st_mtime_ns, stat.st_size, time.time()))
                         connection.execute('DELETE FROM documents_fts WHERE path = ?', (key,))
-                        connection.execute('INSERT INTO documents_fts(path, title, content) VALUES (?, ?, ?)', (key, title, content))
-                        indexed += 1
-                    except Exception as exc:
-                        failed.append({'path': str(path), 'error': str(exc)})
-                if bool(options.get('prune', False)):
-                    live = {str(path) for path in candidates}
+                        connection.execute('INSERT INTO documents_fts(path, title, content) VALUES (?, ?, ?)', (key, path.stem, content))
+                        connection.execute('INSERT OR REPLACE INTO document_locations(path, data) VALUES (?, ?)', (key, json.dumps(location_data, ensure_ascii=False)))
+                    indexed += 1
+                except Exception as exc:
+                    checkpoint()
+                    failed.append({'path': str(path), 'input': str(path), 'error': str(exc)})
+            if bool(options.get('prune', False)):
+                live = {str(path) for path in candidates}
+                with self._document_index_lock, self._document_index_connect() as connection:
                     for key in existing:
-                        if key not in live and any(key == str(directory) or key.startswith(f'{directory}{os.sep}') for directory in directories):
-                            connection.execute('DELETE FROM documents WHERE path = ?', (key,))
-                            connection.execute('DELETE FROM documents_fts WHERE path = ?', (key,))
-                connection.commit()
+                        if key not in live and not Path(key).exists() and any(key.startswith(f'{directory}{os.sep}') for directory in directories):
+                            for table in ('documents', 'documents_fts', 'document_locations'):
+                                connection.execute(f'DELETE FROM {table} WHERE path = ?', (key,))
             return api_success(
                 f'索引更新完成：新增或更新 {indexed} 个，跳过 {skipped} 个，失败 {len(failed)} 个',
                 indexed=indexed,
                 skipped=skipped,
-                failed=failed[:50],
+                failed=failed, failures=failed, partial=bool(failed and indexed), code=0 if indexed or skipped or not failed else -1,
                 scanned=len(candidates),
             )
         except Exception as exc:
@@ -314,6 +381,19 @@ class DocumentIndexMixin:
                     ).fetchall()
             results = []
             for row in rows:
+                with self._document_index_connect() as connection:
+                    location_row = connection.execute('SELECT l.data, d.content FROM document_locations l JOIN documents d ON d.path=l.path WHERE l.path=?', (row[0],)).fetchone()
+                positions = []
+                metadata = json.loads(location_row[0]) if location_row else {}
+                if location_row:
+                    search_text = location_row[1].casefold()
+                    tokens = [token.casefold() for token in query.split() if token]
+                    for location in metadata.get('locations', []):
+                        if any(token in search_text[location['start']:location['end']] for token in tokens):
+                            positions.append(location)
+                            if len(positions) >= 20:
+                                break
+
                 source_state = self._document_index_source_state(row[0], row[7], row[5])
                 results.append({
                     'path': row[0],
@@ -322,7 +402,7 @@ class DocumentIndexMixin:
                     'excerpt': row[3] or '',
                     'score': row[4],
                     'size': row[5],
-                    'indexedAt': row[6],
+                    'indexedAt': row[6], 'locations': positions, 'truncated': bool(metadata.get('truncated')),
                     **source_state,
                 })
             return api_success(f'找到 {len(results)} 个结果', results=results, query=query)
@@ -334,6 +414,7 @@ class DocumentIndexMixin:
             self._document_index_ensure()
             path = str(options.get('path') if isinstance(options, dict) else options or '')
             with self._document_index_lock, self._document_index_connect() as connection:
+                connection.execute('DELETE FROM document_locations WHERE path = ?', (path,))
                 connection.execute('DELETE FROM documents WHERE path = ?', (path,))
                 connection.execute('DELETE FROM documents_fts WHERE path = ?', (path,))
                 connection.commit()
@@ -345,6 +426,7 @@ class DocumentIndexMixin:
         try:
             self._document_index_ensure()
             with self._document_index_lock, self._document_index_connect() as connection:
+                connection.execute('DELETE FROM document_locations')
                 connection.execute('DELETE FROM documents')
                 connection.execute('DELETE FROM documents_fts')
                 connection.commit()

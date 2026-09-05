@@ -1,15 +1,62 @@
 <script setup>
-import { inject, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 
 const { callApi, pickPdf, pickDir, openPath } = inject('pdfApi')
 const shared = inject('pdfShared')
 
-const form = reactive({ filePath: '', password: '', outputDir: '', outputName: '', addPageNumbers: false, pageNumberStart: 1, pageNumberPosition: 'bottom-center' })
+const form = useDraft('pdf/parts/PageWorkbenchPanel/form', { filePath: '', password: '', outputDir: '', outputName: '', addPageNumbers: false, pageNumberStart: 1, pageNumberPosition: 'bottom-center' })
 const pages = ref([])
 const output = ref('')
 const loadingPreview = ref(false)
-const truncated = ref(false)
+const pageIndex = ref(1)
+const pageSize = 24
+const sourceSignature = ref('')
+const sourceCount = ref(0)
+const thumbnails = ref({})
+const selected = ref([])
+const pageRange = ref('')
+const moveTarget = ref(1)
+const undoStack = ref([])
+const redoStack = ref([])
+const dragPage = ref(null)
+const visiblePages = computed(() => pages.value.slice((pageIndex.value - 1) * pageSize, pageIndex.value * pageSize))
+let previewRequest = 0
+const remember = () => {
+  undoStack.value.push(pages.value.map((page) => ({ ...page })))
+  undoStack.value = undoStack.value.slice(-100)
+  redoStack.value = []
+}
+const undo = () => {
+  if (undoStack.value.length) {
+    redoStack.value.push(pages.value)
+    pages.value = undoStack.value.pop()
+  }
+}
+const redo = () => {
+  if (redoStack.value.length) {
+    undoStack.value.push(pages.value)
+    pages.value = redoStack.value.pop()
+  }
+}
+const loadVisible = async () => {
+  const request = ++previewRequest
+  const missing = visiblePages.value.filter((page) => !thumbnails.value[page.originalPage]).map((page) => page.originalPage)
+  if (!missing.length || !form.filePath) return
+  loadingPreview.value = true
+  try {
+    const result = await callApi('pdf_page_preview', { filePath: form.filePath, password: form.password, pageNumbers: missing, limit: pageSize, width: 160 })
+    if (request !== previewRequest || !result) return
+    if (result.sourceSignature !== sourceSignature.value) return ElMessage.error('源文件已变化，请重新载入后再编辑')
+    const entries = Object.entries(thumbnails.value)
+    thumbnails.value = Object.fromEntries(entries.slice(-pageSize * 3))
+    for (const page of result.pages || []) thumbnails.value[page.page] = page.preview
+  } finally {
+    if (request === previewRequest) loadingPreview.value = false
+  }
+}
+watch(() => visiblePages.value.map((page) => page.originalPage).join(','), loadVisible)
 
 const choosePdf = async () => {
   const selected = await pickPdf()
@@ -35,11 +82,17 @@ const loadPages = async () => {
   if (!form.filePath) return ElMessage.warning('请先选择 PDF')
   loadingPreview.value = true
   try {
-    const result = await callApi('pdf_page_preview', { filePath: form.filePath, password: form.password, maxPages: 300, width: 160 })
+    ++previewRequest
+    const result = await callApi('pdf_page_preview', { filePath: form.filePath, password: form.password, limit: pageSize, width: 160 })
     if (result) {
-      pages.value = (result.pages || []).map((page) => ({ ...page, originalPage: page.page, rotateBy: 0 }))
-      truncated.value = !!result.truncated
-      if (truncated.value) ElMessage.warning(`该 PDF 共 ${result.pageCount} 页，页面工作台最多载入 ${result.loadedCount} 页；为避免误删，已禁用生成。`)
+      sourceSignature.value = result.sourceSignature
+      sourceCount.value = result.pageCount
+      thumbnails.value = Object.fromEntries((result.pages || []).map((page) => [page.page, page.preview]))
+      pages.value = Array.from({ length: result.pageCount }, (_, index) => ({ originalPage: index + 1, rotateBy: 0 }))
+      pageIndex.value = 1
+      selected.value = []
+      undoStack.value = []
+      redoStack.value = []
     }
   } finally {
     loadingPreview.value = false
@@ -49,17 +102,57 @@ const loadPages = async () => {
 const move = (index, offset) => {
   const target = index + offset
   if (target < 0 || target >= pages.value.length) return
+  remember()
   const [page] = pages.value.splice(index, 1)
   pages.value.splice(target, 0, page)
 }
 
 const rotate = (page) => {
+  remember()
   page.rotateBy = (page.rotateBy + 90) % 360
 }
 
 const restoreOrder = () => {
-  pages.value.sort((a, b) => a.originalPage - b.originalPage)
-  pages.value.forEach((page) => (page.rotateBy = 0))
+  remember()
+  pages.value = Array.from({ length: sourceCount.value }, (_, index) => ({ originalPage: index + 1, rotateBy: 0 }))
+}
+
+const selectRange = () => {
+  const numbers = new Set()
+  for (const part of pageRange.value.split(/[,，\s]+/).filter(Boolean)) {
+    const match = /^(\d+)(?:-(\d+))?$/.exec(part)
+    if (!match) return ElMessage.warning('使用原页码，例如 1-8,12,20-30')
+    const start = Number(match[1])
+    const end = Number(match[2] || start)
+    if (start < 1 || end > sourceCount.value || end < start) return ElMessage.warning('页码范围无效')
+    for (let number = start; number <= end; number++) numbers.add(number)
+  }
+  selected.value = pages.value.filter((page) => numbers.has(page.originalPage)).map((page) => page.originalPage)
+}
+const removePages = (numbers) => {
+  if (numbers.length >= pages.value.length) return ElMessage.warning('至少保留一页')
+  remember()
+  pages.value = pages.value.filter((page) => !numbers.includes(page.originalPage))
+  selected.value = []
+  pageIndex.value = Math.min(pageIndex.value, Math.ceil(pages.value.length / pageSize))
+}
+const rotateSelected = () => {
+  remember()
+  pages.value.forEach((page) => {
+    if (selected.value.includes(page.originalPage)) page.rotateBy = (page.rotateBy + 90) % 360
+  })
+}
+const moveSelected = () => {
+  remember()
+  const moving = pages.value.filter((page) => selected.value.includes(page.originalPage))
+  const remaining = pages.value.filter((page) => !selected.value.includes(page.originalPage))
+  remaining.splice(Math.max(0, Math.min(remaining.length, moveTarget.value - 1)), 0, ...moving)
+  pages.value = remaining
+}
+const drop = (page) => {
+  const from = pages.value.findIndex((item) => item.originalPage === dragPage.value)
+  const to = pages.value.findIndex((item) => item.originalPage === page.originalPage)
+  if (from >= 0) move(from, to - from)
 }
 
 const chooseOutput = async () => {
@@ -69,10 +162,10 @@ const chooseOutput = async () => {
 
 const execute = async () => {
   if (!form.filePath || !pages.value.length) return ElMessage.warning('请先载入 PDF 页面')
-  if (truncated.value) return ElMessage.warning('页面未完整载入，不能生成新 PDF')
   const rotations = Object.fromEntries(pages.value.filter((page) => page.rotateBy).map((page) => [String(page.originalPage), page.rotateBy]))
   const result = await callApi('pdf_page_workbench', {
     ...form,
+    sourceSignature: sourceSignature.value,
     pageOrder: pages.value.map((page) => page.originalPage),
     rotations
   })
@@ -101,21 +194,31 @@ onUnmounted(() => window.removeEventListener('ppx-open-files', acceptLaunchFiles
         <el-input v-model="form.password" type="password" show-password placeholder="源文件密码（如有）" />
       </div>
       <div class="page-toolbar">
-        <span>当前保留 {{ pages.length }} 页</span>
+        <span>原 {{ sourceCount }} 页 → 保留 {{ pages.length }} 页</span>
+        <el-button size="small" :disabled="!undoStack.length" @click="undo">撤销</el-button>
+        <el-button size="small" :disabled="!redoStack.length" @click="redo">重做</el-button>
         <el-button size="small" :disabled="!pages.length" @click="restoreOrder">恢复原顺序</el-button>
         <el-button size="small" :disabled="!form.filePath" :loading="loadingPreview" @click="loadPages">重新载入</el-button>
       </div>
-      <el-alert v-if="truncated" title="页面数量超过工作台上限。为防止未显示页面被遗漏，本页禁止生成；请先用“页码切割”分段处理。" type="warning" :closable="false" show-icon />
+      <div v-if="pages.length" class="page-toolbar">
+        <el-input v-model="pageRange" placeholder="原页码范围：1-8,12" style="width: 170px" @keyup.enter="selectRange" />
+        <el-button size="small" @click="selectRange">批选</el-button>
+        <el-button size="small" @click="selected = selected.length === pages.length ? [] : pages.map((item) => item.originalPage)">全选 / 清空</el-button>
+        <el-button size="small" :disabled="!selected.length" @click="rotateSelected">旋转所选</el-button>
+        <el-button size="small" type="danger" :disabled="!selected.length" @click="removePages(selected)">删除所选 {{ selected.length || '' }}</el-button>
+      </div>
+      <div v-if="selected.length" class="page-toolbar"><span>移动所选页面至新位置：</span><el-input-number v-model="moveTarget" :min="1" :max="pages.length" /><el-button @click="moveSelected">移动</el-button></div>
+      <el-pagination v-if="pages.length" v-model:current-page="pageIndex" :page-size="pageSize" :total="pages.length" layout="prev, pager, next, jumper, total" />
       <div v-if="pages.length" class="page-grid">
-        <article v-for="(page, index) in pages" :key="page.originalPage" class="page-card">
-          <div class="thumb-wrap"><img :src="page.preview" :alt="`第 ${page.originalPage} 页`" :style="{ transform: `rotate(${page.rotateBy}deg)` }" /></div>
-          <strong>原第 {{ page.originalPage }} 页</strong>
-          <small>新第 {{ index + 1 }} 页 · 旋转 {{ page.rotateBy }}°</small>
+        <article v-for="(page, index) in visiblePages" :key="page.originalPage" class="page-card" draggable="true" @dragstart="dragPage = page.originalPage" @dragover.prevent @drop.prevent="drop(page)">
+          <div class="thumb-wrap"><img v-if="thumbnails[page.originalPage]" :src="thumbnails[page.originalPage]" :alt="`第 ${page.originalPage} 页`" :style="{ transform: `rotate(${page.rotateBy}deg)` }" /><span v-else>正在加载缩略图</span></div>
+          <el-checkbox :model-value="selected.includes(page.originalPage)" @change="selected = $event ? [...selected, page.originalPage] : selected.filter((number) => number !== page.originalPage)">原第 {{ page.originalPage }} 页</el-checkbox>
+          <small>新第 {{ (pageIndex - 1) * pageSize + index + 1 }} 页 · 旋转 {{ page.rotateBy }}°</small>
           <div class="page-actions">
-            <el-button text :disabled="index === 0" @click="move(index, -1)">←</el-button>
+            <el-button text :disabled="pageIndex === 1 && index === 0" @click="move((pageIndex - 1) * pageSize + index, -1)">←</el-button>
             <el-button text @click="rotate(page)">旋转</el-button>
-            <el-button text :disabled="index === pages.length - 1" @click="move(index, 1)">→</el-button>
-            <el-button text type="danger" :disabled="pages.length === 1" @click="pages.splice(index, 1)">删除</el-button>
+            <el-button text :disabled="(pageIndex - 1) * pageSize + index === pages.length - 1" @click="move((pageIndex - 1) * pageSize + index, 1)">→</el-button>
+            <el-button text type="danger" :disabled="pages.length === 1" @click="removePages([page.originalPage])">删除</el-button>
           </div>
         </article>
       </div>
@@ -133,7 +236,7 @@ onUnmounted(() => window.removeEventListener('ppx-open-files', acceptLaunchFiles
         <el-input v-model="form.outputName" placeholder="输出文件名" />
       </div>
       <div class="footer-actions">
-        <el-button type="primary" :loading="shared.loading" :disabled="!pages.length || truncated" @click="execute">生成新 PDF</el-button>
+        <el-button type="primary" :loading="shared.loading" :disabled="!pages.length" @click="execute">生成新 PDF</el-button>
         <el-button v-if="output" @click="openPath(output)">打开结果</el-button>
       </div>
     </el-form>

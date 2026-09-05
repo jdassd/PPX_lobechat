@@ -3,7 +3,7 @@
 ; 有关创建 Inno Setup 脚本文件的详细资料请查阅帮助文档！
 
 #define MyAppName "多功能工具箱"
-#define MyAppVersion "1.1.0"
+#define MyAppVersion "2.8.0"
 #define MyAppFolderName "tools"
 #define MyAppPublisher "Jdassd"
 #define MyAppURL "https://baidu.com"
@@ -29,9 +29,9 @@ ChangesAssociations=yes
 DisableProgramGroupPage=yes
 ; 移除以下行，以在管理安装模式下运行（为所有用户安装）。
 PrivilegesRequired=lowest
-OutputDir=D:/bc/PPX_lobechat/build
+OutputDir=../../../build
 OutputBaseFilename={#MyAppName}-V{#MyAppVersion}_Windows
-SetupIconFile=D:/bc/PPX_lobechat/pyapp/icon/logo.ico
+SetupIconFile=../../icon/logo.ico
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -47,7 +47,7 @@ Name: "chinesesimp"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "D:/bc/PPX_lobechat/build\{#MyAppFolderName}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+Source: "../../../build\{#MyAppFolderName}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 ; 注意: 不要在任何共享系统文件上使用"Flags: ignoreversion"
 
 [Registry]
@@ -64,53 +64,6 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
-[InstallDelete]
-; 安装前清理旧文件
-Type: filesandordirs; Name: "{app}\*"
-
-[Code]
-function GetUninstallString(): String;
-var
-  sUnInstPath: String;
-  sUnInstallString: String;
-begin
-  sUnInstPath := ExpandConstant('Software\Microsoft\Windows\CurrentVersion\Uninstall\{#emit SetupSetting("AppId")}_is1');
-  sUnInstallString := '';
-  if not RegQueryStringValue(HKLM, sUnInstPath, 'UninstallString', sUnInstallString) then
-    RegQueryStringValue(HKCU, sUnInstPath, 'UninstallString', sUnInstallString);
-  Result := sUnInstallString;
-end;
-
-function IsUpgrade(): Boolean;
-begin
-  Result := (GetUninstallString() <> '');
-end;
-
-function UnInstallOldVersion(): Integer;
-var
-  sUnInstallString: String;
-  iResultCode: Integer;
-begin
-  Result := 0;
-  sUnInstallString := GetUninstallString();
-  if sUnInstallString <> '' then begin
-    sUnInstallString := RemoveQuotes(sUnInstallString);
-    if Exec(sUnInstallString, '/SILENT /NORESTART /SUPPRESSMSGBOXES', '', SW_HIDE, ewWaitUntilTerminated, iResultCode) then
-      Result := 3
-    else
-      Result := 2;
-  end else
-    Result := 1;
-end;
-
-procedure CurStepChanged(CurStep: TSetupStep);
-begin
-  if (CurStep=ssInstall) then
-  begin
-    if (IsUpgrade()) then
-    begin
-      UnInstallOldVersion();
-    end;
-  end;
-end;
+; 使用 Inno Setup 的原位文件更新和卸载清单。
+; 不清空安装目录，也不在新版本文件写入前卸载旧版本。
 

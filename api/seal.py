@@ -13,11 +13,12 @@ from datetime import datetime
 from io import BytesIO
 from math import cos, pi, sin, tan
 from pathlib import Path
-from random import randint
+from random import Random
 from typing import Dict, Optional, Tuple
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
+from api.core.outputs import write_output
 from pyapp.config.config import Config
 
 _CHINESE_BRACKETS = '（）【】《》「」『』'
@@ -62,7 +63,7 @@ def _pentagram(x: float, y: float, R: float, y_degree: float = 0):
     r = R * sin(18 * rad) / cos(36 * rad)
     outer = [(x - (R * cos((90 + k * 72 + y_degree) * rad)), y - (R * sin((90 + k * 72 + y_degree) * rad))) for k in range(5)]
     inner = [(x - (r * cos((90 + 36 + k * 72 + y_degree) * rad)), y - (r * sin((90 + 36 + k * 72 + y_degree) * rad))) for k in range(5)]
-    return [point for pair in zip(outer, inner) for point in pair]
+    return [point for pair in zip(outer, inner, strict=True) for point in pair]
 
 
 def _circle(x: float, y: float, r: float):
@@ -156,7 +157,7 @@ class Seal():
             dest = Path(config['outputPath']).expanduser()
             dest.parent.mkdir(parents=True, exist_ok=True)
             return dest
-        output_dir = config.get('outputDir') or Path(Config.staticDir) / 'seals'
+        output_dir = config.get('outputDir') or Path(Config.downloadDir) / 'seals'
         dest_dir = Path(output_dir).expanduser()
         dest_dir.mkdir(parents=True, exist_ok=True)
         filename = config.get('outputName') or f'seal_{self._timestamp()}.png'
@@ -171,8 +172,10 @@ class Seal():
             mode = 'preview'
         config['mode'] = mode
         config['template'] = str(opts.get('template', 'round'))
-        if config['template'] != 'round':
-            raise ValueError('当前仅支持圆形印章模板')
+        if config['template'] not in {'round', 'ellipse'}:
+            raise ValueError('支持圆形或椭圆形印章模板')
+        config['texture_seed'] = self._int_option(opts, 'textureSeed', 0)
+        config['ellipse_ratio'] = self._float_option(opts, 'ellipseRatio', 0.72, 0.45, 0.95)
 
         config['words_up'] = str(opts.get('topText', '某某科技有限公司')).strip()
         config['words_mid'] = str(opts.get('middleText', '专用章')).strip()
@@ -237,12 +240,14 @@ class Seal():
             config = self._build_renderer_config(opts)
             renderer = _RoundSealRenderer(config)
             image = renderer.render()
+            if config['template'] == 'ellipse':
+                image = image.resize((image.width, round(image.height * config['ellipse_ratio'])), Image.Resampling.LANCZOS)
             preview = self._encode_preview(image)
 
             output_path = ''
             if config['mode'] == 'export':
                 dest = self._resolve_output_path(config)
-                image.save(dest, format='PNG')
+                dest = write_output(dest, lambda target: image.save(target, format='PNG'))
                 output_path = str(dest)
 
             msg = '预览已生成' if config['mode'] == 'preview' else f'印章已导出：{output_path}'
@@ -255,12 +260,16 @@ class Seal():
         except Exception as exc:
             return {'code': -1, 'msg': f'生成失败：{exc}'}
 
+    def seal_generate_preview(self, options=None):
+        return self.seal_generate({**(options or {}), 'mode': 'preview'})
+
 
 class _RoundSealRenderer:
     '''圆形印章渲染'''
 
     def __init__(self, config: Dict):
         self.cfg = config
+        self._random = Random(config.get('texture_seed', 0))
         self.edge = config['edge']
         self.outer_radius = config['outer_radius']
         self.border = config['border']
@@ -354,8 +363,8 @@ class _RoundSealRenderer:
         if src_w > dst_w and src_h > dst_h:
             max_x = src_w - dst_w
             max_y = src_h - dst_h
-            left = randint(0, max_x)
-            top = randint(0, max_y)
+            left = self._random.randint(0, max_x)
+            top = self._random.randint(0, max_y)
             texture = texture.crop((left, top, left + dst_w, top + dst_h))
         texture = texture.resize((dst_w, dst_h)).convert('L').filter(ImageFilter.GaussianBlur(1))
         for y in range(dst_h):

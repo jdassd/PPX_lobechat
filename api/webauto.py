@@ -29,7 +29,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from api.core.context import current_context, publish_output
+from api.core.outputs import write_output
+from api.core.store import StateStore
 from api.utils import api_error, api_success
+from pyapp.config.config import Config
 
 # ============================================================================
 # 注入到页面的点选脚本（纯 JS）。
@@ -879,8 +883,14 @@ class WebAutoTool:
                 return True
 
             playwright = sync_playwright().start()
-            browser = playwright.chromium.launch(headless=False, args=_WA_LAUNCH_ARGS)
-            context = browser.new_context(locale='zh-CN', user_agent=_WA_USER_AGENT)
+            # This driver is owned exclusively by this collection session.
+            self._wa_driver = playwright._impl_obj._connection._transport._proc
+            profile = Path(Config.appDataDir) / 'webauto' / 'browser-profile'
+            profile.mkdir(parents=True, exist_ok=True)
+            browser = context = playwright.chromium.launch_persistent_context(str(profile), headless=False,
+                              args=_WA_LAUNCH_ARGS, locale='zh-CN', user_agent=_WA_USER_AGENT)
+            context.set_default_timeout(5000)
+            context.set_default_navigation_timeout(15000)
             context.add_init_script(_STEALTH_INIT)
             page = context.new_page()
 
@@ -958,6 +968,8 @@ class WebAutoTool:
                 pass
             with self._wa_lock:
                 self._wa_pick['active'] = False
+                if self._wa_run.get('running'):
+                    self._wa_run.update(running=False, done=True, success=False, error='浏览器会话已关闭，请重新打开后重试')
 
     def _wa_handle_pick_event(self, payload: Dict[str, Any]) -> None:
         """处理来自页面的点选事件，更新加锁的共享状态。"""
@@ -1104,6 +1116,71 @@ class WebAutoTool:
     # ------------------------------------------------------------------ #
     # 8. 启动采集（在点选用的同一浏览器/同一会话内执行，复用已通过 CF/登录的页面）
     # ------------------------------------------------------------------ #
+    def webauto_collect(self, options=None):
+        """Task queue adapter; the browser stays on its owning session thread."""
+        started = self.webauto_collect_start(options)
+        if started.get('code') != 0:
+            return started
+        context = current_context()
+        self._wa_active_cancel = context.cancel if context else None
+        cancel_started = None
+        while True:
+            if context and context.cancel.is_set():
+                self._wa_run_stop.set()
+                cancel_started = cancel_started or time.monotonic()
+                if time.monotonic() - cancel_started > 2 and getattr(self, '_wa_driver', None):
+                    import psutil
+                    try:
+                        driver = psutil.Process(self._wa_driver.pid)
+                        if driver.ppid() == os.getpid():
+                            owned = driver.children(recursive=True) + [driver]
+                            for process in reversed(owned):
+                                try:
+                                    process.terminate()
+                                except psutil.Error:
+                                    pass
+                            _, remaining = psutil.wait_procs(owned, timeout=1)
+                            for process in remaining:
+                                try:
+                                    process.kill()
+                                except psutil.Error:
+                                    pass
+                    except psutil.Error:
+                        pass
+                    self._wa_driver = None
+                    self._wa_pick_stop.set()
+            state = self.webauto_run_status()
+            if context:
+                limit = int(((options or {}).get('pagination') or {}).get('maxPages') or 1)
+                context.emit(progress=None, current=state.get('page', 0), total=limit,
+                             message=f'第 {state.get("page", 0)} 页，已采集 {state.get("total", 0)} 条')
+            if state.get('done'):
+                self._wa_active_cancel = None
+                if state.get('outputPath'):
+                    publish_output(state['outputPath'])
+                partial = bool(state.get('total') and not state.get('success'))
+                return {**state, 'code': 0 if state.get('success') or partial else -1, 'partial': partial,
+                        'msg': state.get('error') or f'采集完成，共 {state.get("total", 0)} 条',
+                        'errorCode': 'COLLECTION_FAILED' if not state.get('success') else None}
+            time.sleep(0.15)
+
+    def webauto_collect_preview(self, options=None):
+        return self.webauto_collect({**(options or {}), 'pagination': {'enabled': False, 'maxPages': 1},
+                                     'limit': 10, 'export': {}, 'sampleOnly': True})
+
+    def webauto_export(self, options=None):
+        try:
+            stored = StateStore(Config.appDataDir).load('webauto', Path(Config.appDataDir) / 'webauto' / 'results.json', {})
+            result_id = (options or {}).get('resultId')
+            result = next((item for item in stored.get('collections', []) if item.get('id') == result_id), {}) if result_id else stored.get('result') or {}
+            rows = result.get('rows') or []
+            if not rows:
+                return api_error('没有可导出的采集结果，请先完成正式采集')
+            output = self._wa_export(rows, result.get('columns') or [], options or {})
+            return api_success('采集结果已导出', outputPath=output, total=len(rows))
+        except Exception as exc:
+            return api_error(f'导出失败：{exc}', errorCode='EXPORT_FAILED')
+
     def webauto_collect_start(self, options: Dict | None = None):
         """在当前点选会话的浏览器里就地采集。
 
@@ -1120,11 +1197,20 @@ class WebAutoTool:
                     return api_error('已有采集任务在进行中')
                 if self._wa_collect_req is not None:
                     return api_error('采集正在排队启动，请稍候')
-                config = self._wa_build_collect_config(options)
+                if options.get('retryResultId'):
+                    stored = StateStore(Config.appDataDir).load('webauto', Path(Config.appDataDir) / 'webauto/results.json', {})
+                    previous = next((item for item in stored.get('collections', []) if item.get('id') == options['retryResultId']), None)
+                    if not previous or not previous.get('config'):
+                        return api_error('此记录缺少续采信息，请重新验证样本后采集')
+                    config = {**previous['config'], '_resumeRows': previous['rows'], '_resume': previous.get('resume', {}),
+                              '_retryDetails': previous.get('detailFailures', [])}
+                else:
+                    config = self._wa_build_collect_config(options)
                 if not config['fields']:
                     return api_error('请先在浏览器里点选至少一个字段')
                 self._wa_run = self._wa_blank_run()
                 self._wa_run['running'] = True
+                self._wa_run['createdAt'] = time.time()
                 self._wa_run['columns'] = self._wa_compute_columns(config)
                 # 交给点选线程执行（线程亲和）
                 self._wa_run_stop.clear()
@@ -1195,14 +1281,18 @@ class WebAutoTool:
             },
             'limit': int(options.get('limit') or 0),
             'export': options.get('export') or {},
+            'sampleOnly': bool(options.get('sampleOnly')),
         }
 
     def _wa_collect_in_session(self, page, context, config: Dict[str, Any]) -> None:
         """在当前会话页面上执行采集（不开浏览器、不导航、不关闭）。结果写入 self._wa_run。
 
-        天然复用用户已在该浏览器中通过 CF / 登录 / 导航后的页面，彻底规避反爬。
+        复用用户已登录的浏览器会话与当前页面。
         """
-        rows: List[Dict[str, Any]] = []
+        rows: List[Dict[str, Any]] = [dict(row) for row in config.get('_resumeRows', [])]
+        detail_failures = []
+        resume = dict(config.get('_resume') or {})
+        snapshot_config = {key: value for key, value in config.items() if not key.startswith('_')}
         columns = self._wa_compute_columns(config)
         with self._wa_lock:
             self._wa_run['columns'] = list(columns)
@@ -1223,9 +1313,22 @@ class WebAutoTool:
             detail_link_field = detail.get('linkField') or ''
             detail_fields = detail.get('fields') or []
 
-            current_page = 0
-            while not self._wa_run_stop.is_set():
+            for failure in config.get('_retryDetails', []):
+                if self._wa_run_stop.is_set():
+                    detail_failures.append(failure)
+                    continue
+                try:
+                    self._wa_scrape_detail(context, failure['url'], detail_fields, rows[failure['row']])
+                except Exception as exc:
+                    detail_failures.append({**failure, 'error': str(exc)})
+            if resume.get('url') and not resume.get('completed') and page.url != resume['url']:
+                page.goto(resume['url'], wait_until='domcontentloaded', timeout=15000)
+            current_page = max(0, int(resume.get('page') or 1) - 1)
+            skip_rows = int(resume.get('offset') or 0)
+            expected_sample = resume.get('sample')
+            while not self._wa_run_stop.is_set() and not resume.get('completed'):
                 current_page += 1
+                resume = {**resume, 'url': page.url, 'page': current_page, 'offset': skip_rows, 'completed': False}
                 with self._wa_lock:
                     self._wa_run['page'] = current_page
                 try:
@@ -1240,11 +1343,18 @@ class WebAutoTool:
                         blocks = page.query_selector_all(container)
                     except Exception:
                         blocks = []
+                if container and not blocks:
+                    raise ValueError('列表选择器未命中，请检查登录状态和页面结构')
                 if not blocks:
-                    # 无容器或匹配不到 → 整页当作 1 条
                     blocks = [page]
+                sample = [self._wa_extract_block(block, fields) for block in blocks[:3]]
+                if skip_rows and expected_sample is not None and sample != expected_sample:
+                    raise ValueError('续采页面的内容或登录状态已变化，已保留原结果，请重新验证样本')
+                resume['sample'] = sample
 
-                for block in blocks:
+                for block_index, block in enumerate(blocks):
+                    if block_index < skip_rows:
+                        continue
                     if self._wa_run_stop.is_set():
                         break
                     if limit and len(rows) >= limit:
@@ -1256,32 +1366,49 @@ class WebAutoTool:
                         href = self._wa_block_link(block, fields, detail_link_field)
                         if href:
                             detail_url = self._wa_abs_url(page.url, href)
-                            self._wa_scrape_detail(context, detail_url, detail_fields, record)
+                            try:
+                                self._wa_scrape_detail(context, detail_url, detail_fields, record)
+                            except Exception as exc:
+                                detail_failures.append({'url': detail_url, 'row': len(rows), 'error': str(exc)})
 
                     rows.append(record)
+                    resume['offset'] = block_index + 1
                     with self._wa_lock:
                         self._wa_run['total'] = len(rows)
                         self._wa_run['rows'] = [dict(r) for r in rows[:50]]
 
+                if self._wa_run_stop.is_set():
+                    break
                 if limit and len(rows) >= limit:
+                    resume['completed'] = True
                     break
 
                 # 翻页
                 if not pg_enabled or current_page >= pg_max:
+                    resume['completed'] = True
                     break
                 if not pg_selector:
+                    resume['completed'] = True
                     break
+                if not config.get('sampleOnly'):
+                    self._wa_save_result(rows, columns, partial=True, config=snapshot_config, resume=resume, detailFailures=detail_failures)
                 try:
                     nxt = page.query_selector(pg_selector)
                     if not nxt:
+                        resume['completed'] = True
                         break
                     nxt.click()
                     page.wait_for_timeout(max(0, pg_wait))
-                except Exception:
-                    break
+                    skip_rows, expected_sample = 0, None
+                except Exception as exc:
+                    raise ValueError(f'翻页失败，已保留当前结果：{exc}') from exc
 
             # 导出
             output_path = ''
+            if not rows or not any(any(str(value).strip() for value in row.values()) for row in rows):
+                raise ValueError('没有采集到有效内容，请检查字段选择器或登录状态')
+            if not config.get('sampleOnly'):
+                self._wa_save_result(rows, columns, partial=bool(detail_failures or self._wa_run_stop.is_set()), config=snapshot_config, resume=resume, detailFailures=detail_failures)
             try:
                 output_path = self._wa_export(rows, columns, export)
             except Exception as exc:
@@ -1289,20 +1416,29 @@ class WebAutoTool:
                     self._wa_run['error'] = f'导出失败：{exc}'
 
             with self._wa_lock:
+                if detail_failures:
+                    self._wa_run['error'] = f'{len(detail_failures)} 条详情采集失败，可在任务中心重试失败项'
+                if self._wa_run_stop.is_set():
+                    self._wa_run['error'] = '采集已停止，已保留完成的记录'
                 self._wa_run['running'] = False
                 self._wa_run['stopping'] = False
                 self._wa_run['done'] = True
-                self._wa_run['success'] = True
+                self._wa_run['success'] = not bool(self._wa_run.get('error'))
                 self._wa_run['total'] = len(rows)
                 self._wa_run['rows'] = [dict(r) for r in rows[:50]]
                 self._wa_run['outputPath'] = output_path
         except Exception as exc:
+            if not config.get('sampleOnly'):
+                self._wa_save_result(rows, columns, partial=True, config=snapshot_config, resume=resume, detailFailures=detail_failures)
             with self._wa_lock:
                 self._wa_run['running'] = False
                 self._wa_run['stopping'] = False
                 self._wa_run['done'] = True
                 self._wa_run['success'] = False
                 self._wa_run['error'] = f'采集异常：{exc}'
+                self._wa_run['failures'] = [*self._wa_run.get('failures', []), {'input': resume.get('url', ''), 'error': str(exc), 'errorCode': 'COLLECTION_FAILED'}]
+                self._wa_run['total'] = len(rows)
+                self._wa_run['rows'] = [dict(row) for row in rows[:50]]
 
     # ------------------------------------------------------------------ #
     # 采集辅助方法
@@ -1386,11 +1522,14 @@ class WebAutoTool:
         tab = None
         try:
             tab = context.new_page()
-            tab.goto(detail_url, wait_until='domcontentloaded', timeout=60000)
+            response = tab.goto(detail_url, wait_until='domcontentloaded', timeout=15000)
+            if response and response.status >= 400:
+                raise ValueError(f'详情页返回 HTTP {response.status}')
             try:
                 tab.wait_for_timeout(300)
             except Exception:
                 pass
+            matched = 0
             for field in detail_fields:
                 name = field.get('name') or ''
                 selector = field.get('selector') or ''
@@ -1399,6 +1538,7 @@ class WebAutoTool:
                 try:
                     target = tab.query_selector(selector) if selector else None
                     if target is not None:
+                        matched += 1
                         if attr:
                             value = target.get_attribute(attr) or ''
                         else:
@@ -1406,8 +1546,8 @@ class WebAutoTool:
                 except Exception:
                     value = ''
                 record[name] = value
-        except Exception:
-            pass
+            if detail_fields and not matched:
+                raise ValueError('详情字段未命中，请检查登录状态或字段选择器')
         finally:
             try:
                 if tab is not None:
@@ -1458,7 +1598,7 @@ class WebAutoTool:
                 cells = table.add_row().cells
                 for i, col in enumerate(columns):
                     cells[i].text = str(r.get(col, ''))
-            doc.save(str(dest))
+            dest = write_output(dest, lambda target: doc.save(str(target)))
             return str(dest)
 
         # 默认 excel
@@ -1470,10 +1610,27 @@ class WebAutoTool:
         ws = wb.active
         ws.title = '采集结果'
         ws.append([str(c) for c in columns])
-        for r in rows:
-            ws.append([str(r.get(c, '')) for c in columns])
-        wb.save(str(dest))
+        try:
+            for r in rows:
+                ws.append([str(r.get(c, '')) for c in columns])
+                for cell in ws[ws.max_row]:
+                    cell.data_type = 's'
+            dest = write_output(dest, lambda target: wb.save(str(target)))
+        finally:
+            wb.close()
         return str(dest)
+
+    def _wa_save_result(self, rows, columns, partial=False, **metadata):
+        import uuid
+        store = StateStore(Config.appDataDir)
+        data = store.load('webauto', Path(Config.appDataDir) / 'webauto' / 'results.json', {})
+        result_id = self._wa_run.get('resultId') or uuid.uuid4().hex
+        self._wa_run['resultId'] = result_id
+        self._wa_run['failures'] = [{'input': item['url'], 'error': item['error'], 'errorCode': 'DETAIL_FAILED'} for item in metadata.get('detailFailures', [])]
+        result = {'id': result_id, 'rows': rows, 'columns': columns, 'updatedAt': time.time(), 'partial': partial, **metadata}
+        data['collections'] = [item for item in data.get('collections', []) if item.get('id') != result_id] + [result]
+        data['result'] = result
+        store.save('webauto', data)
 
     # ------------------------------------------------------------------ #
     # 9. 采集状态（前端轮询）
@@ -1495,6 +1652,9 @@ class WebAutoTool:
                     rows=[dict(r) for r in st['rows'][:50]],
                     outputPath=st['outputPath'],
                     error=st['error'],
+                    createdAt=st.get('createdAt', 0),
+                    resultId=st.get('resultId', ''),
+                    failures=list(st.get('failures', [])),
                 )
         except Exception as exc:
             return api_error(f'获取采集状态失败：{exc}')
@@ -1510,6 +1670,9 @@ class WebAutoTool:
                 if self._wa_run.get('running') and not self._wa_run.get('done'):
                     self._wa_run['stopping'] = True
                     self._wa_run_stop.set()
+                    cancellation = getattr(self, '_wa_active_cancel', None)
+                    if cancellation is not None:
+                        cancellation.set()
                     return api_success('正在停止采集，完成当前结果导出后结束')
             return api_success('采集已结束')
         except Exception as exc:

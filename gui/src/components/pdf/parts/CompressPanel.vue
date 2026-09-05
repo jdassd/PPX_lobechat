@@ -35,27 +35,15 @@
         <el-input v-model="form.outputName" placeholder="例如：压缩结果.pdf" />
       </el-form-item>
       <el-form-item>
-        <el-button
-          type="primary"
-          :loading="shared.loading"
-          @click="runCompress"
-        >
-          开始压缩
-        </el-button>
+        <el-button type="primary" :loading="shared.loading" @click="runCompress"> 开始压缩 </el-button>
       </el-form-item>
     </el-form>
-    <p class="dpi-hint">
-      推荐：低≈280 DPI（高清打印）、中≈200 DPI（通用传输）、高≈130 DPI（快速分享）。DPI 越低文件越小，越高越清晰。
-    </p>
+    <p class="dpi-hint">推荐：低≈280 DPI（高清打印）、中≈200 DPI（通用传输）、高≈130 DPI（快速分享）。DPI 越低文件越小，越高越清晰。</p>
     <div v-if="form.output" class="result-block">
       <p class="result-title">压缩后的 PDF</p>
       <el-scrollbar max-height="120px">
         <div class="result-list">
-          <el-tag
-            type="success"
-            effect="light"
-            @click="openPath(form.output)"
-          >
+          <el-tag type="success" effect="light" @click="openPath(form.output)">
             {{ form.output }}
           </el-tag>
         </div>
@@ -65,7 +53,8 @@
 </template>
 
 <script setup>
-import { computed, inject, reactive } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { computed, inject } from 'vue'
 import { ElMessage } from 'element-plus'
 
 const { callApi, openPath, pickPdf, pickDir } = inject('pdfApi')
@@ -77,7 +66,7 @@ const compressModeDpiMap = {
   high: 130
 }
 
-const form = reactive({
+const form = useDraft('pdf/parts/CompressPanel/form', {
   file: null,
   mode: 'medium',
   customDpi: 200,

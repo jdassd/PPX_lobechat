@@ -15,10 +15,15 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+from api.core.context import TaskContext, task_context
+from api.core.store import StateStore
+from api.core.worker import ISOLATED_PREFIXES, run_in_worker
+from api.operations import OPERATIONS, execute_operation
 from api.utils.error_handler import api_error, api_success
 from pyapp.config.config import Config
 
 TRACKED_METHODS = {
+    'webauto_collect', 'webauto_export', 'file_classify_undo', 'image_batch_rename_undo',
     'image_format_convert', 'image_batch_compress', 'image_crop', 'image_add_watermark',
     'image_rotate_flip', 'image_concat', 'image_batch_rename', 'image_to_pdf', 'ocr_image',
     'pdf_convert_to_images', 'pdf_convert_to_scan', 'pdf_compress', 'pdf_merge', 'pdf_split',
@@ -35,10 +40,10 @@ TRACKED_METHODS = {
     'format_center_convert', 'format_center_images_to_pdf', 'format_center_merge_pdfs',
 }
 _SENSITIVE_KEY = re.compile(r'(password|passwd|secret|token|cookie|authorization|api[_-]?key)', re.I)
-_MAX_TASKS = 200
+_MAX_TASKS = 1000
 _MAX_STRING = 200_000
-_TASK_STATUSES = ('queued', 'running', 'success', 'failed', 'interrupted', 'canceled')
-_TERMINAL_STATUSES = {'success', 'failed', 'interrupted', 'canceled'}
+_TASK_STATUSES = ('queued', 'running', 'canceling', 'success', 'partial', 'failed', 'interrupted', 'canceled')
+_TERMINAL_STATUSES = {'success', 'partial', 'failed', 'interrupted', 'canceled'}
 _OUTPUT_KEYS = ('output', 'outputPath', 'outputDir', 'path', 'archive', 'file')
 _OUTPUT_LIST_KEYS = ('outputs', 'files', 'created', 'items')
 
@@ -103,8 +108,10 @@ def _task_output_assets(result: Any) -> List[Dict[str, Any]]:
 
 def _task_diagnosis(task: Dict[str, Any]) -> Dict[str, str] | None:
     status = str(task.get('status') or '')
-    if status not in {'failed', 'interrupted', 'canceled'}:
+    if status not in {'partial', 'failed', 'interrupted', 'canceled'}:
         return None
+    if status == 'partial':
+        return {'category': 'partial', 'title': '部分项目未完成', 'suggestion': '打开逐项检查查看原因；批量文件任务重试时会跳过已完成项目。'}
     message = str(task.get('message') or '')
     lowered = message.lower()
     if status == 'interrupted':
@@ -215,12 +222,14 @@ class TaskMixin:
             task_dir = Path(Config.appDataDir) / 'tasks'
             task_dir.mkdir(parents=True, exist_ok=True)
             self._task_store_path = task_dir / 'history.json'
+            self._task_store = StateStore(Config.appDataDir)
             self._task_lock = threading.RLock()
             self._task_condition = threading.Condition(self._task_lock)
             self._task_items: Dict[str, Dict[str, Any]] = {}
             self._task_order: List[str] = []
             self._task_queue = deque()
             self._task_runtime_args: Dict[str, List[Any]] = {}
+            self._task_cancel_events = {}
             self._task_paused = False
             self._task_stopping = False
             self._task_load_locked()
@@ -229,23 +238,17 @@ class TaskMixin:
             self._task_worker_thread.start()
 
     def _task_load_locked(self) -> None:
-        items = []
-        for candidate in (self._task_store_path, self._task_store_path.with_suffix('.bak')):
-            try:
-                payload = json.loads(candidate.read_text(encoding='utf-8'))
-                items = payload.get('tasks', []) if isinstance(payload, dict) else []
-                if isinstance(items, list):
-                    break
-            except (OSError, ValueError, TypeError):
-                continue
+        payload = self._task_store.load('tasks', self._task_store_path, {'schemaVersion': 3, 'tasks': [], 'paused': False})
+        items = payload.get('tasks', [])
+        self._task_paused = bool(payload.get('paused'))
         if not isinstance(items, list):
             items = []
         changed = False
-        for item in items[:_MAX_TASKS]:
+        for item in items:
             if not isinstance(item, dict) or not item.get('id'):
                 continue
             task = dict(item)
-            if task.get('status') in {'queued', 'running'}:
+            if task.get('status') in {'queued', 'running', 'canceling'}:
                 task['status'] = 'interrupted'
                 task['message'] = '应用在任务完成前退出，可从任务中心重试'
                 task['endedAt'] = time.time()
@@ -257,23 +260,24 @@ class TaskMixin:
             self._task_persist_locked()
 
     def _task_persist_locked(self) -> None:
-        tasks = [self._task_items[task_id] for task_id in self._task_order[:_MAX_TASKS] if task_id in self._task_items]
-        payload = {'schemaVersion': 2, 'paused': self._task_paused, 'tasks': tasks}
-        temp_path = self._task_store_path.with_suffix('.tmp')
-        with temp_path.open('w', encoding='utf-8') as handle:
-            json.dump(payload, handle, ensure_ascii=False, indent=2)
-            handle.flush()
-            os.fsync(handle.fileno())
-        if self._task_store_path.is_file():
-            backup_temp = self._task_store_path.with_suffix('.bak.tmp')
-            shutil.copy2(self._task_store_path, backup_temp)
-            os.replace(backup_temp, self._task_store_path.with_suffix('.bak'))
-        os.replace(temp_path, self._task_store_path)
+        tasks = [self._task_items[task_id] for task_id in self._task_order if task_id in self._task_items]
+        self._task_store.save('tasks', {'schemaVersion': 3, 'paused': self._task_paused, 'tasks': tasks})
 
     @staticmethod
     def _task_snapshot(task: Dict[str, Any]) -> Dict[str, Any]:
         snapshot = dict(task)
-        snapshot['outputs'] = _task_output_assets(snapshot.get('result'))
+        result = snapshot.get('result') or {}
+        assets = result.get('outputAssets') if isinstance(result, dict) else None
+        if assets is None:
+            assets = _task_output_assets(result) if task.get('schemaVersion', 1) < 3 else []
+        assets = [*(snapshot.get('outputs') or []), *assets]
+        snapshot['outputs'] = list({item['path']: item for item in assets if isinstance(item, dict) and item.get('path')}.values())
+        completed = {item['input']: item for item in [*snapshot.get('itemResults', []), *result.get('itemResults', [])]
+                     if isinstance(item, dict) and item.get('input')} if isinstance(result, dict) else {}
+        if snapshot.get('inputItems'):
+            fallback = snapshot['status'] if snapshot['status'] in {'canceled', 'interrupted', 'failed'} else 'pending'
+            snapshot['itemResults'] = [completed.get(path, {'input': path, 'status': fallback, 'outputs': []})
+                                       for path in snapshot['inputItems']]
         diagnosis = _task_diagnosis(snapshot)
         if diagnosis:
             snapshot['diagnosis'] = diagnosis
@@ -303,7 +307,7 @@ class TaskMixin:
             metric['total'] += 1
             if status == 'success':
                 metric['success'] += 1
-            if status in {'failed', 'interrupted', 'canceled'}:
+            if status in {'partial', 'failed', 'interrupted', 'canceled'}:
                 metric['attention'] += 1
             started_at = task.get('startedAt')
             ended_at = task.get('endedAt')
@@ -319,7 +323,7 @@ class TaskMixin:
                     daily[task_day]['total'] += 1
                     if status == 'success':
                         daily[task_day]['success'] += 1
-                    if status in {'failed', 'interrupted', 'canceled'}:
+                    if status in {'partial', 'failed', 'interrupted', 'canceled'}:
                         daily[task_day]['attention'] += 1
 
         method_stats = []
@@ -334,12 +338,12 @@ class TaskMixin:
                 'averageDurationSeconds': round(metric['durationTotal'] / metric['durationCount'], 2) if metric['durationCount'] else 0,
             })
         method_stats.sort(key=lambda item: (-item['attention'], -item['total'], -item['averageDurationSeconds'], item['method']))
-        decisive = status_counts['success'] + status_counts['failed']
+        decisive = status_counts['success'] + status_counts['partial'] + status_counts['failed']
         return {
             'total': len(tasks),
-            'active': status_counts['queued'] + status_counts['running'],
-            'attention': status_counts['failed'] + status_counts['interrupted'] + status_counts['canceled'],
-            'finished': len(tasks) - status_counts['queued'] - status_counts['running'],
+            'active': status_counts['queued'] + status_counts['running'] + status_counts['canceling'],
+            'attention': status_counts['partial'] + status_counts['failed'] + status_counts['interrupted'] + status_counts['canceled'],
+            'finished': len(tasks) - status_counts['queued'] - status_counts['running'] - status_counts['canceling'],
             'successRate': round(status_counts['success'] * 100 / decisive, 1) if decisive else 0,
             'averageDurationSeconds': round(sum(durations) / len(durations), 2) if durations else 0,
             'statusCounts': status_counts,
@@ -376,16 +380,26 @@ class TaskMixin:
                     continue
                 task['status'] = 'running'
                 task['startedAt'] = time.time()
-                task['progress'] = 5
+                task['progress'] = None
                 task['message'] = '正在处理'
                 self._task_persist_locked()
                 method = task['method']
                 args = self._task_runtime_args.get(task_id, task.get('args', []))
+                cancellation = self._task_cancel_events.setdefault(task_id, threading.Event())
+            context = TaskContext(cancel=cancellation, callback=lambda payload: self._task_report(task_id, payload))
             try:
                 handler = getattr(self, method, None)
                 if not callable(handler) or method not in TRACKED_METHODS:
                     raise ValueError(f'不支持的任务方法：{method}')
-                result = handler(*args)
+                with task_context(context):
+                    if getattr(self, '_host', None) and method.startswith(ISOLATED_PREFIXES):
+                        result = run_in_worker(method, args, context)
+                    elif getattr(self, '_host', None):
+                        result = execute_operation(method, handler, args)
+                    else:
+                        result = handler(*args)
+                if context.outputs and isinstance(result, dict):
+                    result['outputAssets'] = list({asset['path']: asset for asset in [*context.outputs, *result.get('outputAssets', [])]}.values())
                 ok = self._task_ok(result)
                 safe_result, _ = _json_safe(result)
                 with self._task_condition:
@@ -395,27 +409,54 @@ class TaskMixin:
                     task['result'] = safe_result
                     task['progress'] = 100
                     task['endedAt'] = time.time()
-                    if task.get('cancelRequested'):
-                        task['status'] = 'canceled'
-                        task['message'] = '已响应取消请求；任务可能已产生部分输出'
+                    if task.get('cancelRequested') or cancellation.is_set():
+                        task['status'] = 'interrupted' if self._task_stopping else 'canceled'
+                        task['message'] = '处理已停止，已完成的输出已保留'
                     else:
-                        task['status'] = 'success' if ok else 'failed'
+                        task['status'] = 'partial' if result.get('partial') or (not ok and result.get('outputAssets')) else 'success' if ok else 'failed'
                         task['message'] = self._task_message(result, ok)
                     self._task_runtime_args.pop(task_id, None)
+                    self._task_cancel_events.pop(task_id, None)
                     self._task_persist_locked()
                     self._task_condition.notify_all()
             except Exception as exc:
                 with self._task_condition:
                     task = self._task_items.get(task_id)
                     if task:
-                        task['status'] = 'failed'
+                        task['status'] = ('interrupted' if self._task_stopping else 'canceled') if cancellation.is_set() else 'partial' if context.outputs else 'failed'
                         task['progress'] = 100
                         task['endedAt'] = time.time()
                         task['message'] = str(exc)
-                        task['result'] = {'code': -1, 'msg': str(exc)}
+                        task['result'] = {'code': -1, 'msg': str(exc), 'outputAssets': context.outputs,
+                                          'itemResults': task.get('itemResults', [])}
                         self._task_runtime_args.pop(task_id, None)
+                        self._task_cancel_events.pop(task_id, None)
                         self._task_persist_locked()
                         self._task_condition.notify_all()
+
+    def _task_report(self, task_id, payload):
+        with self._task_condition:
+            task = self._task_items.get(task_id)
+            if not task:
+                return
+            asset = payload.get('outputAsset')
+            if asset:
+                assets = task.setdefault('outputs', [])
+                if not any(item['path'] == asset['path'] for item in assets):
+                    assets.append(asset)
+            if payload.get('itemResult'):
+                task.setdefault('itemResults', []).append(payload['itemResult'])
+            if isinstance(payload.get('inputItems'), list):
+                task['inputItems'] = payload['inputItems']
+            if isinstance(payload.get('itemResults'), list):
+                task['itemResults'] = payload['itemResults']
+            for key in ('current', 'total', 'progress', 'message', 'workflowRunId'):
+                if key in payload and task.get('status') != 'canceling':
+                    task[key] = payload[key]
+            now = time.monotonic()
+            if asset or payload.get('inputItems') or now - getattr(self, '_task_last_progress_save', 0) >= 0.5:
+                self._task_persist_locked()
+                self._task_last_progress_save = now
 
     def task_methods(self):
         return api_success(methods=sorted(TRACKED_METHODS))
@@ -435,7 +476,7 @@ class TaskMixin:
             created_at = time.time()
             task = {
                 'id': task_id,
-                'schemaVersion': 2,
+                'schemaVersion': 3,
                 'method': method,
                 'args': safe_args,
                 'retryable': retryable,
@@ -457,12 +498,63 @@ class TaskMixin:
                     self._task_queue.appendleft(task_id)
                 else:
                     self._task_queue.append(task_id)
-                self._task_order = self._task_order[:_MAX_TASKS]
                 self._task_persist_locked()
                 self._task_condition.notify_all()
             return api_success('任务已加入队列', taskId=task_id, task=self._task_snapshot(task))
         except Exception as exc:
             return api_error(f'创建任务失败：{exc}')
+
+    def task_sync(self, options=None):
+        """One lightweight bridge call for all observed and active tasks."""
+        self._tasks_ensure()
+        ids = set((options or {}).get('ids') or [])
+        with self._task_lock:
+            selected = [self._task_snapshot(item) for item in self._task_items.values()
+                        if item['id'] in ids or item.get('status') in {'queued', 'running', 'canceling'}]
+            return api_success(tasks=selected, paused=self._task_paused)
+
+    def task_import_legacy(self, options=None):
+        """Import former browser history without enqueueing or repeating operations."""
+        try:
+            self._tasks_ensure()
+            records = (options or {}).get('tasks') or []
+            if not isinstance(records, list) or len(records) > 1000:
+                raise ValueError('旧任务记录格式错误或超过单批迁移上限')
+            imported = 0
+            with self._task_condition:
+                for record in records:
+                    if not isinstance(record, dict) or record.get('method') not in TRACKED_METHODS:
+                        continue
+                    identity = str(record.get('id') or '')
+                    if not identity or identity in self._task_items:
+                        continue
+                    safe, retryable = _json_safe(record)
+                    status = safe.get('status')
+                    if status not in {'success', 'partial', 'failed', 'canceled', 'interrupted'}:
+                        status = 'interrupted'
+                    timestamp = float(safe.get('startedAt') or safe.get('createdAt') or time.time())
+                    if timestamp > 10_000_000_000:
+                        timestamp /= 1000
+                    args = safe.get('args') or []
+                    if not isinstance(args, list):
+                        args, retryable = [], False
+                    legacy_result = safe.get('result') or {'outputAssets': safe.get('outputs') or []}
+                    if isinstance(legacy_result, dict) and 'outputAssets' not in legacy_result:
+                        legacy_result['outputAssets'] = _task_output_assets(legacy_result)
+                    self._task_items[identity] = {
+                        'id': identity, 'schemaVersion': 3, 'method': safe['method'], 'status': status,
+                        'args': args, 'retryable': bool(args and retryable and safe.get('retryable', True)),
+                        'createdAt': timestamp, 'startedAt': timestamp, 'endedAt': timestamp,
+                        'message': safe.get('message') or '从旧版迁移的处理记录', 'progress': 100,
+                        'result': legacy_result,
+                    }
+                    self._task_order.append(identity)
+                    imported += 1
+                self._task_order.sort(key=lambda identity: self._task_items[identity].get('createdAt', 0), reverse=True)
+                self._task_persist_locked()
+            return api_success('旧任务记录迁移完成', imported=imported)
+        except Exception as exc:
+            return api_error(f'旧记录迁移失败：{exc}')
 
     def task_get(self, options: Dict | str | None = None):
         try:
@@ -488,6 +580,7 @@ class TaskMixin:
             statuses = {str(item) for item in (raw_statuses or []) if str(item) in _TASK_STATUSES}
             method = str(options.get('method') or '').strip()
             query = str(options.get('query') or options.get('search') or '').strip().lower()
+            tool = str(options.get('tool') or '')
             with self._task_lock:
                 all_tasks = [
                     self._task_snapshot(self._task_items[task_id])
@@ -496,6 +589,9 @@ class TaskMixin:
                 ]
                 tasks = []
                 for task in all_tasks:
+                    descriptor = OPERATIONS.get(task.get('method'))
+                    if tool and (not descriptor or descriptor.tool != tool):
+                        continue
                     if statuses and task.get('status') not in statuses:
                         continue
                     if method and task.get('method') != method:
@@ -545,9 +641,11 @@ class TaskMixin:
                     task['message'] = '任务已取消'
                     task['endedAt'] = time.time()
                     task['progress'] = 100
-                elif task.get('status') == 'running':
+                elif task.get('status') in {'running', 'canceling'}:
                     task['cancelRequested'] = True
-                    task['message'] = '已请求取消，将在当前处理步骤结束后停止'
+                    task['status'] = 'canceling'
+                    task['message'] = '正在停止处理，已完成输出将保留'
+                    self._task_cancel_events.setdefault(task_id, threading.Event()).set()
                 else:
                     return api_error('该任务已经结束')
                 self._task_persist_locked()
@@ -563,12 +661,45 @@ class TaskMixin:
             task = self._task_items.get(task_id)
             if not task:
                 return api_error('任务不存在')
-            if task.get('status') not in {'failed', 'interrupted', 'canceled'}:
+            if task.get('status') not in {'partial', 'failed', 'interrupted', 'canceled'}:
                 return api_error('只有失败、中断或取消的任务可以重试')
             if not task.get('retryable', False):
                 return api_error('任务包含敏感或过大的参数，请返回工具页面重新提交')
             method = task['method']
-            args = task.get('args') or []
+            args = json.loads(json.dumps(task.get('args') or []))
+            result = task.get('result') or {}
+            if method == 'webauto_collect' and args and isinstance(args[0], dict) and result.get('resultId'):
+                args[0]['retryResultId'] = result['resultId']
+            if method == 'workflow_run' and args and isinstance(args[0], dict):
+                resume_id = result.get('run', {}).get('id') or task.get('workflowRunId')
+                if resume_id:
+                    args[0]['_resumeRunId'] = resume_id
+            descriptor = OPERATIONS.get(method)
+            batch_key = descriptor.batchKey if descriptor else None
+            if method == 'format_center_convert':
+                batch_key = 'files'
+            if method in {'file_batch_copy', 'file_batch_delete', 'file_batch_rename', 'file_auto_classify'} and task.get('inputItems'):
+                completed = {item.get('input') for item in task.get('itemResults', []) if item.get('status') in {'success', 'skipped'}}
+                remaining = [path for path in task['inputItems'] if path not in completed]
+                if not remaining:
+                    return api_error('所有文件均已完成，无需重新执行')
+                args[0]['_retryInputs'] = remaining
+                args[0]['_inputOrder'] = args[0].get('_inputOrder') or {path: index for index, path in enumerate(task['inputItems'])}
+            if method in {'pdf_convert_to_images', 'pdf_convert_to_scan'} and task.get('inputItems'):
+                completed = {item.get('input') for item in task.get('itemResults', []) if item.get('status') == 'success'}
+                args[0]['_retryPageNumbers'] = [int(path.rsplit('#page=', 1)[1]) for path in task['inputItems'] if path not in completed]
+                if not args[0]['_retryPageNumbers']:
+                    return api_error('所有页面均已完成，无需重新执行')
+            if batch_key and args and isinstance(args[0], dict):
+                successes = {item.get('input') for item in [*result.get('itemResults', []), *task.get('itemResults', [])] if item.get('status') == 'success'}
+                failures = {item.get('input') for item in result.get('failures', [])}
+                original = args[0].get(batch_key, [])
+                remaining = [item for item in original if (item.get('path') if isinstance(item, dict) else item) not in successes]
+                if task.get('status') == 'partial' and failures:
+                    remaining = [item for item in original if (item.get('path') if isinstance(item, dict) else item) in failures]
+                if not remaining:
+                    return api_error('所有文件均已完成，无需重新执行')
+                args[0][batch_key] = remaining
         return self.task_submit({'method': method, 'args': args, 'retryOf': task_id, 'priority': 1})
 
     @staticmethod
@@ -695,6 +826,10 @@ class TaskMixin:
             return
         with self._task_condition:
             self._task_stopping = True
+            for task_id, cancellation in self._task_cancel_events.items():
+                cancellation.set()
+                if task_id in self._task_items:
+                    self._task_items[task_id]['cancelRequested'] = True
             for task_id in list(self._task_queue):
                 task = self._task_items.get(task_id)
                 if task and task.get('status') == 'queued':
@@ -704,4 +839,4 @@ class TaskMixin:
             self._task_queue.clear()
             self._task_persist_locked()
             self._task_condition.notify_all()
-        self._task_worker_thread.join(timeout=1.5)
+        self._task_worker_thread.join(timeout=4)

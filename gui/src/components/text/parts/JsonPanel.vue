@@ -1,5 +1,6 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { useDraft } from '../../../utils/workspace'
+import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApi as pyCall, hasPyApi } from '@/utils/pyapi'
 
@@ -7,7 +8,7 @@ import PreviewPanel from '../../shared/PreviewPanel.vue'
 
 const loading = ref(false)
 
-const state = reactive({
+const state = useDraft('text/parts/JsonPanel/state', {
   operation: 'format',
   input: '',
   path: '',
@@ -26,7 +27,11 @@ const runJson = async () => {
   if (!ensurePyReady()) return
   loading.value = true
   try {
-    const { ok, data: res, message } = await pyCall('text_format_json', {
+    const {
+      ok,
+      data: res,
+      message
+    } = await pyCall('text_format_json', {
       operation: state.operation,
       content: state.input,
       path: state.path
@@ -61,20 +66,11 @@ const runJson = async () => {
         </el-select>
       </el-form-item>
       <el-form-item v-if="state.operation === 'query'" label="路径">
-        <el-input
-          v-model="state.path"
-          placeholder="示例：$.items[0].name"
-          clearable
-        />
+        <el-input v-model="state.path" placeholder="示例：$.items[0].name" clearable />
       </el-form-item>
     </el-form>
     <div class="text-grid">
-      <el-input
-        v-model="state.input"
-        type="textarea"
-        :rows="10"
-        placeholder="粘贴 JSON 字符串"
-      />
+      <el-input v-model="state.input" type="textarea" :rows="10" placeholder="粘贴 JSON 字符串" />
       <div class="text-grid-actions">
         <el-button type="primary" :loading="loading" @click="runJson">执行</el-button>
       </div>

@@ -27,6 +27,7 @@ except Exception:
 parser = argparse.ArgumentParser()
 parser.add_argument("-m", "--mac", action="store_true", dest="if_mac", help="if_mac")
 parser.add_argument("-l", "--linux", action="store_true", dest="if_linux", help="if_linux")
+parser.add_argument('--output-root', default='build', help='打包输出目录；验证包可使用独立目录')
 args = parser.parse_args()
 ifMac = args.if_mac
 ifLinux = args.if_linux
@@ -43,7 +44,7 @@ if 'generate_logo_icons' in globals() and generate_logo_icons is not None:
     generate_logo_icons()
 
 
-buildPath = 'build'  # dist directory (relative)
+buildPath = os.path.abspath(args.output_root).replace('\\', '/')
 console = False  # show console window
 appName = Config.appName  # project name (display)
 appCollectName = Config.appNameEN  # dist folder name
@@ -56,19 +57,13 @@ flyingMouseNode = f"('../../build/flyingmouse-runtime/{nodeRuntimeName}', 'vendo
 addDll = flyingMouseNode
 addModules = (
     "('../../gui/dist', 'web'), ('../../static', 'static'), "
+    "('../../api/operation_catalog.json', 'api'), "
     "('../../build/flyingmouse-source', 'vendor/flyingmouse-format'), "
     "('../../LICENSE', 'licenses'), ('../../THIRD_PARTY_NOTICES.md', 'licenses')"
 )
 
-# Hidden imports (uvicorn/sqlalchemy 等使用动态导入，PyInstaller 静态分析发现不了)
-hiddenImports = (
-    "'uvicorn', 'uvicorn.logging', 'uvicorn.loops', 'uvicorn.loops.auto', "
-    "'uvicorn.protocols', 'uvicorn.protocols.http', 'uvicorn.protocols.http.auto', "
-    "'uvicorn.protocols.http.h11_impl', "
-    "'uvicorn.lifespan', 'uvicorn.lifespan.on', "
-    "'aiosqlite', 'sqlalchemy.dialects.sqlite', 'sqlalchemy.dialects.sqlite.aiosqlite', "
-    "'greenlet', 'bcrypt', 'email_validator', 'pydantic_settings'"
-)
+# SQLAlchemy 的可选 SQL 后端使用动态加载的 SQLite 方言。
+hiddenImports = "'sqlalchemy.dialects.sqlite'"
 
 
 # Common first part of .spec content
@@ -121,6 +116,18 @@ a = Analysis(['../../main.py'],
             win_no_prefer_redirects=False,
             win_private_assemblies=False,
             noarchive=False)
+
+# Development databases and retired tool files stay on the user's machine.
+# Fresh user databases are created at first launch; SQL migration scripts remain.
+def _bundle_data_allowed(entry):
+    name = entry[0].replace(chr(92), '/').lower()
+    if name.startswith('static/mindmap/'):
+        return False
+    if name.startswith('static/db/') and not (name.endswith('.sql') or name.endswith('/version')):
+        return False
+    return not name.endswith('/.dbkey')
+
+a.datas = [entry for entry in a.datas if _bundle_data_allowed(entry)]
 
 # FlyingMouse's prebuilt Node addons must keep their npm directory layout intact.
 # Analysis auto-classifies .node/.dylib/.so files as binaries; on macOS that turns
