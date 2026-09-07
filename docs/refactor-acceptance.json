@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "version": "2.8.0",
+  "version": "2.8.1",
   "note": "发布决定与验收状态分开记录；未验证项目保持 pending，不因发版改为 passed。",
   "release": {
-    "tag": "v2.8.0",
+    "tag": "v2.8.1",
     "allowPendingAcceptance": true,
-    "reason": "用户明确要求直接升级为 v2.8.0 并推送标签触发 GitHub 正式发版；发布说明保留未完成验收项。"
+    "reason": "用户明确要求将本次许可说明与非商用倡议文案更新推送标签触发自动发版，本次发布为 v2.8.1；沿用 v2.8.0 的未完成验收项，发布说明继续披露，不将其标记为通过。"
   },
   "phases": {
     "1": { "status": "pending", "evidence": "" },

@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Vue-3.0+-4FC08D?style=flat-square&logo=vue.js&logoColor=white" alt="Vue 3" />
   <img src="https://img.shields.io/badge/Python-3.10-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.10" />
   <img src="https://img.shields.io/badge/Pywebview-5.0+-FFD43B?style=flat-square&logo=python&logoColor=blue" alt="Pywebview" />
-  <img src="https://img.shields.io/badge/version-2.8.0-2b6fff?style=flat-square" alt="Version 2.8.0" />
+  <img src="https://img.shields.io/badge/version-2.8.1-2b6fff?style=flat-square" alt="Version 2.8.1" />
   <img src="https://img.shields.io/badge/License-AGPL--3.0-green?style=flat-square" alt="License" />
 </p>
 
@@ -20,15 +20,15 @@
 
 ## 📖 简介
 
-**PPX 2.8.0** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
+**PPX 2.8.1** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
 
 2.8 重构桌面服务、任务执行和工作区：保留操作草稿，统一输出结果与失败重试，完善文档、表格、图片、媒体和自动化流程，并移除思维导图功能。已有导图用户文件保留。
 
-更新内容与验收范围见 [v2.8.0 发布说明](docs/releases/v2.8.0.md)。
+更新内容与验收范围见 [v2.8.1 发布说明](docs/releases/v2.8.1.md)。
 
 ## ✨ 主要功能
 
-PPX 2.8.0 的核心能力包括：
+PPX 2.8.1 的核心能力包括：
 
 ### 📄 文档与数据
 

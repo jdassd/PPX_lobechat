@@ -80,4 +80,6 @@ pyapp/package/exe/InnoSetup6/ISCC.exe pyapp/package/exe/InnoSetup.iss
 3. **真实升级、退出与恢复联测**：已有文件/数据库级回归，还需在安装后的应用中执行恢复后首次启动、升级回退、系统重启、进程异常退出和磁盘故障后的完整流程。
 4. **真实登录网站验证**：采集集成测试使用受控页面，真实站点的登录持久化、二次验证、动态翻页和会话失效需要选定站点后的实际验收。
 
-`docs/refactor-acceptance.json` 分别记录待验收项目与用户明确的 v2.8.0 发布决定。`pyapp/package/verifyRelease.js` 始终校验版本一致性；仅对该明确指定的正式标签允许带 pending 验收项发布，并输出未完成清单。此决定不自动适用于后续版本。
+`docs/refactor-acceptance.json` 分别记录待验收项目与用户明确的发布决定。`pyapp/package/verifyRelease.js` 始终校验版本一致性；仅对该明确指定的正式标签允许带 pending 验收项发布，并输出未完成清单。此决定不自动适用于后续版本。
+
+2026-09-07：用户要求将许可说明与非商用倡议文案更新推送标签触发自动发版，本次发布为 v2.8.1。发布决定已更新到验收记录；上述重构验收范围与 pending 状态继续保留。
