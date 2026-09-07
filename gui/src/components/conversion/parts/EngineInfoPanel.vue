@@ -33,7 +33,7 @@ const groups = computed(() =>
       <div>
         <span class="eyebrow">本地转换引擎</span>
         <h2>{{ engine.metadata.name }}</h2>
-        <p>PPX 通过其公开 CLI 调用转换能力，文件仍在本机处理。</p>
+        <p>转换引擎由 {{ engine.metadata.author }} 开发，PPX 通过其公开 CLI 调用转换能力，文件仍在本机处理。</p>
       </div>
       <el-button :loading="engine.loading" @click="emit('refresh')"
         ><el-icon><Refresh /></el-icon>重新检测</el-button
@@ -78,8 +78,8 @@ const groups = computed(() =>
     </section>
 
     <footer class="license-note">
-      <b>作者与许可</b>
-      <p>转换引擎版权归 {{ engine.metadata.author }} 所有，采用“{{ engine.metadata.license }}”。PPX 经授权内置其 CLI 运行时并保留署名，不把 FlyingMouse 代码声明为 PPX 自有实现。</p>
+      <b>本项目非商用说明</b>
+      <p>PPX 面向个人学习、研究及非商业用途，倡议非商用使用，请勿用于软件销售、付费分发或收费服务。代码授权条款以项目 LICENSE 为准。</p>
     </footer>
   </section>
 </template>

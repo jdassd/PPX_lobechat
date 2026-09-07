@@ -17,7 +17,7 @@ export const TOOLS = [
     capability: 'flyingmouse',
     badge: '内置 FlyingMouse',
     points: ['图片、Office、PDF、音视频互转', '混合批量与目标格式记忆', '图片合成 PDF 与 PDF 合并'],
-    features: [feature('universal', '通用格式转换', ['格式', '转换', 'Office', '音频', '视频'], { featured: true }), feature('images-pdf', '图片合成 PDF', ['图片转 PDF', '装订'], { featured: true }), feature('merge-pdf', 'PDF 合并', ['组合 PDF']), feature('engine', '转换引擎与许可', ['FlyingMouse', '依赖', '运行时'])]
+    features: [feature('universal', '通用格式转换', ['格式', '转换', 'Office', '音频', '视频'], { featured: true }), feature('images-pdf', '图片合成 PDF', ['图片转 PDF', '装订'], { featured: true }), feature('merge-pdf', 'PDF 合并', ['组合 PDF']), feature('engine', '转换引擎与说明', ['FlyingMouse', '依赖', '运行时', '非商用'])]
   },
   {
     id: 'image',

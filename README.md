@@ -110,7 +110,7 @@ PPX 2.8.0 的核心能力包括：
     pnpm run start
     ```
 
-`pnpm run init` 会准备内置 FlyingMouse 的生产依赖；若克隆时未带子模块，可先运行 `git submodule update --init --recursive`。运行时与许可细节见[转换引擎接入说明](docs/flyingmouse-format-integration.md)。
+`pnpm run init` 会准备内置 FlyingMouse 的生产依赖；若克隆时未带子模块，可先运行 `git submodule update --init --recursive`。运行时细节见[转换引擎接入说明](docs/flyingmouse-format-integration.md)。
 
 ### 质量检查
 
@@ -185,8 +185,8 @@ PPX/
 
 - **Issues**: [GitHub Issues](https://github.com/jdassd/PPX_lobechat/issues)
 
-## 📄 开源协议
+## 📄 非商用说明与开源协议
 
-PPX 自有代码采用 [GNU AGPL v3](LICENSE) 开源协议。
+PPX 面向个人学习、研究及非商业用途，倡议非商用使用，请勿用于软件销售、付费分发或收费服务。
 
-安装包内置的 FlyingMouse Format 仍是具有独立版权与许可的上游组件，其许可不因 PPX 的 AGPL v3 而改变。作者署名、授权边界和依赖声明见[转换引擎接入说明](docs/flyingmouse-format-integration.md)与[第三方组件声明](THIRD_PARTY_NOTICES.md)。
+上述说明为项目使用倡议，不修改现有许可证。PPX 自有代码仍采用 [GNU AGPL v3](LICENSE)，代码授权条款以该许可证为准。第三方组件信息见[第三方组件声明](THIRD_PARTY_NOTICES.md)。

@@ -13,7 +13,7 @@ const TABS = [
   { name: 'universal', label: '通用转换', icon: Refresh },
   { name: 'images-pdf', label: '图片合成 PDF', icon: Picture },
   { name: 'merge-pdf', label: 'PDF 合并', icon: Files },
-  { name: 'engine', label: '引擎与许可', icon: InfoFilled }
+  { name: 'engine', label: '引擎与说明', icon: InfoFilled }
 ]
 
 const props = defineProps({ initialTab: { type: String, default: '' } })
@@ -28,8 +28,7 @@ const engine = reactive({
   optional: [],
   metadata: {
     name: 'FlyingMouse Format',
-    author: '牢蜂（LaoFeng）',
-    license: '个人非商用许可'
+    author: '牢蜂（LaoFeng）'
   }
 })
 

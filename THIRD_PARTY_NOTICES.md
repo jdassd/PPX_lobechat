@@ -20,4 +20,4 @@ PPX 安装包包含当前目标平台的 Node.js 运行时，用于启动内置 
 
 ## 可选转换引擎
 
-FFmpeg、LibreOffice、Poppler、Tesseract、qpdf 等大型引擎不作为 FlyingMouse 源码的一部分重新授权。PPX 仅在用户系统或独立合规运行时提供这些组件时启用相应格式，实际可用能力以“转换中心 → 引擎与许可”页面为准。
+FFmpeg、LibreOffice、Poppler、Tesseract、qpdf 等大型引擎不作为 FlyingMouse 源码的一部分重新授权。PPX 仅在用户系统或独立合规运行时提供这些组件时启用相应格式，实际可用能力以“转换中心 → 引擎与说明”页面为准。
