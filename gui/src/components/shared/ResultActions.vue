@@ -8,7 +8,8 @@ import { callApiRaw } from '../../utils/pyapi'
 import { handoffAssets } from '../../utils/workspace'
 import { getResultRoutes } from '../../utils/resultRouting.mjs'
 
-const props = defineProps({ assets: { type: Array, default: () => [] } })
+const props = defineProps({ assets: { type: Array, default: () => [] }, sourceTaskId: { type: String, default: '' } })
+const emit = defineEmits(['sent'])
 const { state: capabilities, loadCapabilities } = useCapabilities()
 const opened = ref(false)
 const page = ref(1)
@@ -64,7 +65,10 @@ const openFile = async (asset) => {
 }
 const send = () => {
   if (!plan.value?.acceptedCount || plan.value.unavailable) return
-  if (handoffAssets(plan.value.assets, routeId.value)) opened.value = false
+  if (handoffAssets(plan.value.assets, routeId.value, props.sourceTaskId)) {
+    opened.value = false
+    emit('sent')
+  }
 }
 </script>
 

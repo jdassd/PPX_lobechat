@@ -80,7 +80,7 @@ const run = async () => {
   const revision = ++version
   form.groups = []
   form.files = []
-  const result = await request('excel_split_by_column', { filePath: form.file.path, sheetName: form.sheet, schemaText: form.schemaText, delimiter: form.delimiter, column: form.column, minRows: form.minRows, limit: form.limit, emptyLabel: form.emptyLabel, outputDir: form.outputDir, ...readingRules() }, () => revision === version)
+  const result = await request('excel_split_by_column', { filePath: form.file.path, sheetName: form.sheet, schemaText: form.schemaText, delimiter: form.delimiter, column: form.column, minRows: form.minRows, limit: form.limit, emptyLabel: form.emptyLabel, outputDir: form.outputDir, ...readingRules() }, () => revision === version, [form.file])
   if (result) {
     form.groups = result.groups || []
     form.files = result.files || []

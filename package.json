@@ -1,7 +1,7 @@
 {
   "name": "tools",
   "private": true,
-  "version": "2.10.0",
+  "version": "2.11.0",
   "description": "本地优先的图片、文档、表格与文件批处理桌面工作台",
   "author": "jdassd <jdassd@163.com>",
   "scripts": {
@@ -81,7 +81,7 @@
     "format:py:macos": "node ./pyapp/package/python.js -m ruff format .",
     "format:py:windows": "node ./pyapp/package/python.js -m ruff format .",
     "test": "run-script-os",
-    "test:gui": "node --test tests/frontend/resultRouting.test.mjs",
+    "test:gui": "node --test tests/frontend/resultRouting.test.mjs tests/frontend/inputOrigins.test.mjs",
     "test:e2e": "pnpm -C ./gui run build && node ./pyapp/package/python.js tests/e2e/workspace_flow.py",
     "test:linux": "node ./pyapp/package/python.js -m unittest discover -s tests -v",
     "test:macos": "node ./pyapp/package/python.js -m unittest discover -s tests -v",

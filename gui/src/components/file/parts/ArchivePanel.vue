@@ -2,7 +2,7 @@
 import { mergeFileQueue, useDraft } from '../../../utils/workspace'
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { callApi as pyCall, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
+import { callApi as pyCall, callTaskApi, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
 
 import ResultTable from '../../shared/ResultTable.vue'
 
@@ -96,13 +96,17 @@ const runCompress = async () => {
       ok,
       data: res,
       message
-    } = await pyCall('file_compress', {
-      items: archive.items.map((item) => item.path || item),
-      format: archive.format,
-      archiveName: archive.archiveName,
-      outputDir: archive.outputDir,
-      password: archive.password
-    })
+    } = await callTaskApi(
+      'file_compress',
+      {
+        items: archive.items.map((item) => item.path || item),
+        format: archive.format,
+        archiveName: archive.archiveName,
+        outputDir: archive.outputDir,
+        password: archive.password
+      },
+      archive.items
+    )
     if (ok) {
       archive.result = res.file || ''
       ElMessage.success(message || '压缩完成')

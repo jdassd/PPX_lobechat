@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 from api.core.context import TaskContext, task_context
+from api.core.input_origins import retry_origins, validate_origins
 from api.core.store import StateStore
 from api.core.worker import ISOLATED_PREFIXES, run_in_worker
 from api.operations import OPERATIONS, execute_operation
@@ -263,9 +264,12 @@ class TaskMixin:
         tasks = [self._task_items[task_id] for task_id in self._task_order if task_id in self._task_items]
         self._task_store.save('tasks', {'schemaVersion': 3, 'paused': self._task_paused, 'tasks': tasks})
 
-    @staticmethod
-    def _task_snapshot(task: Dict[str, Any]) -> Dict[str, Any]:
+    def _task_snapshot(self, task: Dict[str, Any]) -> Dict[str, Any]:
         snapshot = dict(task)
+        snapshot['inputOrigins'] = [
+            {**item, 'sourceAvailable': item.get('sourceTaskId') in self._task_items}
+            for item in task.get('inputOrigins', []) if isinstance(item, dict)
+        ]
         result = snapshot.get('result') or {}
         assets = result.get('outputAssets') if isinstance(result, dict) else None
         if assets is None:
@@ -462,6 +466,9 @@ class TaskMixin:
         return api_success(methods=sorted(TRACKED_METHODS))
 
     def task_submit(self, options: Dict | None = None):
+        return self._task_create(options)
+
+    def _task_create(self, options=None, *, retry_source=None):
         try:
             self._tasks_ensure()
             options = options or {}
@@ -491,6 +498,16 @@ class TaskMixin:
                 'result': None,
             }
             with self._task_condition:
+                if retry_source is not None:
+                    task['inputOrigins'] = retry_origins(retry_source.get('inputOrigins', []), method, args)
+                    task['inputOriginWarnings'] = []
+                else:
+                    def source_lookup(identity):
+                        source = self._task_items.get(identity)
+                        return self._task_snapshot(source) if source else None
+
+                    task['inputOrigins'], task['inputOriginWarnings'] = validate_origins(
+                        options.get('inputOrigins'), method, args, source_lookup)
                 self._task_items[task_id] = task
                 self._task_order.insert(0, task_id)
                 self._task_runtime_args[task_id] = args
@@ -700,7 +717,7 @@ class TaskMixin:
                 if not remaining:
                     return api_error('所有文件均已完成，无需重新执行')
                 args[0][batch_key] = remaining
-        return self.task_submit({'method': method, 'args': args, 'retryOf': task_id, 'priority': 1})
+            return self._task_create({'method': method, 'args': args, 'retryOf': task_id, 'priority': 1}, retry_source=task)
 
     @staticmethod
     def _task_batch_ids(options: Dict | None = None) -> List[str]:

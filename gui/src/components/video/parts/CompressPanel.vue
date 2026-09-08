@@ -3,7 +3,7 @@ import VideoInspection from '../../shared/VideoInspection.vue'
 import { useDraft } from '../../../utils/workspace'
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { callApi as pyCall, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
+import { callTaskApi, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
 
 const videoFilter = ['视频文件 (*.mp4;*.mov;*.avi;*.mkv;*.webm)']
 
@@ -61,15 +61,19 @@ const runCompress = async () => {
       ok,
       data: res,
       message
-    } = await pyCall('video_compress', {
-      filePath: form.file.path,
-      mode: form.mode,
-      bitrate: form.bitrate,
-      targetSizeMB: form.targetSizeMB,
-      preset: form.preset,
-      ffPreset: form.ffPreset,
-      outputDir: form.outputDir
-    })
+    } = await callTaskApi(
+      'video_compress',
+      {
+        filePath: form.file.path,
+        mode: form.mode,
+        bitrate: form.bitrate,
+        targetSizeMB: form.targetSizeMB,
+        preset: form.preset,
+        ffPreset: form.ffPreset,
+        outputDir: form.outputDir
+      },
+      [form.file]
+    )
     if (ok) {
       form.result = res.file || ''
       ElMessage.success(message || '压缩完成')

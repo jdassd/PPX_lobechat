@@ -30,6 +30,8 @@ class TaskSnapshot:
     current: int = 0
     total: int = 0
     outputs: list[dict] = field(default_factory=list)
+    inputOrigins: list[dict] = field(default_factory=list)
+    inputOriginWarnings: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -40,6 +42,7 @@ class OperationDescriptor:
     label: str
     fields: list[dict] = field(default_factory=list)
     batchKey: str | None = None
+    primaryInputFields: list[str] = field(default_factory=list)
 
 
 _CATALOG = json.loads(Path(__file__).with_name('operation_catalog.json').read_text(encoding='utf-8'))

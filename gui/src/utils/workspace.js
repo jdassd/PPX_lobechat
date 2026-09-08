@@ -1,5 +1,8 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { planResultHandoff } from './resultRouting.mjs'
+import { fileIdentity } from './inputOrigins.mjs'
+
+export { fileIdentity } from './inputOrigins.mjs'
 
 const drafts = new Map()
 export const draftKeys = ref([])
@@ -11,10 +14,6 @@ export const currentIncomingAssets = computed(() => (incomingRoute.value.split('
 export function clearIncomingFiles() {
   incomingAssets.value = []
   incomingRoute.value = ''
-}
-export function fileIdentity(path) {
-  const value = String(path || '')
-  return /^[a-z]:[\\/]|^\\\\/i.test(value) ? value.replace(/\\/g, '/').toLowerCase() : value
 }
 export function mergeFileQueue(current, incoming) {
   const result = [...current]
@@ -35,13 +34,13 @@ export function consumeIncomingFiles(routeId) {
   if (!routeId || routeId !== incomingRoute.value || routeId.split('/')[0] !== workspaceTool.value) return []
   const files = currentIncomingAssets.value.map((asset) => {
     const filename = asset.path.split(/[\\/]/).pop()
-    return { path: asset.path, filename, ext: filename.includes('.') ? '.' + filename.split('.').pop() : '', dir: asset.path.slice(0, -filename.length) }
+    return { path: asset.path, filename, ext: filename.includes('.') ? '.' + filename.split('.').pop() : '', dir: asset.path.slice(0, -filename.length), ...(asset.origin ? { origin: { ...asset.origin } } : {}) }
   })
   if (files.length) clearIncomingFiles()
   return files
 }
 const CONFIG_PREFIX = 'ppx-workspace-v1:'
-const PRIVATE_OR_RUNTIME = /password|passwd|secret|token|cookie|authorization|api.?key|^files?$|filePath|^source$|^input$|^text$|content|preview|result|output$|outputs$|generated|loading|busy|logs|schema$|sheets|groups|summary|profiles|operations|skipped|history|dataUrl|base64|^left$|^right$/i
+const PRIVATE_OR_RUNTIME = /password|passwd|secret|token|cookie|authorization|api.?key|^files?$|filePath|^source$|^input$|^text$|^origin$|^inputOrigins$|^inputOriginWarnings$|^sourceTaskId$|content|preview|result|output$|outputs$|generated|loading|busy|logs|schema$|sheets|groups|summary|profiles|operations|skipped|history|dataUrl|base64|^left$|^right$/i
 
 export function safeConfiguration(value, depth = 0) {
   if (depth > 5 || !value || typeof value !== 'object') return {}
@@ -94,10 +93,10 @@ export function useDraft(key, defaults) {
 
 export const getDraft = (key) => drafts.get(key)
 export const draftsForTool = (tool) => computed(() => draftKeys.value.filter((key) => key.startsWith(`${tool}/`)))
-export function handoffAssets(assets, routeId) {
+export function handoffAssets(assets, routeId, sourceTaskId = '') {
   const plan = planResultHandoff(assets, routeId)
   if (!plan.acceptedCount || plan.acceptedCount < (plan.route.capability?.minimumAssets || 1)) return false
-  incomingAssets.value = plan.assets.map((asset) => ({ ...asset }))
+  incomingAssets.value = plan.assets.map((asset) => ({ ...asset, origin: sourceTaskId ? { sourceTaskId, sourceAssetPath: asset.path } : undefined }))
   incomingRoute.value = routeId
   const [tool, feature = ''] = routeId.split('/')
   window.dispatchEvent(new CustomEvent('ppx-navigate', { detail: { tool, feature } }))

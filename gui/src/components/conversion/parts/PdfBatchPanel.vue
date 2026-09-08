@@ -4,7 +4,7 @@ import { computed, ref } from 'vue'
 import { FolderOpened, Loading, Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
-import { callApi, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
+import { callTaskApi, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
 import ConversionFileQueue from './ConversionFileQueue.vue'
 
 const props = defineProps({
@@ -88,11 +88,15 @@ const run = async () => {
   results.value = []
   try {
     const method = isMerge.value ? 'format_center_merge_pdfs' : 'format_center_images_to_pdf'
-    const { ok, data, message } = await callApi(method, {
-      files: files.value.map(filePath),
-      outputDir: form.outputDir,
-      outputName: form.outputName
-    })
+    const { ok, data, message } = await callTaskApi(
+      method,
+      {
+        files: files.value.map(filePath),
+        outputDir: form.outputDir,
+        outputName: form.outputName
+      },
+      files.value
+    )
     if (!ok) throw new Error(message || '生成 PDF 失败')
     const payload = data && typeof data === 'object' ? data : {}
     const rawOutputs = Array.isArray(payload.outputs) ? payload.outputs : Array.isArray(payload.files) ? payload.files : []

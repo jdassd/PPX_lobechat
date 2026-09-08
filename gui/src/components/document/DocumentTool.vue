@@ -2,7 +2,7 @@
 import { mergeFileQueue, useDraft } from '../../utils/workspace'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { callApi, callApiRaw, selectInputFiles } from '@/utils/pyapi'
+import { callApi, callTaskApi, callApiRaw, selectInputFiles } from '@/utils/pyapi'
 
 const props = defineProps({ initialTab: { type: String, default: '' } })
 const activeTab = ref(props.initialTab || 'search')
@@ -93,7 +93,7 @@ const chooseFiles = async () => {
   const files = await selectInputFiles('document/index', ['支持的文档 (*.pdf;*.docx;*.xlsx;*.xlsm;*.txt;*.md;*.markdown;*.csv;*.json;*.log)'])
   indexForm.files = mergeFileQueue(
     indexForm.files,
-    (files || []).filter((file) => file?.path).map((file) => file.path)
+    (files || []).filter((file) => file?.path)
   )
 }
 
@@ -101,7 +101,7 @@ const buildIndex = async () => {
   if (!indexForm.directories.length && !indexForm.files.length) return ElMessage.warning('请先添加至少一个目录或文件')
   indexing.value = true
   try {
-    const response = await callApi('document_index_build', { ...indexForm })
+    const response = await callTaskApi('document_index_build', { ...indexForm, files: indexForm.files.map((file) => file?.path || file) }, indexForm.files)
     if (response.ok) {
       ElMessage.success(response.message || '索引更新完成')
       await refreshStatus()
@@ -272,8 +272,8 @@ onMounted(refreshStatus)
           </div>
           <h4>单独文件</h4>
           <div class="directory-list file-list">
-            <div v-for="(file, index) in indexForm.files" :key="file" class="directory-item">
-              <span>{{ file }}</span
+            <div v-for="(file, index) in indexForm.files" :key="file?.path || file" class="directory-item">
+              <span>{{ file?.path || file }}</span
               ><el-button text type="danger" @click="indexForm.files.splice(index, 1)">移除</el-button>
             </div>
             <el-empty v-if="!indexForm.files.length" :image-size="48" description="可按需添加单个文档" />

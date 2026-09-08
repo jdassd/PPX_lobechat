@@ -82,7 +82,7 @@ const exportReport = async () => {
   if (!form.file) return ElMessage.warning('请先选择 Excel 文件')
   const revision = ++version
   form.output = ''
-  const result = await request('excel_quality_report', { ...payload(), outputDir: form.outputDir }, () => revision === version)
+  const result = await request('excel_quality_report', { ...payload(), outputDir: form.outputDir }, () => revision === version, [form.file])
   if (result) {
     form.output = result.output || ''
     ElMessage.success(result.msg || '报告已生成')
@@ -93,7 +93,7 @@ const run = async () => {
   if (!form.file) return ElMessage.warning('请先选择 Excel 文件')
   const revision = ++version
   Object.assign(form, { summary: null, profiles: [], output: '' })
-  const result = await request('excel_column_profile', payload(), () => revision === version)
+  const result = await request('excel_column_profile', payload(), () => revision === version, [form.file])
   if (result) {
     form.summary = result.summary || null
     form.profiles = result.profiles || []

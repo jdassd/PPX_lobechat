@@ -4,7 +4,7 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ArrowRight, Delete, FolderOpened, Loading, Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
-import { callApi, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
+import { callApi, callTaskApi, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
 import ConversionFileQueue from './ConversionFileQueue.vue'
 
 const props = defineProps({ engine: { type: Object, required: true } })
@@ -266,14 +266,18 @@ const runConversion = async () => {
   warnings.value = []
   try {
     rememberTarget(form.targetFormat)
-    const { ok, data, message } = await callApi('format_center_convert', {
-      files: files.value.map(filePath),
-      targetFormat: form.targetFormat,
-      targets: Object.fromEntries(files.value.map((file) => [filePath(file), targetFor(file)])),
-      outputDir: form.outputDir,
-      compressionLevel: form.compressionLevel,
-      videoCodec: form.videoCodec
-    })
+    const { ok, data, message } = await callTaskApi(
+      'format_center_convert',
+      {
+        files: files.value.map(filePath),
+        targetFormat: form.targetFormat,
+        targets: Object.fromEntries(files.value.map((file) => [filePath(file), targetFor(file)])),
+        outputDir: form.outputDir,
+        compressionLevel: form.compressionLevel,
+        videoCodec: form.videoCodec
+      },
+      files.value
+    )
     const payload = data && typeof data === 'object' ? data : {}
     failures.value = Array.isArray(payload.failures) ? payload.failures : []
     form.outputDir = payload.outputDir || form.outputDir

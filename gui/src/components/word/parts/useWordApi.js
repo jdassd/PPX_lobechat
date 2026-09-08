@@ -6,7 +6,7 @@
  */
 
 import { ElMessage } from 'element-plus'
-import { callApi as pyCall, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
+import { callApi as pyCall, callTaskApi, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
 
 /**
  * 创建共享的 Word 调用层。
@@ -35,7 +35,7 @@ export function useWordApi(shared) {
     }
   }
 
-  const callApi = async (method, payload) => {
+  const callApi = async (method, payload, inputAssets = null) => {
     if (!ensurePyReady()) return null
     if (!window.pywebview.api[method]) {
       ElMessage.error('当前客户端版本缺少 Word 能力')
@@ -43,7 +43,7 @@ export function useWordApi(shared) {
     }
     shared.loading = true
     try {
-      const result = await pyCall(method, payload)
+      const result = await (inputAssets === null ? pyCall(method, payload) : callTaskApi(method, payload, inputAssets))
       if (result.ok) {
         ElMessage.success(result.message || '操作成功')
         pushLog('success', result.message || '操作成功', method, result.data)

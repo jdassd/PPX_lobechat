@@ -251,7 +251,7 @@ const runProcess = async () => {
   if (!state.preview.file || !schemaFields.value.length) return ElMessage.warning('请先选择 Excel 并读取工作表')
   clearResults()
   const sequence = processSequence
-  const res = await request('excel_process', processPayload(), () => sequence === processSequence)
+  const res = await request('excel_process', processPayload(), () => sequence === processSequence, [state.preview.file])
   if (!res) return
   Object.assign(state.process, { summary: res.summary, groups: res.groups || [], groupFiles: res.groupFiles || [], jsonPath: res.jsonPath || '', combinedPath: res.combinedPath || '' })
   ElMessage.success(res.msg || '完整数据处理完成')
@@ -271,7 +271,8 @@ const runMergeTables = async () => {
       outputDir: state.merge.outputDir,
       outputName: state.merge.outputName
     },
-    () => sequence === mergeSequence
+    () => sequence === mergeSequence,
+    state.merge.tables
   )
   if (res) {
     state.merge.result = res.output

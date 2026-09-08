@@ -35,6 +35,7 @@
 
 import { beginApiTask, isTaskMethod, settleApiTask, observeTask, hydrateBackendTasks } from './taskCenter'
 import { consumeIncomingFiles } from './workspace'
+import { getInputOrigins } from './inputOrigins.mjs'
 
 // 轮询兜底间隔（毫秒）与默认超时（毫秒）
 const POLL_INTERVAL = 50
@@ -153,6 +154,17 @@ export function normalizeResult(res) {
  * @throws {Error} 非桌面环境/就绪超时/方法不存在/后端执行异常 时抛出（带 message）
  */
 export async function callApi(method, ...args) {
+  return invokeApi(method, args)
+}
+
+/** Submit an operation with the file objects actually used by its primary input.
+ * Origins travel as task metadata and never enter the operation's arguments.
+ */
+export async function callTaskApi(method, options, inputAssets = []) {
+  return invokeApi(method, [options], getInputOrigins(inputAssets))
+}
+
+async function invokeApi(method, args, inputOrigins = []) {
   let taskId = null
   try {
     await whenPyReady()
@@ -163,7 +175,7 @@ export async function callApi(method, ...args) {
     const previewOnly = args[0]?.dryRun || ['file_search', 'file_deduplicate', 'excel_column_profile'].includes(method) || (method === 'ocr_table' && args[0]?.saveFile === false) || (method === 'seal_generate' && args[0]?.mode !== 'export')
     const shouldQueue = isTaskMethod(method) && !previewOnly && typeof api.task_submit === 'function' && typeof api.task_get === 'function'
     if (shouldQueue) {
-      const submitted = normalizeResult(await api.task_submit({ method, args }))
+      const submitted = normalizeResult(await api.task_submit({ method, args, inputOrigins }))
       if (!submitted.ok) return submitted
       taskId = submitted.data.taskId
       beginApiTask(method, args, taskId)

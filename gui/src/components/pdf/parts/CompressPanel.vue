@@ -111,13 +111,17 @@ const runCompress = async () => {
       return
     }
   }
-  const res = await callApi('pdf_compress', {
-    filePath: form.file.path,
-    mode: form.mode,
-    customDpi: form.customDpi,
-    outputDir: form.outputDir,
-    outputName: form.outputName
-  })
+  const res = await callApi(
+    'pdf_compress',
+    {
+      filePath: form.file.path,
+      mode: form.mode,
+      customDpi: form.customDpi,
+      outputDir: form.outputDir,
+      outputName: form.outputName
+    },
+    [form.file]
+  )
   if (res) {
     form.output = res.output
   }

@@ -3,7 +3,7 @@ import VideoInspection from '../../shared/VideoInspection.vue'
 import { useDraft } from '../../../utils/workspace'
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { callApi as pyCall, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
+import { callApi as pyCall, callTaskApi, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
 
 const videoFilter = ['视频文件 (*.mp4;*.mov;*.avi;*.mkv;*.webm)']
 
@@ -205,12 +205,16 @@ const runCut = async () => {
       ok,
       data: res,
       message
-    } = await pyCall('video_cut', {
-      filePath: form.file.path,
-      start: form.start,
-      end: form.end,
-      outputDir: form.outputDir
-    })
+    } = await callTaskApi(
+      'video_cut',
+      {
+        filePath: form.file.path,
+        start: form.start,
+        end: form.end,
+        outputDir: form.outputDir
+      },
+      [form.file]
+    )
     if (ok) {
       form.result = res.file || ''
       ElMessage.success(message || '截取完成')

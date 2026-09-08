@@ -3,7 +3,7 @@ import ImageEffectPreview from '../../shared/ImageEffectPreview.vue'
 import { mergeFileQueue, useDraft } from '../../../utils/workspace'
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { callApi as pyCall, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
+import { callTaskApi, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
 
 import FileSelector from '../../shared/FileSelector.vue'
 import ResultTable from '../../shared/ResultTable.vue'
@@ -125,7 +125,7 @@ const runWatermark = async () => {
       scalePercent: form.scalePercent,
       outputDir: form.outputDir
     }
-    const { ok, data: res, message } = await pyCall('image_add_watermark', payload)
+    const { ok, data: res, message } = await callTaskApi('image_add_watermark', payload, form.files)
     if (ok) {
       form.result = res.files || []
       form.generatedDir = res.outputDir || form.outputDir

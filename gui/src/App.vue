@@ -66,7 +66,7 @@ const density = ref(localStorage.getItem('ppx-density') || 'regular')
 
 const activeTool = computed(() => toolById(active.value))
 const activeView = computed(() => VIEWS[active.value] || HomeLauncher)
-const latestOutputs = computed(() => tasks.value.find((task) => task.tool === active.value && task.outputs?.length)?.outputs || [])
+const latestOutputTask = computed(() => tasks.value.find((task) => task.tool === active.value && task.outputs?.length))
 onMounted(() => {
   if (window.pywebview?.api) loadOperationCatalog()
   else window.addEventListener('pywebviewready', loadOperationCatalog, { once: true })
@@ -240,7 +240,7 @@ const toggleTheme = () => {
       <template #left>
         <div class="logo-area">
           <img class="logo-image" src="/logo.png" alt="" />
-          <span class="logo-label">多功能工具箱 <small>2.10.0</small></span>
+          <span class="logo-label">多功能工具箱 <small>2.11.0</small></span>
         </div>
       </template>
       <template #right>
@@ -275,7 +275,7 @@ const toggleTheme = () => {
             <div class="tool-desc">{{ activeTool.desc }}</div>
           </div>
           <WorkspacePresets :tool="active" />
-          <ResultActions :assets="latestOutputs" />
+          <ResultActions :assets="latestOutputTask?.outputs || []" :source-task-id="latestOutputTask?.id || ''" />
           <el-tag v-if="activeTool.badge" class="tool-badge" size="small" effect="plain">{{ activeTool.badge }}</el-tag>
         </header>
 

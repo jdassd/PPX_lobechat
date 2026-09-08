@@ -4,7 +4,7 @@ import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { DocumentChecked, FolderOpened, Picture, Upload } from '@element-plus/icons-vue'
 
-import { callApi, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
+import { callTaskApi, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
 
 const props = defineProps({
   sourceType: {
@@ -78,7 +78,7 @@ const run = async () => {
       dpi: form.dpi,
       outputMode: isPdf.value ? form.outputMode : 'text'
     }
-    const response = await callApi(isPdf.value ? 'ocr_pdf' : 'ocr_image', payload)
+    const response = await callTaskApi(isPdf.value ? 'ocr_pdf' : 'ocr_image', payload, [form.file])
     if (!response.ok) {
       ElMessage.error(response.message || 'OCR 识别失败')
       return

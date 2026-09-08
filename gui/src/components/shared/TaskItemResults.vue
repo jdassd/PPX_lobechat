@@ -29,7 +29,7 @@ watch(filter, () => {
       >
       <el-table-column prop="message" label="说明" min-width="240" show-overflow-tooltip />
       <el-table-column label="结果" width="190"
-        ><template #default="{ row }"><ResultActions v-if="row.outputs?.length" :assets="row.outputs" /></template
+        ><template #default="{ row }"><ResultActions v-if="row.outputs?.length" :assets="row.outputs" :source-task-id="task.id" /></template
       ></el-table-column>
     </el-table>
     <el-pagination v-model:current-page="page" :page-size="25" :total="filtered.length" layout="total, prev, pager, next" />

@@ -6,7 +6,7 @@ import { ElMessage } from 'element-plus'
 
 import FileSelector from '@/components/shared/FileSelector.vue'
 import ResultTable from '@/components/shared/ResultTable.vue'
-import { callApi, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
+import { callTaskApi, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
 
 const props = defineProps({ supportedFormats: { type: Object, required: true } })
 const loading = ref(false)
@@ -37,14 +37,18 @@ const run = async () => {
   }
   loading.value = true
   try {
-    const result = await callApi('image_rotate_flip', {
-      files: form.files.map((item) => item?.path || item),
-      operation: form.operation,
-      angle: form.angle,
-      flipHorizontal: form.flipHorizontal,
-      flipVertical: form.flipVertical,
-      outputDir: form.outputDir
-    })
+    const result = await callTaskApi(
+      'image_rotate_flip',
+      {
+        files: form.files.map((item) => item?.path || item),
+        operation: form.operation,
+        angle: form.angle,
+        flipHorizontal: form.flipHorizontal,
+        flipVertical: form.flipVertical,
+        outputDir: form.outputDir
+      },
+      form.files
+    )
     if (!result.ok) {
       ElMessage.error(result.message || '处理失败')
       return

@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { callApi, hasPyApi } from '@/utils/pyapi'
+import { callApi, callTaskApi, hasPyApi } from '@/utils/pyapi'
 
 // A response belongs to the input snapshot that started it, never the next file.
 export function useExcelRequest(onLog = () => {}) {
@@ -11,12 +11,12 @@ export function useExcelRequest(onLog = () => {}) {
     error.value = message
     ElMessage.error(message)
   }
-  const request = async (method, payload, current = () => true) => {
+  const request = async (method, payload, current = () => true, inputAssets = null) => {
     pending.value += 1
     if (current()) error.value = ''
     try {
       if (!hasPyApi()) throw new Error('请在桌面客户端中打开 Excel 工具后重试')
-      const result = await callApi(method, payload)
+      const result = await (inputAssets === null ? callApi(method, payload) : callTaskApi(method, payload, inputAssets))
       if (!current()) return null
       if (!result.ok) throw new Error(result.message || '操作失败，请检查文件与所选工作表后重试')
       onLog('success', result.message || '操作成功', method)

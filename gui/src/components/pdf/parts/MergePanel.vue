@@ -73,14 +73,18 @@ const runMerge = async () => {
     ElMessage.warning('请至少选择两个 PDF')
     return
   }
-  const res = await callApi('pdf_merge', {
-    files: form.files.map((item) => ({
-      path: item.path,
-      pageSpec: item.pageSpec || ''
-    })),
-    outputDir: form.outputDir,
-    outputName: form.outputName
-  })
+  const res = await callApi(
+    'pdf_merge',
+    {
+      files: form.files.map((item) => ({
+        path: item.path,
+        pageSpec: item.pageSpec || ''
+      })),
+      outputDir: form.outputDir,
+      outputName: form.outputName
+    },
+    form.files
+  )
   if (res) {
     form.output = res.output
   }

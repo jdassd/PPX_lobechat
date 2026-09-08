@@ -69,12 +69,16 @@ const runMerge = async () => {
     ElMessage.warning('请至少选择两个 Word')
     return
   }
-  const res = await callApi('word_merge', {
-    files: form.files.map((item) => ({ path: item.path })),
-    pageBreak: form.pageBreak,
-    outputDir: form.outputDir,
-    outputName: form.outputName
-  })
+  const res = await callApi(
+    'word_merge',
+    {
+      files: form.files.map((item) => ({ path: item.path })),
+      pageBreak: form.pageBreak,
+      outputDir: form.outputDir,
+      outputName: form.outputName
+    },
+    form.files
+  )
   if (res) {
     form.output = res.output
   }

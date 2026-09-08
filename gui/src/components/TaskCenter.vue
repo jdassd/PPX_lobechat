@@ -1,5 +1,6 @@
 <script setup>
 import TaskItemResults from './shared/TaskItemResults.vue'
+import TaskOrigins from './shared/TaskOrigins.vue'
 import { computed, onActivated, onDeactivated, onUnmounted, reactive, ref, watch } from 'vue'
 import ResultActions from './shared/ResultActions.vue'
 import { CircleCheck, CircleClose, Clock, CopyDocument, Download, FolderOpened, Loading, RefreshRight, Search, VideoPause, VideoPlay, WarningFilled } from '@element-plus/icons-vue'
@@ -266,8 +267,8 @@ const exportTasks = (format) => {
   const exported = selectedIds.value.length ? selectedTasks.value : filteredTasks.value
   if (!exported.length) return ElMessage.warning('没有可导出的任务')
   if (format === 'csv') {
-    const headers = ['任务ID', '名称', '方法', '状态', '开始时间', '耗时秒', '消息', '输出路径']
-    const rows = exported.map((task) => [task.id, task.label, task.method, task.status, task.startedAt ? new Date(task.startedAt).toISOString() : '', task.startedAt && task.endedAt ? Math.max(0, (task.endedAt - task.startedAt) / 1000).toFixed(2) : '', task.message, (task.outputs || []).map((item) => item.path).join(' | ')])
+    const headers = ['任务ID', '名称', '方法', '状态', '开始时间', '耗时秒', '消息', '输出路径', '重试来源任务ID', '接力来源任务ID', '接力来源文件']
+    const rows = exported.map((task) => [task.id, task.label, task.method, task.status, task.startedAt ? new Date(task.startedAt).toISOString() : '', task.startedAt && task.endedAt ? Math.max(0, (task.endedAt - task.startedAt) / 1000).toFixed(2) : '', task.message, (task.outputs || []).map((item) => item.path).join(' | '), task.retryOf || '', (task.inputOrigins || []).map((item) => item.sourceTaskId).join(' | '), (task.inputOrigins || []).map((item) => item.inputPath).join(' | ')])
     downloadText(`\ufeff${[headers, ...rows].map((row) => row.map(csvCell).join(',')).join('\n')}`, 'text/csv;charset=utf-8', 'csv')
   } else {
     const payload = { exportedAt: new Date().toISOString(), schemaVersion: 2, filters: { query: query.value, status: statusFilter.value, tool: toolFilter.value }, stats: taskStats.value, tasks: exported }
@@ -408,6 +409,7 @@ const exportTasks = (format) => {
           <p class="task-message">{{ task.message }}</p>
           <small v-if="task.total && ['queued', 'running', 'canceling'].includes(task.status)">已处理 {{ task.current || 0 }} / {{ task.total }}</small>
           <TaskItemResults :task="task" />
+          <TaskOrigins :task="task" />
           <el-alert v-if="task.diagnosis" class="task-diagnosis" :title="task.diagnosis.title" :description="task.diagnosis.suggestion" :type="task.diagnosis.category === 'canceled' ? 'info' : 'warning'" :closable="false" show-icon />
           <el-progress v-if="['queued', 'running', 'canceling'].includes(task.status)" :percentage="task.progress === null ? 100 : Number(task.progress || 0)" :indeterminate="task.progress === null" :stroke-width="5" :show-text="false" class="task-progress" />
           <div v-if="task.outputs?.length" class="task-assets">
@@ -422,7 +424,7 @@ const exportTasks = (format) => {
                 ><el-icon><CopyDocument /></el-icon>复制路径</el-button
               >
             </div>
-            <ResultActions :assets="task.outputs" />
+            <ResultActions :assets="task.outputs" :source-task-id="task.id" />
           </div>
         </div>
         <div class="task-actions">

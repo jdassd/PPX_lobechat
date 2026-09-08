@@ -25,7 +25,7 @@
  */
 
 import { ElMessage } from 'element-plus'
-import { callApi as pyCall, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
+import { callApi as pyCall, callTaskApi, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
 
 /**
  * 创建共享的 PDF 调用层。
@@ -54,7 +54,7 @@ export function usePdfApi(shared) {
     }
   }
 
-  const callApi = async (method, payload) => {
+  const callApi = async (method, payload, inputAssets = null) => {
     if (!ensurePyReady()) return null
     if (!window.pywebview.api[method]) {
       ElMessage.error('当前客户端版本缺少 PDF 能力')
@@ -63,7 +63,7 @@ export function usePdfApi(shared) {
     shared.loading = true
     try {
       // 统一封装：归一化返回 { ok, message, data }
-      const result = await pyCall(method, payload)
+      const result = await (inputAssets === null ? pyCall(method, payload) : callTaskApi(method, payload, inputAssets))
       if (result.ok) {
         ElMessage.success(result.message || '操作成功')
         pushLog('success', result.message || '操作成功', method, result.data)

@@ -1,0 +1,130 @@
+{
+  "version": "2.11.0",
+  "date": "2026-09-08",
+  "environment": "Windows source app, real Python API, Edge browser, isolated fixture files",
+  "checks": {
+    "lint": {
+      "passed": true,
+      "styleWarnings": 148,
+      "errors": 0
+    },
+    "python": {
+      "passed": true,
+      "tests": 77,
+      "addedOriginTests": 6
+    },
+    "frontend": {
+      "passed": true,
+      "tests": 16,
+      "addedOriginTests": 4
+    },
+    "productionBuild": {
+      "passed": true
+    },
+    "browser": {
+      "passed": true,
+      "pageErrors": [],
+      "resultHandoff": {
+        "verifiedRoutes": [
+          "image/compress",
+          "image/watermark",
+          "image/rotate",
+          "pdf/merge",
+          "word/merge",
+          "conversion/images-pdf",
+          "conversion/merge-pdf",
+          "conversion/universal",
+          "pdf/compress",
+          "excel/merge",
+          "excel/profile",
+          "excel/process",
+          "excel/split",
+          "document/index",
+          "file/archive",
+          "video/compress",
+          "video/cut"
+        ],
+        "unavailableDependencies": [
+          "pdf/ocr"
+        ],
+        "checks": [
+          "mixed selection",
+          "single-file limits",
+          "disabled module",
+          "missing assets",
+          "auxiliary picker isolation",
+          "same-route return",
+          "deduplicated append"
+        ]
+      },
+      "excel": {
+        "passed": true,
+        "checks": [
+          "header row 2",
+          "typed date sort",
+          "trim and deduplicate preview/export parity",
+          "source unchanged",
+          "file switch clears results and preserves directory",
+          "corrupt file error",
+          "slow A cannot overwrite B",
+          "quality retains original 3 rows",
+          "quality report generated",
+          "split into two groups",
+          "980x760 light/dark action bounds"
+        ]
+      },
+      "inputOrigins": {
+        "passed": true,
+        "chains": [
+          "image compression → rotation",
+          "image parent dialog → compression",
+          "Excel → profile → quality report",
+          "file copy → document index"
+        ],
+        "checks": [
+          "receive and preview never execute",
+          "precise parent and path",
+          "business args exclude lineage",
+          "same-path native replacement clears lineage",
+          "auxiliary watermark picker does not consume or supply main origin",
+          "workspace drafts exclude origin metadata",
+          "remove then local selection clears lineage",
+          "filtered parent lookup and back",
+          "parent handoff closes origins dialog",
+          "removed parent keeps relation",
+          "980×760 light/dark no overflow"
+        ],
+        "taskIds": [
+          "1489d1a1a0284342be1346e0c2cd4c01",
+          "50069838dae64988a92af491faed92a4",
+          "f429a27d7e884d7d9e3d7d23bc7ec4f9",
+          "c0bba4e97f9549c6adb4f26af6d1e764"
+        ]
+      },
+      "checks": [
+        "draft retention",
+        "restart configuration",
+        "partial failure",
+        "retry only failed input",
+        "output dimensions and alpha",
+        "handoff scoped to target module",
+        "1000-page PDF editing/undo/reorder/export",
+        "two-step workflow via forms",
+        "pause only blocks new tasks",
+        "cancel queued task",
+        "browser collection detail retry without duplicate rows"
+      ]
+    }
+  },
+  "screenshots": [
+    "origins-light.png",
+    "origins-dark.png",
+    "origins-missing.png"
+  ],
+  "limits": [
+    "Source relations verify declared primary input and recorded parent output paths, not content hashes.",
+    "PDF OCR runtime unavailable locally; its receiver and catalog contract are covered, not a real OCR execution.",
+    "Native install, upgrade, recovery and manual acceptance remain pending.",
+    "GitHub three-platform build results are recorded separately in the release."
+  ]
+}
