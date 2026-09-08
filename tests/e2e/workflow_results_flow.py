@@ -85,7 +85,7 @@ def verify_workflow_results(api, page, report_dir):
             {'id': 'long', 'name': '长文本', 'method': 'text_case_transform', 'args': {'content': long_text, 'mode': 'upper'}},
         ]})['workflow']
         page.locator('.workflow-tool').get_by_role('button', name='刷新', exact=True).click()
-        expect(page.locator('.workflow-tool > .el-loading-mask')).not_to_be_visible()
+        expect(page.locator('.workflow-tool > .el-loading-mask:visible')).to_have_count(0)
         page.get_by_role('tab', name='工作流', exact=True).click()
         page.locator('.workflow-list-item').filter(has_text=fixture['name']).click()
         rules = editor.locator('[data-step-index="0"] [data-field-name="rules"] textarea')

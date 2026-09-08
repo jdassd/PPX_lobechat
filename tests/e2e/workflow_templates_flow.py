@@ -194,7 +194,7 @@ def verify_workflow_templates(api, page, root, chosen, report_dir):
     page.get_by_role('navigation', name='工具', exact=True).get_by_role('button', name='自动化工作流', exact=True).click()
     page.get_by_role('tab', name='运行记录', exact=True).click()
     page.locator('.workflow-tool').get_by_role('button', name='刷新', exact=True).click()
-    expect(page.locator('.workflow-tool > .el-loading-mask')).not_to_be_visible()
+    expect(page.locator('.workflow-tool > .el-loading-mask:visible')).to_have_count(0)
     latest = page.locator('.run-list .el-collapse-item').first
     latest.locator('.el-collapse-item__header').click()
     expect(latest.get_by_role('button', name='检查结果 / 继续处理', exact=False)).to_have_count(2)

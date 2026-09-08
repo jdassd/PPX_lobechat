@@ -22,7 +22,7 @@ def verify_workflow_preflight(api, page, root, chosen, report_dir):
     navigation.get_by_role('button', name='自动化工作流', exact=True).click()
     page.get_by_role('tab', name='运行记录', exact=True).click()
     page.locator('.workflow-tool').get_by_role('button', name='刷新', exact=True).click()
-    expect(page.locator('.workflow-tool > .el-loading-mask')).not_to_be_visible()
+    expect(page.locator('.workflow-tool > .el-loading-mask:visible')).to_have_count(0)
     page.get_by_role('tab', name='工作流', exact=True).click()
     page.locator('.workflow-list-item').filter(has_text=workflow['name']).click()
     editor = page.locator('.workflow-editor')
@@ -148,8 +148,9 @@ def verify_workflow_preflight(api, page, root, chosen, report_dir):
     assert latest['steps'][0]['result']['result'] == 'NEW DRAFT'
     # The task can finish before the browser receives its completion snapshot.
     # Finish this user flow before the next scenario switches back to editing.
+    # Refresh and completion can briefly leave two fading masks; wait for all.
     expect(page.get_by_role('tab', name='运行记录', exact=True)).to_have_attribute('aria-selected', 'true')
-    expect(page.locator('.workflow-tool > .el-loading-mask')).not_to_be_visible()
+    expect(page.locator('.workflow-tool > .el-loading-mask:visible')).to_have_count(0)
     result = {'passed': True, 'checks': [
         'read-only checks never save or queue', 'invalid input and self-reference block run',
         'error location focuses runtime input', 'known inputs and deferred prior output',
