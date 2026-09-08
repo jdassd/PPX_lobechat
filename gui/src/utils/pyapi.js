@@ -34,7 +34,7 @@
  */
 
 import { beginApiTask, isTaskMethod, settleApiTask, observeTask, hydrateBackendTasks } from './taskCenter'
-import { consumeIncomingFiles, getDraft } from './workspace'
+import { consumeIncomingFiles } from './workspace'
 
 // 轮询兜底间隔（毫秒）与默认超时（毫秒）
 const POLL_INTERVAL = 50
@@ -157,7 +157,6 @@ export async function callApi(method, ...args) {
   try {
     await whenPyReady()
     const api = window.pywebview.api
-    if (method.startsWith('excel_') && args[0]) args[0] = { ...(getDraft('excel/options') || {}), ...args[0] }
     if (typeof api[method] !== 'function') {
       throw new Error(`当前客户端缺少能力：${method}`)
     }

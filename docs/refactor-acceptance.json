@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "version": "2.9.0",
+  "version": "2.10.0",
   "note": "发布决定与验收状态分开记录；未验证项目保持 pending，不因发版改为 passed。",
   "release": {
-    "tag": "v2.9.0",
+    "tag": "v2.10.0",
     "allowPendingAcceptance": true,
-    "reason": "用户本次授权自主设计、实现与优化工具箱，并要求集中打 Tag 触发 GitHub 自动发版；本阶段以 v2.9.0 发布结果接力及本地启动优化。旧重构的三平台安装、升级、恢复和完整人工验收仍为 pending；本轮自动验证范围在 docs/releases/v2.9.0.md 单独记录，不将未验证项目标记为通过。"
+    "reason": "用户于 2026-09-08 明确要求继续逐版本实现并打 Tag 触发 GitHub 自动发版；v2.10.0 集中发布 Excel 类型一致性、显式规则、陈旧响应处理与单表接力。旧重构的三平台安装、升级、恢复和完整人工验收仍为 pending；本轮自动验证范围在 docs/releases/v2.10.0.md 单独记录，不将未验证项目标记为通过。"
   },
   "phases": {
     "1": { "status": "pending", "evidence": "" },

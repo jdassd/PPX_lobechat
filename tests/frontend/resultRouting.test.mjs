@@ -55,7 +55,7 @@ test('route ids are unique and results remain stably ordered', () => {
 })
 
 test('single-file receivers reject multiple files rather than consuming the first', () => {
-  for (const [route, extension] of [['pdf/compress', 'pdf'], ['pdf/ocr', 'pdf'], ['video/compress', 'mp4'], ['video/cut', 'mp4']]) {
+  for (const [route, extension] of [['pdf/compress', 'pdf'], ['pdf/ocr', 'pdf'], ['video/compress', 'mp4'], ['video/cut', 'mp4'], ['excel/profile', 'xlsx'], ['excel/process', 'xlsx'], ['excel/split', 'xlsx']]) {
     const input = [asset('/tmp/a.' + extension), asset('/tmp/b.' + extension)]
     assert.equal(planResultHandoff(input, route).acceptedCount, 0)
     assert.ok(!getResultRoutes(input).some((item) => item.route.id === route))
@@ -66,6 +66,17 @@ test('single-file receivers reject multiple files rather than consuming the firs
 test('merge receivers require multiple compatible files in suggestions', () => {
   assert.ok(!getResultRoutes([asset('/tmp/a.pdf')]).some((item) => item.route.id.endsWith('/merge') || item.route.id.endsWith('/merge-pdf')))
   assert.ok(getResultRoutes([asset('/tmp/a.docx'), asset('/tmp/b.docx')]).some((item) => item.route.id === 'word/merge'))
+})
+
+test('single-table Excel receivers accept OOXML and leave CSV or legacy XLS to conversion', () => {
+  for (const id of ['excel/profile', 'excel/process', 'excel/split']) {
+    for (const extension of ['xlsx', 'xlsm', 'xltx', 'xltm']) {
+      assert.equal(planResultHandoff([asset('/tmp/input.' + extension)], id).acceptedCount, 1)
+    }
+    for (const extension of ['csv', 'json', 'xls']) {
+      assert.equal(planResultHandoff([asset('/tmp/input.' + extension)], id).acceptedCount, 0)
+    }
+  }
 })
 
 test('image-to-PDF matches its converter instead of general image support', () => {

@@ -2,7 +2,7 @@
   <section class="panel">
     <header>
       <h4>合并为单个 Excel</h4>
-      <p>把多个表合并成一个 Excel，方便汇总</p>
+      <p>按第一份分表的字段合并全部数据；表头、公式与去空格规则应用于每份输入。展开文件可设置字段映射。</p>
     </header>
     <div class="subpanel">
       <div class="subpanel-head">
@@ -12,7 +12,7 @@
         </div>
         <div class="field-row">
           <el-button size="small" @click="selectExcel('mergeTables', true)">选择文件</el-button>
-          <el-button size="small" text type="danger" @click="clearList('mergeTables')" :disabled="!merge.tables.length"> 清空 </el-button>
+          <el-button size="small" text type="danger" :disabled="!merge.tables.length" @click="clearList('mergeTables')"> 清空 </el-button>
         </div>
       </div>
       <el-table v-if="merge.tables.length" :data="merge.tables" size="small" border>
@@ -29,7 +29,7 @@
         <el-table-column prop="path" label="文件（展开设置字段映射）" min-width="220" show-overflow-tooltip />
         <el-table-column label="工作表" width="220">
           <template #default="scope">
-            <el-input v-model="scope.row.sheet" size="small" placeholder="留空使用默认工作表" />
+            <el-input v-model="scope.row.sheet" size="small" placeholder="留空使用默认工作表" @change="loadTableColumns(scope.row)" />
           </template>
         </el-table-column>
         <el-table-column label="操作" width="80">
@@ -52,19 +52,20 @@
       </el-form-item>
     </el-form>
     <div class="actions">
-      <el-button type="primary" :loading="loading" @click="runMergeTables"> 开始合并 </el-button>
+      <el-button type="primary" :disabled="!merge.tables.length" :loading="loading" @click="runMergeTables"> 开始合并 </el-button>
     </div>
     <div v-if="merge.result" class="result-block">
       <p class="result-title">输出结果</p>
-      <el-tag type="success" effect="plain" @click="openPath(merge.result)">
+      <el-button class="output-path" type="primary" text @click="openPath(merge.result)">
         {{ merge.result }}
-      </el-tag>
+      </el-button>
     </div>
   </section>
 </template>
 
 <script setup>
 defineProps({
+  loadTableColumns: { type: Function, required: true },
   // state.merge 切片（reactive 引用，v-model 直接修改保持响应式）
   merge: {
     type: Object,
@@ -112,6 +113,22 @@ defineProps({
   margin: 0 0 10px;
   font-weight: 600;
   color: var(--ppx-text-secondary);
+}
+
+.output-path {
+  justify-content: flex-start;
+  max-width: 100%;
+  height: auto;
+  min-height: 32px;
+  padding: 8px 10px;
+  text-align: left;
+  white-space: normal;
+}
+.output-path :deep(span) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  line-height: 1.6;
 }
 
 .subpanel {

@@ -193,7 +193,7 @@ class Excel():
     @staticmethod
     def _public_rows(rows):
         return [{key: value.isoformat() if isinstance(value, (date, datetime)) else value
-                 for key, value in row.items() if not key.startswith('_')} for row in rows]
+                 for key, value in row.items() if key not in {'_source', '_cells'}} for row in rows]
 
     def _safe_filename_part(self, value: Any, fallback: str) -> str:
         safe_value = self._unsafe_filename_chars.sub('_', self._normalize_cell(value))
@@ -259,46 +259,46 @@ class Excel():
         except Exception:
             return None
 
+    def _preview_data(self, opts):
+        """Keep typed records private until sample transformations have finished."""
+        source = self._ensure_excel_file(opts.get('filePath', ''))
+        sheets = self._list_sheets(source)
+        delimiter = opts.get('delimiter') or '|'
+        limit = max(1, min(int(opts.get('limit') or 30), 200))
+        offset = max(0, int(opts.get('offset') or 0))
+        header, data_rows, active_sheet = self._load_sheet(source, opts.get('sheetName'), opts, limit=limit, offset=offset)
+        schema = self._normalize_schema(opts.get('schemaText', ''), delimiter, header)
+        rows = self._rows_to_dicts(schema, data_rows, active_sheet)
+        wb = load_workbook(source, read_only=True, data_only=True)
+        try:
+            ws = wb[active_sheet]
+            row_count = max(0, (ws.max_row or 0) - max(1, int(opts.get('headerRow') or 1)))
+        finally:
+            wb.close()
+        return {
+            'code': 0,
+            'msg': '解析完成',
+            'schema': schema,
+            'schemaText': delimiter.join(schema),
+            'delimiter': delimiter,
+            'rowCount': row_count,
+            'rowCountEstimated': True,
+            'offset': offset,
+            'limit': limit,
+            'hasMore': offset + limit < row_count,
+            'formulaPolicy': opts.get('formulaPolicy') or 'preserve',
+            'sheet': active_sheet,
+            'sheets': sheets,
+            'sample': self._public_rows(rows),
+            'cellTypes': [{key: value.get('type') for key, value in row.get('_cells', {}).items()} for row in rows],
+            'formulaRule': 'preserve 保留本行相对引用并随排序平移；values 使用 Excel 上次保存的缓存值，不重新计算公式。输出为新 xlsx 数据表，不包含宏。'
+        }, rows
+
     def excel_preview(self, options: Dict = None):
         '''读取 Excel 表头与样例数据'''
         try:
-            opts = self._validate_payload(options)
-            file_path = opts.get('filePath', '')
-            sheet_name = opts.get('sheetName')
-            delimiter = opts.get('delimiter') or '|'
-
-            source = self._ensure_excel_file(file_path)
-            sheets = self._list_sheets(source)
-            limit = max(1, min(int(opts.get('limit') or 30), 200))
-            offset = max(0, int(opts.get('offset') or 0))
-            header, data_rows, active_sheet = self._load_sheet(source, sheet_name, opts, limit=limit, offset=offset)
-            schema = self._normalize_schema(opts.get('schemaText', ''), delimiter, header)
-            rows = self._rows_to_dicts(schema, data_rows, active_sheet)
-            wb = load_workbook(source, read_only=True, data_only=True)
-            try:
-                ws = wb[active_sheet]
-                row_count = max(0, (ws.max_row or 0) - max(1, int(opts.get('headerRow') or 1)))
-            finally:
-                wb.close()
-
-            return {
-                'code': 0,
-                'msg': '解析完成',
-                'schema': schema,
-                'schemaText': delimiter.join(schema),
-                'delimiter': delimiter,
-                'rowCount': row_count,
-                'rowCountEstimated': True,
-                'offset': offset,
-                'limit': limit,
-                'hasMore': offset + limit < row_count,
-                'formulaPolicy': opts.get('formulaPolicy') or 'preserve',
-                'sheet': active_sheet,
-                'sheets': sheets,
-                'sample': self._public_rows(rows),
-                'cellTypes': [{key: value.get('type') for key, value in row.get('_cells', {}).items()} for row in rows],
-                'formulaRule': 'preserve 保留本行相对引用并随排序平移；values 使用 Excel 上次保存的缓存值，不重新计算公式。输出为新 xlsx 数据表，不包含宏。'
-            }
+            result, _ = self._preview_data(self._validate_payload(options))
+            return result
         except Exception as exc:
             return {'code': -1, 'msg': f'解析失败：{exc}'}
 
@@ -316,7 +316,6 @@ class Excel():
             export_groups = bool(opts.get('exportGroups', True))
             export_json = bool(opts.get('exportJson', True))
             export_combined = bool(opts.get('exportCombined', False))
-            output_dir = self._ensure_output_dir(source, opts.get('outputDir', ''), 'excel')
 
             header, data_rows, active_sheet = self._load_sheet(source, sheet_name, opts)
             schema = self._normalize_schema(schema_text, delimiter, header)
@@ -327,16 +326,9 @@ class Excel():
                 merged = self._load_merge_tables(schema, merge_files, opts)
                 records.extend(merged)
 
-            records = self._clean_records(records, opts)
-            if sort_by and sort_by not in schema:
-                raise ValueError(f'排序字段不存在：{sort_by}')
-            if group_by and group_by not in schema:
-                raise ValueError(f'分组字段不存在：{group_by}')
-            if sort_by and sort_by in schema:
-                reverse = sort_order == 'desc'
-                nonempty = [item for item in records if item.get(sort_by) is not None and item.get(sort_by) != '']
-                empty = [item for item in records if item.get(sort_by) is None or item.get(sort_by) == '']
-                records = sorted(nonempty, key=lambda item: self._sort_key(item.get(sort_by)), reverse=reverse) + empty
+            source_rows = len(records)
+            records = self._process_records(records, schema, opts)
+            output_dir = self._ensure_output_dir(source, opts.get('outputDir', ''), 'excel')
 
             grouped = self._group_records(records, group_by)
             chart = self._build_chart(grouped) if group_by else {}
@@ -356,7 +348,9 @@ class Excel():
                 combined_path = str(self._write_rows(schema, records, Path(combined_path)))
 
             summary = {
+                'sourceRows': source_rows,
                 'totalRows': len(records),
+                'removedDuplicates': source_rows - len(records),
                 'groupBy': group_by,
                 'groupCount': len(grouped) if group_by else 0,
                 'sortBy': sort_by,
@@ -384,13 +378,15 @@ class Excel():
     def _clean_records(records, options):
         cleaned, seen = [], set()
         keys = options.get('deduplicateColumns') or []
-        if records and any(key not in records[0] or key.startswith('_') for key in keys):
+        if not isinstance(keys, (list, tuple)) or any(not isinstance(key, str) for key in keys):
+            raise ValueError('去重字段必须是字段名称列表')
+        if records and any(key not in records[0] or key in {'_source', '_cells'} for key in keys):
             raise ValueError('去重字段不存在，请重新选择字段')
         for record in records:
             row = {**record, '_cells': dict(record.get('_cells', {}))}
             if options.get('trimText'):
                 for key, value in row.items():
-                    if not key.startswith('_') and isinstance(value, str) and row['_cells'].get(key, {}).get('type') != 'f':
+                    if key not in {'_source', '_cells'} and isinstance(value, str) and row['_cells'].get(key, {}).get('type') != 'f':
                         row[key] = value.strip()
             if keys:
                 signature = tuple((type(row.get(key)).__name__, str(row.get(key))) for key in keys)
@@ -400,21 +396,41 @@ class Excel():
             cleaned.append(row)
         return cleaned
 
+    def _process_records(self, records, schema, options):
+        """The same typed transformation is used for samples and complete exports."""
+        keys = options.get('deduplicateColumns') or []
+        if not isinstance(keys, (list, tuple)) or any(not isinstance(key, str) for key in keys):
+            raise ValueError('去重字段必须是字段名称列表')
+        if any(key not in schema for key in keys):
+            raise ValueError('去重字段不存在，请重新选择字段')
+        for field, label in [('sortBy', '排序'), ('groupBy', '分组')]:
+            if options.get(field) and options[field] not in schema:
+                raise ValueError(f'{label}字段不存在：{options[field]}')
+        order = str(options.get('sortOrder') or 'asc').lower()
+        if order not in {'asc', 'desc'}:
+            raise ValueError('排序方向必须是 asc 或 desc')
+        rows = self._clean_records(records, options)
+        sort_by = options.get('sortBy')
+        if sort_by:
+            nonempty = [row for row in rows if row.get(sort_by) is not None and row.get(sort_by) != '']
+            empty = [row for row in rows if row.get(sort_by) is None or row.get(sort_by) == '']
+            rows = sorted(nonempty, key=lambda row: self._sort_key(row.get(sort_by)), reverse=order == 'desc') + empty
+        return rows
+
     def excel_process_preview(self, options=None):
         """Bounded before/after sample; never runs the export or scans the full sheet."""
-        opts = self._validate_payload(options)
-        preview = self.excel_preview({**opts, 'limit': min(100, int(opts.get('limit') or 30))})
-        if preview.get('code') != 0:
-            return preview
-        before = preview['sample']
-        after = self._clean_records(before, opts)
-        sort_by = opts.get('sortBy')
-        if sort_by:
-            nonempty = [row for row in after if row.get(sort_by) is not None and row.get(sort_by) != '']
-            empty = [row for row in after if row.get(sort_by) is None or row.get(sort_by) == '']
-            after = sorted(nonempty, key=lambda row: self._sort_key(row.get(sort_by)), reverse=opts.get('sortOrder') == 'desc') + empty
-        return {**preview, 'before': before, 'after': self._public_rows(after), 'sampleOnly': True,
-                'msg': '仅比较当前样本，完整排序和去重将在执行时进行'}
+        try:
+            opts = self._validate_payload(options)
+            preview, records = self._preview_data({**opts, 'limit': max(1, min(100, int(opts.get('limit') or 30)))})
+            after = self._process_records(records, preview['schema'], opts)
+            message = f'仅比较主文件的 {len(records)} 行样本；完整排序、去重与分组将在执行时进行'
+            if opts.get('mergeFiles'):
+                message += '。样本不包含附加分表，附加分表会在完整执行时合并'
+            return {**preview, 'before': preview['sample'], 'after': self._public_rows(after),
+                    'sampleOnly': True, 'sampleRows': len(records), 'sampleRemovedDuplicates': len(records) - len(after),
+                    'includesMergeFiles': False, 'msg': message}
+        except Exception as exc:
+            return {'code': -1, 'msg': f'样本比较失败：{exc}'}
 
     def excel_merge_tables(self, options: Dict = None):
         '''将多个分表合并为主表'''
@@ -448,6 +464,8 @@ class Excel():
                         mapped['_cells'][column] = row['_cells'].get(source_column, {})
                     merged.append(mapped)
 
+            source_rows = len(merged)
+            merged = self._process_records(merged, schema, opts)
             output_dir = self._ensure_output_dir(first_path, opts.get('outputDir', ''), 'merged')
             filename = opts.get('outputName') or f'merged_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
             dest = output_dir / (filename if filename.lower().endswith('.xlsx') else f'{filename}.xlsx')
@@ -458,6 +476,8 @@ class Excel():
                 'msg': f'已合并 {len(tables)} 个分表',
                 'output': str(dest),
                 'rows': len(merged),
+                'sourceRows': source_rows,
+                'removedDuplicates': source_rows - len(merged),
                 'schema': schema
             }
         except Exception as exc:

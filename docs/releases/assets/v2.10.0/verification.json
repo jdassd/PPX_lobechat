@@ -1,0 +1,129 @@
+{
+  "version": "2.10.0",
+  "date": "2026-09-08",
+  "environment": "Windows source app, real Python API, Edge browser, isolated fixture files",
+  "checks": {
+    "lint": {
+      "passed": true,
+      "existingStyleWarnings": 148,
+      "errors": 0
+    },
+    "python": {
+      "passed": true,
+      "tests": 71,
+      "addedExcelTests": 6
+    },
+    "resultRouting": {
+      "passed": true,
+      "tests": 12
+    },
+    "productionBuild": {
+      "passed": true
+    },
+    "browser": {
+      "passed": true,
+      "pageErrors": [],
+      "resultHandoff": {
+        "verifiedRoutes": [
+          "image/compress",
+          "image/watermark",
+          "image/rotate",
+          "pdf/merge",
+          "word/merge",
+          "conversion/images-pdf",
+          "conversion/merge-pdf",
+          "conversion/universal",
+          "pdf/compress",
+          "excel/merge",
+          "excel/profile",
+          "excel/process",
+          "excel/split",
+          "document/index",
+          "file/archive",
+          "video/compress",
+          "video/cut"
+        ],
+        "unavailableDependencies": [
+          "pdf/ocr"
+        ],
+        "checks": [
+          "mixed selection",
+          "single-file limits",
+          "disabled module",
+          "missing assets",
+          "auxiliary picker isolation",
+          "same-route return",
+          "deduplicated append"
+        ]
+      },
+      "excel": {
+        "passed": true,
+        "checks": [
+          "header row 2",
+          "typed date sort",
+          "trim and deduplicate preview/export parity",
+          "source unchanged",
+          "file switch clears results and preserves directory",
+          "corrupt file error",
+          "slow A cannot overwrite B",
+          "quality retains original 3 rows",
+          "quality report generated",
+          "split into two groups",
+          "980x760 light/dark action bounds"
+        ]
+      },
+      "checks": [
+        "draft retention",
+        "restart configuration",
+        "partial failure",
+        "retry only failed input",
+        "output dimensions and alpha",
+        "handoff scoped to target module",
+        "1000-page PDF editing/undo/reorder/export",
+        "two-step workflow via forms",
+        "pause only blocks new tasks",
+        "cancel queued task",
+        "browser collection detail retry without duplicate rows"
+      ]
+    },
+    "finalVersionExcelBrowser": {
+      "passed": true,
+      "checks": [
+        "header row 2",
+        "typed date sort",
+        "trim and deduplicate preview/export parity",
+        "source unchanged",
+        "file switch clears results and preserves directory",
+        "corrupt file error",
+        "slow A cannot overwrite B",
+        "quality retains original 3 rows",
+        "quality report generated",
+        "split into two groups",
+        "980x760 light/dark action bounds"
+      ]
+    },
+    "visualReview": {
+      "passed": true,
+      "viewport": "980x760",
+      "themes": [
+        "light",
+        "dark"
+      ],
+      "details": [
+        "main input wraps",
+        "execute action remains visible",
+        "result path wraps inside panel",
+        "keyboard-capable output buttons"
+      ]
+    }
+  },
+  "pending": [
+    "Native install, in-place upgrade, recovery and complete manual acceptance on Windows/macOS/Linux",
+    "Local PDF OCR runtime unavailable; disabled route verified, recognition not covered"
+  ],
+  "release": {
+    "tag": "v2.10.0",
+    "mechanism": "Push verified commit first, then annotated tag; GitHub Actions checks and packages all three platforms before release",
+    "statusAtCommit": "Local checks complete; remote CI and automatic release are verified separately in GitHub run history"
+  }
+}

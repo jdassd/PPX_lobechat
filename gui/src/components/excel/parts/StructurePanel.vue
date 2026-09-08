@@ -2,7 +2,7 @@
   <section class="panel">
     <header>
       <h4>设置工作表与字段</h4>
-      <p>定义第一行字段、选择工作表并预览样例数据</p>
+      <p>按上方表头行读取字段；结构与主文件会用于清洗处理。</p>
     </header>
     <el-form :model="preview" label-width="110px">
       <el-form-item label="源 Excel">
@@ -10,6 +10,7 @@
           <el-button type="primary" @click="selectExcel('preview')">选择文件</el-button>
           <span v-if="preview.file" class="file-chip">{{ preview.file.filename }}</span>
           <el-tag v-else type="info" effect="plain">尚未选择</el-tag>
+          <el-button v-if="preview.file" text type="danger" @click="clearInput">移除主文件</el-button>
         </div>
       </el-form-item>
       <el-form-item v-if="preview.sheets.length" label="工作表">
@@ -18,20 +19,10 @@
         </el-select>
       </el-form-item>
       <el-form-item label="分隔符">
-        <el-input
-          v-model="preview.delimiter"
-          placeholder="默认使用 |"
-          maxlength="4"
-          style="width: 120px"
-        />
+        <el-input v-model="preview.delimiter" placeholder="默认使用 |" maxlength="4" style="width: 120px" />
       </el-form-item>
       <el-form-item label="结构定义">
-        <el-input
-          v-model="preview.schemaText"
-          type="textarea"
-          :rows="2"
-          placeholder="示例：姓名|手机号|地区|业务类型"
-        />
+        <el-input v-model="preview.schemaText" type="textarea" :rows="2" placeholder="示例：姓名|手机号|地区|业务类型" />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" :loading="loading" @click="loadPreview">刷新预览</el-button>
@@ -40,33 +31,16 @@
     <div v-if="preview.schema.length" class="schema-chips">
       <p class="result-title">字段结构</p>
       <div class="schema-tags">
-        <el-tag
-          v-for="field in preview.schema"
-          :key="field"
-          size="large"
-          effect="plain"
-        >
+        <el-tag v-for="field in preview.schema" :key="field" size="large" effect="plain">
           {{ field }}
         </el-tag>
       </div>
-      <p class="schema-note">总行数：{{ preview.rowCount }} · 当前工作表：{{ preview.sheet || '默认' }}</p>
+      <p class="schema-note">数据行数：{{ preview.rowCount }} · 当前工作表：{{ preview.sheet || '默认' }} · 下方仅为样本</p>
     </div>
     <div v-if="preview.sample.length" class="result-block">
       <p class="result-title">样例数据</p>
-      <el-table
-        :data="preview.sample"
-        height="260"
-        border
-        size="small"
-        header-cell-class-name="table-header"
-      >
-        <el-table-column
-          v-for="field in preview.schema"
-          :key="field"
-          :prop="field"
-          :label="field"
-          show-overflow-tooltip
-        />
+      <el-table :data="preview.sample" height="260" border size="small" header-cell-class-name="table-header">
+        <el-table-column v-for="field in preview.schema" :key="field" :prop="field" :label="field" show-overflow-tooltip />
       </el-table>
     </div>
   </section>
@@ -74,6 +48,7 @@
 
 <script setup>
 defineProps({
+  clearInput: { type: Function, required: true },
   // state.preview 切片（reactive 引用，子组件内 v-model 直接修改保持响应式）
   preview: {
     type: Object,

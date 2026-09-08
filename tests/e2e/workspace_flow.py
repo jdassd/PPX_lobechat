@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 import fitz
+from excel_processing_flow import verify_excel_processing
 from PIL import Image
 from playwright.sync_api import expect, sync_playwright
 from result_handoff_flow import verify_result_handoff
@@ -132,6 +133,13 @@ def main():
                     + ".map(method => [method, (...args) => window.ppxCall(method, args)]))};"
                 )
                 page.goto(f"http://127.0.0.1:{port}")
+                if '--excel-only' in sys.argv:
+                    result = verify_excel_processing(api, page, root, chosen, report_dir)
+                    assert not errors, errors
+                    print(json.dumps(result, ensure_ascii=False), flush=True)
+                    evidence.close()
+                    browser.close()
+                    return
                 if '--handoff-only' in sys.argv:
                     handoff = verify_result_handoff(api, page, root, chosen, picker_calls, report_dir)
                     assert not errors, errors
@@ -260,12 +268,13 @@ def main():
                 page.get_by_role('button', name='继续队列', exact=True).click()
                 verify_web_collection(api, context)
                 handoff = verify_result_handoff(api, page, root, chosen, picker_calls, report_dir)
+                excel = verify_excel_processing(api, page, root, chosen, report_dir)
                 assert not errors, errors
                 report_dir = ROOT / "build/verification"
                 report_dir.mkdir(parents=True, exist_ok=True)
                 page.screenshot(path=str(report_dir / 'workspace.png'), full_page=True)
                 (report_dir / 'workspace.json').write_text(json.dumps({
-                    'passed': True, 'pageErrors': errors, 'resultHandoff': handoff,
+                    'passed': True, 'pageErrors': errors, 'resultHandoff': handoff, 'excel': excel,
                     'checks': ['draft retention', 'restart configuration', 'partial failure', 'retry only failed input',
                                'output dimensions and alpha', 'handoff scoped to target module', '1000-page PDF editing/undo/reorder/export',
                                'two-step workflow via forms', 'pause only blocks new tasks', 'cancel queued task',

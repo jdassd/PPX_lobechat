@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Vue-3.0+-4FC08D?style=flat-square&logo=vue.js&logoColor=white" alt="Vue 3" />
   <img src="https://img.shields.io/badge/Python-3.10-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.10" />
   <img src="https://img.shields.io/badge/Pywebview-5.0+-FFD43B?style=flat-square&logo=python&logoColor=blue" alt="Pywebview" />
-  <img src="https://img.shields.io/badge/version-2.9.0-2b6fff?style=flat-square" alt="Version 2.9.0" />
+  <img src="https://img.shields.io/badge/version-2.10.0-2b6fff?style=flat-square" alt="Version 2.10.0" />
   <img src="https://img.shields.io/badge/License-AGPL--3.0-green?style=flat-square" alt="License" />
 </p>
 
@@ -20,17 +20,17 @@
 
 ## 📖 简介
 
-**PPX 2.9.0** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
+**PPX 2.10.0** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
 
-2.9 打通结果接力：根据文件类型和数量推荐兼容操作，把结果带到明确的主输入；批量队列追加去重，单文件操作说明替换范围，接收后由用户手动运行。启动使用本机字体，减少对网络的依赖。
+2.10 补齐表格处理链路：一份工作簿可直接交给质检、清洗或拆分；清洗样本和完整导出共用保留类型的处理规则，输入变化后自动清除旧结果。任务结果接力覆盖 18 个具体操作，接收后由用户检查并手动运行。
 
-更新内容与验收范围见 [v2.9.0 发布说明](docs/releases/v2.9.0.md)。
+更新内容与验收范围见 [v2.10.0 发布说明](docs/releases/v2.10.0.md)。
 
 定位、目标用户、14 个模块的输入输出与异常设计、协作流程、优先级和扩展边界见 [统一工具箱设计方案](docs/toolbox-design.md)。
 
 ## ✨ 主要功能
 
-PPX 2.9.0 的核心能力包括：
+PPX 2.10.0 的核心能力包括：
 
 ### 📄 文档与数据
 
@@ -59,7 +59,7 @@ PPX 2.9.0 的核心能力包括：
 - **任务中心**：持久保存队列与历史，支持筛选分页、批量取消/重试、7 天趋势、方法可靠性、失败诊断、多输出资产的打开/定位/复制，以及 JSON/CSV 导出和可预览清理。
 - **模块中心**：按需开启可选能力，并检查 OCR、FFmpeg、LibreOffice 与 Playwright 依赖。
 - **全局搜索**：按 `Ctrl/⌘ + K` 搜索工具或具体动作。
-- **结果接力**：在“检查结果 / 继续处理”中选择兼容操作，预先查看可发送数量和跳过原因；覆盖图片、转换、PDF、Word、Excel、索引、归档和视频的 15 个目标操作。
+- **结果接力**：在“检查结果 / 继续处理”中选择兼容操作，预先查看可发送数量和跳过原因；覆盖图片、转换、PDF、Word、Excel、索引、归档和视频的 18 个目标操作。
 - **设置与维护**：跨平台健康检查、SHA-256 完整备份、延迟安全恢复、隐私诊断报告及窗口状态记忆；旧版备份继续兼容并明确标注校验等级。
 
 ## 🏗️ 技术栈
