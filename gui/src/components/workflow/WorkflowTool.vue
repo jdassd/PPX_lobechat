@@ -2,8 +2,9 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { callApi, callApiRaw } from '@/utils/pyapi'
-import { loadOperationCatalog } from '@/utils/taskCenter'
+import { loadOperationCatalog, tasks } from '@/utils/taskCenter'
 import OperationForm from '../shared/OperationForm.vue'
+import ResultActions from '../shared/ResultActions.vue'
 
 const props = defineProps({ initialTab: { type: String, default: '' } })
 
@@ -73,6 +74,7 @@ const filteredRuns = computed(() => {
   })
 })
 const pagedRuns = computed(() => filteredRuns.value.slice((runPage.value - 1) * 20, runPage.value * 20))
+const runTaskId = (run) => tasks.value.find((task) => task.workflowRunId === run.id)?.id || ''
 watch([runQuery, runStatus, runTrigger], () => {
   runPage.value = 1
 })
@@ -95,7 +97,7 @@ const resetEditor = () => {
     name: '新工作流',
     description: '',
     enabled: true,
-    steps: [{ id: 'step-1', name: '第一个步骤', method: methods.value[0] || 'image_batch_compress', argsText: '{}', onError: 'stop', retryCount: 0, retryDelaySeconds: 1 }]
+    steps: [{ id: 'step-1', name: '第一个步骤', method: methods.value[0] || 'image_batch_compress', argsText: '{}', onError: 'stop', onPartial: 'continue', retryCount: 0, retryDelaySeconds: 1 }]
   })
   runInput.value = '{}'
 }
@@ -109,6 +111,7 @@ const loadEditor = (workflow) => {
     enabled: workflow.enabled !== false,
     steps: (workflow.steps || []).map((step) => ({
       ...step,
+      onPartial: step.onPartial || 'continue',
       retryCount: Number(step.retryCount || 0),
       retryDelaySeconds: Number(step.retryDelaySeconds || 0),
       argsText: JSON.stringify(step.args || {}, null, 2)
@@ -159,7 +162,7 @@ const addStep = () => {
   const index = editor.steps.length + 1
   let sequence = index
   while (editor.steps.some((step) => step.id === `step-${sequence}`)) sequence += 1
-  const step = { id: `step-${sequence}`, name: `步骤 ${index}`, method: methods.value[0] || '', argsText: '{}', onError: 'stop', retryCount: 0, retryDelaySeconds: 1 }
+  const step = { id: `step-${sequence}`, name: `步骤 ${index}`, method: methods.value[0] || '', argsText: '{}', onError: 'stop', onPartial: 'continue', retryCount: 0, retryDelaySeconds: 1 }
   changeMethod(step)
   editor.steps.push(step)
 }
@@ -182,6 +185,7 @@ const saveWorkflow = async () => {
       method: step.method,
       args: parseObject(step.argsText, `步骤 ${index + 1} 参数`),
       onError: step.onError,
+      onPartial: step.onPartial,
       retryCount: Number(step.retryCount || 0),
       retryDelaySeconds: Number(step.retryDelaySeconds || 0)
     }))
@@ -206,6 +210,7 @@ const saveWorkflow = async () => {
     selectedId.value = response.data.workflow.id
     ElMessage.success('工作流已保存')
     await refresh(true)
+    return response.data.workflow
   } catch (error) {
     ElMessage.error(error?.message || '保存失败')
   } finally {
@@ -223,20 +228,18 @@ const removeWorkflow = async () => {
 }
 
 const runWorkflow = async () => {
+  if (saving.value || running.value) return
   if (!editor.id) {
     ElMessage.warning('请先保存工作流')
     return
   }
-  let input
-  try {
-    input = parseObject(runInput.value, '运行输入')
-  } catch (error) {
-    return ElMessage.error(error.message)
-  }
   running.value = true
   try {
-    const response = await callApi('workflow_run', { id: editor.id, input })
-    if (response.ok) ElMessage.success('工作流执行完成')
+    const saved = await saveWorkflow()
+    if (!saved?.id) return
+    const response = await callApi('workflow_run', { id: saved.id, input: saved.inputExample || {} })
+    if (response.ok && response.data?.partial) ElMessage.warning('工作流部分完成，请查看步骤记录和已生成文件')
+    else if (response.ok) ElMessage.success('工作流执行完成')
     else ElMessage.error(response.message || '工作流执行失败')
     await refresh(true)
     activeTab.value = 'history'
@@ -452,7 +455,7 @@ onMounted(() => refresh(false))
             </div>
             <small class="bundle-hint">包含步骤参数与输入示例，不含运行历史；分享前请检查敏感字段。</small>
             <el-button v-if="bundleOutput" class="bundle-output" text type="primary" size="small" @click="revealBundle">定位最近导出的模板包</el-button>
-            <button v-for="item in workflows" :key="item.id" class="workflow-list-item" :class="{ active: item.id === selectedId }" type="button" @click="loadEditor(item)">
+            <button v-for="item in workflows" :key="item.id" class="workflow-list-item" :class="{ active: item.id === selectedId }" type="button" :disabled="running || saving" @click="loadEditor(item)">
               <span>{{ item.name }}</span>
               <small>{{ item.steps?.length || 0 }} 步 · {{ item.enabled === false ? '停用' : '启用' }}</small>
             </button>
@@ -462,7 +465,7 @@ onMounted(() => refresh(false))
             <div v-for="template in templates" :key="template.id" class="template-card">
               <strong>{{ template.name }}</strong>
               <p>{{ template.description }}</p>
-              <el-button size="small" plain @click="useTemplate(template)">使用模板</el-button>
+              <el-button size="small" plain :disabled="running || saving" @click="useTemplate(template)">使用模板</el-button>
             </div>
           </aside>
 
@@ -474,7 +477,7 @@ onMounted(() => refresh(false))
               </div>
               <el-switch v-model="editor.enabled" active-text="启用" />
             </div>
-            <el-form label-position="top">
+            <el-form label-position="top" :disabled="running || saving">
               <div class="two-columns">
                 <el-form-item label="名称">
                   <el-input v-model="editor.name" maxlength="120" />
@@ -483,6 +486,20 @@ onMounted(() => refresh(false))
                   <el-input v-model="editor.description" maxlength="500" />
                 </el-form-item>
               </div>
+
+              <section class="run-setup">
+                <h4>本次运行</h4>
+                <p>先填写输入，再立即运行。运行前会保存当前步骤和输入；下方可以调整处理规则。</p>
+                <el-form-item label="运行输入" class="run-input">
+                  <OperationForm v-model="runInput" :fields="inputFields" :disabled="running || saving" />
+                </el-form-item>
+                <div class="editor-actions">
+                  <el-button v-if="editor.id" type="danger" plain @click="removeWorkflow">删除</el-button>
+                  <span class="action-spacer" />
+                  <el-button :loading="saving" @click="saveWorkflow">保存</el-button>
+                  <el-button type="primary" :loading="running" :disabled="!editor.id" @click="runWorkflow">立即运行</el-button>
+                </div>
+              </section>
 
               <div class="step-stack">
                 <div v-for="(step, index) in editor.steps" :key="`${step.id}-${index}`" class="step-card">
@@ -499,8 +516,12 @@ onMounted(() => refresh(false))
                         <el-option label="失败后继续" value="continue" />
                       </el-select>
                     </div>
-                    <OperationForm v-model="step.argsText" :fields="descriptor(step.method)?.fields || []" :previous="editor.steps.slice(0, index)" />
+                    <OperationForm v-model="step.argsText" :fields="descriptor(step.method)?.fields || []" :previous="editor.steps.slice(0, index)" :disabled="running || saving" />
                     <div class="step-policy">
+                      <el-select v-model="step.onPartial" class="partial-select" aria-label="部分成功时的处理方式">
+                        <el-option label="部分成功后继续" value="continue" />
+                        <el-option label="部分成功即停止" value="stop" />
+                      </el-select>
                       <span>失败自动重试</span>
                       <el-input-number v-model="step.retryCount" :min="0" :max="5" size="small" />
                       <span>次，每次等待</span>
@@ -516,16 +537,6 @@ onMounted(() => refresh(false))
                 </div>
               </div>
               <el-button plain class="add-step" @click="addStep">+ 添加步骤</el-button>
-
-              <el-form-item label="运行输入" class="run-input">
-                <OperationForm v-model="runInput" :fields="inputFields" />
-              </el-form-item>
-              <div class="editor-actions">
-                <el-button v-if="editor.id" type="danger" plain @click="removeWorkflow">删除</el-button>
-                <span class="action-spacer" />
-                <el-button :loading="saving" @click="saveWorkflow">保存</el-button>
-                <el-button type="primary" :loading="running" :disabled="!editor.id" @click="runWorkflow">立即运行</el-button>
-              </div>
             </el-form>
           </section>
         </div>
@@ -648,6 +659,7 @@ onMounted(() => refresh(false))
               <el-timeline-item v-for="step in run.steps || []" :key="step.id" :type="step.status === 'success' ? 'success' : 'danger'" :timestamp="formatTime(step.endedAt)">
                 <strong>{{ step.name }}</strong> · <code>{{ step.method }}</code>
                 <p>{{ step.message || (step.status === 'success' ? '完成' : '失败') }}</p>
+                <ResultActions v-if="step.result?.outputAssets?.length" :assets="step.result.outputAssets" :source-task-id="runTaskId(run)" />
                 <small v-if="step.attemptCount > 1">共执行 {{ step.attemptCount }} 次（自动重试 {{ step.attemptCount - 1 }} 次）</small>
                 <ul v-if="step.attempts?.length > 1" class="attempt-list">
                   <li v-for="attempt in step.attempts" :key="attempt.attempt">
@@ -841,6 +853,29 @@ h3 {
 }
 .run-input {
   margin-top: 4px;
+}
+.run-setup {
+  border-top: 1px solid var(--ppx-glass-border);
+  border-bottom: 1px solid var(--ppx-glass-border);
+  padding: 18px 0;
+  margin-bottom: 20px;
+}
+.run-setup h4 {
+  margin: 0 0 6px;
+  font-size: 15px;
+}
+.run-setup p {
+  color: var(--ppx-text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 0 0 14px;
+}
+.partial-select {
+  width: 180px;
+}
+.workflow-list-item:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 .action-spacer {
   flex: 1;

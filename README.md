@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Vue-3.0+-4FC08D?style=flat-square&logo=vue.js&logoColor=white" alt="Vue 3" />
   <img src="https://img.shields.io/badge/Python-3.10-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.10" />
   <img src="https://img.shields.io/badge/Pywebview-5.0+-FFD43B?style=flat-square&logo=python&logoColor=blue" alt="Pywebview" />
-  <img src="https://img.shields.io/badge/version-2.11.0-2b6fff?style=flat-square" alt="Version 2.11.0" />
+  <img src="https://img.shields.io/badge/version-2.12.0-2b6fff?style=flat-square" alt="Version 2.12.0" />
   <img src="https://img.shields.io/badge/License-AGPL--3.0-green?style=flat-square" alt="License" />
 </p>
 
@@ -20,17 +20,17 @@
 
 ## 📖 简介
 
-**PPX 2.11.0** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
+**PPX 2.12.0** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
 
-2.11 为结果接力增加可追溯的文件来源：执行后的任务能查到用了哪次处理的哪个输出，支持逐层查看、重试保留和来源记录清理后的提示。18 个目标操作继续由用户检查并手动运行，文件改选或移除后不会沿用旧来源。
+2.12 新增“图片压缩 → 归档”和“Excel 清洗 → 质检报告”两个可复用模板：填写本次输入后手动运行，当前编辑会先保存，部分成功可停止并在修复后续跑。运行记录可以逐步查看和接力结果，继续沿用 18 个目标操作的明确文件来源。
 
-更新内容与验收范围见 [v2.11.0 发布说明](docs/releases/v2.11.0.md)。
+更新内容与验收范围见 [v2.12.0 发布说明](docs/releases/v2.12.0.md)。
 
 定位、目标用户、14 个模块的输入输出与异常设计、协作流程、优先级和扩展边界见 [统一工具箱设计方案](docs/toolbox-design.md)。
 
 ## ✨ 主要功能
 
-PPX 2.11.0 的核心能力包括：
+PPX 2.12.0 的核心能力包括：
 
 ### 📄 文档与数据
 
@@ -50,7 +50,7 @@ PPX 2.11.0 的核心能力包括：
 ### 🛠️ 文件与自动化
 
 - **文件批处理**：搜索、分类、复制、安全删除、回收站恢复、批量改名与撤销、查重及压缩解压。
-- **自动化工作流**：使用安全白名单串联本地工具，支持参数引用、步骤重试与退避、内置模板、周期运行、目录监听、触发器启停/立即运行、模板包导入导出及运行历史导出/清理。
+- **自动化工作流**：使用安全白名单串联本地工具，包含图片压缩归档、Excel 清洗质检等 4 个内置模板，支持参数引用、部分成功策略、步骤重试与退避、周期运行、目录监听、模板包导入导出及逐步结果查看。
 - **网页数据采集**：点选字段、翻页采集并导出 Excel / Word。
 - **安全边界**：删除操作可恢复且必须预览；重命名不覆盖；系统启动项只读。
 

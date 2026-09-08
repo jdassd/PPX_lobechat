@@ -178,6 +178,10 @@ def _task_diagnosis(task: Dict[str, Any]) -> Dict[str, str] | None:
 def _json_safe(value: Any, key: str = '', depth: int = 0) -> Tuple[Any, bool]:
     """Return a JSON-safe value plus whether it can be safely retried."""
     if key and _SENSITIVE_KEY.search(key):
+        # Empty defaults such as an optional archive password carry no secret and
+        # must not turn an otherwise recoverable batch task into a dead end.
+        if value is None or value == '' or value is False or value == [] or value == {} or value == ():
+            return value, True
         return '[REDACTED]', False
     if depth > 12:
         return '[DEPTH_LIMIT]', False

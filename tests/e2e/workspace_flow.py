@@ -23,6 +23,7 @@ from PIL import Image
 from playwright.sync_api import expect, sync_playwright
 from result_handoff_flow import verify_result_handoff
 from web_collection_flow import verify_web_collection
+from workflow_templates_flow import verify_workflow_templates
 
 from api.api import API
 from api.core.context import stop_process
@@ -143,6 +144,13 @@ def main():
                     return
                 if '--excel-only' in sys.argv:
                     result = verify_excel_processing(api, page, root, chosen, report_dir)
+                    assert not errors, errors
+                    print(json.dumps(result, ensure_ascii=False), flush=True)
+                    evidence.close()
+                    browser.close()
+                    return
+                if '--templates-only' in sys.argv:
+                    result = verify_workflow_templates(api, page, root, chosen, report_dir)
                     assert not errors, errors
                     print(json.dumps(result, ensure_ascii=False), flush=True)
                     evidence.close()
@@ -278,16 +286,17 @@ def main():
                 handoff = verify_result_handoff(api, page, root, chosen, picker_calls, report_dir)
                 excel = verify_excel_processing(api, page, root, chosen, report_dir)
                 origins = verify_input_origins(api, page, root, chosen, picker_calls, report_dir)
+                templates = verify_workflow_templates(api, page, root, chosen, report_dir)
                 assert not errors, errors
                 report_dir = ROOT / "build/verification"
                 report_dir.mkdir(parents=True, exist_ok=True)
                 page.screenshot(path=str(report_dir / 'workspace.png'), full_page=True)
                 (report_dir / 'workspace.json').write_text(json.dumps({
-                    'passed': True, 'pageErrors': errors, 'resultHandoff': handoff, 'excel': excel, 'inputOrigins': origins,
+                    'passed': True, 'pageErrors': errors, 'resultHandoff': handoff, 'excel': excel, 'inputOrigins': origins, 'templates': templates,
                     'checks': ['draft retention', 'restart configuration', 'partial failure', 'retry only failed input',
                                'output dimensions and alpha', 'handoff scoped to target module', '1000-page PDF editing/undo/reorder/export',
                                'two-step workflow via forms', 'pause only blocks new tasks', 'cancel queued task',
-                               'browser collection detail retry without duplicate rows']
+                               'browser collection detail retry without duplicate rows', 'built-in workflow templates and history result actions']
                 }, indent=2), encoding='utf-8')
                 evidence.close()
                 browser.close()

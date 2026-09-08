@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { callApiRaw } from '../../utils/pyapi'
 import MappingEditor from './MappingEditor.vue'
-const props = defineProps({ modelValue: { type: String, default: '{}' }, fields: { type: Array, default: () => [] }, previous: { type: Array, default: () => [] } })
+const props = defineProps({ modelValue: { type: String, default: '{}' }, fields: { type: Array, default: () => [] }, previous: { type: Array, default: () => [] }, disabled: { type: Boolean, default: false } })
 const emit = defineEmits(['update:modelValue'])
 const advanced = ref(false)
 const error = ref('')
@@ -32,7 +32,7 @@ const choose = async (field) => {
 }
 const reference = (field, stepId) => {
   if (!stepId) return set(field.name, field.default ?? '')
-  const key = field.type === 'files' ? 'outputPaths' : field.type === 'file' ? 'outputAssets.0.path' : field.type === 'directory' ? 'outputDir' : 'output'
+  const key = ['files', 'paths'].includes(field.type) ? 'outputPaths' : field.type === 'file' ? 'outputAssets.0.path' : field.type === 'directory' ? 'outputDir' : 'output'
   set(field.name, '{{steps.' + stepId + '.' + key + '}}')
 }
 const editJson = (value) => {
@@ -66,10 +66,10 @@ const removeTable = (field, index) =>
 
 <template>
   <div class="operation-form">
-    <div class="form-mode"><el-switch v-model="advanced" active-text="高级 JSON 编辑" /></div>
-    <el-input v-if="advanced" :model-value="modelValue" type="textarea" :rows="8" @update:model-value="editJson" />
+    <div class="form-mode"><el-switch v-model="advanced" active-text="高级 JSON 编辑" :disabled="disabled" /></div>
+    <el-input v-if="advanced" :model-value="modelValue" type="textarea" :rows="8" :disabled="disabled" @update:model-value="editJson" />
     <el-alert v-if="error" :title="error" type="warning" :closable="false" />
-    <el-form v-else-if="!advanced" label-position="top">
+    <el-form v-else-if="!advanced" label-position="top" :disabled="disabled">
       <el-form-item v-for="field in fields" :key="field.name" :label="field.label">
         <div class="field-value">
           <el-input v-if="isReference(field)" :model-value="display(field)" readonly />
@@ -93,7 +93,7 @@ const removeTable = (field, index) =>
             </div>
             <el-button @click="choose(field)">添加表格文件</el-button>
           </div>
-          <OperationForm v-else-if="field.type === 'object'" :model-value="JSON.stringify(values[field.name] || {})" :fields="field.fields || []" @update:model-value="editObject(field, $event)" />
+          <OperationForm v-else-if="field.type === 'object'" :model-value="JSON.stringify(values[field.name] || {})" :fields="field.fields || []" :disabled="disabled" @update:model-value="editObject(field, $event)" />
           <el-input v-else-if="field.type === 'json'" :model-value="JSON.stringify(display(field) || {}, null, 2)" type="textarea" :rows="3" placeholder="可选高级参数" @change="editObject(field, $event)" />
           <el-input v-else :model-value="typeof display(field) === 'object' ? JSON.stringify(display(field)) : display(field)" :type="field.type === 'password' ? 'password' : 'text'" :show-password="field.type === 'password'" @update:model-value="set(field.name, $event)" />
           <el-select v-if="previous.length" placeholder="引用前一步结果" clearable class="reference" @change="reference(field, $event)"><el-option v-for="step in previous" :key="step.id" :value="step.id" :label="step.name || step.id" /></el-select>
@@ -117,12 +117,16 @@ const removeTable = (field, index) =>
 .field-value > .el-input,
 .field-value > .el-textarea {
   flex: 1;
+  min-width: 0;
 }
 .reference {
   width: 180px;
   flex-shrink: 0;
 }
 .operation-form {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 12px;
   border: 1px solid var(--ppx-glass-border);
   border-radius: 8px;

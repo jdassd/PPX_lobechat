@@ -1,0 +1,173 @@
+{
+  "version": "2.12.0",
+  "date": "2026-09-08",
+  "environment": "Windows source app, real Python API, Edge browser, isolated fixture files",
+  "checks": {
+    "lint": {
+      "passed": true,
+      "errors": 0,
+      "styleWarnings": 148
+    },
+    "python": {
+      "passed": true,
+      "tests": 85,
+      "addedWorkflowAndRetryTests": 8
+    },
+    "frontend": {
+      "passed": true,
+      "tests": 20,
+      "addedEmptySecretTests": 4
+    },
+    "productionBuild": {
+      "passed": true
+    },
+    "browser": {
+      "passed": true,
+      "pageErrors": [],
+      "resultHandoff": {
+        "verifiedRoutes": [
+          "image/compress",
+          "image/watermark",
+          "image/rotate",
+          "pdf/merge",
+          "word/merge",
+          "conversion/images-pdf",
+          "conversion/merge-pdf",
+          "conversion/universal",
+          "pdf/compress",
+          "excel/merge",
+          "excel/profile",
+          "excel/process",
+          "excel/split",
+          "document/index",
+          "file/archive",
+          "video/compress",
+          "video/cut"
+        ],
+        "unavailableDependencies": [
+          "pdf/ocr"
+        ],
+        "checks": [
+          "mixed selection",
+          "single-file limits",
+          "disabled module",
+          "missing assets",
+          "auxiliary picker isolation",
+          "same-route return",
+          "deduplicated append"
+        ]
+      },
+      "excel": {
+        "passed": true,
+        "checks": [
+          "header row 2",
+          "typed date sort",
+          "trim and deduplicate preview/export parity",
+          "source unchanged",
+          "file switch clears results and preserves directory",
+          "corrupt file error",
+          "slow A cannot overwrite B",
+          "quality retains original 3 rows",
+          "quality report generated",
+          "split into two groups",
+          "980x760 light/dark action bounds"
+        ]
+      },
+      "inputOrigins": {
+        "passed": true,
+        "chains": [
+          "image compression → rotation",
+          "image parent dialog → compression",
+          "Excel → profile → quality report",
+          "file copy → document index"
+        ],
+        "checks": [
+          "receive and preview never execute",
+          "precise parent and path",
+          "business args exclude lineage",
+          "same-path native replacement clears lineage",
+          "auxiliary watermark picker does not consume or supply main origin",
+          "workspace drafts exclude origin metadata",
+          "remove then local selection clears lineage",
+          "filtered parent lookup and back",
+          "parent handoff closes origins dialog",
+          "removed parent keeps relation",
+          "980×760 light/dark no overflow"
+        ],
+        "taskIds": [
+          "c08d6047c939441a90d7536f9c7e1a67",
+          "187d16a1a5fc493eb03a0ae7aef06142",
+          "a044e77698044230ba94aa71e0b4f7ba",
+          "b2121c7fd3e243eab27cadfdad6f04ef"
+        ]
+      },
+      "templates": {
+        "passed": true,
+        "checks": [
+          "template UI input and immediate save",
+          "paths field references outputPaths",
+          "image copy ZIP and source unchanged",
+          "invalid JSON blocks run",
+          "history per-step result handoff preserves queue task origin",
+          "Excel header row 2 clean copy then header row 1 report",
+          "partial completion stops archive and keeps outputs",
+          "task-center retry restores complete archive without rewriting success",
+          "980x760 light/dark no horizontal overflow"
+        ],
+        "runs": [
+          "8a62376b8eba49d9a1abb453ab8c42bb",
+          "6cb285ac711d423e932f150595120044",
+          "48cb552da978457ba0e9027e924ab657",
+          "96514554da684ef4bc04f98640e5bf19"
+        ]
+      },
+      "checks": [
+        "draft retention",
+        "restart configuration",
+        "partial failure",
+        "retry only failed input",
+        "output dimensions and alpha",
+        "handoff scoped to target module",
+        "1000-page PDF editing/undo/reorder/export",
+        "two-step workflow via forms",
+        "pause only blocks new tasks",
+        "cancel queued task",
+        "browser collection detail retry without duplicate rows",
+        "built-in workflow templates and history result actions"
+      ]
+    },
+    "targetedWorkflowTemplates": {
+      "passed": true,
+      "checks": [
+        "template UI input and immediate save",
+        "paths field references outputPaths",
+        "image copy ZIP and source unchanged",
+        "invalid JSON blocks run",
+        "history per-step result handoff preserves queue task origin",
+        "Excel header row 2 clean copy then header row 1 report",
+        "partial completion stops archive and keeps outputs",
+        "task-center retry restores complete archive without rewriting success",
+        "980x760 light/dark no horizontal overflow"
+      ],
+      "runs": [
+        "d1a6d8b9a9564ad3860ed994af35c73d",
+        "e9b60617dbba41f89802c807da12d14a",
+        "6d85ab505ad94fb78dfdafbff36b75b0",
+        "766bb9f44e5e4fa0abd8948ae7cccde1"
+      ]
+    }
+  },
+  "screenshots": [
+    "templates-light.png",
+    "templates-dark.png",
+    "templates-results.png"
+  ],
+  "limits": [
+    "Template workflows are manually created and run; no scheduling is enabled automatically.",
+    "The Excel report inspects the cleaned workbook; its source quality requires a separate analysis.",
+    "Retried step messages describe the current attempt; retained output files are also listed.",
+    "Source origins are explicit path relationships, not content hashes.",
+    "Native installation, upgrade and recovery acceptance is still pending.",
+    "Local PDF OCR is dependency-disabled; all reported browser chains used available local capabilities."
+  ]
+}

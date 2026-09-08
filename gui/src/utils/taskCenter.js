@@ -1,9 +1,9 @@
 import { computed, ref } from 'vue'
+import { sanitizeTaskValue as sanitizeValue } from './taskSanitizer.mjs'
 
 const STORAGE_KEY = 'ppx-v25-tasks'
 const LEGACY_STORAGE_KEYS = ['ppx-v24-tasks', 'ppx-v23-tasks', 'ppx-v2-tasks']
 const MAX_TASKS = 200
-const SENSITIVE_KEY = /(password|passwd|secret|token|cookie|authorization|api[_-]?key)/i
 
 // 仅将真正产生结果、改变文件或执行较重分析的调用送入持久任务队列。
 export const TASK_METHODS = {
@@ -66,33 +66,6 @@ export const TASK_METHODS = {
   ocr_table: ['document', 'table', '表格 OCR'],
   document_index_build: ['document', 'index', '建立文档索引'],
   workflow_run: ['workflow', 'history', '运行工作流']
-}
-
-const sanitizeValue = (value, key = '', depth = 0) => {
-  if (key && SENSITIVE_KEY.test(key)) return { value: '[REDACTED]', retryable: false }
-  if (depth > 10) return { value: '[DEPTH_LIMIT]', retryable: false }
-  if (value === null || ['boolean', 'number'].includes(typeof value)) return { value, retryable: true }
-  if (typeof value === 'string') return value.length <= 200000 ? { value, retryable: true } : { value: `${value.slice(0, 200000)}\n[TRUNCATED]`, retryable: false }
-  if (Array.isArray(value)) {
-    let retryable = true
-    const output = value.map((item) => {
-      const safe = sanitizeValue(item, '', depth + 1)
-      retryable = retryable && safe.retryable
-      return safe.value
-    })
-    return { value: output, retryable }
-  }
-  if (value && typeof value === 'object') {
-    let retryable = true
-    const output = {}
-    Object.entries(value).forEach(([itemKey, item]) => {
-      const safe = sanitizeValue(item, itemKey, depth + 1)
-      output[itemKey] = safe.value
-      retryable = retryable && safe.retryable
-    })
-    return { value: output, retryable }
-  }
-  return { value: String(value), retryable: false }
 }
 
 const readTasks = () => {

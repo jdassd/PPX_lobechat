@@ -113,6 +113,47 @@ BUILTIN_WORKFLOWS = [
             },
         ],
     },
+    {
+        'id': 'builtin-image-archive',
+        'name': '图片压缩 → 归档',
+        'description': '手动运行后保留源图片，生成压缩副本并打包为 ZIP；可在运行前修改输入和输出目录。',
+        'inputExample': {'files': [], 'outputDir': '', 'archiveName': '图片分享包'},
+        'steps': [
+            {
+                'id': 'compress', 'name': '压缩分享副本', 'method': 'image_batch_compress',
+                'args': {'files': '{{input.files}}', 'outputDir': '{{input.outputDir}}', 'mode': 'quality', 'quality': 82},
+                'onError': 'stop', 'onPartial': 'stop',
+            },
+            {
+                'id': 'archive', 'name': '打包压缩副本', 'method': 'file_compress',
+                'args': {'items': '{{steps.compress.outputPaths}}', 'outputDir': '{{input.outputDir}}',
+                         'archiveName': '{{input.archiveName}}', 'format': 'zip'},
+                'onError': 'stop', 'onPartial': 'stop',
+            },
+        ],
+    },
+    {
+        'id': 'builtin-excel-quality',
+        'name': 'Excel 清洗 → 质检报告',
+        'description': '手动运行后保留源工作簿，生成去空格、可按列去重的清洗副本，并检查该副本。',
+        'inputExample': {'filePath': '', 'outputDir': '', 'headerRow': 1, 'trimText': True, 'deduplicateColumns': []},
+        'steps': [
+            {
+                'id': 'clean', 'name': '生成清洗副本', 'method': 'excel_process',
+                'args': {'filePath': '{{input.filePath}}', 'outputDir': '{{input.outputDir}}',
+                         'headerRow': '{{input.headerRow}}', 'trimText': '{{input.trimText}}',
+                         'deduplicateColumns': '{{input.deduplicateColumns}}', 'exportCombined': True,
+                         'exportGroups': False, 'exportJson': False},
+                'onError': 'stop', 'onPartial': 'stop',
+            },
+            {
+                'id': 'report', 'name': '检查清洗副本', 'method': 'excel_quality_report',
+                'args': {'filePath': '{{steps.clean.combinedPath}}', 'outputDir': '{{input.outputDir}}',
+                         'headerRow': 1, 'blankRatioThreshold': 0.5},
+                'onError': 'stop', 'onPartial': 'stop',
+            },
+        ],
+    },
 ]
 
 
@@ -238,6 +279,7 @@ class WorkflowMixin:
                 'method': method,
                 'args': _copy(args),
                 'onError': 'continue' if raw.get('onError') == 'continue' else 'stop',
+                'onPartial': 'stop' if raw.get('onPartial') == 'stop' else 'continue',
                 'retryCount': retry_count,
                 'retryDelaySeconds': retry_delay,
             })
@@ -695,6 +737,8 @@ class WorkflowMixin:
                     self._workflow_persist_locked()
                 checkpoint()
                 partial = partial or step_run['status'] == 'partial'
+                if step_run['status'] == 'partial' and step.get('onPartial') == 'stop':
+                    break
                 if not ok:
                     failed = True
                     if step['onError'] != 'continue':
