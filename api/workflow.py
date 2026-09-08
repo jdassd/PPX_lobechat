@@ -168,6 +168,25 @@ BUILTIN_WORKFLOWS = [
              'onError': 'stop', 'onPartial': 'stop'},
         ],
     },
+    {
+        'id': 'builtin-search-archive',
+        'name': '搜索文档 → 保留目录归档',
+        'description': '按名称和扩展名搜索文档，再按来源相对路径打包；搜索不完整时停止，自动排除所选输出目录。',
+        'inputExample': {'directory': '', 'outputDir': '', 'keyword': '',
+                         'extensions': ['pdf', 'docx', 'xlsx', 'txt'], 'recursive': True,
+                         'limit': 500, 'archiveName': '文档归档'},
+        'steps': [
+            {'id': 'search', 'name': '搜索要归档的文档', 'method': 'file_search',
+             'args': {'directory': '{{input.directory}}', 'keyword': '{{input.keyword}}',
+                      'extensions': '{{input.extensions}}', 'recursive': '{{input.recursive}}',
+                      'limit': '{{input.limit}}', 'excludeDirectory': '{{input.outputDir}}'},
+             'onError': 'stop', 'onPartial': 'stop'},
+            {'id': 'archive', 'name': '按相对路径归档', 'method': 'file_compress',
+             'args': {'items': '{{steps.search.outputPaths}}', 'format': 'zip',
+                      'baseDir': '{{input.directory}}', 'outputDir': '{{input.outputDir}}',
+                      'archiveName': '{{input.archiveName}}'}, 'onError': 'stop', 'onPartial': 'stop'},
+        ],
+    },
 ]
 
 
@@ -228,6 +247,24 @@ class WorkflowMixin:
             if run.get('status') == 'running':
                 run.update(status='interrupted', endedAt=time.time())
                 interrupted = True
+        # Older versions registered query source files as newly generated files.
+        # Repair identities supported by retained history without touching files
+        # or dropping paths also known to have been written by real operations.
+        if not payload.get('querySourceExclusionFixed'):
+            import os
+
+            from api.operations import QUERY_METHODS
+            queried, generated = set(), set()
+            for run in payload['runs']:
+                for step in run.get('steps', []):
+                    identities = queried if step.get('method') in QUERY_METHODS else generated
+                    identities.update(os.path.normcase(os.path.abspath(asset['path']))
+                                      for asset in (step.get('result') or {}).get('outputAssets', []) if asset.get('path'))
+            sources = queried - generated
+            payload['generatedPaths'] = [path for path in payload.get('generatedPaths', [])
+                                         if os.path.normcase(os.path.abspath(path)) not in sources]
+            payload['querySourceExclusionFixed'] = True
+            interrupted = True
         if interrupted:
             self._workflow_store.save('workflows', payload)
         return payload
@@ -550,6 +587,8 @@ class WorkflowMixin:
         return isinstance(result, dict) and (result.get('code') == 0 or result.get('success') is True)
 
     def _workflow_execute_step(self, step: Dict[str, Any], context: Dict[str, Any], previous=None):
+        from api.operations import QUERY_METHODS
+        generates_files = step['method'] not in QUERY_METHODS
         step_started = time.time()
         attempts = []
         result: Any = None
@@ -591,9 +630,10 @@ class WorkflowMixin:
                         if asset:
                             if not any(item['path'] == asset['path'] for item in parent_context.outputs):
                                 parent_context.outputs.append(asset)
-                            with self._workflow_lock:
-                                self._workflow_generated_paths.add(str(Path(asset['path']).resolve()))
-                                self._workflow_persist_locked()
+                            if generates_files:
+                                with self._workflow_lock:
+                                    self._workflow_generated_paths.add(str(Path(asset['path']).resolve()))
+                                    self._workflow_persist_locked()
                         parent_context.emit(**payload)
 
                     child_context = TaskContext(cancel=parent_context.cancel, callback=report_step)
@@ -606,8 +646,9 @@ class WorkflowMixin:
                         result.setdefault('itemResults', child_context.item_results)
                         result.setdefault('inputItems', child_context.input_items)
                     checkpoint()
-                    for asset in result.get('outputAssets', []) if isinstance(result, dict) else []:
-                        self._workflow_generated_paths.add(str(Path(asset['path']).resolve()))
+                    if generates_files and isinstance(result, dict):
+                        with self._workflow_lock:
+                            self._workflow_generated_paths.update(str(Path(asset['path']).resolve()) for asset in result.get('outputAssets', []))
                     ok = self._workflow_result_ok(result)
                     message = (
                         str(result.get('msg') or result.get('message') or '')
@@ -706,7 +747,7 @@ class WorkflowMixin:
             resume_steps = {step['id']: step for step in previous_run.get('steps', [])}
             if any(not Path(asset['path']).exists() for step in resume_steps.values()
                    for asset in step.get('result', {}).get('outputAssets', [])):
-                return api_error('先前已生成的结果已移动或删除，请重新运行工作流')
+                return api_error('先前的结果文件已移动或删除，请重新运行工作流')
 
         input_data = options.get('input') or {}
         watch_data = options.get('watch') or {}

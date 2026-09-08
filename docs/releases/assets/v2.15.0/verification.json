@@ -1,0 +1,198 @@
+{
+  "version": "2.15.0",
+  "verifiedAt": "2026-09-08T16:26:13.670879+00:00",
+  "python": {
+    "passed": 130,
+    "failed": 0,
+    "command": "pnpm run test"
+  },
+  "frontend": {
+    "passed": 25,
+    "failed": 0,
+    "command": "pnpm run test:gui"
+  },
+  "lint": {
+    "passed": true,
+    "errors": 0,
+    "existingWarnings": 147,
+    "command": "pnpm run lint"
+  },
+  "productionBuild": {
+    "passed": true,
+    "command": "pnpm -C gui run build"
+  },
+  "browser": {
+    "passed": true,
+    "pageErrors": [],
+    "resultHandoff": {
+      "verifiedRoutes": [
+        "image/compress",
+        "image/watermark",
+        "image/rotate",
+        "pdf/merge",
+        "word/merge",
+        "conversion/images-pdf",
+        "conversion/merge-pdf",
+        "conversion/universal",
+        "pdf/compress",
+        "excel/merge",
+        "excel/profile",
+        "excel/process",
+        "excel/split",
+        "document/index",
+        "file/archive",
+        "video/compress",
+        "video/cut"
+      ],
+      "unavailableDependencies": [
+        "pdf/ocr"
+      ],
+      "checks": [
+        "mixed selection",
+        "single-file limits",
+        "disabled module",
+        "missing assets",
+        "auxiliary picker isolation",
+        "same-route return",
+        "deduplicated append"
+      ]
+    },
+    "excel": {
+      "passed": true,
+      "checks": [
+        "header row 2",
+        "typed date sort",
+        "trim and deduplicate preview/export parity",
+        "source unchanged",
+        "file switch clears results and preserves directory",
+        "corrupt file error",
+        "slow A cannot overwrite B",
+        "quality retains original 3 rows",
+        "quality report generated",
+        "split into two groups",
+        "980x760 light/dark action bounds"
+      ]
+    },
+    "inputOrigins": {
+      "passed": true,
+      "chains": [
+        "image compression → rotation",
+        "image parent dialog → compression",
+        "Excel → profile → quality report",
+        "file copy → document index"
+      ],
+      "checks": [
+        "receive and preview never execute",
+        "precise parent and path",
+        "business args exclude lineage",
+        "same-path native replacement clears lineage",
+        "auxiliary watermark picker does not consume or supply main origin",
+        "workspace drafts exclude origin metadata",
+        "remove then local selection clears lineage",
+        "filtered parent lookup and back",
+        "parent handoff closes origins dialog",
+        "removed parent keeps relation",
+        "980×760 light/dark no overflow"
+      ],
+      "taskIds": [
+        "f24633b6b1cf45bb80190622e3878e64",
+        "4a3021dfa52a4352bdf09ca13ff8a108",
+        "54101471b66f435ca6df01f857e14eb4",
+        "f7ffa6fbe8614df3b3ff7e34fe3e97ca"
+      ]
+    },
+    "templates": {
+      "passed": true,
+      "checks": [
+        "template UI input and immediate save",
+        "paths field references outputPaths",
+        "image copy ZIP and source unchanged",
+        "invalid JSON blocks run",
+        "history per-step result handoff preserves queue task origin",
+        "Excel header row 2 clean copy then header row 1 report",
+        "partial completion stops archive and keeps outputs",
+        "task-center retry restores complete archive without rewriting success",
+        "980x760 light/dark no horizontal overflow"
+      ],
+      "runs": [
+        "ed3bae924d57459e833069ce10bfc921",
+        "aea232c53f2a49ff80e082d9451856d7",
+        "678475bb233d44ee8de42f8e8cf3423d",
+        "4bcdfa5e6db644579c06d13bb55f258b"
+      ]
+    },
+    "preflight": {
+      "passed": true,
+      "checks": [
+        "read-only checks never save or queue",
+        "invalid input and self-reference block run",
+        "error location focuses runtime input",
+        "known inputs and deferred prior output",
+        "stale response discarded after queued input event",
+        "API errors never queue",
+        "null JSON does not crash and switching clears stale form error",
+        "file counts and 980x760 light/dark layout",
+        "real two-file ZIP after successful check",
+        "new workflow checks saves and runs in one action"
+      ]
+    },
+    "workflowResults": {
+      "passed": true,
+      "checks": [
+        "typed result field picker writes real result binding",
+        "incompatible file results absent for text",
+        "real text cleaning and format template",
+        "data previews render only after opening",
+        "zero false empty and long data remain distinct",
+        "preview is limited while copy uses full value",
+        "clipboard payload and failure feedback checked with browser-local stub",
+        "invalid JSON rules block queue instead of running old rules",
+        "JSON query path uses text input",
+        "980x760 result picker and light/dark data views"
+      ]
+    },
+    "searchArchive": {
+      "passed": true,
+      "checks": [
+        "literal keyword and case-insensitive extension with real files",
+        "nonrecursive empty result",
+        "search and reviewed file handoff never auto-execute",
+        "manual archive retains layout and ignores hidden 7Z password in ZIP mode",
+        "real search template ZIP preserves both same-named files and bytes",
+        "51 matches with limit 50 stop before archive",
+        "standalone truncation warning and stale result clearing",
+        "980x760 light/dark search results and workflow stop evidence"
+      ]
+    },
+    "checks": [
+      "draft retention",
+      "restart configuration",
+      "partial failure",
+      "retry only failed input",
+      "output dimensions and alpha",
+      "handoff scoped to target module",
+      "1000-page PDF editing/undo/reorder/export",
+      "two-step workflow via forms",
+      "pause only blocks new tasks",
+      "cancel queued task",
+      "browser collection detail retry without duplicate rows",
+      "built-in workflow templates and history result actions"
+    ]
+  },
+  "nativeInstallAcceptance": "pending",
+  "nativeClipboardPermissions": "pending; browser-local stub verifies payload and error feedback",
+  "releaseGate": "passed with previously authorized pending acceptance preserved",
+  "finalSearchArchive": {
+    "passed": true,
+    "checks": [
+      "literal keyword and case-insensitive extension with real files",
+      "nonrecursive empty result",
+      "search and reviewed file handoff never auto-execute",
+      "manual archive retains layout and ignores hidden 7Z password in ZIP mode",
+      "real search template ZIP preserves both same-named files and bytes",
+      "51 matches with limit 50 stop before archive",
+      "standalone truncation warning and stale result clearing",
+      "980x760 light/dark search results and workflow stop evidence"
+    ]
+  }
+}

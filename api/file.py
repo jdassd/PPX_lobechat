@@ -5,14 +5,12 @@
 """
 from __future__ import annotations
 
-import difflib
-import filecmp
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
-import subprocess
 import tempfile
 import time
 import uuid
@@ -22,7 +20,17 @@ from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Dict, Iterable, List, Tuple
 
-from api.core.context import checkpoint, iter_progress, publish_output, record_inputs, record_item, run_process
+from api.core.archive_entries import iter_archive_entries
+from api.core.context import (
+    TaskCancelled,
+    checkpoint,
+    iter_progress,
+    publish_output,
+    record_inputs,
+    record_item,
+    run_process,
+)
+from api.core.file_search import search_files
 from api.core.journal import save_manifest
 from api.core.outputs import atomic_output, output_asset, write_output
 
@@ -142,65 +150,6 @@ class FileTool:
         record_inputs(files)
         return files
 
-    def _search_with_fd(self, directory: Path, filters: Dict, limit: int):
-        """尝试使用 fd/fdfind 进行快速文件名搜索，不满足条件或失败时返回 None."""
-        fd_path = shutil.which('fd') or shutil.which('fdfind')
-        if not fd_path:
-            return None
-        keyword = filters['keyword']
-        extensions = filters['extensions']
-        args = [
-            fd_path,
-            '--hidden',
-            '--follow',
-            '--type',
-            'f',
-            '--max-results',
-            str(limit),
-        ]
-        for ext in extensions:
-            args += ['--extension', ext]
-        pattern = keyword or ''
-        if not pattern:
-            # 使用空模式时 fd 需要一个通配符，这里使用 '.' 匹配全部文件
-            pattern = '.'
-        args.append(pattern)
-        args.append(str(directory))
-        try:
-            proc = subprocess.run(args, capture_output=True, text=True)
-        except Exception:
-            return None
-        # returncode 为 1 时表示无匹配结果，也视为正常
-        if proc.returncode not in (0, 1):
-            return None
-        matched = []
-        for line in proc.stdout.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            path = Path(line)
-            if not path.is_absolute():
-                path = directory / path
-            try:
-                if not path.is_file():
-                    continue
-                if not self._match_common_filters(path, filters):
-                    continue
-                stat = path.stat()
-            except OSError:
-                continue
-            matched.append({
-                'name': path.name,
-                'path': str(path),
-                'size': stat.st_size,
-                'sizeText': format_bytes(stat.st_size),
-                'modified': stat.st_mtime,
-                'ext': path.suffix.lower(),
-            })
-            if len(matched) >= limit:
-                break
-        return matched
-
     @staticmethod
     def _hash_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
         hasher = hashlib.sha256()
@@ -291,27 +240,31 @@ class FileTool:
             opts = self._validate(options)
             directory = ensure_directory(opts.get('directory'), auto_create=False)
             filters = self._parse_common_filters(opts)
-            limit = clamp_int(opts.get('limit', 500), 50, 2000)
-
-            # 优先尝试使用 fd 这类开源文件搜索引擎，加速大目录检索
-            matched = self._search_with_fd(directory, filters, limit)
-            if matched is None:
-                matched = []
-                for path in self._iter_files(directory, recursive=filters['recursive']):
-                    if not self._match_common_filters(path, filters):
-                        continue
-                    stat = path.stat()
-                    matched.append({
-                        'name': path.name,
-                        'path': str(path),
-                        'size': stat.st_size,
-                        'sizeText': format_bytes(stat.st_size),
-                        'modified': stat.st_mtime,
-                        'ext': path.suffix.lower(),
-                    })
-                    if len(matched) >= limit:
-                        break
-            return api_success('搜索完成', items=matched)
+            limit = clamp_int(opts.get('limit'), default=500, min_value=50, max_value=2000)
+            for name in ('min_size', 'max_size', 'start_time', 'end_time'):
+                if not math.isfinite(filters[name]) or filters[name] < 0:
+                    raise ValueError('大小和修改时间必须是非负有限数值')
+            if filters['max_size'] and filters['min_size'] > filters['max_size']:
+                raise ValueError('最小大小不能大于最大大小')
+            if filters['end_time'] and filters['start_time'] > filters['end_time']:
+                raise ValueError('修改时间的开始值不能晚于结束值')
+            if opts.get('excludeDirectory'):
+                excluded = Path(opts['excludeDirectory']).expanduser().resolve()
+                resolved = directory.resolve()
+                if excluded == resolved or excluded in resolved.parents:
+                    raise ValueError('跳过目录不能包含整个搜索目录，请单独选择输出目录')
+                if excluded.exists() and not excluded.is_dir():
+                    raise ValueError('跳过目录不能是文件')
+                filters['exclude_directory'] = excluded
+            result = search_files(directory, filters, limit)
+            count = result['matchedCount']
+            message = f'搜索完成，找到 {count} 个文件' if count else '未找到匹配文件'
+            if result['partial']:
+                reason = f'超过 {limit} 条结果上限，请缩小范围' if result['truncated'] else result['errors'][0]['message']
+                message = f'搜索结果不完整，已保留 {count} 条；{reason}'
+            return api_success(message, **result)
+        except TaskCancelled:
+            raise
         except Exception as exc:
             return api_error(f'搜索失败：{exc}')
 
@@ -343,16 +296,6 @@ class FileTool:
         largest = largest[:10]
         return total_size, file_count, dir_count, ext_counter, largest
 
-    def _iter_archive_entries(self, path: Path) -> Iterable[Tuple[Path, Path]]:
-        if path.is_file():
-            yield path, Path(path.name)
-            return
-        for root, _, files in os.walk(path):
-            for filename in files:
-                file_path = Path(root) / filename
-                rel_path = file_path.relative_to(path.parent)
-                yield file_path, rel_path
-
     def file_compress(self, options: Dict | None = None):
         """压缩打包"""
         try:
@@ -364,10 +307,15 @@ class FileTool:
             for path in items:
                 if not path.exists():
                     raise FileNotFoundError(f'路径不存在：{path}')
+            base_dir = opts.get('baseDir') or None
+            if base_dir and not opts.get('outputDir'):
+                raise ValueError('保留相对路径时请明确选择输出目录')
             fmt = str(opts.get('format', 'zip')).lower()
             output_dir = Path(opts.get('outputDir') or items[0].parent)
             output_dir.mkdir(parents=True, exist_ok=True)
             filename = opts.get('archiveName') or f'archive_{int(time.time())}'
+            if not isinstance(filename, str) or filename in {'.', '..'} or any(character in filename for character in '/\\:'):
+                raise ValueError('压缩包名称只能是文件名，不能包含目录')
             if fmt not in {'zip', '7z'}:
                 raise ValueError('当前仅支持 ZIP 和 7Z')
             suffix = f'.{fmt}'
@@ -381,7 +329,9 @@ class FileTool:
                         seven_zip = shutil.which('7z') or shutil.which('7za') or shutil.which('7zz')
                         if not seven_zip:
                             raise OSError('未检测到 7-Zip，暂不支持 ZIP 密码压缩，请改用 7Z 格式或安装 7-Zip')
-                        common_root = os.path.commonpath([str(path.parent) for path in items])
+                        for _ in iter_archive_entries(items, base_dir=base_dir, exclude=[temporary, dest]):
+                            pass
+                        common_root = str(Path(base_dir).resolve()) if base_dir else os.path.commonpath([str(path.resolve().parent) for path in items])
                         rel_paths = [os.path.relpath(str(path), common_root) for path in items]
                         cmd = [
                             seven_zip,
@@ -391,32 +341,27 @@ class FileTool:
                             f'-p{password}',
                             '-mem=ZipCrypto',
                             str(temporary),
+                            '--',
                         ] + rel_paths
-                        proc = subprocess.run(cmd, cwd=common_root, capture_output=True, text=True)
+                        proc = run_process(cmd, cwd=common_root, timeout=3600)
                         if proc.returncode != 0:
                             stderr = proc.stderr.strip() or '调用 7-Zip 创建带密码 ZIP 失败'
                             raise RuntimeError(stderr)
                     else:
                         compression = zipfile.ZIP_DEFLATED
                         with zipfile.ZipFile(temporary, 'w', compression=compression, compresslevel=6) as handler:
-                            for path in iter_progress(items):
-                                if path.is_dir():
-                                    for file_path in path.rglob('*'):
-                                        checkpoint()
-                                        if file_path.resolve() in {temporary.resolve(), dest.resolve()}:
-                                            continue
-                                        if file_path.is_file():
-                                            handler.write(file_path, file_path.relative_to(path.parent))
-                                else:
-                                    handler.write(path, arcname=path.name)
+                            for path, name in iter_progress(iter_archive_entries(items, base_dir=base_dir, exclude=[temporary, dest])):
+                                handler.write(path, arcname=name)
                 else:
                     if py7zr is None:
                         raise ImportError('缺少 py7zr 依赖，请运行 pip install py7zr')
                     password = opts.get('password') or None
                     with py7zr.SevenZipFile(temporary, 'w', password=password) as handler:
-                        for path in iter_progress(items):
-                            handler.writeall(path, arcname=path.name)
+                        for path, name in iter_progress(iter_archive_entries(items, base_dir=base_dir, exclude=[temporary, dest])):
+                            handler.write(path, arcname=name)
             return api_success('压缩完成', file=str(dest))
+        except TaskCancelled:
+            raise
         except Exception as exc:
             return api_error(f'压缩失败：{exc}')
 

@@ -6,7 +6,6 @@ import json
 import math
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
 
 from api.core.context import TaskCancelled, checkpoint, current_context, record_inputs, report_progress
 from api.core.outputs import output_asset
@@ -49,6 +48,7 @@ class OperationDescriptor:
 
 _CATALOG = json.loads(Path(__file__).with_name('operation_catalog.json').read_text(encoding='utf-8'))
 OPERATIONS = {item['id']: OperationDescriptor(**item) for item in _CATALOG}
+QUERY_METHODS = frozenset({'file_search', 'file_deduplicate', 'excel_column_profile'})
 
 # Explicit legacy result contracts. Values identify outputs, never arbitrary text.
 _OUTPUT_FIELDS = {
@@ -179,6 +179,19 @@ def validate_operation_args(method, args, *, allow_bindings=True, detailed=False
                 add(field_info, f'{field_info["label"]}不能小于 {field_info["min"]}')
             if field_info.get('max') is not None and value > field_info['max']:
                 add(field_info, f'{field_info["label"]}不能大于 {field_info["max"]}')
+    if method == 'file_compress':
+        base_dir = args.get('baseDir')
+        unknown_root = 'baseDir' in deferred_fields or (allow_bindings and isinstance(base_dir, str) and '{{' in base_dir)
+        if base_dir and not unknown_root and 'outputDir' not in deferred_fields and not args.get('outputDir'):
+            errors.append(problem('outputDir', '保留相对路径时请明确选择输出目录'))
+        name = args.get('archiveName')
+        if isinstance(name, str) and 'archiveName' not in deferred_fields and not (allow_bindings and '{{' in name):
+            if name in {'.', '..'} or any(character in name for character in '/\\:'):
+                errors.append(problem('archiveName', '压缩包名称只能是文件名，不能包含目录'))
+    if method == 'file_search' and not {'minSize', 'maxSize'} & set(deferred_fields):
+        lower, upper = args.get('minSize', 0), args.get('maxSize', 0)
+        if isinstance(lower, (int, float)) and isinstance(upper, (int, float)) and upper > 0 and lower > upper:
+            errors.append(problem('maxSize', '最小大小不能大于最大大小'))
     return errors
 
 
@@ -249,7 +262,7 @@ class OperationService:
                                'preview': preview if hasattr(self._host, preview) else None, 'dependencies': dependencies,
                                'inputTypes': [field['type'] for field in item.fields if field['type'] in {'file', 'files', 'directory'}],
                                'outputTypes': ['asset'] if _OUTPUT_FIELDS.get(item.id) else ['data'],
-                               'kind': 'query' if item.id in {'file_search', 'file_deduplicate', 'excel_column_profile'} else 'operation'})
+                               'kind': 'query' if item.id in QUERY_METHODS else 'operation'})
         return api_success(schemaVersion=1, operations=operations)
 
     def operations_validate(self, options=None):

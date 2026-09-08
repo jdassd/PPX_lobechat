@@ -14,6 +14,7 @@ const archive = useDraft('file/parts/ArchivePanel/archive', {
   archiveName: '',
   password: '',
   outputDir: '',
+  baseDir: '',
   result: ''
 })
 
@@ -43,6 +44,12 @@ const selectArchiveOutput = async () => {
   if (dir) {
     archive.outputDir = dir
   }
+}
+
+const selectArchiveBase = async () => {
+  if (loading.value || !ensurePyReady()) return
+  const directory = await callApiRaw('system_pySelectDirDialog', archive.baseDir || '')
+  if (directory && !loading.value) archive.baseDir = directory
 }
 
 const selectExtractTarget = async () => {
@@ -103,7 +110,8 @@ const runCompress = async () => {
         format: archive.format,
         archiveName: archive.archiveName,
         outputDir: archive.outputDir,
-        password: archive.password
+        baseDir: archive.baseDir,
+        password: archive.format === '7z' ? archive.password : ''
       },
       archive.items
     )
@@ -179,7 +187,15 @@ const runExtract = async () => {
           </el-table-column>
         </el-table>
         <el-empty v-else description="尚未添加" />
-        <el-form :model="archive" label-width="100px" style="margin-top: 12px">
+        <el-form :model="archive" label-width="100px" :disabled="loading" style="margin-top: 12px">
+          <el-form-item label="保留目录结构">
+            <div class="field-row">
+              <el-input v-model="archive.baseDir" placeholder="可选，选择文件的共同根目录" readonly />
+              <el-button :disabled="loading" @click="selectArchiveBase">选择根目录</el-button>
+              <el-button v-if="archive.baseDir" :disabled="loading" text @click="archive.baseDir = ''">清除</el-button>
+            </div>
+            <small>保留根目录内的相对路径，避免不同文件夹中的同名文件冲突。</small>
+          </el-form-item>
           <el-form-item label="格式">
             <el-radio-group v-model="archive.format">
               <el-radio-button label="zip">ZIP</el-radio-button>

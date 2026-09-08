@@ -22,6 +22,7 @@ from input_origins_flow import verify_input_origins
 from PIL import Image
 from playwright.sync_api import expect, sync_playwright
 from result_handoff_flow import verify_result_handoff
+from search_archive_flow import verify_search_archive
 from web_collection_flow import verify_web_collection
 from workflow_preflight_flow import verify_workflow_preflight
 from workflow_results_flow import verify_workflow_results
@@ -137,6 +138,13 @@ def main():
                     + ".map(method => [method, (...args) => window.ppxCall(method, args)]))};"
                 )
                 page.goto(f"http://127.0.0.1:{port}")
+                if '--search-only' in sys.argv:
+                    result = verify_search_archive(api, page, root, report_dir)
+                    assert not errors, errors
+                    print(json.dumps(result, ensure_ascii=False), flush=True)
+                    evidence.close()
+                    browser.close()
+                    return
                 if '--results-only' in sys.argv:
                     result = verify_workflow_results(api, page, report_dir)
                     assert not errors, errors
@@ -305,12 +313,13 @@ def main():
                 templates = verify_workflow_templates(api, page, root, chosen, report_dir)
                 preflight = verify_workflow_preflight(api, page, root, chosen, report_dir)
                 workflow_results = verify_workflow_results(api, page, report_dir)
+                search_archive = verify_search_archive(api, page, root, report_dir)
                 assert not errors, errors
                 report_dir = ROOT / "build/verification"
                 report_dir.mkdir(parents=True, exist_ok=True)
                 page.screenshot(path=str(report_dir / 'workspace.png'), full_page=True)
                 (report_dir / 'workspace.json').write_text(json.dumps({
-                    'passed': True, 'pageErrors': errors, 'resultHandoff': handoff, 'excel': excel, 'inputOrigins': origins, 'templates': templates, 'preflight': preflight, 'workflowResults': workflow_results,
+                    'passed': True, 'pageErrors': errors, 'resultHandoff': handoff, 'excel': excel, 'inputOrigins': origins, 'templates': templates, 'preflight': preflight, 'workflowResults': workflow_results, 'searchArchive': search_archive,
                     'checks': ['draft retention', 'restart configuration', 'partial failure', 'retry only failed input',
                                'output dimensions and alpha', 'handoff scoped to target module', '1000-page PDF editing/undo/reorder/export',
                                'two-step workflow via forms', 'pause only blocks new tasks', 'cancel queued task',
