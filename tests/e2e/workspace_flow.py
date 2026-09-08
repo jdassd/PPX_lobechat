@@ -24,6 +24,7 @@ from playwright.sync_api import expect, sync_playwright
 from result_handoff_flow import verify_result_handoff
 from web_collection_flow import verify_web_collection
 from workflow_preflight_flow import verify_workflow_preflight
+from workflow_results_flow import verify_workflow_results
 from workflow_templates_flow import verify_workflow_templates
 
 from api.api import API
@@ -136,6 +137,13 @@ def main():
                     + ".map(method => [method, (...args) => window.ppxCall(method, args)]))};"
                 )
                 page.goto(f"http://127.0.0.1:{port}")
+                if '--results-only' in sys.argv:
+                    result = verify_workflow_results(api, page, report_dir)
+                    assert not errors, errors
+                    print(json.dumps(result, ensure_ascii=False), flush=True)
+                    evidence.close()
+                    browser.close()
+                    return
                 if '--preflight-only' in sys.argv:
                     result = verify_workflow_preflight(api, page, root, chosen, report_dir)
                     assert not errors, errors
@@ -260,7 +268,7 @@ def main():
                 choices_id = next_step.locator('.step-row [role="combobox"]').first.get_attribute('aria-controls')
                 page.locator('[id="' + choices_id + '"]').get_by_role('option', name='旋转与翻转图片', exact=True).click()
                 next_step.locator('.operation-form .el-form-item').filter(has_text='输入文件').locator('.reference .el-select__wrapper').click()
-                page.get_by_role('option', name='第一个步骤', exact=True).click()
+                page.get_by_role('option', name='第一个步骤 · 结果文件列表', exact=True).click()
                 editor.get_by_role('button', name='保存', exact=True).click()
                 expect(editor.get_by_role('button', name='立即运行', exact=True)).to_be_enabled(timeout=15000)
                 editor.get_by_role('button', name='立即运行', exact=True).click()
@@ -296,12 +304,13 @@ def main():
                 origins = verify_input_origins(api, page, root, chosen, picker_calls, report_dir)
                 templates = verify_workflow_templates(api, page, root, chosen, report_dir)
                 preflight = verify_workflow_preflight(api, page, root, chosen, report_dir)
+                workflow_results = verify_workflow_results(api, page, report_dir)
                 assert not errors, errors
                 report_dir = ROOT / "build/verification"
                 report_dir.mkdir(parents=True, exist_ok=True)
                 page.screenshot(path=str(report_dir / 'workspace.png'), full_page=True)
                 (report_dir / 'workspace.json').write_text(json.dumps({
-                    'passed': True, 'pageErrors': errors, 'resultHandoff': handoff, 'excel': excel, 'inputOrigins': origins, 'templates': templates, 'preflight': preflight,
+                    'passed': True, 'pageErrors': errors, 'resultHandoff': handoff, 'excel': excel, 'inputOrigins': origins, 'templates': templates, 'preflight': preflight, 'workflowResults': workflow_results,
                     'checks': ['draft retention', 'restart configuration', 'partial failure', 'retry only failed input',
                                'output dimensions and alpha', 'handoff scoped to target module', '1000-page PDF editing/undo/reorder/export',
                                'two-step workflow via forms', 'pause only blocks new tasks', 'cancel queued task',

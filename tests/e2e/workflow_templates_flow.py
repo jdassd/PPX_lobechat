@@ -71,7 +71,7 @@ def verify_workflow_templates(api, page, root, chosen, report_dir):
     compress = editor.locator('.step-card').first
     archive_step = editor.locator('.step-card').nth(1)
     form_item(archive_step, '处理项').locator('.reference .el-select__wrapper').click()
-    page.get_by_role('option', name='压缩分享副本', exact=True).click()
+    page.get_by_role('option', name='压缩分享副本 · 结果文件列表', exact=True).click()
     expect(form_item(archive_step, '处理项').locator('input').first).to_have_value('{{steps.compress.outputPaths}}')
     compress.locator('.form-mode .el-switch').click()
     args = {

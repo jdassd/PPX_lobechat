@@ -120,8 +120,8 @@ export const TOOLS = [
     group: 'automation',
     hue: '#8b5cf6',
     defaultEnabled: true,
-    badge: 'v2.13',
-    points: ['配置检查与常用模板', '串联本地工具并保留结果', '查看续跑来源与沿用成果'],
+    badge: 'v2.14',
+    points: ['配置检查与常用模板', '按具体结果字段串联步骤', '查看数据结果与续跑成果'],
     features: [feature('workflows', '编排工作流', ['流水线', '批处理', '模板包', '预检', '检查配置'], { featured: true }), feature('triggers', '自动触发器', ['定时', '目录监听'], { featured: true }), feature('history', '运行记录', ['日志', '步骤结果', '导出', '续跑', '沿用'])]
   },
   {

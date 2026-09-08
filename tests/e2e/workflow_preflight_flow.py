@@ -146,6 +146,10 @@ def verify_workflow_preflight(api, page, root, chosen, report_dir):
     assert latest is not None, 'New workflow did not create a run'
     assert latest['status'] == 'success', latest
     assert latest['steps'][0]['result']['result'] == 'NEW DRAFT'
+    # The task can finish before the browser receives its completion snapshot.
+    # Finish this user flow before the next scenario switches back to editing.
+    expect(page.get_by_role('tab', name='运行记录', exact=True)).to_have_attribute('aria-selected', 'true')
+    expect(page.locator('.workflow-tool > .el-loading-mask')).not_to_be_visible()
     result = {'passed': True, 'checks': [
         'read-only checks never save or queue', 'invalid input and self-reference block run',
         'error location focuses runtime input', 'known inputs and deferred prior output',

@@ -1,6 +1,7 @@
 """Versioned operation contracts shared by the bridge, queue and workflow editor."""
 from __future__ import annotations
 
+import copy
 import json
 import math
 from dataclasses import asdict, dataclass, field
@@ -43,6 +44,7 @@ class OperationDescriptor:
     fields: list[dict] = field(default_factory=list)
     batchKey: str | None = None
     primaryInputFields: list[str] = field(default_factory=list)
+    resultFields: list[dict] = field(default_factory=list)
 
 
 _CATALOG = json.loads(Path(__file__).with_name('operation_catalog.json').read_text(encoding='utf-8'))
@@ -79,6 +81,21 @@ _OUTPUT_FIELDS = {
     'text_format_json': [], 'text_case_transform': [], 'text_deduplicate_sort': [],
     'text_batch_replace': [], 'document_index_build': [], 'workflow_run': [],
 }
+
+
+def operation_result_fields(method):
+    """Declared selectable results, separate from legacy file-path extraction."""
+    descriptor = OPERATIONS.get(method)
+    if descriptor is None:
+        return []
+    fields = copy.deepcopy(descriptor.resultFields)
+    if _OUTPUT_FIELDS.get(method) or method == 'file_batch_copy':
+        fields.extend([
+            {'path': 'outputPaths', 'label': '结果文件列表', 'type': 'files', 'description': '可能为空；包含本步骤返回的文件路径'},
+            {'path': 'outputPaths.0', 'label': '第一份结果文件', 'type': 'file', 'optional': True, 'description': '只使用结果列表中的第一份文件'},
+            {'path': 'outputDir', 'label': '结果目录', 'type': 'directory', 'optional': True, 'description': '结果位于同一目录或操作明确返回目录时可用'},
+        ])
+    return fields
 
 
 def _values(value, parts):
@@ -143,10 +160,14 @@ def validate_operation_args(method, args, *, allow_bindings=True, detailed=False
             add(field_info, f'{field_info["label"]}必须是有限数字')
         if kind == 'boolean' and not isinstance(value, bool):
             add(field_info, f'{field_info["label"]}必须为开关值')
+        if kind == 'textarea' and not field_info.get('acceptStructured') and not isinstance(value, str):
+            add(field_info, f'{field_info["label"]}必须是文本')
         if kind in {'files', 'list', 'paths', 'directories', 'tables'} and not isinstance(value, list):
             add(field_info, f'{field_info["label"]}必须为列表')
         if kind == 'json' and not isinstance(value, (dict, list)):
             add(field_info, f'{field_info["label"]}必须是对象或列表')
+        elif kind == 'json' and field_info.get('jsonType') == 'array' and not isinstance(value, list):
+            add(field_info, f'{field_info["label"]}必须是 JSON 列表')
         if kind in {'object', 'mapping', 'mapping-number'} and not isinstance(value, dict):
             add(field_info, f'{field_info["label"]}必须是映射对象')
         if kind == 'select' and field_info.get('options'):
@@ -224,7 +245,7 @@ class OperationService:
             elif item.id == 'pdf_page_workbench':
                 preview = 'pdf_page_preview'
             dependencies = ['flyingmouse'] if item.tool == 'conversion' else ['ffmpeg', 'ffprobe'] if item.tool == 'video' else ['rapidocr'] if item.id.startswith('ocr_') else []
-            operations.append({**asdict(item), 'workflow': item.id in WORKFLOW_METHODS, 'cancellable': True,
+            operations.append({**asdict(item), 'resultFields': operation_result_fields(item.id), 'workflow': item.id in WORKFLOW_METHODS, 'cancellable': True,
                                'preview': preview if hasattr(self._host, preview) else None, 'dependencies': dependencies,
                                'inputTypes': [field['type'] for field in item.fields if field['type'] in {'file', 'files', 'directory'}],
                                'outputTypes': ['asset'] if _OUTPUT_FIELDS.get(item.id) else ['data'],

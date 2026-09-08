@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "version": "2.13.0",
+  "version": "2.14.0",
   "note": "发布决定与验收状态分开记录；未验证项目保持 pending，不因发版改为 passed。",
   "release": {
-    "tag": "v2.13.0",
+    "tag": "v2.14.0",
     "allowPendingAcceptance": true,
-    "reason": "用户于 2026-09-08 明确要求继续逐版本实现并打 Tag 触发 GitHub 自动发版；v2.13.0 集中发布只读配置检查、运行前阻断和错误定位、续跑来源与计数、部分成果缺失阻断。旧重构的三平台安装、升级、恢复和完整人工验收仍为 pending；本轮自动验证范围在 docs/releases/v2.13.0.md 单独记录，不将未验证项目标记为通过。"
+    "reason": "用户于 2026-09-08 明确要求继续逐版本实现并打 Tag 触发 GitHub 自动发版；v2.14.0 集中发布结果字段选择、文本模板、按需数据预览与复制、操作参数契约修正。旧重构的三平台安装、升级、恢复和完整人工验收仍为 pending；本轮自动验证范围在 docs/releases/v2.14.0.md 单独记录，不将未验证项目标记为通过。"
   },
   "phases": {
     "1": { "status": "pending", "evidence": "" },

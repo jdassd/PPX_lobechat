@@ -154,6 +154,20 @@ BUILTIN_WORKFLOWS = [
             },
         ],
     },
+    {
+        'id': 'builtin-text-clean-format',
+        'name': '文本去重 → 统一格式',
+        'description': '逐行清除首尾空格和重复内容，再统一大小写或命名格式；结果可在运行记录中查看和复制。',
+        'inputExample': {'content': '', 'mode': 'upper'},
+        'steps': [
+            {'id': 'clean', 'name': '逐行清理文本', 'method': 'text_deduplicate_sort',
+             'args': {'content': '{{input.content}}', 'operation': 'deduplicate', 'trimWhitespace': True,
+                      'keepEmpty': False, 'caseSensitive': True}, 'onError': 'stop', 'onPartial': 'stop'},
+            {'id': 'format', 'name': '统一文本格式', 'method': 'text_case_transform',
+             'args': {'content': '{{steps.clean.result}}', 'mode': '{{input.mode}}'},
+             'onError': 'stop', 'onPartial': 'stop'},
+        ],
+    },
 ]
 
 

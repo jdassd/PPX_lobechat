@@ -5,6 +5,8 @@ import { callApi, callApiRaw } from '@/utils/pyapi'
 import { loadOperationCatalog, tasks } from '@/utils/taskCenter'
 import OperationForm from '../shared/OperationForm.vue'
 import ResultActions from '../shared/ResultActions.vue'
+import WorkflowDataResult from './WorkflowDataResult.vue'
+import { resultFieldsForStep } from '@/utils/workflowResults.mjs'
 
 const props = defineProps({ initialTab: { type: String, default: '' } })
 
@@ -61,6 +63,13 @@ const bundleOutput = ref('')
 const historyBusy = ref(false)
 
 const editor = reactive({ id: '', name: '', description: '', enabled: true, steps: [] })
+const stepsWithResults = computed(() =>
+  editor.steps.map((step, index) => ({
+    id: step.id || `step-${index + 1}`,
+    name: step.name,
+    resultFields: resultFieldsForStep(step, descriptor(step.method))
+  }))
+)
 watch(
   [editor, runInput],
   () => {
@@ -618,7 +627,7 @@ onMounted(() => refresh(false))
                         <el-option label="失败后继续" value="continue" />
                       </el-select>
                     </div>
-                    <OperationForm v-model="step.argsText" :fields="descriptor(step.method)?.fields || []" :previous="editor.steps.slice(0, index)" :disabled="editorBusy" />
+                    <OperationForm v-model="step.argsText" :fields="descriptor(step.method)?.fields || []" :previous="stepsWithResults.slice(0, index)" :disabled="editorBusy" />
                     <div class="step-policy">
                       <el-select v-model="step.onPartial" class="partial-select" aria-label="部分成功时的处理方式">
                         <el-option label="部分成功后继续" value="continue" />
@@ -765,6 +774,7 @@ onMounted(() => refresh(false))
                 <strong>{{ step.name }}</strong> · <code>{{ step.method }}</code>
                 <p>{{ step.message || (step.status === 'success' ? '完成' : '失败') }}</p>
                 <p v-if="step.resumeInfo" class="resume-info"><span v-if="step.resumeInfo.reusedStep">沿用已完成步骤，本次未重新执行。 </span>{{ resumeCounts(step.resumeInfo) }}</p>
+                <WorkflowDataResult :result="step.result || {}" :fields="descriptor(step.method)?.resultFields || []" />
                 <ResultActions v-if="step.result?.outputAssets?.length" :assets="step.result.outputAssets" :source-task-id="runTaskId(run)" />
                 <small v-if="step.attemptCount > 1">共执行 {{ step.attemptCount }} 次（自动重试 {{ step.attemptCount - 1 }} 次）</small>
                 <ul v-if="step.attempts?.length > 1" class="attempt-list">
