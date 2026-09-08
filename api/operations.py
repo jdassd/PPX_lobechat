@@ -77,7 +77,7 @@ _OUTPUT_FIELDS = {
     'file_batch_rename_undo': ['restored.to'], 'file_classify_undo': ['restored.to'], 'file_compress': ['file'],
     'image_batch_rename_undo': ['files'],
     'file_decompress': ['files'], 'file_recycle_restore': ['restored.to'],
-    'file_deduplicate': [], 'file_batch_delete': [], 'file_recycle_purge': [],
+    'file_deduplicate': ['groups.files'], 'file_deduplicate_report': ['file'], 'file_batch_delete': [], 'file_recycle_purge': [],
     'text_format_json': [], 'text_case_transform': [], 'text_deduplicate_sort': [],
     'text_batch_replace': [], 'document_index_build': [], 'workflow_run': [],
 }

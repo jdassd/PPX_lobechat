@@ -18,6 +18,7 @@ from typing import Any, Dict, Iterable, List
 from api.core.context import TaskCancelled, TaskContext, checkpoint, current_context, report_progress, task_context
 from api.core.store import StateStore
 from api.core.worker import ISOLATED_PREFIXES, run_in_worker
+from api.core.workflow_bindings import BINDING
 from api.core.workflow_bindings import resolve as _resolve
 from api.utils.error_handler import api_error, api_success
 from pyapp.config.config import Config
@@ -34,7 +35,7 @@ WORKFLOW_METHODS = {
     'text_format_json', 'text_case_transform', 'text_deduplicate_sort', 'text_batch_replace',
     'video_format_convert', 'video_compress', 'video_cut', 'video_extract_audio', 'video_concat',
     'file_search', 'file_auto_classify', 'file_batch_copy', 'file_batch_rename',
-    'file_deduplicate', 'file_compress', 'file_decompress', 'seal_generate',
+    'file_deduplicate', 'file_deduplicate_report', 'file_compress', 'file_decompress', 'seal_generate',
     'ocr_table', 'document_index_build',
 }
 
@@ -187,6 +188,21 @@ BUILTIN_WORKFLOWS = [
                       'archiveName': '{{input.archiveName}}'}, 'onError': 'stop', 'onPartial': 'stop'},
         ],
     },
+    {
+        'id': 'builtin-duplicate-report',
+        'name': '重复文件扫描 → 核对报告',
+        'description': '按内容比较候选，完整扫描后导出 Excel 核对报告；排除报告目录，不删除来源文件。',
+        'inputExample': {'directory': '', 'outputDir': '', 'extensions': [], 'recursive': True, 'limit': 5000},
+        'steps': [
+            {'id': 'scan', 'name': '比较重复内容', 'method': 'file_deduplicate',
+             'args': {'directory': '{{input.directory}}', 'mode': 'content', 'extensions': '{{input.extensions}}',
+                      'recursive': '{{input.recursive}}', 'limit': '{{input.limit}}',
+                      'excludeDirectory': '{{input.outputDir}}'}, 'onError': 'stop', 'onPartial': 'stop'},
+            {'id': 'report', 'name': '导出核对报告', 'method': 'file_deduplicate_report',
+             'args': {'groups': '{{steps.scan.groups}}', 'summary': '{{steps.scan.summary}}',
+                      'outputDir': '{{input.outputDir}}'}, 'onError': 'stop', 'onPartial': 'stop'},
+        ],
+    },
 ]
 
 
@@ -208,6 +224,19 @@ def _recorded_input_count(result):
         return None
     paths = {str(item.get('path') if isinstance(item, dict) else item) for item in inputs}
     return len(paths)
+
+
+def _depends_on_rerun(value, rerun_ids):
+    if isinstance(value, dict):
+        return any(_depends_on_rerun(item, rerun_ids) for item in value.values())
+    if isinstance(value, list):
+        return any(_depends_on_rerun(item, rerun_ids) for item in value)
+    if isinstance(value, str):
+        for match in BINDING.finditer(value):
+            parts = match.group(1).split('.')
+            if parts[0] == 'steps' and (len(parts) == 1 or parts[1] in rerun_ids):
+                return bool(rerun_ids)
+    return False
 
 
 class WorkflowMixin:
@@ -697,7 +726,7 @@ class WorkflowMixin:
             if isinstance(result, dict)
             else ''
         )
-        if previous and isinstance(result, dict):
+        if previous and isinstance(result, dict) and generates_files:
             from api.operations import enrich_result
             resume_info['processedInputCount'] = _recorded_input_count(result)
             retained = [asset for asset in previous.get('outputAssets', []) if Path(asset['path']).exists()]
@@ -707,6 +736,9 @@ class WorkflowMixin:
             result = enrich_result(step['method'], result)
             retained_paths = {asset.get('path') for asset in retained if asset.get('path')} - newly_generated
             resume_info['retainedOutputCount'] = len(retained_paths & {asset.get('path') for asset in result.get('outputAssets', [])})
+        elif previous and isinstance(result, dict):
+            # Queries describe this scan, not a cumulative set of past matches.
+            resume_info.update(processedInputCount=_recorded_input_count(result), retainedInputCount=0, retainedOutputCount=0)
         step_run = {
             'id': step['id'],
             'name': step['name'],
@@ -777,20 +809,26 @@ class WorkflowMixin:
             current_context().emit(workflowRunId=run_id)
         failed = False
         partial = False
+        rerun_ids = set()
         try:
             for step_index, step in enumerate(workflow['steps']):
                 report_progress(step_index, len(workflow['steps']), f'执行步骤：{step["name"]}')
                 previous = resume_steps.get(step['id'])
-                if previous and previous['status'] == 'success':
+                dependency_rerun = bool(previous and _depends_on_rerun(step['args'], rerun_ids))
+                if previous and previous['status'] == 'success' and not dependency_rerun:
                     step_run, result, ok = {**previous, 'reused': True, 'resumeInfo': {
                         'processedInputCount': 0, 'retainedInputCount': _recorded_input_count(previous['result']),
                         'retainedOutputCount': len({asset['path'] for asset in previous['result']['outputAssets']}) if 'outputAssets' in previous['result'] else None,
                     }}, _copy(previous['result']), True
                 else:
-                    step_run, result, ok = self._workflow_execute_step(step, context, previous.get('result') if previous else None)
+                    step_run, result, ok = self._workflow_execute_step(step, context, previous.get('result') if previous and not dependency_rerun else None)
+                    rerun_ids.add(step['id'])
                 if previous:
                     info = step_run.setdefault('resumeInfo', {'processedInputCount': None, 'retainedInputCount': None, 'retainedOutputCount': None})
                     info.update(sourceRunId=run['resumeOfRunId'], reusedStep=bool(step_run.get('reused')))
+                    if dependency_rerun:
+                        info.update(processedInputCount=_recorded_input_count(result), retainedInputCount=0,
+                                    retainedOutputCount=0, reason='前序依赖已重新执行，本步骤使用当前结果重新生成')
                 context['steps'][step['id']] = _copy(result)
                 run['steps'].append(step_run)
                 with self._workflow_lock:

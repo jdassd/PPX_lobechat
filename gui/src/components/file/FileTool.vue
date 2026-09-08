@@ -17,7 +17,7 @@ const TABS = [
   { name: 'delete', label: '批量删除' },
   { name: 'recycle', label: '回收与恢复' },
   { name: 'rename', label: '批量改名' },
-  { name: 'dedup', label: '文件去重' },
+  { name: 'dedup', label: '重复审查' },
   { name: 'archive', label: '压缩 / 解压' }
 ]
 

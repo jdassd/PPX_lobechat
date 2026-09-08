@@ -5,7 +5,7 @@ from unittest import mock
 
 from api.api import API
 from api.core.workflow_bindings import BINDING, lookup
-from api.operations import OPERATIONS, enrich_result, operation_result_fields
+from api.operations import OPERATIONS, enrich_result, operation_result_fields, validate_operation_args
 from api.workflow import WORKFLOW_METHODS
 from pyapp.config.config import Config
 
@@ -34,6 +34,13 @@ class WorkflowResultContractTests(unittest.TestCase):
         item = next(item for item in operations if item['id'] == 'text_format_json')
         item['resultFields'][0]['when']['values'].clear()
         self.assertTrue(operation_result_fields('text_format_json')[0]['when']['values'])
+
+    def test_nonempty_catalog_defaults_satisfy_their_declared_types(self):
+        for name, operation in OPERATIONS.items():
+            args = {field['name']: field['default'] for field in operation.fields if field.get('default') is not None}
+            errors = [error for error in validate_operation_args(name, args, allow_bindings=False, detailed=True)
+                      if error['field'] in args and args[error['field']] not in ('', [])]
+            self.assertEqual(errors, [], name)
 
     def test_declared_text_results_match_real_handlers_in_each_mode(self):
         cases = [

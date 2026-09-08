@@ -58,6 +58,7 @@ export const TASK_METHODS = {
   file_batch_rename: ['file', 'rename', '批量重命名'],
   file_batch_rename_undo: ['file', 'rename', '撤销批量重命名'],
   file_deduplicate: ['file', 'dedup', '查找重复文件'],
+  file_deduplicate_report: ['file', 'dedup', '导出重复文件核对报告'],
   file_compress: ['file', 'archive', '压缩文件'],
   file_decompress: ['file', 'archive', '解压文件'],
   file_recycle_restore: ['file', 'recycle', '恢复回收文件'],

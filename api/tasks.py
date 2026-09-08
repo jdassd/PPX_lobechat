@@ -35,7 +35,7 @@ TRACKED_METHODS = {
     'text_format_json', 'text_case_transform', 'text_deduplicate_sort', 'text_batch_replace',
     'video_format_convert', 'video_compress', 'video_cut', 'video_extract_audio', 'video_concat',
     'file_search', 'file_auto_classify', 'file_batch_copy', 'file_batch_delete',
-    'file_batch_rename', 'file_batch_rename_undo', 'file_deduplicate', 'file_compress',
+    'file_batch_rename', 'file_batch_rename_undo', 'file_deduplicate', 'file_deduplicate_report', 'file_compress',
     'file_decompress', 'file_recycle_restore', 'file_recycle_purge', 'seal_generate',
     'ocr_table', 'document_index_build', 'workflow_run',
     'format_center_convert', 'format_center_images_to_pdf', 'format_center_merge_pdfs',

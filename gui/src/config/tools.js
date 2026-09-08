@@ -108,7 +108,7 @@ export const TOOLS = [
       feature('delete', '安全批量删除', ['回收站', '预演'], { danger: true }),
       feature('recycle', 'PPX 回收站', ['恢复', '撤销', '清理']),
       feature('rename', '批量重命名', ['正则', '序号'], { featured: true }),
-      feature('dedup', '查找重复文件', ['去重', 'MD5']),
+      feature('dedup', '重复文件审查', ['去重', 'SHA-256', '同名', '核对报告'], { featured: true }),
       feature('archive', '压缩与解压', ['ZIP', '7Z'], { featured: true })
     ]
   },
@@ -120,8 +120,8 @@ export const TOOLS = [
     group: 'automation',
     hue: '#8b5cf6',
     defaultEnabled: true,
-    badge: 'v2.15',
-    points: ['图片、表格、文本与搜索归档模板', '按结果字段串联并检查配置', '搜索不完整时停止归档'],
+    badge: 'v2.16',
+    points: ['七个常用处理模板', '扫描、核对报告与归档协作', '不完整扫描停止后续自动处理'],
     features: [feature('workflows', '编排工作流', ['流水线', '批处理', '模板包', '预检', '检查配置'], { featured: true }), feature('triggers', '自动触发器', ['定时', '目录监听'], { featured: true }), feature('history', '运行记录', ['日志', '步骤结果', '导出', '续跑', '沿用'])]
   },
   {

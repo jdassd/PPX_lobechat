@@ -773,7 +773,9 @@ onMounted(() => refresh(false))
               <el-timeline-item v-for="step in run.steps || []" :key="step.id" :type="step.status === 'success' ? 'success' : 'danger'" :timestamp="formatTime(step.endedAt)">
                 <strong>{{ step.name }}</strong> · <code>{{ step.method }}</code>
                 <p>{{ step.message || (step.status === 'success' ? '完成' : '失败') }}</p>
-                <p v-if="step.resumeInfo" class="resume-info"><span v-if="step.resumeInfo.reusedStep">沿用已完成步骤，本次未重新执行。 </span>{{ resumeCounts(step.resumeInfo) }}</p>
+                <p v-if="step.resumeInfo" class="resume-info">
+                  <span v-if="step.resumeInfo.reusedStep">沿用已完成步骤，本次未重新执行。 </span><span v-if="step.resumeInfo.reason">{{ step.resumeInfo.reason }}。 </span>{{ resumeCounts(step.resumeInfo) }}
+                </p>
                 <WorkflowDataResult :result="step.result || {}" :fields="descriptor(step.method)?.resultFields || []" />
                 <ResultActions v-if="step.result?.outputAssets?.length" :assets="step.result.outputAssets" :source-task-id="runTaskId(run)" />
                 <small v-if="step.attemptCount > 1">共执行 {{ step.attemptCount }} 次（自动重试 {{ step.attemptCount - 1 }} 次）</small>

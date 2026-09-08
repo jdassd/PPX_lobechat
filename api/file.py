@@ -30,6 +30,7 @@ from api.core.context import (
     record_item,
     run_process,
 )
+from api.core.file_duplicates import export_duplicate_report, scan_duplicates
 from api.core.file_search import search_files
 from api.core.journal import save_manifest
 from api.core.outputs import atomic_output, output_asset, write_output
@@ -787,46 +788,38 @@ class FileTool:
             return api_error(f'分类撤销失败：{exc}')
 
     def file_deduplicate(self, options: Dict | None = None):
-        """文件去重"""
+        """只读重复候选审查；来源文件从不自动删除。"""
         try:
             opts = self._validate(options)
             directory = ensure_directory(opts.get('directory'), auto_create=False)
             mode = str(opts.get('mode', 'content')).lower()
             filters = self._parse_common_filters(opts)
-            filters['recursive'] = bool(opts.get('recursive', True))
-            limit = clamp_int(opts.get('limit', 5000), 100, 20000)
-            groups: Dict[str, List[Path]] = {}
-            scanned = 0
-            for path in self._iter_files(directory, recursive=filters['recursive']):
-                if not self._match_common_filters(path, filters):
-                    continue
-                key = path.name.lower() if mode == 'name' else self._hash_file(path)
-                groups.setdefault(key, []).append(path)
-                scanned += 1
-                if scanned >= limit:
-                    break
-            duplicates = []
-            space_saved = 0
-            for items in groups.values():
-                if len(items) < 2:
-                    continue
-                sizes = [item.stat().st_size for item in items]
-                keep_size = max(sizes)
-                space_saved += sum(sizes) - keep_size
-                duplicates.append({
-                    'count': len(items),
-                    'sizeEach': format_bytes(sizes[0]),
-                    'files': [str(item) for item in items],
-                })
-            return api_success(
-                '去重扫描完成',
-                groups=duplicates,
-                totalGroups=len(duplicates),
-                spaceSaved=format_bytes(space_saved),
-                scanned=scanned,
-            )
+            if opts.get('excludeDirectory'):
+                excluded = Path(opts['excludeDirectory']).expanduser().resolve()
+                resolved = directory.resolve()
+                if excluded == resolved or excluded in resolved.parents or (excluded.exists() and not excluded.is_dir()):
+                    raise ValueError('跳过目录必须是独立目录，不能覆盖整个扫描范围')
+                filters['exclude_directory'] = excluded
+            limit = clamp_int(opts.get('limit'), default=5000, min_value=100, max_value=20000)
+            result = scan_duplicates(directory, filters, limit, mode)
+            message = '扫描完整' if result['complete'] else '扫描不完整，请缩小范围或处理读取错误后重试'
+            return api_success(f"{message}，找到 {result['totalGroups']} 组{'同名候选' if mode == 'name' else '相同内容'}", **result)
+        except TaskCancelled:
+            raise
         except Exception as exc:
             return api_error(f'文件去重失败：{exc}')
+
+    def file_deduplicate_report(self, options: Dict | None = None):
+        """将已检查的扫描快照导出为可继续处理的 Excel 报告。"""
+        try:
+            opts = self._validate(options)
+            output_dir = ensure_directory(opts.get('outputDir'), auto_create=True)
+            target = export_duplicate_report(opts.get('groups'), opts.get('summary'), output_dir)
+            return api_success('已导出扫描时快照，来源文件保持不变', file=str(target), outputDir=str(output_dir))
+        except TaskCancelled:
+            raise
+        except Exception as exc:
+            return api_error(f'导出核对报告失败：{exc}')
 
     # -------------------- P2 功能 --------------------
 

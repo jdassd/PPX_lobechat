@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Vue-3.0+-4FC08D?style=flat-square&logo=vue.js&logoColor=white" alt="Vue 3" />
   <img src="https://img.shields.io/badge/Python-3.10-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.10" />
   <img src="https://img.shields.io/badge/Pywebview-5.0+-FFD43B?style=flat-square&logo=python&logoColor=blue" alt="Pywebview" />
-  <img src="https://img.shields.io/badge/version-2.15.0-2b6fff?style=flat-square" alt="Version 2.15.0" />
+  <img src="https://img.shields.io/badge/version-2.16.0-2b6fff?style=flat-square" alt="Version 2.16.0" />
   <img src="https://img.shields.io/badge/License-AGPL--3.0-green?style=flat-square" alt="License" />
 </p>
 
@@ -20,17 +20,17 @@
 
 ## 📖 简介
 
-**PPX 2.15.0** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
+**PPX 2.16.0** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
 
-2.15 补齐“搜索文档 → 保留目录归档”：搜索明确说明完整性，结果过多或读取失败时停止自动归档；ZIP/7Z 可保留相对路径，避免同名文件冲突。搜索结果也能经检查后交给下一工具，继续复用已有任务、预检和 18 个文件结果接力目标。
+2.16 补齐“重复文件扫描 → 核对报告”：先筛选同大小候选再比较内容，明确区分同名文件与相同内容、扫描是否完整，以及硬链接别名。扫描进入可取消的任务队列，结果可导出为 Excel 快照，并继续交给表格工具或归档，复用已有 18 个文件结果接力目标。
 
-更新内容与验收范围见 [v2.15.0 发布说明](docs/releases/v2.15.0.md)。
+更新内容与验收范围见 [v2.16.0 发布说明](docs/releases/v2.16.0.md)。
 
 定位、目标用户、14 个模块的输入输出与异常设计、协作流程、优先级和扩展边界见 [统一工具箱设计方案](docs/toolbox-design.md)。
 
 ## ✨ 主要功能
 
-PPX 2.15.0 的核心能力包括：
+PPX 2.16.0 的核心能力包括：
 
 ### 📄 文档与数据
 
@@ -49,8 +49,8 @@ PPX 2.15.0 的核心能力包括：
 
 ### 🛠️ 文件与自动化
 
-- **文件批处理**：搜索、分类、复制、安全删除、回收站恢复、批量改名与撤销、查重及压缩解压。
-- **自动化工作流**：使用安全白名单串联本地工具，包含图片压缩归档、Excel 清洗质检、文本去重统一格式、搜索文档保留目录归档等 6 个内置模板，支持结果字段选择、数据预览与复制、配置预检、部分成功策略、失败续跑、周期运行和目录监听。
+- **文件批处理**：完整性可核对的搜索、分类、复制、安全删除、回收站恢复、批量改名与撤销、重复候选审查、Excel 核对报告及保留相对路径的压缩解压。
+- **自动化工作流**：使用安全白名单串联本地工具，包含图片压缩归档、Excel 清洗质检、文本去重统一格式、搜索归档、重复扫描核对报告等 7 个内置模板，支持结果字段选择、数据预览与复制、配置预检、部分成功策略、失败续跑、周期运行和目录监听。
 - **网页数据采集**：点选字段、翻页采集并导出 Excel / Word。
 - **安全边界**：删除操作可恢复且必须预览；重命名不覆盖；系统启动项只读。
 

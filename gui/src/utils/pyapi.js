@@ -172,7 +172,7 @@ async function invokeApi(method, args, inputOrigins = []) {
     if (typeof api[method] !== 'function') {
       throw new Error(`当前客户端缺少能力：${method}`)
     }
-    const previewOnly = args[0]?.dryRun || ['file_search', 'file_deduplicate', 'excel_column_profile'].includes(method) || (method === 'ocr_table' && args[0]?.saveFile === false) || (method === 'seal_generate' && args[0]?.mode !== 'export')
+    const previewOnly = args[0]?.dryRun || ['file_search', 'excel_column_profile'].includes(method) || (method === 'ocr_table' && args[0]?.saveFile === false) || (method === 'seal_generate' && args[0]?.mode !== 'export')
     const shouldQueue = isTaskMethod(method) && !previewOnly && typeof api.task_submit === 'function' && typeof api.task_get === 'function'
     if (shouldQueue) {
       const submitted = normalizeResult(await api.task_submit({ method, args, inputOrigins }))
