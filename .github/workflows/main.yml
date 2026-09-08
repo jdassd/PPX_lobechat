@@ -156,6 +156,13 @@ jobs:
             echo "prerelease=false" >> $GITHUB_OUTPUT
           fi
 
+          # checkout 可能将附注标签覆盖成提交引用，重新读取远端标签以保留发布说明。
+          git fetch --no-tags origin "+refs/tags/$TAG_NAME:refs/tags/$TAG_NAME"
+          if [ "$(git rev-parse "refs/tags/$TAG_NAME^{commit}")" != "$GITHUB_SHA" ]; then
+            echo "标签指向与本次构建提交不一致，停止发布" >&2
+            exit 1
+          fi
+
           git tag -l --format='%(contents)' "$TAG_NAME" > release_notes.md
           if [ ! -s release_notes.md ]; then
             git log -1 --pretty=%B > release_notes.md
