@@ -112,6 +112,55 @@ def enrich_result(method, result):
     return result
 
 
+def validate_operation_args(method, args, *, allow_bindings=True, detailed=False, deferred_fields=()):
+    """Pure operation-contract validation for editors and workflow preflight."""
+    def problem(field, message):
+        return {'field': field, 'message': message} if detailed else message
+
+    descriptor = OPERATIONS.get(method)
+    if descriptor is None:
+        return [problem('', '未知操作')]
+    if not isinstance(args, dict):
+        return [problem('', '参数必须为对象')]
+    errors = []
+    def add(field, message):
+        errors.append(problem(field['name'], message))
+
+    for field_info in descriptor.fields:
+        if field_info['name'] in deferred_fields:
+            continue
+        value = args.get(field_info['name'])
+        if value is None or value == '' or value == []:
+            if field_info.get('required'):
+                add(field_info, f'{field_info["label"]}不能为空')
+            continue
+        if allow_bindings and isinstance(value, str) and '{{' in value:
+            continue
+        kind = field_info['type']
+        if kind == 'number' and (isinstance(value, bool) or not isinstance(value, (int, float))):
+            add(field_info, f'{field_info["label"]}必须是数字')
+        elif kind == 'number' and not math.isfinite(value):
+            add(field_info, f'{field_info["label"]}必须是有限数字')
+        if kind == 'boolean' and not isinstance(value, bool):
+            add(field_info, f'{field_info["label"]}必须为开关值')
+        if kind in {'files', 'list', 'paths', 'directories', 'tables'} and not isinstance(value, list):
+            add(field_info, f'{field_info["label"]}必须为列表')
+        if kind == 'json' and not isinstance(value, (dict, list)):
+            add(field_info, f'{field_info["label"]}必须是对象或列表')
+        if kind in {'object', 'mapping', 'mapping-number'} and not isinstance(value, dict):
+            add(field_info, f'{field_info["label"]}必须是映射对象')
+        if kind == 'select' and field_info.get('options'):
+            choices = [item.get('value') if isinstance(item, dict) else item for item in field_info['options']]
+            if value not in choices:
+                add(field_info, f'{field_info["label"]}不在支持的选项中')
+        if kind == 'number' and isinstance(value, (int, float)) and not isinstance(value, bool):
+            if field_info.get('min') is not None and value < field_info['min']:
+                add(field_info, f'{field_info["label"]}不能小于 {field_info["min"]}')
+            if field_info.get('max') is not None and value > field_info['max']:
+                add(field_info, f'{field_info["label"]}不能大于 {field_info["max"]}')
+    return errors
+
+
 def execute_operation(method, handler, args):
     descriptor = OPERATIONS.get(method)
     options = args[0] if args and isinstance(args[0], dict) else {}
@@ -185,41 +234,8 @@ class OperationService:
     def operations_validate(self, options=None):
         options = options or {}
         method = options.get('method')
-        descriptor = OPERATIONS.get(method)
-        if descriptor is None:
+        if method not in OPERATIONS:
             return api_error('未知操作', errorCode='UNKNOWN_OPERATION')
         args = options.get('args', {})
-        if not isinstance(args, dict):
-            return api_error('参数必须为对象', errorCode='INVALID_ARGUMENT')
-        errors = []
-        for field_info in descriptor.fields:
-            value = args.get(field_info['name'])
-            if value is None or value == '' or value == []:
-                if field_info.get('required'):
-                    errors.append(f'{field_info["label"]}不能为空')
-                continue
-            if isinstance(value, str) and '{{' in value:
-                continue
-            kind = field_info['type']
-            if kind == 'number' and (isinstance(value, bool) or not isinstance(value, (int, float))):
-                errors.append(f'{field_info["label"]}必须是数字')
-            elif kind == 'number' and not math.isfinite(value):
-                errors.append(f'{field_info["label"]}必须是有限数字')
-            if kind == 'boolean' and not isinstance(value, bool):
-                errors.append(f'{field_info["label"]}必须为开关值')
-            if kind in {'files', 'list', 'paths', 'directories', 'tables'} and not isinstance(value, list):
-                errors.append(f'{field_info["label"]}必须为列表')
-            if kind == 'json' and not isinstance(value, (dict, list)):
-                errors.append(f'{field_info["label"]}必须是对象或列表')
-            if kind in {'object', 'mapping', 'mapping-number'} and not isinstance(value, dict):
-                errors.append(f'{field_info["label"]}必须是映射对象')
-            if kind == 'select' and field_info.get('options'):
-                choices = [item.get('value') if isinstance(item, dict) else item for item in field_info['options']]
-                if value not in choices:
-                    errors.append(f'{field_info["label"]}不在支持的选项中')
-            if kind == 'number' and isinstance(value, (int, float)) and not isinstance(value, bool):
-                if field_info.get('min') is not None and value < field_info['min']:
-                    errors.append(f'{field_info["label"]}不能小于 {field_info["min"]}')
-                if field_info.get('max') is not None and value > field_info['max']:
-                    errors.append(f'{field_info["label"]}不能大于 {field_info["max"]}')
+        errors = validate_operation_args(method, args)
         return api_error('；'.join(errors), errors=errors, errorCode='INVALID_ARGUMENT') if errors else api_success('参数检查通过')

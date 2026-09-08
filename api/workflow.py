@@ -18,6 +18,7 @@ from typing import Any, Dict, Iterable, List
 from api.core.context import TaskCancelled, TaskContext, checkpoint, current_context, report_progress, task_context
 from api.core.store import StateStore
 from api.core.worker import ISOLATED_PREFIXES, run_in_worker
+from api.core.workflow_bindings import resolve as _resolve
 from api.utils.error_handler import api_error, api_success
 from pyapp.config.config import Config
 
@@ -37,7 +38,6 @@ WORKFLOW_METHODS = {
     'ocr_table', 'document_index_build',
 }
 
-_BINDING = re.compile(r'\{\{\s*([a-zA-Z_][\w]*(?:\.[\w-]+)*)\s*\}\}')
 _MAX_STEP_RETRIES = 5
 _MAX_RETRY_DELAY_SECONDS = 300
 _MAX_BUNDLE_BYTES = 2 * 1024 * 1024
@@ -161,41 +161,20 @@ def _copy(value: Any) -> Any:
     return copy.deepcopy(value)
 
 
-def _lookup(context: Dict[str, Any], expression: str) -> Any:
-    value: Any = context
-    for part in expression.split('.'):
-        if isinstance(value, dict) and part in value:
-            value = value[part]
-        elif isinstance(value, (list, tuple)) and part.isdigit() and int(part) < len(value):
-            value = value[int(part)]
-        else:
-            raise ValueError(f'找不到工作流变量：{expression}')
-    return _copy(value)
-
-
-def _resolve(value: Any, context: Dict[str, Any]) -> Any:
-    if isinstance(value, list):
-        return [_resolve(item, context) for item in value]
-    if isinstance(value, dict):
-        return {str(key): _resolve(item, context) for key, item in value.items()}
-    if not isinstance(value, str):
-        return value
-    full = _BINDING.fullmatch(value)
-    if full:
-        return _lookup(context, full.group(1))
-
-    def replace(match: re.Match) -> str:
-        resolved = _lookup(context, match.group(1))
-        if isinstance(resolved, (dict, list)):
-            return json.dumps(resolved, ensure_ascii=False)
-        return '' if resolved is None else str(resolved)
-
-    return _BINDING.sub(replace, value)
-
-
 def _clean_id(value: Any, prefix: str) -> str:
     raw = re.sub(r'[^a-zA-Z0-9_-]+', '-', str(value or '')).strip('-')
     return raw[:80] or f'{prefix}-{uuid.uuid4().hex[:10]}'
+
+
+def _recorded_input_count(result):
+    """Empty legacy records mean unknown; they do not prove zero work occurred."""
+    inputs = [item.get('input') for item in result.get('itemResults', []) if item.get('input')]
+    if not inputs and (result.get('code') == 0 or result.get('success') is True):
+        inputs = result.get('inputItems')
+    if not isinstance(inputs, list) or not inputs:
+        return None
+    paths = {str(item.get('path') if isinstance(item, dict) else item) for item in inputs}
+    return len(paths)
 
 
 class WorkflowMixin:
@@ -294,6 +273,15 @@ class WorkflowMixin:
 
     def workflow_templates(self):
         return api_success(templates=_copy(BUILTIN_WORKFLOWS))
+
+    def workflow_preflight(self, options: Dict | None = None):
+        """Validate a prospective manual run without touching workflow state or files."""
+        try:
+            from api.core.workflow_preflight import preflight
+            report = preflight({} if options is None else options, self._workflow_validate_steps)
+            return api_success('预检完成' if report['valid'] else '预检发现问题', **report)
+        except Exception:
+            return api_error('检查配置失败，请核对参数的数据结构', errorCode='PREFLIGHT_ERROR')
 
     def workflow_list(self):
         try:
@@ -553,6 +541,8 @@ class WorkflowMixin:
         result: Any = None
         ok = False
         canceled = False
+        resume_info = {'processedInputCount': None, 'retainedInputCount': None,
+                       'retainedOutputCount': None} if previous else None
         try:
             args = _resolve(step['args'], context)
             if previous and isinstance(args, dict):
@@ -563,10 +553,14 @@ class WorkflowMixin:
                     batch_key = 'files'
                 completed = {item.get('input') for item in previous.get('itemResults', []) if item.get('status') in {'success', 'skipped'}}
                 if batch_key and isinstance(args.get(batch_key), list):
+                    original_batch = args[batch_key]
                     args[batch_key] = [item for item in args[batch_key] if (item.get('path') if isinstance(item, dict) else item) not in completed]
+                    resume_info['retainedInputCount'] = len({str(item.get('path') if isinstance(item, dict) else item) for item in original_batch
+                                                             if (item.get('path') if isinstance(item, dict) else item) in completed})
                 elif step['method'] in {'file_batch_copy', 'file_batch_delete', 'file_batch_rename', 'file_auto_classify'} and previous.get('inputItems'):
                     args['_retryInputs'] = [path for path in previous['inputItems'] if path not in completed]
                     args['_inputOrder'] = {path: index for index, path in enumerate(previous['inputItems'])}
+                    resume_info['retainedInputCount'] = len(set(previous['inputItems']) & completed)
             handler = getattr(self, step['method'], None)
             if step['method'] not in WORKFLOW_METHODS or not callable(handler):
                 raise ValueError(f'步骤方法不可用：{step["method"]}')
@@ -650,10 +644,14 @@ class WorkflowMixin:
         )
         if previous and isinstance(result, dict):
             from api.operations import enrich_result
+            resume_info['processedInputCount'] = _recorded_input_count(result)
             retained = [asset for asset in previous.get('outputAssets', []) if Path(asset['path']).exists()]
+            newly_generated = {asset['path'] for asset in result.get('outputAssets', [])}
             result['outputAssets'] = list({asset['path']: asset for asset in [*retained, *result.get('outputAssets', [])]}.values())
             result['itemResults'] = list({item['input']: item for item in [*previous.get('itemResults', []), *result.get('itemResults', [])] if item.get('input')}.values())
             result = enrich_result(step['method'], result)
+            retained_paths = {asset.get('path') for asset in retained if asset.get('path')} - newly_generated
+            resume_info['retainedOutputCount'] = len(retained_paths & {asset.get('path') for asset in result.get('outputAssets', [])})
         step_run = {
             'id': step['id'],
             'name': step['name'],
@@ -666,6 +664,8 @@ class WorkflowMixin:
             'attemptCount': len(attempts),
             'attempts': attempts,
         }
+        if resume_info is not None:
+            step_run['resumeInfo'] = resume_info
         return step_run, result, ok
 
     def workflow_run(self, options: Dict | None = None):
@@ -690,9 +690,9 @@ class WorkflowMixin:
             if previous_run.get('stepsSignature') != signature:
                 return api_error('工作流步骤已修改，请使用当前版本重新运行')
             resume_steps = {step['id']: step for step in previous_run.get('steps', [])}
-            if any(not Path(asset['path']).exists() for step in resume_steps.values() if step['status'] == 'success'
+            if any(not Path(asset['path']).exists() for step in resume_steps.values()
                    for asset in step.get('result', {}).get('outputAssets', [])):
-                return api_error('先前成功步骤的结果已移动或删除，请重新运行工作流')
+                return api_error('先前已生成的结果已移动或删除，请重新运行工作流')
 
         input_data = options.get('input') or {}
         watch_data = options.get('watch') or {}
@@ -711,6 +711,8 @@ class WorkflowMixin:
             'steps': [],
             'stepsSignature': signature,
         }
+        if options.get('_resumeRunId'):
+            run['resumeOfRunId'] = str(options['_resumeRunId'])
         with self._workflow_lock:
             self._workflow_data['runs'].insert(0, _copy(run))
             self._workflow_persist_locked()
@@ -725,9 +727,15 @@ class WorkflowMixin:
                 report_progress(step_index, len(workflow['steps']), f'执行步骤：{step["name"]}')
                 previous = resume_steps.get(step['id'])
                 if previous and previous['status'] == 'success':
-                    step_run, result, ok = {**previous, 'reused': True}, _copy(previous['result']), True
+                    step_run, result, ok = {**previous, 'reused': True, 'resumeInfo': {
+                        'processedInputCount': 0, 'retainedInputCount': _recorded_input_count(previous['result']),
+                        'retainedOutputCount': len({asset['path'] for asset in previous['result']['outputAssets']}) if 'outputAssets' in previous['result'] else None,
+                    }}, _copy(previous['result']), True
                 else:
                     step_run, result, ok = self._workflow_execute_step(step, context, previous.get('result') if previous else None)
+                if previous:
+                    info = step_run.setdefault('resumeInfo', {'processedInputCount': None, 'retainedInputCount': None, 'retainedOutputCount': None})
+                    info.update(sourceRunId=run['resumeOfRunId'], reusedStep=bool(step_run.get('reused')))
                 context['steps'][step['id']] = _copy(result)
                 run['steps'].append(step_run)
                 with self._workflow_lock:

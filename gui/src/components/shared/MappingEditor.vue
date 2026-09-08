@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-const props = defineProps({ modelValue: { type: Object, default: () => ({}) }, numeric: Boolean, keyLabel: { type: String, default: '目标字段' }, valueLabel: { type: String, default: '来源字段' } })
+const props = defineProps({ modelValue: { type: Object, default: () => ({}) }, numeric: Boolean, disabled: Boolean, keyLabel: { type: String, default: '目标字段' }, valueLabel: { type: String, default: '来源字段' } })
 const emit = defineEmits(['update:modelValue'])
 const newKey = ref('')
 const entries = computed(() => Object.entries(props.modelValue || {}))
@@ -23,7 +23,7 @@ const add = () => {
     <div v-for="[key, value] in entries" :key="key" class="mapping-row">
       <span :title="key">{{ key }}</span
       ><span>→</span>
-      <el-input-number v-if="numeric" :model-value="Number(value)" @update:model-value="set(key, $event)" />
+      <el-input-number v-if="numeric" :key="disabled ? 'locked-mapping' : 'editable-mapping'" :disabled="disabled" :model-value="Number(value)" @update:model-value="set(key, $event)" />
       <el-input v-else :model-value="String(value)" :placeholder="valueLabel" @update:model-value="set(key, $event)" />
       <el-button text @click="remove(key)">移除</el-button>
     </div>

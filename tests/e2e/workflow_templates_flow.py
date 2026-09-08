@@ -199,6 +199,8 @@ def verify_workflow_templates(api, page, root, chosen, report_dir):
     latest.locator('.el-collapse-item__header').click()
     expect(latest.get_by_role('button', name='检查结果 / 继续处理', exact=False)).to_have_count(2)
     expect(latest.get_by_role('button', name='检查结果 / 继续处理', exact=False).last).to_be_visible()
+    expect(latest.locator('.resume-info').first).to_contain_text(partial['workflowRunId'])
+    expect(latest).to_contain_text('本次处理 1 项 / 沿用已完成输入 1 项 / 沿用输出 1 个')
     page.wait_for_timeout(350)  # Finish the Element Plus collapse animation before evidence.
     latest.scroll_into_view_if_needed()
     page.screenshot(path=str(report_dir / 'templates-results.png'))

@@ -1,0 +1,156 @@
+{
+  "version": "2.13.0",
+  "verifiedAt": "2026-09-08T15:10:51.300591+00:00",
+  "python": {
+    "passed": 103,
+    "failed": 0,
+    "command": "pnpm run test"
+  },
+  "frontend": {
+    "passed": 20,
+    "failed": 0,
+    "command": "pnpm run test:gui"
+  },
+  "lint": {
+    "passed": true,
+    "errors": 0,
+    "existingWarnings": 147,
+    "command": "pnpm run lint"
+  },
+  "productionBuild": {
+    "passed": true,
+    "command": "pnpm -C gui run build"
+  },
+  "browser": {
+    "passed": true,
+    "pageErrors": [],
+    "resultHandoff": {
+      "verifiedRoutes": [
+        "image/compress",
+        "image/watermark",
+        "image/rotate",
+        "pdf/merge",
+        "word/merge",
+        "conversion/images-pdf",
+        "conversion/merge-pdf",
+        "conversion/universal",
+        "pdf/compress",
+        "excel/merge",
+        "excel/profile",
+        "excel/process",
+        "excel/split",
+        "document/index",
+        "file/archive",
+        "video/compress",
+        "video/cut"
+      ],
+      "unavailableDependencies": [
+        "pdf/ocr"
+      ],
+      "checks": [
+        "mixed selection",
+        "single-file limits",
+        "disabled module",
+        "missing assets",
+        "auxiliary picker isolation",
+        "same-route return",
+        "deduplicated append"
+      ]
+    },
+    "excel": {
+      "passed": true,
+      "checks": [
+        "header row 2",
+        "typed date sort",
+        "trim and deduplicate preview/export parity",
+        "source unchanged",
+        "file switch clears results and preserves directory",
+        "corrupt file error",
+        "slow A cannot overwrite B",
+        "quality retains original 3 rows",
+        "quality report generated",
+        "split into two groups",
+        "980x760 light/dark action bounds"
+      ]
+    },
+    "inputOrigins": {
+      "passed": true,
+      "chains": [
+        "image compression → rotation",
+        "image parent dialog → compression",
+        "Excel → profile → quality report",
+        "file copy → document index"
+      ],
+      "checks": [
+        "receive and preview never execute",
+        "precise parent and path",
+        "business args exclude lineage",
+        "same-path native replacement clears lineage",
+        "auxiliary watermark picker does not consume or supply main origin",
+        "workspace drafts exclude origin metadata",
+        "remove then local selection clears lineage",
+        "filtered parent lookup and back",
+        "parent handoff closes origins dialog",
+        "removed parent keeps relation",
+        "980×760 light/dark no overflow"
+      ],
+      "taskIds": [
+        "ccca07642e1142edb9b3926d2f337ebe",
+        "ae143c9de0fa4dd1b9554f933ce6b4dc",
+        "53a84ae5d4a442748f26df9e9deec7c9",
+        "d31b45de47c544d980ef25a340012288"
+      ]
+    },
+    "templates": {
+      "passed": true,
+      "checks": [
+        "template UI input and immediate save",
+        "paths field references outputPaths",
+        "image copy ZIP and source unchanged",
+        "invalid JSON blocks run",
+        "history per-step result handoff preserves queue task origin",
+        "Excel header row 2 clean copy then header row 1 report",
+        "partial completion stops archive and keeps outputs",
+        "task-center retry restores complete archive without rewriting success",
+        "980x760 light/dark no horizontal overflow"
+      ],
+      "runs": [
+        "cc4866f1d4734c5fab9839dc4bd1f0fe",
+        "abf5817c8a5245c2844faa53e6ce6ea5",
+        "1b89504e561346a19b59a5facf20bca9",
+        "acfb022ac69146eda949db5b4ae828e7"
+      ]
+    },
+    "preflight": {
+      "passed": true,
+      "checks": [
+        "read-only checks never save or queue",
+        "invalid input and self-reference block run",
+        "error location focuses runtime input",
+        "known inputs and deferred prior output",
+        "stale response discarded after queued input event",
+        "API errors never queue",
+        "null JSON does not crash and switching clears stale form error",
+        "file counts and 980x760 light/dark layout",
+        "real two-file ZIP after successful check",
+        "new workflow checks saves and runs in one action"
+      ]
+    },
+    "checks": [
+      "draft retention",
+      "restart configuration",
+      "partial failure",
+      "retry only failed input",
+      "output dimensions and alpha",
+      "handoff scoped to target module",
+      "1000-page PDF editing/undo/reorder/export",
+      "two-step workflow via forms",
+      "pause only blocks new tasks",
+      "cancel queued task",
+      "browser collection detail retry without duplicate rows",
+      "built-in workflow templates and history result actions"
+    ]
+  },
+  "nativeInstallAcceptance": "pending",
+  "releaseGate": "passed with previously authorized pending acceptance preserved"
+}

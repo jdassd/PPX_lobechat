@@ -114,10 +114,22 @@ class WorkflowTemplateTests(unittest.TestCase):
             Image.new('RGB', (12, 8), 'blue').save(missing)
             resumed = api.workflow_run({'id': saved['id'], 'input': inputs, '_resumeRunId': first['run']['id']})
             self.assertEqual(resumed['run']['status'], 'success', resumed)
+            self.assertEqual(resumed['run']['resumeOfRunId'], first['run']['id'])
+            resume_info = resumed['run']['steps'][0]['resumeInfo']
+            self.assertEqual(resume_info['processedInputCount'], 1)
+            self.assertEqual(resume_info['retainedInputCount'], 1)
+            self.assertEqual(resume_info['retainedOutputCount'], 1)
+            self.assertEqual(resume_info['sourceRunId'], first['run']['id'])
+            self.assertFalse(resume_info['reusedStep'])
             self.assertEqual(retained.stat().st_mtime_ns, before)
             self.assertEqual(len(resumed['context']['steps']['compress']['outputPaths']), 2)
             with zipfile.ZipFile(resumed['context']['steps']['archive']['file']) as package:
                 self.assertEqual(set(package.namelist()), {'good_compress.png', 'later_compress.png'})
+            reused = api.workflow_run({'id': saved['id'], 'input': inputs, '_resumeRunId': resumed['run']['id']})
+            self.assertEqual(reused['run']['steps'][0]['resumeInfo']['processedInputCount'], 0)
+            self.assertEqual(reused['run']['steps'][0]['resumeInfo']['retainedInputCount'], 2)
+            self.assertEqual(reused['run']['steps'][0]['resumeInfo']['retainedOutputCount'], 2)
+            self.assertEqual(retained.stat().st_mtime_ns, before)
 
     def test_partial_stop_preserves_outputs_and_skips_archive(self):
         with tempfile.TemporaryDirectory() as directory, mock.patch.object(Config, 'appDataDir', directory):
@@ -145,6 +157,62 @@ class WorkflowTemplateTests(unittest.TestCase):
             ]})
             run = api.workflow_run({'id': saved['workflow']['id']})
             self.assertEqual(run['run']['steps'][1]['status'], 'success')
+
+    def test_resume_marks_whole_success_step_as_reused_without_processing_inputs(self):
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(Config, 'appDataDir', directory):
+            api = WorkflowApi()
+            self.addCleanup(api.workflow_stop)
+            saved = api.workflow_save({'name': 'reuse', 'steps': [
+                {'id': 'one', 'method': 'text_case_transform', 'args': {'value': 'ok'}},
+                {'id': 'two', 'method': 'image_batch_compress', 'args': {'files': [str(Path(directory) / 'missing.png')]}},
+            ]})['workflow']
+            first = api.workflow_run({'id': saved['id']})
+            resumed = api.workflow_run({'id': saved['id'], '_resumeRunId': first['run']['id']})
+            step = resumed['run']['steps'][0]
+            self.assertTrue(step['reused'])
+            self.assertEqual(step['resumeInfo']['processedInputCount'], 0)
+            self.assertTrue(step['resumeInfo']['reusedStep'])
+            self.assertIsNone(step['resumeInfo']['retainedInputCount'])
+            self.assertIsNone(resumed['run']['steps'][1]['resumeInfo']['processedInputCount'])
+
+    def test_missing_partial_output_blocks_resume_before_creating_another_run(self):
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(Config, 'appDataDir', str(Path(directory) / 'state')):
+            root = Path(directory)
+            good, missing = root / 'good.png', root / 'missing.png'
+            Image.new('RGB', (12, 8), 'red').save(good)
+            api = API()
+            self.addCleanup(api.task_shutdown)
+            self.addCleanup(api.workflow_stop)
+            saved = api.workflow_create_from_template({'templateId': 'builtin-image-archive'})['workflow']
+            options = {'id': saved['id'], 'input': {'files': [str(good), str(missing)], 'outputDir': str(root / 'outputs')}}
+            first = api.workflow_run(options)
+            self.assertTrue(first['partial'])
+            Path(first['outputAssets'][0]['path']).unlink()
+            before = len(api.workflow_list()['runs'])
+            resumed = api.workflow_run({**options, '_resumeRunId': first['run']['id']})
+            self.assertNotEqual(resumed['code'], 0)
+            self.assertIn('已移动或删除', resumed['msg'])
+            self.assertEqual(len(api.workflow_list()['runs']), before)
+            self.assertFalse(list((root / 'outputs').glob('*.zip')))
+
+    def test_directory_batch_resume_counts_only_filtered_and_recorded_inputs(self):
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(Config, 'appDataDir', directory):
+            api = WorkflowApi()
+            self.addCleanup(api.workflow_stop)
+            api._workflow_ensure()
+            retained = Path(directory) / 'retained.txt'
+            retained.write_text('keep', encoding='utf-8')
+            previous = {'inputItems': ['good', 'bad'], 'itemResults': [
+                {'input': 'good', 'status': 'success'}, {'input': 'bad', 'status': 'failed'}],
+                'outputAssets': [{'path': str(retained), 'kind': 'file'}]}
+            handler = mock.Mock(return_value=api_success('copied', inputItems=['bad'], itemResults=[{'input': 'bad', 'status': 'success'}], outputAssets=[]))
+            api.file_batch_copy = handler
+            step = api._workflow_validate_steps([{'id': 'copy', 'method': 'file_batch_copy', 'args': {'sourceDirs': [directory]}}])[0]
+            step_run, result, ok = api._workflow_execute_step(step, {'input': {}, 'watch': {}, 'steps': {}}, previous)
+            self.assertTrue(ok)
+            self.assertEqual(handler.call_args.args[0]['_retryInputs'], ['bad'])
+            self.assertEqual(step_run['resumeInfo'], {'processedInputCount': 1, 'retainedInputCount': 1, 'retainedOutputCount': 1})
+            self.assertEqual(result['outputPaths'], [str(retained)])
 
 
 if __name__ == '__main__':

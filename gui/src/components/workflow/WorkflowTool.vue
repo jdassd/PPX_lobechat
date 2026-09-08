@@ -12,6 +12,11 @@ const activeTab = ref(props.initialTab || 'workflows')
 const loading = ref(false)
 const saving = ref(false)
 const running = ref(false)
+const checking = ref(false)
+const preflightReport = ref(null)
+const editorRoot = ref(null)
+const editorBusy = computed(() => checking.value || saving.value || running.value || loading.value || bundleBusy.value)
+let editorRevision = 0
 const workflows = ref([])
 const templates = ref([])
 const methods = ref([])
@@ -27,6 +32,7 @@ const inputFieldsFor = (steps) => {
     } catch {
       continue
     }
+    if (!args || Array.isArray(args) || typeof args !== 'object') continue
     for (const [key, value] of Object.entries(args)) {
       const match = typeof value === 'string' && /^\{\{input\.([\w-]+)\}\}$/.exec(value)
       if (match) fields.set(match[1], { ...(descriptor(step.method)?.fields.find((field) => field.name === key) || { type: 'text', label: key }), name: match[1] })
@@ -55,6 +61,74 @@ const bundleOutput = ref('')
 const historyBusy = ref(false)
 
 const editor = reactive({ id: '', name: '', description: '', enabled: true, steps: [] })
+watch(
+  [editor, runInput],
+  () => {
+    editorRevision += 1
+    preflightReport.value = null
+  },
+  { deep: true, flush: 'sync' }
+)
+const draftSteps = () =>
+  editor.steps.map((step, index) => ({
+    id: step.id || `step-${index + 1}`,
+    name: step.name || step.method,
+    method: step.method,
+    args: parseStepArgs(step, index),
+    onError: step.onError,
+    onPartial: step.onPartial,
+    retryCount: Number(step.retryCount || 0),
+    retryDelaySeconds: Number(step.retryDelaySeconds || 0)
+  }))
+const checkConfiguration = async () => {
+  if (checking.value) return false
+  const revision = editorRevision
+  checking.value = true
+  preflightReport.value = null
+  try {
+    const response = await callApi('workflow_preflight', { steps: draftSteps(), input: parseObject(runInput.value, '运行输入'), watch: {} })
+    if (revision !== editorRevision) return false
+    if (!response.ok || typeof response.data?.valid !== 'boolean') throw new Error(response.message || '配置检查失败，请重试')
+    preflightReport.value = response.data
+    return response.data.valid === true
+  } catch (error) {
+    if (revision === editorRevision) preflightReport.value = { valid: false, errors: [{ message: error?.message || '配置检查失败', index: error?.stepIndex, fieldPath: error?.stepIndex === undefined ? '/input' : '/' }], deferred: [] }
+    return false
+  } finally {
+    checking.value = false
+  }
+}
+const issueLabel = (issue) => (Number.isInteger(issue.index) ? `步骤 ${issue.index + 1} · ${editor.steps[issue.index]?.name || issue.stepId || ''}` : '运行配置')
+const locateIssue = (issue) => {
+  let section = Number.isInteger(issue.index) ? editorRoot.value?.querySelector(`[data-step-index="${issue.index}"]`) : editorRoot.value?.querySelector('.run-input')
+  let name = String(issue.fieldPath || '')
+    .split('/')[1]
+    ?.replaceAll('~1', '/')
+    .replaceAll('~0', '~')
+  try {
+    const value = JSON.parse(editor.steps[issue.index]?.argsText || '{}')[name]
+    const source = typeof value === 'string' && /^\{\{\s*input\.([\w-]+)(?:\.[\w-]+)*\s*\}\}$/.exec(value)
+    if (source) {
+      section = editorRoot.value?.querySelector('.run-input')
+      name = source[1]
+    }
+  } catch {
+    // Invalid JSON is located at its step so it can be repaired in place.
+  }
+  const field = [...(section?.querySelectorAll('[data-field-name]') || [])].find((node) => node.dataset.fieldName === name)
+  const target = field || section
+  target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  target?.querySelector('input:not([disabled]), textarea:not([disabled]), button:not([disabled])')?.focus({ preventScroll: true })
+}
+const resumeCounts = (info) =>
+  [
+    ['processedInputCount', '本次处理', '项'],
+    ['retainedInputCount', '沿用已完成输入', '项'],
+    ['retainedOutputCount', '沿用输出', '个']
+  ]
+    .filter(([key]) => typeof info?.[key] === 'number' && Number.isFinite(info[key]))
+    .map(([key, label, unit]) => `${label} ${info[key]} ${unit}`)
+    .join(' / ')
 const scheduleForm = reactive({ workflowId: '', name: '', intervalMinutes: 60, input: '{}' })
 const watchForm = reactive({ workflowId: '', name: '', path: '', extensions: '', recursive: false, debounceSeconds: 3, input: '{}' })
 
@@ -85,9 +159,22 @@ const formatTime = (value) => {
 }
 
 const parseObject = (text, label) => {
-  const value = JSON.parse(text || '{}')
+  let value
+  try {
+    value = JSON.parse(text || '{}')
+  } catch {
+    throw new Error(`${label}的 JSON 格式不完整，请修正后继续`)
+  }
   if (!value || Array.isArray(value) || typeof value !== 'object') throw new Error(`${label}必须是 JSON 对象`)
   return value
+}
+const parseStepArgs = (step, index) => {
+  try {
+    return parseObject(step.argsText, `步骤 ${index + 1} 参数`)
+  } catch (error) {
+    error.stepIndex = index
+    throw error
+  }
 }
 
 const resetEditor = () => {
@@ -151,11 +238,19 @@ const refresh = async (keepSelection = true) => {
 }
 
 const useTemplate = async (template) => {
-  const response = await callApi('workflow_create_from_template', { templateId: template.id })
-  if (!response.ok) return ElMessage.error(response.message || '创建失败')
-  ElMessage.success('已从模板创建，可继续调整参数')
-  selectedId.value = response.data.workflow.id
-  await refresh(true)
+  if (editorBusy.value) return
+  saving.value = true
+  try {
+    const response = await callApi('workflow_create_from_template', { templateId: template.id })
+    if (!response.ok) return ElMessage.error(response.message || '创建失败')
+    ElMessage.success('已从模板创建，可继续调整参数')
+    selectedId.value = response.data.workflow.id
+    await refresh(true)
+  } catch (error) {
+    ElMessage.error(error?.message || '创建失败')
+  } finally {
+    saving.value = false
+  }
 }
 
 const addStep = () => {
@@ -179,16 +274,7 @@ const saveWorkflow = async () => {
   if (!editor.steps.length) return ElMessage.warning('至少添加一个步骤')
   let steps
   try {
-    steps = editor.steps.map((step, index) => ({
-      id: step.id || `step-${index + 1}`,
-      name: step.name || step.method,
-      method: step.method,
-      args: parseObject(step.argsText, `步骤 ${index + 1} 参数`),
-      onError: step.onError,
-      onPartial: step.onPartial,
-      retryCount: Number(step.retryCount || 0),
-      retryDelaySeconds: Number(step.retryDelaySeconds || 0)
-    }))
+    steps = draftSteps()
   } catch (error) {
     return ElMessage.error(error.message)
   }
@@ -219,22 +305,26 @@ const saveWorkflow = async () => {
 }
 
 const removeWorkflow = async () => {
-  if (!editor.id) return
-  await ElMessageBox.confirm('关联的定时任务和目录监听也会一并删除，是否继续？', '删除工作流', { type: 'warning' })
-  const response = await callApi('workflow_delete', { id: editor.id })
-  if (!response.ok) return ElMessage.error(response.message || '删除失败')
-  ElMessage.success('已删除')
-  await refresh(false)
+  if (!editor.id || editorBusy.value) return
+  saving.value = true
+  try {
+    await ElMessageBox.confirm('关联的定时任务和目录监听也会一并删除，是否继续？', '删除工作流', { type: 'warning' })
+    const response = await callApi('workflow_delete', { id: editor.id })
+    if (!response.ok) return ElMessage.error(response.message || '删除失败')
+    ElMessage.success('已删除')
+    await refresh(false)
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') ElMessage.error(error?.message || '删除失败')
+  } finally {
+    saving.value = false
+  }
 }
 
 const runWorkflow = async () => {
-  if (saving.value || running.value) return
-  if (!editor.id) {
-    ElMessage.warning('请先保存工作流')
-    return
-  }
+  if (editorBusy.value) return
   running.value = true
   try {
+    if (!(await checkConfiguration())) return
     const saved = await saveWorkflow()
     if (!saved?.id) return
     const response = await callApi('workflow_run', { id: saved.id, input: saved.inputExample || {} })
@@ -439,11 +529,11 @@ onMounted(() => refresh(false))
           <aside class="workflow-list">
             <div class="section-head">
               <strong>我的工作流</strong>
-              <el-button size="small" @click="resetEditor">新建</el-button>
+              <el-button size="small" :disabled="editorBusy" @click="resetEditor">新建</el-button>
             </div>
             <div class="bundle-toolbar">
-              <el-button size="small" :loading="bundleBusy" @click="importBundle">导入模板包</el-button>
-              <el-dropdown :disabled="!workflows.length || bundleBusy" @command="exportBundle">
+              <el-button size="small" :disabled="editorBusy" :loading="bundleBusy" @click="importBundle">导入模板包</el-button>
+              <el-dropdown :disabled="!workflows.length || editorBusy" @command="exportBundle">
                 <el-button size="small" :loading="bundleBusy" :disabled="!workflows.length">导出模板包</el-button>
                 <template #dropdown>
                   <el-dropdown-menu>
@@ -455,7 +545,7 @@ onMounted(() => refresh(false))
             </div>
             <small class="bundle-hint">包含步骤参数与输入示例，不含运行历史；分享前请检查敏感字段。</small>
             <el-button v-if="bundleOutput" class="bundle-output" text type="primary" size="small" @click="revealBundle">定位最近导出的模板包</el-button>
-            <button v-for="item in workflows" :key="item.id" class="workflow-list-item" :class="{ active: item.id === selectedId }" type="button" :disabled="running || saving" @click="loadEditor(item)">
+            <button v-for="item in workflows" :key="item.id" class="workflow-list-item" :class="{ active: item.id === selectedId }" type="button" :disabled="editorBusy" @click="loadEditor(item)">
               <span>{{ item.name }}</span>
               <small>{{ item.steps?.length || 0 }} 步 · {{ item.enabled === false ? '停用' : '启用' }}</small>
             </button>
@@ -465,19 +555,19 @@ onMounted(() => refresh(false))
             <div v-for="template in templates" :key="template.id" class="template-card">
               <strong>{{ template.name }}</strong>
               <p>{{ template.description }}</p>
-              <el-button size="small" plain :disabled="running || saving" @click="useTemplate(template)">使用模板</el-button>
+              <el-button size="small" plain :disabled="editorBusy" @click="useTemplate(template)">使用模板</el-button>
             </div>
           </aside>
 
-          <section class="workflow-editor">
+          <section ref="editorRoot" class="workflow-editor">
             <div class="editor-top">
               <div>
                 <h3>{{ editor.id ? '编辑工作流' : '新建工作流' }}</h3>
                 <p>按顺序添加工具，为每一步选择文件和参数；需要串联时，从“引用前一步结果”选择来源。</p>
               </div>
-              <el-switch v-model="editor.enabled" active-text="启用" />
+              <el-switch v-model="editor.enabled" active-text="启用" :disabled="editorBusy" />
             </div>
-            <el-form label-position="top" :disabled="running || saving">
+            <el-form label-position="top" :disabled="editorBusy">
               <div class="two-columns">
                 <el-form-item label="名称">
                   <el-input v-model="editor.name" maxlength="120" />
@@ -489,20 +579,32 @@ onMounted(() => refresh(false))
 
               <section class="run-setup">
                 <h4>本次运行</h4>
-                <p>先填写输入，再立即运行。运行前会保存当前步骤和输入；下方可以调整处理规则。</p>
+                <p>先填写输入并检查配置。检查不会保存或执行；立即运行会先检查，通过后保存当前步骤和输入。</p>
                 <el-form-item label="运行输入" class="run-input">
-                  <OperationForm v-model="runInput" :fields="inputFields" :disabled="running || saving" />
+                  <OperationForm v-model="runInput" :fields="inputFields" :disabled="editorBusy" />
                 </el-form-item>
                 <div class="editor-actions">
                   <el-button v-if="editor.id" type="danger" plain @click="removeWorkflow">删除</el-button>
                   <span class="action-spacer" />
+                  <el-button :loading="checking" @click="checkConfiguration">检查配置</el-button>
                   <el-button :loading="saving" @click="saveWorkflow">保存</el-button>
-                  <el-button type="primary" :loading="running" :disabled="!editor.id" @click="runWorkflow">立即运行</el-button>
+                  <el-button type="primary" :loading="running" @click="runWorkflow">立即运行</el-button>
+                </div>
+                <div v-if="preflightReport" class="preflight-report" aria-live="polite" data-testid="preflight-report">
+                  <strong>{{ preflightReport.valid ? '配置检查通过' : '配置尚未通过，请修正以下问题' }}</strong>
+                  <ul v-if="preflightReport.errors?.length" class="preflight-issues">
+                    <li v-for="(issue, index) in preflightReport.errors" :key="index">
+                      <span>{{ issueLabel(issue) }} · {{ issue.fieldPath || '/' }}：{{ issue.message }}</span>
+                      <el-button text type="primary" @click="locateIssue(issue)">定位</el-button>
+                    </li>
+                  </ul>
+                  <p v-if="preflightReport.truncated">共 {{ preflightReport.errorCount }} 个问题，当前显示前 {{ preflightReport.errors.length }} 个；修正后请重新检查。</p>
+                  <p v-if="preflightReport.deferred?.length">{{ preflightReport.deferred.length }} 处前序步骤输出将在执行后核对。</p>
                 </div>
               </section>
 
               <div class="step-stack">
-                <div v-for="(step, index) in editor.steps" :key="`${step.id}-${index}`" class="step-card">
+                <div v-for="(step, index) in editor.steps" :key="`${step.id}-${index}`" :data-step-index="index" class="step-card">
                   <div class="step-number">{{ index + 1 }}</div>
                   <div class="step-body">
                     <div class="step-row">
@@ -516,16 +618,16 @@ onMounted(() => refresh(false))
                         <el-option label="失败后继续" value="continue" />
                       </el-select>
                     </div>
-                    <OperationForm v-model="step.argsText" :fields="descriptor(step.method)?.fields || []" :previous="editor.steps.slice(0, index)" :disabled="running || saving" />
+                    <OperationForm v-model="step.argsText" :fields="descriptor(step.method)?.fields || []" :previous="editor.steps.slice(0, index)" :disabled="editorBusy" />
                     <div class="step-policy">
                       <el-select v-model="step.onPartial" class="partial-select" aria-label="部分成功时的处理方式">
                         <el-option label="部分成功后继续" value="continue" />
                         <el-option label="部分成功即停止" value="stop" />
                       </el-select>
                       <span>失败自动重试</span>
-                      <el-input-number v-model="step.retryCount" :min="0" :max="5" size="small" />
+                      <el-input-number :key="editorBusy ? 'locked-retry' : 'editable-retry'" v-model="step.retryCount" :disabled="editorBusy" :min="0" :max="5" size="small" />
                       <span>次，每次等待</span>
-                      <el-input-number v-model="step.retryDelaySeconds" :min="0" :max="300" size="small" />
+                      <el-input-number :key="editorBusy ? 'locked-delay' : 'editable-delay'" v-model="step.retryDelaySeconds" :disabled="editorBusy" :min="0" :max="300" size="small" />
                       <span>秒</span>
                     </div>
                   </div>
@@ -542,7 +644,7 @@ onMounted(() => refresh(false))
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="触发器" name="triggers">
+      <el-tab-pane label="触发器" name="triggers" :disabled="editorBusy">
         <div class="trigger-grid">
           <el-card shadow="never">
             <template #header><strong>周期运行</strong></template>
@@ -607,14 +709,14 @@ onMounted(() => refresh(false))
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="运行记录" name="history">
+      <el-tab-pane label="运行记录" name="history" :disabled="editorBusy">
         <div class="history-head">
           <div>
             <h3>自动化运行记录</h3>
             <p>每一步的结果都会保存在本机，最多保留 80 次；当前筛选可导出或清理。</p>
           </div>
           <div class="history-actions">
-            <el-button @click="refresh(true)">刷新</el-button>
+            <el-button :disabled="editorBusy" @click="refresh(true)">刷新</el-button>
             <el-dropdown :disabled="!filteredRuns.length" @command="exportRuns">
               <el-button :disabled="!filteredRuns.length">导出当前筛选</el-button>
               <template #dropdown>
@@ -624,7 +726,7 @@ onMounted(() => refresh(false))
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
-            <el-button type="danger" plain :loading="historyBusy" :disabled="!filteredRuns.length" @click="clearRuns">清理当前筛选</el-button>
+            <el-button type="danger" plain :loading="historyBusy" :disabled="editorBusy || !filteredRuns.length" @click="clearRuns">清理当前筛选</el-button>
           </div>
         </div>
         <div class="history-filters">
@@ -655,10 +757,14 @@ onMounted(() => refresh(false))
                 <time>{{ formatTime(run.startedAt) }}</time>
               </div>
             </template>
+            <p v-if="run.resumeOfRunId" class="resume-info">
+              续跑来源：<code>{{ run.resumeOfRunId }}</code>
+            </p>
             <el-timeline>
               <el-timeline-item v-for="step in run.steps || []" :key="step.id" :type="step.status === 'success' ? 'success' : 'danger'" :timestamp="formatTime(step.endedAt)">
                 <strong>{{ step.name }}</strong> · <code>{{ step.method }}</code>
                 <p>{{ step.message || (step.status === 'success' ? '完成' : '失败') }}</p>
+                <p v-if="step.resumeInfo" class="resume-info"><span v-if="step.resumeInfo.reusedStep">沿用已完成步骤，本次未重新执行。 </span>{{ resumeCounts(step.resumeInfo) }}</p>
                 <ResultActions v-if="step.result?.outputAssets?.length" :assets="step.result.outputAssets" :source-task-id="runTaskId(run)" />
                 <small v-if="step.attemptCount > 1">共执行 {{ step.attemptCount }} 次（自动重试 {{ step.attemptCount - 1 }} 次）</small>
                 <ul v-if="step.attempts?.length > 1" class="attempt-list">
@@ -679,6 +785,42 @@ onMounted(() => refresh(false))
 </template>
 
 <style scoped>
+.preflight-report {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--ppx-glass-border);
+  border-radius: 8px;
+  background: var(--ppx-bg-soft);
+  font-size: 12px;
+}
+.preflight-issues {
+  max-height: 250px;
+  overflow: auto;
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+.preflight-issues li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+.preflight-issues li span {
+  min-width: 0;
+}
+.preflight-report p {
+  margin: 8px 0 0;
+}
+.resume-info {
+  overflow-wrap: anywhere;
+  color: var(--ppx-text-muted);
+  font-size: 12px;
+}
+.editor-actions {
+  flex-wrap: wrap;
+}
 .workflow-tool {
   height: 100%;
   overflow: auto;
