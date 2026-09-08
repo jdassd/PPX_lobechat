@@ -43,11 +43,15 @@ logoPath = os.path.join(rootDir, 'pyapp', 'icon', 'logo.png')
 
 
 # 生成软件包的控制文件 (Package name must be alphanumeric, use English name)
+# PyInstaller bundles the build host's native executable and libraries.
+appArchitecture = subprocess.check_output(['dpkg', '--print-architecture'], text=True, timeout=10).strip()
+if not appArchitecture or not appArchitecture.replace('-', '').isalnum() or appArchitecture in {'all', 'any'}:
+    raise ValueError(f'无法确认 Debian 构建架构：{appArchitecture!r}')
 getControl = f"""Package: {appDistName}
 Version: {appVersion}
 Section: base
 Priority: optional
-Architecture: all
+Architecture: {appArchitecture}
 Depends: python3
 Maintainer: {appDeveloper}
 Description: {appName} - {appBlogs}
@@ -70,25 +74,8 @@ with open(os.path.join(scriptDir, f'{appDistName}.desktop'), 'w+', encoding='utf
     f.write(getDesktop)
 
 
-# 生成安装完成调用的 postinst 脚本
-getPostinst = """#!/bin/bash
-# 更新桌面图标数据库
-update-desktop-database /usr/share/applications || true
-# 获取当前的用户名
-username="$(who | awk 'NR==1 {print $1}')"
-# 判断桌面文件夹是否存在
-if [ -d "/home/${username}/Desktop" ]; then
-echo 'Desktop exist'
-# 将桌面文件复制到桌面
-cp """ + f'/usr/share/applications/{appDistName}.desktop' + """ /home/${username}/Desktop
-else
-echo '桌面文件夹不存在'
-# 中文系统自动复制到中文桌面
-cp """ + f'/usr/share/applications/{appDistName}.desktop' + """ /home/${username}/桌面
-fi
-"""
-with open(os.path.join(scriptDir, 'postinst'), 'w+', encoding='utf-8') as f:
-    f.write(getPostinst)
+# postinst is maintained as a shared script; installation must not guess a user
+# or depend on a logged-in desktop session.
 
 
 buildDir = os.path.join(rootDir, 'build')
@@ -125,6 +112,11 @@ shutil.copy2(str(logoFile), str(buildPath / appDistName / 'usr' / 'share' / 'ico
 
 # 构建 deb 包
 subprocess.run(['dpkg-deb', '--build', appDistName], cwd=str(buildPath), check=True)
+package_path = buildPath / f'{appDistName}.deb'
+for field, expected in [('Architecture', appArchitecture), ('Version', appVersion)]:
+    actual = subprocess.check_output(['dpkg-deb', '--field', str(package_path), field], text=True, timeout=10).strip()
+    if actual != expected:
+        raise ValueError(f'Debian {field} 不匹配：{actual!r} != {expected!r}')
 
 # 清理并重命名 (keep Chinese name in final deb filename for user recognition)
 shutil.rmtree(str(buildPath / appDistName), ignore_errors=True)

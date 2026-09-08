@@ -1,6 +1,16 @@
 {
   "version": "2.16.0",
   "verifiedAt": "2026-09-08T17:02:40.502352+00:00",
+  "additionalValidation": {
+    "verifiedAt": "2026-09-08T17:27:00+00:00",
+    "fullBrowserAfterLoadingMaskFix": "passed",
+    "overlappingLoadingMasks": "passed",
+    "innoCompilerFixedFileVersion": "2.16.0.0",
+    "linuxPostinstWithoutDesktopUtility": "passed in Git Bash sh",
+    "linuxPostinstWithFailingDesktopUtility": "passed in Git Bash sh",
+    "debianArchitectureAndVersion": "pending; enforced by native CI packaging",
+    "nativeInstallation": "pending"
+  },
   "python": {
     "passed": 149,
     "failed": 0,
