@@ -1,10 +1,10 @@
 <script setup>
-import { useDraft } from '../../../utils/workspace'
+import { mergeFileQueue, useDraft } from '../../../utils/workspace'
 import { computed, ref } from 'vue'
 import { FolderOpened, Loading, Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
-import { callApi, callApiRaw, hasPyApi } from '@/utils/pyapi'
+import { callApi, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
 import ConversionFileQueue from './ConversionFileQueue.vue'
 
 const props = defineProps({
@@ -42,22 +42,13 @@ const selectFiles = async () => {
     ElMessage.warning('该功能需在 PPX 桌面客户端中使用')
     return
   }
-  const picked = await callApiRaw('system_pyCreateFileDialog', isMerge.value ? PDF_FILTER : IMAGE_FILTER)
+  const picked = await selectInputFiles(isMerge.value ? 'conversion/merge-pdf' : 'conversion/images-pdf', isMerge.value ? PDF_FILTER : IMAGE_FILTER)
   if (!picked?.length) return
   const rejected = picked.filter((item) => !accepts(item))
   if (rejected.length) {
     ElMessage.warning(isMerge.value ? '已忽略非 PDF 文件' : '已忽略不支持的图片文件')
   }
-  const seen = new Set(files.value.map((item) => filePath(item).toLowerCase()))
-  files.value = [
-    ...files.value,
-    ...picked.filter(accepts).filter((item) => {
-      const identity = filePath(item).toLowerCase()
-      if (!identity || seen.has(identity)) return false
-      seen.add(identity)
-      return true
-    })
-  ]
+  files.value = mergeFileQueue(files.value, picked.filter(accepts))
   results.value = []
 }
 

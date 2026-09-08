@@ -1,6 +1,6 @@
 <script setup>
 import { computed, getCurrentInstance, ref, watch } from 'vue'
-import { consumeIncomingFiles, currentIncomingAssets as incomingAssets, mergeFileQueue } from '../../utils/workspace'
+import { consumeIncomingFiles, currentIncomingAssets as incomingAssets, incomingRouteId, mergeFileQueue } from '../../utils/workspace'
 
 const props = defineProps({
   label: { type: String, default: '' },
@@ -9,7 +9,8 @@ const props = defineProps({
   buttonText: { type: String, default: '选择文件' },
   placeholder: { type: String, default: '尚未选择' },
   maxDisplay: { type: Number, default: 8 },
-  removable: { type: Boolean, default: false }
+  removable: { type: Boolean, default: false },
+  incomingRoute: { type: String, default: '' }
 })
 const emit = defineEmits(['select', 'remove', 'update:files'])
 const instance = getCurrentInstance()
@@ -50,8 +51,10 @@ const remove = (file) => {
   else emit('remove', file)
 }
 const acceptIncoming = () => {
-  emit('update:files', mergeFileQueue(props.files, consumeIncomingFiles()))
+  const files = consumeIncomingFiles(props.incomingRoute)
+  if (files.length) emit('update:files', mergeFileQueue(props.files, files))
 }
+const matchingIncoming = computed(() => Boolean(managed.value && props.incomingRoute && incomingRouteId.value === props.incomingRoute && incomingAssets.value.length))
 </script>
 
 <template>
@@ -63,7 +66,7 @@ const acceptIncoming = () => {
       </div>
       <el-button size="small" @click="emit('select')">{{ files.length ? '追加文件' : buttonText }}</el-button>
     </div>
-    <el-button v-if="managed && incomingAssets.length" type="primary" plain size="small" @click="acceptIncoming">使用上一步的 {{ incomingAssets.length }} 个结果</el-button>
+    <el-button v-if="matchingIncoming" type="primary" plain size="small" :aria-label="'使用上一步结果：' + incomingAssets.length + ' 个文件'" @click="acceptIncoming">使用上一步的 {{ incomingAssets.length }} 个结果</el-button>
     <div v-if="managed && files.length > 1" class="queue-tools">
       <el-checkbox :model-value="selected.length === files.length" :indeterminate="selected.length > 0 && selected.length < files.length" @change="selected = $event ? files.map(pathOf) : []">全选 {{ files.length }} 个文件</el-checkbox>
       <el-button

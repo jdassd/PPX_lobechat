@@ -84,6 +84,9 @@ jobs:
       - name: 运行 Python 单元测试
         run: pnpm run test
 
+      - name: 验证工具接力规则
+        run: pnpm run test:gui
+
       - name: 安装浏览器测试运行时
         run: node pyapp/package/python.js -m playwright install --with-deps chromium
 

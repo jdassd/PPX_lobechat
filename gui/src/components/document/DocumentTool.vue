@@ -1,11 +1,17 @@
 <script setup>
-import { useDraft } from '../../utils/workspace'
+import { mergeFileQueue, useDraft } from '../../utils/workspace'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { callApi, callApiRaw } from '@/utils/pyapi'
+import { callApi, callApiRaw, selectInputFiles } from '@/utils/pyapi'
 
 const props = defineProps({ initialTab: { type: String, default: '' } })
 const activeTab = ref(props.initialTab || 'search')
+watch(
+  () => props.initialTab,
+  (value) => {
+    if (['search', 'index', 'table'].includes(value)) activeTab.value = value
+  }
+)
 const loading = ref(false)
 const indexing = ref(false)
 const searching = ref(false)
@@ -84,10 +90,11 @@ const chooseDirectory = async () => {
 }
 
 const chooseFiles = async () => {
-  const files = await callApiRaw('system_pyCreateFileDialog', ['支持的文档 (*.pdf;*.docx;*.xlsx;*.xlsm;*.txt;*.md;*.markdown;*.csv;*.json;*.log)'])
-  for (const file of files || []) {
-    if (file?.path && !indexForm.files.includes(file.path)) indexForm.files.push(file.path)
-  }
+  const files = await selectInputFiles('document/index', ['支持的文档 (*.pdf;*.docx;*.xlsx;*.xlsm;*.txt;*.md;*.markdown;*.csv;*.json;*.log)'])
+  indexForm.files = mergeFileQueue(
+    indexForm.files,
+    (files || []).filter((file) => file?.path).map((file) => file.path)
+  )
 }
 
 const buildIndex = async () => {

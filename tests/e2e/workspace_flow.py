@@ -19,6 +19,7 @@ sys.path.insert(0, str(ROOT))
 import fitz
 from PIL import Image
 from playwright.sync_api import expect, sync_playwright
+from result_handoff_flow import verify_result_handoff
 from web_collection_flow import verify_web_collection
 
 from api.api import API
@@ -98,6 +99,7 @@ def main():
                 page = context.new_page()
                 page.set_default_timeout(15000)
                 errors = []
+                picker_calls = []
                 evidence.enter_context(browser_evidence(context, page, report_dir, errors))
                 def record_error(error):
                     errors.append(str(error))
@@ -107,6 +109,7 @@ def main():
 
                 def dispatch(_source, method, args):
                     if method == "system_pyCreateFileDialog":
+                        picker_calls.append(args)
                         return [{"path": str(path), "filename": path.name, "ext": path.suffix, "dir": str(path.parent)} for path in chosen]
                     if method == "system_pySelectDirDialog":
                         return str(root / "outputs")
@@ -129,6 +132,13 @@ def main():
                     + ".map(method => [method, (...args) => window.ppxCall(method, args)]))};"
                 )
                 page.goto(f"http://127.0.0.1:{port}")
+                if '--handoff-only' in sys.argv:
+                    handoff = verify_result_handoff(api, page, root, chosen, picker_calls, report_dir)
+                    assert not errors, errors
+                    print(json.dumps(handoff, ensure_ascii=False), flush=True)
+                    evidence.close()
+                    browser.close()
+                    return
                 navigation = page.get_by_role("navigation", name="工具")
                 navigation.get_by_role("button", name="图片处理", exact=True).click()
                 page.get_by_text("目标体积", exact=True).click()
@@ -169,9 +179,9 @@ def main():
                     assert output.mode == "RGBA"
                 page.get_by_role("button", name="检查结果 / 继续处理", exact=False).first.click()
                 page.locator(".el-dialog:visible .el-select__wrapper").click()
-                page.get_by_role("option", name="图片工具", exact=True).click()
-                page.get_by_role("button", name="将全部结果交给下一工具", exact=True).click()
-                expect(page.get_by_text("已带入 1 个结果", exact=False)).to_be_visible()
+                page.get_by_role("option").filter(has_text=re.compile('^压缩图片 · 1 个文件')).click()
+                page.get_by_role("button", name="交给下一工具", exact=True).click()
+                expect(page.get_by_text("待接收：1 个结果", exact=False)).to_be_visible()
                 chosen = [pdf_source]
                 navigation.get_by_role('button', name='PDF 工具', exact=True).click()
                 page.get_by_role('button', name='页面工作台', exact=True).click()
@@ -249,11 +259,13 @@ def main():
                 assert not (root / 'must-not-exist').exists()
                 page.get_by_role('button', name='继续队列', exact=True).click()
                 verify_web_collection(api, context)
+                handoff = verify_result_handoff(api, page, root, chosen, picker_calls, report_dir)
+                assert not errors, errors
                 report_dir = ROOT / "build/verification"
                 report_dir.mkdir(parents=True, exist_ok=True)
                 page.screenshot(path=str(report_dir / 'workspace.png'), full_page=True)
                 (report_dir / 'workspace.json').write_text(json.dumps({
-                    'passed': True, 'pageErrors': errors,
+                    'passed': True, 'pageErrors': errors, 'resultHandoff': handoff,
                     'checks': ['draft retention', 'restart configuration', 'partial failure', 'retry only failed input',
                                'output dimensions and alpha', 'handoff scoped to target module', '1000-page PDF editing/undo/reorder/export',
                                'two-step workflow via forms', 'pause only blocks new tasks', 'cancel queued task',

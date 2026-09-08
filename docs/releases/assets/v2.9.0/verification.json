@@ -1,0 +1,47 @@
+{
+  "passed": true,
+  "pageErrors": [],
+  "resultHandoff": {
+    "verifiedRoutes": [
+      "image/compress",
+      "image/watermark",
+      "image/rotate",
+      "pdf/merge",
+      "word/merge",
+      "conversion/images-pdf",
+      "conversion/merge-pdf",
+      "conversion/universal",
+      "pdf/compress",
+      "excel/merge",
+      "document/index",
+      "file/archive",
+      "video/compress",
+      "video/cut"
+    ],
+    "unavailableDependencies": [
+      "pdf/ocr"
+    ],
+    "checks": [
+      "mixed selection",
+      "single-file limits",
+      "disabled module",
+      "missing assets",
+      "auxiliary picker isolation",
+      "same-route return",
+      "deduplicated append"
+    ]
+  },
+  "checks": [
+    "draft retention",
+    "restart configuration",
+    "partial failure",
+    "retry only failed input",
+    "output dimensions and alpha",
+    "handoff scoped to target module",
+    "1000-page PDF editing/undo/reorder/export",
+    "two-step workflow via forms",
+    "pause only blocks new tasks",
+    "cancel queued task",
+    "browser collection detail retry without duplicate rows"
+  ]
+}

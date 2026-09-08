@@ -6,7 +6,7 @@
  */
 
 import { ElMessage } from 'element-plus'
-import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
+import { callApi as pyCall, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
 
 /**
  * 创建共享的 Word 调用层。
@@ -72,9 +72,9 @@ export function useWordApi(shared) {
    * 弹出 Word 文件选择对话框，返回后端原始数组（未选择时返回空数组）。
    * @returns {Promise<Array>}
    */
-  const pickDocx = async () => {
+  const pickDocx = async (routeId = '') => {
     if (!ensurePyReady()) return []
-    const result = await callApiRaw('system_pyCreateFileDialog', ['Word 文档 (*.docx)'])
+    const result = await selectInputFiles(routeId, ['Word 文档 (*.docx)'])
     return result && result.length ? result : []
   }
 

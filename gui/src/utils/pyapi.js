@@ -34,7 +34,7 @@
  */
 
 import { beginApiTask, isTaskMethod, settleApiTask, observeTask, hydrateBackendTasks } from './taskCenter'
-import { consumeIncomingFiles, currentIncomingAssets, getDraft } from './workspace'
+import { consumeIncomingFiles, getDraft } from './workspace'
 
 // 轮询兜底间隔（毫秒）与默认超时（毫秒）
 const POLL_INTERVAL = 50
@@ -197,10 +197,19 @@ export async function callApi(method, ...args) {
  */
 export async function callApiRaw(method, ...args) {
   await whenPyReady()
-  if (method === 'system_pyCreateFileDialog' && currentIncomingAssets.value.length) return consumeIncomingFiles()
   const api = window.pywebview.api
   if (typeof api[method] !== 'function') {
     throw new Error(`当前客户端缺少能力：${method}`)
   }
   return api[method](...args)
+}
+
+/**
+ * Primary file inputs opt in to a result handoff.  Auxiliary dialogs must keep
+ * using callApiRaw so watermark/source/output pickers never consume a handoff.
+ */
+export async function selectInputFiles(routeId, ...fileDialogArgs) {
+  const incoming = consumeIncomingFiles(routeId)
+  if (incoming.length) return incoming
+  return callApiRaw('system_pyCreateFileDialog', ...fileDialogArgs)
 }

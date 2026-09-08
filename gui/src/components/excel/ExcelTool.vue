@@ -47,10 +47,10 @@
 </template>
 
 <script setup>
-import { useDraft } from '../../utils/workspace'
+import { mergeFileQueue, useDraft } from '../../utils/workspace'
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
+import { callApi as pyCall, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
 import { useInitialTab } from '@/composables/useInitialTab'
 import ToolWorkspace from '@/components/shared/ToolWorkspace.vue'
 import StructurePanel from './parts/StructurePanel.vue'
@@ -179,7 +179,7 @@ const pushLog = (type, message, action) => {
 
 const selectExcel = async (target, multiple = false) => {
   if (!ensurePyReady()) return
-  const result = await callApiRaw('system_pyCreateFileDialog', excelFilter)
+  const result = target === 'mergeTables' ? await selectInputFiles('excel/merge', excelFilter) : await callApiRaw('system_pyCreateFileDialog', excelFilter)
   if (!result || !result.length) return
   if (target === 'preview') {
     state.preview.file = result[0]
@@ -202,7 +202,7 @@ const selectExcel = async (target, multiple = false) => {
   if (target === 'processMerge') {
     state.process.mergeFiles.push(...mapped)
   } else if (target === 'mergeTables') {
-    state.merge.tables.push(...mapped)
+    state.merge.tables = mergeFileQueue(state.merge.tables, mapped)
   }
 }
 

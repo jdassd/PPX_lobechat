@@ -4,7 +4,7 @@ import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { DocumentChecked, FolderOpened, Picture, Upload } from '@element-plus/icons-vue'
 
-import { callApi, callApiRaw, hasPyApi } from '@/utils/pyapi'
+import { callApi, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
 
 const props = defineProps({
   sourceType: {
@@ -32,7 +32,7 @@ const ensureDesktop = () => {
 const selectFile = async () => {
   if (!ensureDesktop()) return
   try {
-    const files = await callApiRaw('system_pyCreateFileDialog', filter.value)
+    const files = await selectInputFiles(isPdf.value ? 'pdf/ocr' : '', filter.value)
     if (files?.length) form.file = files[0]
   } catch (error) {
     ElMessage.error(error?.message || '选择文件失败')

@@ -1,14 +1,16 @@
 import { computed, reactive, ref, watch } from 'vue'
+import { planResultHandoff } from './resultRouting.mjs'
 
 const drafts = new Map()
 export const draftKeys = ref([])
 export const incomingAssets = ref([])
 export const workspaceTool = ref('home')
-const incomingTool = ref('')
-export const currentIncomingAssets = computed(() => (incomingTool.value === workspaceTool.value ? incomingAssets.value : []))
+const incomingRoute = ref('')
+export const incomingRouteId = computed(() => incomingRoute.value)
+export const currentIncomingAssets = computed(() => (incomingRoute.value.split('/')[0] === workspaceTool.value ? incomingAssets.value : []))
 export function clearIncomingFiles() {
   incomingAssets.value = []
-  incomingTool.value = ''
+  incomingRoute.value = ''
 }
 export function fileIdentity(path) {
   const value = String(path || '')
@@ -27,10 +29,13 @@ export function mergeFileQueue(current, incoming) {
   return result
 }
 
-export function consumeIncomingFiles() {
+export function consumeIncomingFiles(routeId) {
+  // A handoff is intentionally consumed only by its declared primary input.
+  // This prevents hidden/kept-alive panels and auxiliary pickers from stealing it.
+  if (!routeId || routeId !== incomingRoute.value || routeId.split('/')[0] !== workspaceTool.value) return []
   const files = currentIncomingAssets.value.map((asset) => {
     const filename = asset.path.split(/[\\/]/).pop()
-    return { path: asset.path, filename, ext: '.' + filename.split('.').pop(), dir: asset.path.slice(0, -filename.length) }
+    return { path: asset.path, filename, ext: filename.includes('.') ? '.' + filename.split('.').pop() : '', dir: asset.path.slice(0, -filename.length) }
   })
   if (files.length) clearIncomingFiles()
   return files
@@ -89,10 +94,14 @@ export function useDraft(key, defaults) {
 
 export const getDraft = (key) => drafts.get(key)
 export const draftsForTool = (tool) => computed(() => draftKeys.value.filter((key) => key.startsWith(`${tool}/`)))
-export function handoffAssets(assets, tool) {
-  incomingAssets.value = assets.filter((item) => item.kind !== 'directory' && item.exists !== false)
-  incomingTool.value = tool
-  window.dispatchEvent(new CustomEvent('ppx-navigate', { detail: { tool } }))
+export function handoffAssets(assets, routeId) {
+  const plan = planResultHandoff(assets, routeId)
+  if (!plan.acceptedCount || plan.acceptedCount < (plan.route.capability?.minimumAssets || 1)) return false
+  incomingAssets.value = plan.assets.map((asset) => ({ ...asset }))
+  incomingRoute.value = routeId
+  const [tool, feature = ''] = routeId.split('/')
+  window.dispatchEvent(new CustomEvent('ppx-navigate', { detail: { tool, feature } }))
+  return true
 }
 
 // Retired navigation records are removed; this never accesses users' documents.

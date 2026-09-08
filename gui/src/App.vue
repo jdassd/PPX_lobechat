@@ -2,7 +2,8 @@
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watchEffect } from 'vue'
 import WorkspacePresets from './components/shared/WorkspacePresets.vue'
 import ResultActions from './components/shared/ResultActions.vue'
-import { currentIncomingAssets as incomingAssets, clearIncomingFiles, workspaceTool } from './utils/workspace'
+import { currentIncomingAssets as incomingAssets, clearIncomingFiles, incomingRouteId, workspaceTool } from './utils/workspace'
+import { RESULT_ROUTES } from './utils/resultRouting.mjs'
 import { loadOperationCatalog, tasks } from './utils/taskCenter'
 import { List, Moon, Search, SetUp, Sunny } from '@element-plus/icons-vue'
 
@@ -57,6 +58,7 @@ watchEffect(() => {
   workspaceTool.value = active.value
 })
 const activeFeature = ref('')
+const incomingTarget = computed(() => RESULT_ROUTES.find((route) => route.id === incomingRouteId.value))
 const collapsed = ref(localStorage.getItem('ppx-sidebar-collapsed') === '1')
 const cmdOpen = ref(false)
 const theme = ref(localStorage.getItem('ppx-theme') || 'light')
@@ -187,6 +189,7 @@ const onKey = (event) => {
 onMounted(() => window.addEventListener('keydown', onKey))
 onUnmounted(() => window.removeEventListener('keydown', onKey))
 
+let navigationSequence = 0
 const go = (target) => {
   const rawId = typeof target === 'string' ? target : target?.tool || target?.id
   const rawFeature = typeof target === 'object' ? target.feature || '' : ''
@@ -194,8 +197,12 @@ const go = (target) => {
   const id = redirect?.tool || rawId
   if (!id) return
   const feature = redirect?.feature || rawFeature
+  const sequence = ++navigationSequence
   active.value = id
-  activeFeature.value = feature
+  activeFeature.value = ''
+  nextTick(() => {
+    if (sequence === navigationSequence) activeFeature.value = feature
+  })
   if (toolById(id)) pushRecent(id, feature)
 }
 
@@ -233,7 +240,7 @@ const toggleTheme = () => {
       <template #left>
         <div class="logo-area">
           <img class="logo-image" src="/logo.png" alt="" />
-          <span class="logo-label">多功能工具箱 <small>2.8.1</small></span>
+          <span class="logo-label">多功能工具箱 <small>2.9.0</small></span>
         </div>
       </template>
       <template #right>
@@ -273,12 +280,18 @@ const toggleTheme = () => {
         </header>
 
         <div class="tool-content">
-          <el-alert v-if="incomingAssets.length" :title="`已带入 ${incomingAssets.length} 个结果；点击此工具的选择文件按钮即可使用`" type="info" show-icon @close="clearIncomingFiles" />
-          <transition name="view" mode="out-in">
-            <KeepAlive>
-              <component :is="activeView" :key="active" :initial-tab="activeFeature" @open="go" @search="cmdOpen = true" @modules="go('modules')" @tasks="go('tasks')" />
-            </KeepAlive>
-          </transition>
+          <el-alert v-if="incomingAssets.length" class="incoming-notice" :title="`待接收：${incomingAssets.length} 个结果 → ${incomingTarget?.label || activeTool?.name || '下一工具'}`" type="info" show-icon :closable="false">
+            <p>在目标操作中点击“使用上一步结果”或主文件选择按钮。{{ incomingTarget?.capability?.maximumAssets ? '接收将替换当前源文件，其它参数保留。' : '接收会追加到当前队列并去重。' }} 接收后不会自动执行。</p>
+            <el-button text type="primary" size="small" @click="go(incomingTarget)">返回目标操作</el-button>
+            <el-button text size="small" @click="clearIncomingFiles">取消接收</el-button>
+          </el-alert>
+          <div class="active-tool-view">
+            <transition name="view" mode="out-in">
+              <KeepAlive>
+                <component :is="activeView" :key="active" :initial-tab="activeFeature" @open="go" @search="cmdOpen = true" @modules="go('modules')" @tasks="go('tasks')" />
+              </KeepAlive>
+            </transition>
+          </div>
         </div>
       </main>
     </div>
@@ -345,9 +358,19 @@ const toggleTheme = () => {
   margin-left: auto;
 }
 .tool-content {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+.active-tool-view {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.incoming-notice {
+  flex-shrink: 0;
 }
 .logo-area {
   display: flex;

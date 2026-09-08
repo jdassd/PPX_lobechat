@@ -4,7 +4,7 @@
       <h4>合并 Word 文档</h4>
       <p>支持自定义顺序，将多个 .docx 合并为单一文件（保留各文档样式）</p>
     </header>
-    <FileSelector v-model:files="form.files" label="待合并 Word" button-text="添加 Word" description="按队列顺序合并，可拖动排序" @select="selectDocx" />
+    <FileSelector v-model:files="form.files" incoming-route="word/merge" label="待合并 Word" button-text="添加 Word" description="按队列顺序合并，可拖动排序" @select="selectDocx" />
     <el-form label-width="120px" class="mt24">
       <el-form-item label="文档间分页">
         <el-switch v-model="form.pageBreak" />
@@ -52,7 +52,7 @@ const form = useDraft('word/parts/MergePanel/form', {
 })
 
 const selectDocx = async () => {
-  const result = await pickDocx()
+  const result = await pickDocx('word/merge')
   if (!result.length) return
   form.files = mergeFileQueue(form.files, result)
 }

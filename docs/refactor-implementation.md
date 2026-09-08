@@ -83,3 +83,5 @@ pyapp/package/exe/InnoSetup6/ISCC.exe pyapp/package/exe/InnoSetup.iss
 `docs/refactor-acceptance.json` 分别记录待验收项目与用户明确的发布决定。`pyapp/package/verifyRelease.js` 始终校验版本一致性；仅对该明确指定的正式标签允许带 pending 验收项发布，并输出未完成清单。此决定不自动适用于后续版本。
 
 2026-09-07：用户要求将许可说明与非商用倡议文案更新推送标签触发自动发版，本次发布为 v2.8.1。发布决定已更新到验收记录；上述重构验收范围与 pending 状态继续保留。
+
+2026-09-08：用户授权自主推进工具箱设计、实现和优化，并要求集中打 Tag 触发自动发版。本阶段 v2.9.0 实现 15 个结果接力目标、精确主输入接收及本地字体启动，设计与验收范围见 [工具箱设计方案](toolbox-design.md)和 [v2.9.0 发布说明](releases/v2.9.0.md)。本次发布决定单独记录，旧的完整人工验收继续保持 pending。

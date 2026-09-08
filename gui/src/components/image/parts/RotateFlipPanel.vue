@@ -6,7 +6,7 @@ import { ElMessage } from 'element-plus'
 
 import FileSelector from '@/components/shared/FileSelector.vue'
 import ResultTable from '@/components/shared/ResultTable.vue'
-import { callApi, callApiRaw, hasPyApi } from '@/utils/pyapi'
+import { callApi, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
 
 const props = defineProps({ supportedFormats: { type: Object, required: true } })
 const loading = ref(false)
@@ -19,7 +19,7 @@ const ensureReady = () => {
 }
 const selectFiles = async () => {
   if (!ensureReady()) return
-  const files = await callApiRaw('system_pyCreateFileDialog', props.supportedFormats.imageFilter)
+  const files = await selectInputFiles('image/rotate', props.supportedFormats.imageFilter)
   if (files?.length) form.files = mergeFileQueue(form.files, files)
 }
 const selectDir = async () => {
@@ -65,7 +65,7 @@ const openPath = (path) => path && callApiRaw('system_pyOpenFile', path)
       <h4>旋转与翻转</h4>
       <p>批量旋转、镜像或按自定义角度翻转图片</p>
     </header>
-    <FileSelector label="待处理图片" v-model:files="form.files" removable @select="selectFiles" @remove="removeFile" />
+    <FileSelector label="待处理图片" v-model:files="form.files" incoming-route="image/rotate" removable @select="selectFiles" @remove="removeFile" />
     <el-form :model="form" label-width="120px" class="form-block">
       <el-form-item label="处理方式">
         <el-select v-model="form.operation" style="width: 240px"> <el-option label="顺时针 90°" value="rotate90" /><el-option label="旋转 180°" value="rotate180" /><el-option label="旋转 270°" value="rotate270" /> <el-option label="水平镜像" value="mirror" /><el-option label="垂直翻转" value="flip" /><el-option label="自定义" value="custom" /> </el-select>

@@ -25,7 +25,7 @@
  */
 
 import { ElMessage } from 'element-plus'
-import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
+import { callApi as pyCall, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
 
 /**
  * 创建共享的 PDF 调用层。
@@ -92,9 +92,9 @@ export function usePdfApi(shared) {
    * 弹出 PDF 文件选择对话框，返回后端原始数组（未选择时返回空数组）。
    * @returns {Promise<Array>}
    */
-  const pickPdf = async () => {
+  const pickPdf = async (routeId = '') => {
     if (!ensurePyReady()) return []
-    const result = await callApiRaw('system_pyCreateFileDialog', ['PDF 文件 (*.pdf)'])
+    const result = await selectInputFiles(routeId, ['PDF 文件 (*.pdf)'])
     return result && result.length ? result : []
   }
 
@@ -104,9 +104,7 @@ export function usePdfApi(shared) {
    */
   const pickImages = async () => {
     if (!ensurePyReady()) return []
-    const files = await callApiRaw('system_pyCreateFileDialog', [
-      '图片 (*.png;*.jpg;*.jpeg;*.webp;*.bmp)'
-    ])
+    const files = await callApiRaw('system_pyCreateFileDialog', ['图片 (*.png;*.jpg;*.jpeg;*.webp;*.bmp)'])
     return files?.length ? files : []
   }
 

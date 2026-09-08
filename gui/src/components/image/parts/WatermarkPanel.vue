@@ -3,7 +3,7 @@ import ImageEffectPreview from '../../shared/ImageEffectPreview.vue'
 import { mergeFileQueue, useDraft } from '../../../utils/workspace'
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
+import { callApi as pyCall, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
 
 import FileSelector from '../../shared/FileSelector.vue'
 import ResultTable from '../../shared/ResultTable.vue'
@@ -45,7 +45,7 @@ const ensurePyReady = () => {
 
 const selectImages = async () => {
   if (!ensurePyReady()) return
-  const files = await callApiRaw('system_pyCreateFileDialog', props.supportedFormats.imageFilter)
+  const files = await selectInputFiles('image/watermark', props.supportedFormats.imageFilter)
   if (files?.length) {
     form.files = mergeFileQueue(form.files, files)
   }
@@ -147,7 +147,7 @@ const runWatermark = async () => {
       <h4>批量添加水印</h4>
       <p>支持文字与图片水印，九宫格定位与透明度控制</p>
     </header>
-    <FileSelector label="待处理图片" v-model:files="form.files" :removable="true" @select="selectImages" @remove="removeFile" />
+    <FileSelector label="待处理图片" v-model:files="form.files" incoming-route="image/watermark" :removable="true" @select="selectImages" @remove="removeFile" />
     <el-form :model="form" label-width="110px" class="form-block">
       <el-form-item label="水印类型">
         <el-radio-group v-model="form.watermarkType">

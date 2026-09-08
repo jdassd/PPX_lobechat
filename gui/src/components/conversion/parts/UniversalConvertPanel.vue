@@ -4,7 +4,7 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ArrowRight, Delete, FolderOpened, Loading, Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
-import { callApi, callApiRaw, hasPyApi } from '@/utils/pyapi'
+import { callApi, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
 import ConversionFileQueue from './ConversionFileQueue.vue'
 
 const props = defineProps({ engine: { type: Object, required: true } })
@@ -209,7 +209,7 @@ const selectFiles = async () => {
     ElMessage.warning('该功能需在 PPX 桌面客户端中使用')
     return
   }
-  const picked = await callApiRaw('system_pyCreateFileDialog', FILE_FILTER)
+  const picked = await selectInputFiles('conversion/universal', FILE_FILTER)
   if (picked?.length) await addFiles(picked)
 }
 

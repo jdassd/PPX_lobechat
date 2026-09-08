@@ -1,8 +1,8 @@
 <script setup>
-import { useDraft } from '../../../utils/workspace'
+import { mergeFileQueue, useDraft } from '../../../utils/workspace'
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
+import { callApi as pyCall, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
 
 import ResultTable from '../../shared/ResultTable.vue'
 
@@ -63,9 +63,12 @@ const selectArchiveFile = async () => {
 
 const addArchiveFiles = async () => {
   if (!ensurePyReady()) return
-  const files = await callApiRaw('system_pyCreateFileDialog', ['全部文件 (*.*)'])
+  const files = await selectInputFiles('file/archive', ['全部文件 (*.*)'])
   if (files?.length) {
-    archive.items.push(...files.map((file) => ({ ...file, type: 'file' })))
+    archive.items = mergeFileQueue(
+      archive.items,
+      files.map((file) => ({ ...file, type: 'file' }))
+    )
   }
 }
 

@@ -2,8 +2,7 @@
    深空玻璃主题 - Atelier Paper Theme
    ======================================== */
 
-/* 引入阿里字体图标 */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@500;600;700&display=swap');
+/* 字体使用本机回退；图标随应用打包，启动不依赖远程字体服务。 */
 @import "./iconfont/iconfont.css";
 
 /* ========================================

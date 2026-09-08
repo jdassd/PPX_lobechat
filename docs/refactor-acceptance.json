@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "version": "2.8.1",
+  "version": "2.9.0",
   "note": "发布决定与验收状态分开记录；未验证项目保持 pending，不因发版改为 passed。",
   "release": {
-    "tag": "v2.8.1",
+    "tag": "v2.9.0",
     "allowPendingAcceptance": true,
-    "reason": "用户明确要求将本次许可说明与非商用倡议文案更新推送标签触发自动发版，本次发布为 v2.8.1；沿用 v2.8.0 的未完成验收项，发布说明继续披露，不将其标记为通过。"
+    "reason": "用户本次授权自主设计、实现与优化工具箱，并要求集中打 Tag 触发 GitHub 自动发版；本阶段以 v2.9.0 发布结果接力及本地启动优化。旧重构的三平台安装、升级、恢复和完整人工验收仍为 pending；本轮自动验证范围在 docs/releases/v2.9.0.md 单独记录，不将未验证项目标记为通过。"
   },
   "phases": {
     "1": { "status": "pending", "evidence": "" },

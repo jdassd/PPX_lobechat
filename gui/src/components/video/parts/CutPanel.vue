@@ -3,7 +3,7 @@ import VideoInspection from '../../shared/VideoInspection.vue'
 import { useDraft } from '../../../utils/workspace'
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { callApi as pyCall, callApiRaw, hasPyApi } from '@/utils/pyapi'
+import { callApi as pyCall, callApiRaw, hasPyApi, selectInputFiles } from '@/utils/pyapi'
 
 const videoFilter = ['视频文件 (*.mp4;*.mov;*.avi;*.mkv;*.webm)']
 
@@ -167,7 +167,7 @@ const loadVideoPreview = async () => {
 
 const selectVideo = async () => {
   if (!ensurePyReady()) return
-  const result = await callApiRaw('system_pyCreateFileDialog', videoFilter)
+  const result = await selectInputFiles('video/cut', videoFilter)
   if (result?.length) {
     form.file = result[0]
     form.previewUrl = ''

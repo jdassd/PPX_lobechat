@@ -83,7 +83,7 @@ const compressCurrentDpi = computed(() => {
 })
 
 const selectPdf = async () => {
-  const result = await pickPdf()
+  const result = await pickPdf('pdf/compress')
   if (!result.length) return
   form.file = result[0]
 }

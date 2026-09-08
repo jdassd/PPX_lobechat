@@ -4,7 +4,7 @@
       <h4>将多个 PDF 合并</h4>
       <p>支持自定义顺序，生成单一归档文件</p>
     </header>
-    <FileSelector v-model:files="form.files" label="待合并 PDF" button-text="添加 PDF" description="按队列顺序合并；页码留空表示全部页面" @select="selectPdf">
+    <FileSelector v-model:files="form.files" incoming-route="pdf/merge" label="待合并 PDF" button-text="添加 PDF" description="按队列顺序合并；页码留空表示全部页面" @select="selectPdf">
       <template #options="{ file }">
         <el-input v-model="file.pageSpec" size="small" placeholder="页码：1-3,5,8" :aria-label="file.filename + ' 页码'" style="width: 180px" />
       </template>
@@ -53,7 +53,7 @@ const form = useDraft('pdf/parts/MergePanel/form', {
 })
 
 const selectPdf = async () => {
-  const result = await pickPdf()
+  const result = await pickPdf('pdf/merge')
   if (!result.length) return
   form.files = mergeFileQueue(
     form.files,
