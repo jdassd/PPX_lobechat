@@ -38,7 +38,7 @@ class FileSearchTests(unittest.TestCase):
         self.assertEqual([item['path'] for item in result['items']], [str(wanted.resolve())])
         self.assertEqual(result['items'][0]['relativePath'], 'Report[1].TXT')
         all_paths = {item['path'] for item in self.search(extensions=['txt'])['items']}
-        self.assertEqual(all_paths, {str(wanted), str(self.root / 'Report1.txt'), str(hidden), str(ignored_by_git)})
+        self.assertEqual(all_paths, {str(path.resolve()) for path in (wanted, self.root / 'Report1.txt', hidden, ignored_by_git)})
 
     def test_non_recursive_search_does_not_visit_nested_matches(self):
         wanted = self.make('top.txt')
