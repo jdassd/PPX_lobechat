@@ -1,0 +1,55 @@
+{
+  "tag": "v2.16.0",
+  "commit": "ea9fb3e5f4d49691982611df1c8f8de4e26eaae7",
+  "verifiedAt": "2026-09-08T17:50:09.749411+00:00",
+  "releaseUrl": "https://github.com/jdassd/PPX_lobechat/releases/tag/v2.16.0",
+  "assets": [
+    {
+      "name": "-V2.16.0_Linux.deb",
+      "bytes": 422715194,
+      "sha256": "f75c8b7712ce5d9ba0f9f4e9aa9f0b77f06a8c6546f9c2bdd95ba52f5825f75d",
+      "downloadVerified": true,
+      "format": "Debian package",
+      "version": "2.16.0",
+      "architecture": "amd64",
+      "postinstMatchesTag": true,
+      "postinstMode": "0o755",
+      "postinstSha256": "313cfdcd3caaee820719fdfb7226d36e761364482438b70f86737963e2a56c67"
+    },
+    {
+      "name": "-v2.16.0_macOS.dmg",
+      "bytes": 324824707,
+      "sha256": "7784a626ed964dee79ebbb340821b5dfee5f41de3eedd8ab6d46600652cb66ab",
+      "downloadVerified": true,
+      "format": "UDIF disk image",
+      "trailerVersion": 4,
+      "mountedApplicationVersion": "not checked"
+    },
+    {
+      "name": "-V2.16.0_Windows.exe",
+      "bytes": 243025463,
+      "sha256": "ea17a6cf63b89e97679f10eaafa7b6d24dc6773851660c6d72107e88d5a208d5",
+      "downloadVerified": true,
+      "format": "PE installer",
+      "fileVersion": "2.16.0.0",
+      "fixedFileVersionMatchesTag": true,
+      "versionStrings": {
+        "Comments": "This installation was built with Inno Setup.",
+        "CompanyName": "Jdassd                                                      ",
+        "FileDescription": "多功能工具箱 Setup                                                ",
+        "FileVersion": "2.16.0              ",
+        "LegalCopyright": "                                                                                                    ",
+        "OriginalFileName": "                                                  ",
+        "ProductName": "多功能工具箱                                                      ",
+        "ProductVersion": "2.16.0                                            "
+      },
+      "machine": 332,
+      "productVersion": "2.16.0",
+      "productVersionMatchesTag": true
+    }
+  ],
+  "errors": [],
+  "passed": true,
+  "releaseBodyMatchesAnnotation": true,
+  "nativeInstallAcceptance": "pending"
+}

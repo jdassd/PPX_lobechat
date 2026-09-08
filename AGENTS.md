@@ -20,8 +20,14 @@
 - Keep file and component names consistent with existing modules; avoid introducing new naming patterns.
 
 ## Testing Guidelines
-- No dedicated test framework or test directory is configured.
-- If you add tests, document the runner and provide a `pnpm` script for it.
+- `pnpm run test` runs Python unittest cases in `tests/`; `pnpm run test:gui` runs frontend contract checks.
+- `pnpm run test:e2e` builds the frontend and verifies complete workflows with Playwright and the real Python API.
+- Run checks appropriate to the change. Native installation, upgrade and restore acceptance is tracked separately in `docs/refactor-acceptance.json`.
+
+## 后续产品方向
+- 用户于 2026-09-09 明确要求：后续版本重点剔除没用的功能，增加实用功能。以减少实际操作和提高批处理可靠性为标准，不以功能数量为目标。
+- 先合并重复入口、删除无调用或已被替代的实现，再扩展已有主流程；删除时保持旧工作流迁移和历史可读，不清除用户数据。
+- 优先级和候选取舍见 `docs/toolbox-function-priorities.md`；整体契约见 `docs/toolbox-design.md`，实际发布状态见 `docs/toolbox-iterations.md`。
 
 ## Commit & Pull Request Guidelines
 - Recent commits are short, imperative summaries (often in Chinese). Keep messages concise and focused.

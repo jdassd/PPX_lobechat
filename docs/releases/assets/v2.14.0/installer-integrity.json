@@ -1,0 +1,52 @@
+{
+  "tag": "v2.14.0",
+  "commit": "a11d440ea405782581ffa7fa5d7f66cde1480baf",
+  "verifiedAt": "2026-09-08T17:29:55.891707+00:00",
+  "releaseUrl": "https://github.com/jdassd/PPX_lobechat/releases/tag/v2.14.0",
+  "assets": [
+    {
+      "name": "-V2.14.0_Linux.deb",
+      "bytes": 422700960,
+      "sha256": "ec3750d3f90d8eef86bad345b8c12f11055beb7c94bae17c81bda3d16f5d3517",
+      "downloadVerified": true,
+      "format": "Debian package",
+      "version": "2.14.0",
+      "architecture": "all"
+    },
+    {
+      "name": "-v2.14.0_macOS.dmg",
+      "bytes": 324836594,
+      "sha256": "4638c1c4181a800a448da3e8d70c152f7779ed977b4235df8b64dc91eb0227cc",
+      "downloadVerified": true,
+      "format": "UDIF disk image",
+      "trailerVersion": 4,
+      "mountedApplicationVersion": "not checked"
+    },
+    {
+      "name": "-V2.14.0_Windows.exe",
+      "bytes": 243029919,
+      "sha256": "f36b8a38a2f7e42ed77c43b3d83108a4e48295416055f1a6d7ed737496cd753c",
+      "downloadVerified": true,
+      "format": "PE installer",
+      "fileVersion": "0.0.0.0",
+      "fixedFileVersionMatchesTag": false,
+      "versionStrings": {
+        "Comments": "This installation was built with Inno Setup.",
+        "CompanyName": "Jdassd                                                      ",
+        "FileDescription": "多功能工具箱 Setup                                                ",
+        "FileVersion": "                    ",
+        "LegalCopyright": "                                                                                                    ",
+        "OriginalFileName": "                                                  ",
+        "ProductName": "多功能工具箱                                                      ",
+        "ProductVersion": "2.14.0                                            "
+      },
+      "machine": 332,
+      "productVersion": "2.14.0",
+      "productVersionMatchesTag": true
+    }
+  ],
+  "errors": [],
+  "passed": true,
+  "releaseBodyMatchesAnnotation": true,
+  "nativeInstallAcceptance": "pending"
+}

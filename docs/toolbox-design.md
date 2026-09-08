@@ -236,6 +236,8 @@ inputOrigin: { inputPath, sourceTaskId, sourceAssetPath, sourceMethod, sourceCre
 
 ## 7. 迭代检查与扩展方向
 
+2026-09-09 用户补充：后续版本重点剔除没用的功能，增加实用功能。后续以[功能取舍路线图](toolbox-function-priorities.md)为优先依据：先收敛重复入口与不相关推荐，再补齐失败项修正、逐文件核对等现有链路的缺口；下列远期扩展不优先于该方向。
+
 后续每轮新增接力或模块时，按以下检查：是否已有同类入口；接收的主输入是否明确；多文件语义是否安全；依赖、错误和撤销是否可解释；是否可由现有 operation/task/output 复用；是否会让用户误以为已自动执行。
 
 可扩展方向：
