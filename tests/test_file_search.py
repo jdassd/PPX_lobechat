@@ -35,7 +35,7 @@ class FileSearchTests(unittest.TestCase):
         ignored_by_git = self.make('ignored/report.txt')
         self.make('.gitignore', 'ignored/')
         result = self.search(keyword='REPORT[1]', extensions=['txt'])
-        self.assertEqual([item['path'] for item in result['items']], [str(wanted)])
+        self.assertEqual([item['path'] for item in result['items']], [str(wanted.resolve())])
         self.assertEqual(result['items'][0]['relativePath'], 'Report[1].TXT')
         all_paths = {item['path'] for item in self.search(extensions=['txt'])['items']}
         self.assertEqual(all_paths, {str(wanted), str(self.root / 'Report1.txt'), str(hidden), str(ignored_by_git)})
@@ -45,7 +45,7 @@ class FileSearchTests(unittest.TestCase):
         self.make('child/nested.txt')
         result = self.search(recursive=False)
         self.assertTrue(result['complete'])
-        self.assertEqual([item['path'] for item in result['items']], [str(wanted)])
+        self.assertEqual([item['path'] for item in result['items']], [str(wanted.resolve())])
 
     def test_limit_is_applied_after_filters_and_exact_boundary_is_complete(self):
         for index in range(55):
