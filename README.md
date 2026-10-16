@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Vue-3.0+-4FC08D?style=flat-square&logo=vue.js&logoColor=white" alt="Vue 3" />
   <img src="https://img.shields.io/badge/Python-3.10-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.10" />
   <img src="https://img.shields.io/badge/Pywebview-5.0+-FFD43B?style=flat-square&logo=python&logoColor=blue" alt="Pywebview" />
-  <img src="https://img.shields.io/badge/version-2.16.0-2b6fff?style=flat-square" alt="Version 2.16.0" />
+  <img src="https://img.shields.io/badge/version-2.17.0-2b6fff?style=flat-square" alt="Version 2.17.0" />
   <img src="https://img.shields.io/badge/License-AGPL--3.0-green?style=flat-square" alt="License" />
 </p>
 
@@ -20,17 +20,17 @@
 
 ## 📖 简介
 
-**PPX 2.16.0** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
+**PPX 2.17.0** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
 
-2.16 补齐“重复文件扫描 → 核对报告”：先筛选同大小候选再比较内容，明确区分同名文件与相同内容、扫描是否完整，以及硬链接别名。扫描进入可取消的任务队列，结果可导出为 Excel 快照，并继续交给表格工具或归档，复用已有 18 个文件结果接力目标。
+2.17 修正小图水印定位和首页收藏键盘误导航，改善文本工具窄窗口布局与结果区主题，补齐 PDF、Word、图片和转换中心的真实文件回归，并将模块导航与文本交互检查接入自动发版流程。
 
-更新内容与验收范围见 [v2.16.0 发布说明](docs/releases/v2.16.0.md)。
+更新内容与验收范围见 [v2.17.0 发布说明](docs/releases/v2.17.0.md)。
 
 定位、目标用户、14 个模块的输入输出与异常设计、协作流程、优先级和扩展边界见 [统一工具箱设计方案](docs/toolbox-design.md)。
 
 ## ✨ 主要功能
 
-PPX 2.16.0 的核心能力包括：
+PPX 2.17.0 的核心能力包括：
 
 ### 📄 文档与数据
 
@@ -127,7 +127,7 @@ pnpm run test
 # 文件兼容、单文件限制、路径去重等接力规则（Node.js 内置测试）
 pnpm run test:gui
 
-# 浏览器 → 本机 API → 真实输出，以及 15 个接力目标的接收/依赖边界
+# 浏览器 → 本机 API → 真实输出、18 个接力目标、模块导航和文本/收藏交互
 pnpm run test:e2e
 ```
 

@@ -217,20 +217,24 @@ class ImageTool:
         width, height = base_size
         mark_w, mark_h = overlay_size
         pos = (position or 'bottom-right').lower()
+        max_x = max(0, width - mark_w)
+        max_y = max(0, height - mark_h)
+        inset_x = min(max(0, margin), max_x)
+        inset_y = min(max(0, margin), max_y)
 
         if 'left' in pos:
-            x = margin
+            x = inset_x
         elif 'right' in pos:
-            x = max(margin, width - mark_w - margin)
+            x = max(0, width - mark_w - margin)
         else:
-            x = max(margin, (width - mark_w) // 2)
+            x = min(max_x, max(0, (width - mark_w) // 2))
 
         if 'top' in pos:
-            y = margin
+            y = inset_y
         elif 'bottom' in pos:
-            y = max(margin, height - mark_h - margin)
+            y = max(0, height - mark_h - margin)
         else:
-            y = max(margin, (height - mark_h) // 2)
+            y = min(max_y, max(0, (height - mark_h) // 2))
         return x, y
 
     def _ensure_single_file(self, options: Dict) -> Path:

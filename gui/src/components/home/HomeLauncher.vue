@@ -63,16 +63,18 @@ const toggleActionFavorite = (action) => toggleFavorite(actionKey(action))
       <section class="section">
         <div class="section-head"><span>常用动作</span><small>直接进入具体步骤</small></div>
         <div class="action-grid">
-          <article v-for="action in featured" :key="`${action.tool}-${action.id}`" class="action-card" :style="{ '--hue': action.hue }" role="button" tabindex="0" @click="openAction(action)" @keydown.enter="openAction(action)">
-            <span class="action-icon"
-              ><el-icon :size="19"><component :is="action.icon" /></el-icon
-            ></span>
-            <span class="action-meta"
-              ><b>{{ action.label }}</b
-              ><small>{{ action.toolName }}</small></span
-            >
-            <el-icon class="arrow"><ArrowRight /></el-icon>
-            <button class="favorite-toggle" :class="{ active: isActionFavorite(action) }" type="button" :title="isActionFavorite(action) ? '取消收藏' : '收藏动作'" @click.stop="toggleActionFavorite(action)">
+          <article v-for="action in featured" :key="`${action.tool}-${action.id}`" class="action-card" :style="{ '--hue': action.hue }">
+            <button class="action-open" type="button" @click="openAction(action)">
+              <span class="action-icon"
+                ><el-icon :size="19"><component :is="action.icon" /></el-icon
+              ></span>
+              <span class="action-meta"
+                ><b>{{ action.label }}</b
+                ><small>{{ action.toolName }}</small></span
+              >
+              <el-icon class="arrow"><ArrowRight /></el-icon>
+            </button>
+            <button class="favorite-toggle" :class="{ active: isActionFavorite(action) }" type="button" :title="isActionFavorite(action) ? '取消收藏' : '收藏动作'" :aria-label="`${isActionFavorite(action) ? '取消收藏' : '收藏'}${action.label}`" @click="toggleActionFavorite(action)">
               <el-icon><StarFilled v-if="isActionFavorite(action)" /><Star v-else /></el-icon>
             </button>
           </article>
@@ -259,18 +261,34 @@ kbd {
 }
 .action-card {
   position: relative;
-  display: flex;
-  align-items: center;
-  gap: 10px;
   min-width: 0;
-  padding: 12px;
   border: 1px solid var(--ppx-glass-border);
   border-radius: 12px;
   background: var(--ppx-bg-surface);
   color: var(--ppx-text-primary);
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+.action-open {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 12px 38px 12px 12px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
   cursor: pointer;
   text-align: left;
-  transition: 0.18s ease;
+  font: inherit;
+  transition: transform 0.18s ease;
+}
+.action-open:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--hue) 58%, transparent);
+  outline-offset: -2px;
 }
 .favorite-toggle {
   position: absolute;
@@ -332,9 +350,11 @@ kbd {
   font-size: 10px;
 }
 .action-card:hover {
-  transform: translateY(-2px);
   border-color: var(--hue);
   box-shadow: var(--ppx-shadow-sm);
+}
+.action-card:hover .action-open {
+  transform: translateY(-2px);
 }
 .action-icon {
   width: 36px;

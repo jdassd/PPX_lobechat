@@ -1,0 +1,292 @@
+{
+  "version": "2.17.0",
+  "verifiedAt": "2026-10-16T15:15:11.730273+08:00",
+  "environment": "Windows x64; local development runtime; native acceptance separate",
+  "sourceRevision": "e561daf7470839d73d12e115b39703185e5c64b5",
+  "sourceState": "base revision plus release working tree; content hashes below",
+  "sourceSha256": {
+    "api/image.py": "6c3470ff55aabd44ae60f589d935edf2998cee83c03b97686681bdecae0313bf",
+    "gui/src/components/home/HomeLauncher.vue": "ea78bd3c1075a7b91bfbd940f0cc16ef56ebd8bcfbf8c30b6da1a8e6433c7ac9",
+    "gui/src/components/shared/PreviewPanel.vue": "9feb3d4a413335e99b6bdbac0987d2a804aca64a40c6a397c8dbe2e43aeae982",
+    "tests/test_real_operations.py": "2bc410ee88860349abe33db47eddf82bb6d8fcff83fd718d9a44ea4a23109150",
+    "tests/e2e/visual_sweep.py": "ce9d528ce6eed384329cbd146f22b24e37197741bca4c39316fdb943603784f9"
+  },
+  "python": {
+    "passed": 158,
+    "failed": 0,
+    "skipped": 0,
+    "command": "pnpm run test",
+    "realOperationCases": 9
+  },
+  "frontend": {
+    "passed": 25,
+    "failed": 0,
+    "command": "pnpm run test:gui"
+  },
+  "lint": {
+    "passed": true,
+    "errors": 0,
+    "existingWarnings": 147,
+    "command": "pnpm run lint"
+  },
+  "productionBuild": {
+    "passed": true,
+    "command": "pnpm run test:e2e (includes Vite production build)"
+  },
+  "browser": {
+    "passed": true,
+    "pageErrors": [],
+    "resultHandoff": {
+      "verifiedRoutes": [
+        "image/compress",
+        "image/watermark",
+        "image/rotate",
+        "pdf/merge",
+        "word/merge",
+        "conversion/images-pdf",
+        "conversion/merge-pdf",
+        "conversion/universal",
+        "pdf/compress",
+        "excel/merge",
+        "excel/profile",
+        "excel/process",
+        "excel/split",
+        "document/index",
+        "file/archive",
+        "video/compress",
+        "video/cut"
+      ],
+      "unavailableDependencies": [
+        "pdf/ocr"
+      ],
+      "checks": [
+        "mixed selection",
+        "single-file limits",
+        "disabled module",
+        "missing assets",
+        "auxiliary picker isolation",
+        "same-route return",
+        "deduplicated append"
+      ]
+    },
+    "excel": {
+      "passed": true,
+      "checks": [
+        "header row 2",
+        "typed date sort",
+        "trim and deduplicate preview/export parity",
+        "source unchanged",
+        "file switch clears results and preserves directory",
+        "corrupt file error",
+        "slow A cannot overwrite B",
+        "quality retains original 3 rows",
+        "quality report generated",
+        "split into two groups",
+        "980x760 light/dark action bounds"
+      ]
+    },
+    "inputOrigins": {
+      "passed": true,
+      "chains": [
+        "image compression → rotation",
+        "image parent dialog → compression",
+        "Excel → profile → quality report",
+        "file copy → document index"
+      ],
+      "checks": [
+        "receive and preview never execute",
+        "precise parent and path",
+        "business args exclude lineage",
+        "same-path native replacement clears lineage",
+        "auxiliary watermark picker does not consume or supply main origin",
+        "workspace drafts exclude origin metadata",
+        "remove then local selection clears lineage",
+        "filtered parent lookup and back",
+        "parent handoff closes origins dialog",
+        "removed parent keeps relation",
+        "980×760 light/dark no overflow"
+      ],
+      "taskIds": [
+        "bfbdf957d866426aaf1e425a03788ed9",
+        "6d3a3f6c07cd42099fe03d4a71d9fe06",
+        "d1f1823a3a584c429e4b7503b2430483",
+        "c813583bd79f44feb6b1bf881feac4f4"
+      ]
+    },
+    "templates": {
+      "passed": true,
+      "checks": [
+        "template UI input and immediate save",
+        "paths field references outputPaths",
+        "image copy ZIP and source unchanged",
+        "invalid JSON blocks run",
+        "history per-step result handoff preserves queue task origin",
+        "Excel header row 2 clean copy then header row 1 report",
+        "partial completion stops archive and keeps outputs",
+        "task-center retry restores complete archive without rewriting success",
+        "980x760 light/dark no horizontal overflow"
+      ],
+      "runs": [
+        "25a9507d18594b4997cdb2804df2558a",
+        "13350a239960404db37fd7ad211d0365",
+        "585772fe06664c37b3ccf4c8d37f4021",
+        "13afc6129b234bd882d8d7ceeb14a469"
+      ]
+    },
+    "preflight": {
+      "passed": true,
+      "checks": [
+        "read-only checks never save or queue",
+        "invalid input and self-reference block run",
+        "error location focuses runtime input",
+        "known inputs and deferred prior output",
+        "stale response discarded after queued input event",
+        "API errors never queue",
+        "null JSON does not crash and switching clears stale form error",
+        "file counts and 980x760 light/dark layout",
+        "real two-file ZIP after successful check",
+        "new workflow checks saves and runs in one action"
+      ]
+    },
+    "workflowResults": {
+      "passed": true,
+      "checks": [
+        "typed result field picker writes real result binding",
+        "incompatible file results absent for text",
+        "real text cleaning and format template",
+        "data previews render only after opening",
+        "zero false empty and long data remain distinct",
+        "preview is limited while copy uses full value",
+        "clipboard payload and failure feedback checked with browser-local stub",
+        "invalid JSON rules block queue instead of running old rules",
+        "JSON query path uses text input",
+        "980x760 result picker and light/dark data views"
+      ]
+    },
+    "searchArchive": {
+      "passed": true,
+      "checks": [
+        "literal keyword and case-insensitive extension with real files",
+        "nonrecursive empty result",
+        "search and reviewed file handoff never auto-execute",
+        "manual archive retains layout and ignores hidden 7Z password in ZIP mode",
+        "real search template ZIP preserves both same-named files and bytes",
+        "51 matches with limit 50 stop before archive",
+        "standalone truncation warning and stale result clearing",
+        "980x760 light/dark search results and workflow stop evidence"
+      ]
+    },
+    "duplicateReview": {
+      "passed": true,
+      "checks": [
+        "real scan enters persistent task queue and skips unique-size hashing",
+        "name mode never claims duplicate bytes; mode changes clear old results",
+        "real workbook snapshot preserves sources and connects to Excel tools",
+        "template binds groups and summary and creates actual workbook",
+        "partial query retry clears old matches and regenerates the dependent report with visible reason",
+        "100-file cap is explicit and partial workbook is labelled",
+        "large group renders only 20 files per page; empty and stale states",
+        "980x760 light/dark and partial review evidence"
+      ]
+    },
+    "checks": [
+      "draft retention",
+      "restart configuration",
+      "partial failure",
+      "retry only failed input",
+      "output dimensions and alpha",
+      "handoff scoped to target module",
+      "1000-page PDF editing/undo/reorder/export",
+      "two-step workflow via forms",
+      "pause only blocks new tasks",
+      "cancel queued task",
+      "browser collection detail retry without duplicate rows",
+      "built-in workflow templates and history result actions"
+    ]
+  },
+  "visualAndText": {
+    "passed": true,
+    "revision": "e561daf7470839d73d12e115b39703185e5c64b5",
+    "visuals": [
+      {
+        "file": "home-desktop-light.png",
+        "width": 1440,
+        "height": 1000,
+        "theme": "light"
+      },
+      {
+        "file": "home-desktop-dark.png",
+        "width": 1440,
+        "height": 1000,
+        "theme": "dark"
+      },
+      {
+        "file": "home-narrow-light.png",
+        "width": 900,
+        "height": 760,
+        "theme": "light"
+      },
+      {
+        "file": "home-narrow-dark.png",
+        "width": 900,
+        "height": 760,
+        "theme": "dark"
+      },
+      {
+        "file": "text-tools-narrow-light.png",
+        "width": 900,
+        "height": 760,
+        "theme": "light"
+      },
+      {
+        "file": "text-tools-narrow-dark.png",
+        "width": 900,
+        "height": 760,
+        "theme": "dark"
+      }
+    ],
+    "favoriteKeyboard": "toggles without navigating",
+    "textWorkflows": [
+      "JSON format and invalid JSON feedback",
+      "case transform",
+      "deduplicate and statistics",
+      "literal replacement and invalid regex feedback"
+    ],
+    "navigationSmoke": [
+      "转换中心",
+      "图片处理",
+      "PDF 工具",
+      "Word 工具",
+      "Excel 工具",
+      "文档中心",
+      "文件批处理",
+      "自动化工作流",
+      "网页数据采集",
+      "文本工具",
+      "视频处理",
+      "印章图片生成",
+      "设置与维护",
+      "系统诊断（高级）"
+    ],
+    "pageErrors": []
+  },
+  "videoRealProcessing": {
+    "passed": true,
+    "checks": [
+      "compress",
+      "cut",
+      "extract WAV audio",
+      "concat",
+      "stream types and duration",
+      "invalid cut range"
+    ],
+    "fixture": "2-second 160x120 H.264/AAC generated in temporary directory"
+  },
+  "releaseGate": "passed using explicit 2026-10-16 release authorization; pending native acceptance preserved",
+  "limitations": [
+    "Module navigation is smoke coverage, not every leaf operation or parameter combination.",
+    "Local LibreOffice and OCR runtime missing: real OCR and dependent conversions not accepted.",
+    "Native installation, upgrade, restore, clipboard permissions and file dialogs pending.",
+    "Cross-platform test and packaging results are produced by the tag workflow."
+  ]
+}

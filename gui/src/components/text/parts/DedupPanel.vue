@@ -129,4 +129,27 @@ const runDedup = async () => {
 .stats-panel {
   margin-top: 16px;
 }
+
+@media (max-width: 1100px) {
+  .text-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas: 'input output' 'action action';
+  }
+  .text-grid > :first-child {
+    grid-area: input;
+  }
+  .text-grid-actions {
+    grid-area: action;
+    padding: 2px 0;
+  }
+  .text-grid > :last-child {
+    grid-area: output;
+  }
+}
+@media (max-width: 520px) {
+  .text-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'input' 'action' 'output';
+  }
+}
 </style>

@@ -1,5 +1,6 @@
 <script setup>
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watchEffect } from 'vue'
+import { version as appVersion } from '../package.json'
 import WorkspacePresets from './components/shared/WorkspacePresets.vue'
 import ResultActions from './components/shared/ResultActions.vue'
 import { currentIncomingAssets as incomingAssets, clearIncomingFiles, incomingRouteId, workspaceTool } from './utils/workspace'
@@ -240,7 +241,9 @@ const toggleTheme = () => {
       <template #left>
         <div class="logo-area">
           <img class="logo-image" src="/logo.png" alt="" />
-          <span class="logo-label">多功能工具箱 <small>2.16.0</small></span>
+          <span class="logo-label"
+            >多功能工具箱 <small>{{ appVersion }}</small></span
+          >
         </div>
       </template>
       <template #right>

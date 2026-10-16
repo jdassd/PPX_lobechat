@@ -206,4 +206,9 @@ watch([() => state.mode, () => state.ignoreWhitespace, () => state.ignoreCase], 
     grid-template-columns: 1fr;
   }
 }
+@media (max-width: 1100px) {
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 </style>
