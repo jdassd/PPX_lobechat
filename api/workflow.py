@@ -321,6 +321,8 @@ class WorkflowMixin:
             args = raw.get('args') or {}
             if not isinstance(args, dict):
                 raise ValueError(f'步骤 {step_id} 的参数必须是对象')
+            if method in {'pdf_cut', 'pdf_split', 'pdf_multi_cut', 'pdf_merge'}:
+                WorkflowMixin._workflow_reject_pdf_passwords(step_id, args)
             try:
                 retry_count = max(0, min(int(raw.get('retryCount') or raw.get('retries') or 0), _MAX_STEP_RETRIES))
                 retry_delay_value = float(raw.get('retryDelaySeconds') or 0)
@@ -343,6 +345,20 @@ class WorkflowMixin:
                 'retryDelaySeconds': retry_delay,
             })
         return clean
+
+    @staticmethod
+    def _workflow_reject_pdf_passwords(step_id: str, value: Any) -> None:
+        """Keep PDF passwords out of persistent workflow definitions."""
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if str(key).lower() in {'password', 'sourcepassword'} and item not in (None, ''):
+                    raise ValueError(
+                        f'步骤 {step_id} 含有 PDF 密码；工作流不会保存密码，请改用 PDF 工具手动处理加密文件'
+                    )
+                WorkflowMixin._workflow_reject_pdf_passwords(step_id, item)
+        elif isinstance(value, list):
+            for item in value:
+                WorkflowMixin._workflow_reject_pdf_passwords(step_id, item)
 
     @staticmethod
     def _workflow_find(items: Iterable[Dict[str, Any]], item_id: str) -> Dict[str, Any] | None:

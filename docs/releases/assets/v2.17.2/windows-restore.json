@@ -1,0 +1,46 @@
+{
+  "passed": true,
+  "rounds": [
+    {
+      "width": 2508,
+      "height": 1390,
+      "x": 160,
+      "y": 86,
+      "constructorAdjustment": [
+        26,
+        71
+      ]
+    },
+    {
+      "width": 2508,
+      "height": 1390,
+      "x": 160,
+      "y": 86,
+      "constructorAdjustment": [
+        26,
+        71
+      ]
+    },
+    {
+      "width": 2508,
+      "height": 1390,
+      "x": 160,
+      "y": 86,
+      "constructorAdjustment": [
+        26,
+        71
+      ]
+    }
+  ],
+  "finalState": {
+    "schemaVersion": 3,
+    "width": 1280,
+    "height": 766,
+    "x": 80,
+    "y": 43,
+    "savedAt": 1792385757.653842
+  },
+  "checks": [
+    "close and reopen twice without accumulating size loss"
+  ]
+}

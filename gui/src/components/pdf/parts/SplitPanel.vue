@@ -12,6 +12,9 @@
           <el-tag v-else type="info" effect="plain">尚未选择</el-tag>
         </div>
       </el-form-item>
+      <el-form-item label="打开密码">
+        <el-input v-model="form.password" type="password" show-password autocomplete="new-password" placeholder="加密 PDF 可填写；仅本次运行使用" />
+      </el-form-item>
       <el-form-item label="每个文件页数">
         <el-input-number v-model="form.pagesPerFile" :min="1" :max="50" />
       </el-form-item>
@@ -50,6 +53,7 @@ const form = useDraft('pdf/parts/SplitPanel/form', {
   file: null,
   outputDir: '',
   pagesPerFile: 1,
+  password: '',
   result: []
 })
 
@@ -57,6 +61,8 @@ const selectPdf = async () => {
   const result = await pickPdf()
   if (!result.length) return
   form.file = result[0]
+  form.password = ''
+  form.result = []
 }
 
 const selectDir = async () => {
@@ -71,8 +77,10 @@ const runSplit = async () => {
     ElMessage.warning('请选择 PDF 文件')
     return
   }
+  form.result = []
   const res = await callApi('pdf_split', {
     filePath: form.file.path,
+    password: form.password,
     outputDir: form.outputDir,
     pagesPerFile: form.pagesPerFile
   })

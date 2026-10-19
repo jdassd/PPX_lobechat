@@ -77,6 +77,8 @@ import sys
 import PyInstaller.config
 from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_submodules
 
+cryptoHiddenImports = ['Crypto.Cipher.AES', 'Crypto.Cipher.ARC4', 'Crypto.Util.Padding']
+
 try:
     ocrDatas = collect_data_files('rapidocr')
     ocrBinaries = collect_dynamic_libs('onnxruntime')
@@ -108,7 +110,7 @@ a = Analysis(['../../main.py'],
             pathex=[],
             binaries=[{addDll}] + ocrBinaries,
             datas=[{addModules}] + ocrDatas,
-            hiddenimports=[{hiddenImports}] + ocrHiddenImports,
+            hiddenimports=[{hiddenImports}] + ocrHiddenImports + cryptoHiddenImports,
             hookspath=[],
             hooksconfig={{}},
             runtime_hooks=[],

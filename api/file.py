@@ -764,7 +764,7 @@ class FileTool:
             manifest_path = directory / '.ppx_history' / 'classify' / f'{transaction}.json'
             manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
             target_root = Path(manifest['targetDir'])
-            restored, skipped = [], []
+            restored, removed, skipped = [], [], []
             for record in iter_progress(manifest['mappings'], '正在撤销分类'):
                 if record.get('status') == 'undone':
                     continue
@@ -778,12 +778,20 @@ class FileTool:
                         skipped.append(record)
                         continue
                     target = write_output(target, lambda dest: shutil.copy2(source, dest), allow_empty=True)
-                    restored.append({'from': str(source), 'to': str(target)})
                 source.unlink()
                 record['status'] = 'undone'
                 save_manifest(manifest_path, manifest)
-            return api_success('分类撤销完成；已修改或冲突的文件保留', restored=restored, skipped=skipped,
-                               restoredCount=len(restored), outputAssets=[output_asset(item['to']) for item in restored])
+                if manifest['operation'] == 'move':
+                    restored.append({'from': str(source), 'to': str(target)})
+                else:
+                    removed.append({'from': str(source), 'to': str(target)})
+            undone_count = len(restored) + len(removed)
+            message = f'分类撤销完成：成功撤销 {undone_count} 项'
+            if skipped:
+                message += f'，保留 {len(skipped)} 项（文件已修改或存在冲突）'
+            return api_success(message, restored=restored, removed=removed, skipped=skipped,
+                               restoredCount=undone_count, undoneCount=undone_count, removedCount=len(removed),
+                               outputAssets=[output_asset(item['to']) for item in restored])
         except Exception as exc:
             return api_error(f'分类撤销失败：{exc}')
 
@@ -828,11 +836,15 @@ class FileTool:
         try:
             opts = self._validate(options)
             directory = ensure_directory(opts.get('directory') or opts.get('sourceDir'), auto_create=False)
+            dry_run = bool(opts.get('dryRun', False))
             target_dir_opt = opts.get('targetDir')
             if target_dir_opt:
-                target_dir = ensure_directory(target_dir_opt, auto_create=True)
+                target_dir = Path(target_dir_opt)
             else:
                 target_dir = directory / '_classified'
+            if target_dir.exists() and not target_dir.is_dir():
+                raise ValueError(f'路径不是目录：{target_dir}')
+            if not dry_run:
                 target_dir.mkdir(parents=True, exist_ok=True)
             mode = str(opts.get('mode', 'type')).lower()
             if mode not in {'type', 'size', 'date'}:
@@ -842,7 +854,6 @@ class FileTool:
                 operation = 'copy'
             conflict_policy = str(opts.get('conflictPolicy', 'rename')).lower()
             recursive = bool(opts.get('recursive', True))
-            dry_run = bool(opts.get('dryRun', False))
             filters = self._parse_common_filters(opts)
             filters['recursive'] = recursive
             files = self._collect_filtered_files(directory, filters, ensure_non_empty=False)

@@ -2,6 +2,7 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 const apiReady = ref(!!window.pywebview?.api)
+const useNativeFrameResize = ref(false)
 
 const handles = [
   { dir: 'n', class: 'resize-n' },
@@ -38,9 +39,14 @@ let startWidth = 0
 let startHeight = 0
 let rafId = 0
 let pending = null
+let nativeResizePending = false
+let lastPointerEvent = null
+let activePointerId = null
+let themeObserver = null
 
-const startResize = (dir, event) => {
-  if (!apiReady.value || !window.pywebview?.api?.resize_window) return
+const startResize = async (dir, event) => {
+  const api = window.pywebview?.api
+  if (!apiReady.value || (!api?.begin_native_resize && !api?.resize_window)) return
   if (event.pointerType === 'mouse' && event.button !== 0) return
   event.preventDefault()
   event.stopPropagation()
@@ -51,11 +57,33 @@ const startResize = (dir, event) => {
   startY = event.clientY
   startWidth = window.innerWidth
   startHeight = window.innerHeight
+  activePointerId = event.pointerId
+  lastPointerEvent = null
 
   window.addEventListener('pointermove', onPointerMove)
   window.addEventListener('pointerup', stopResize)
   window.addEventListener('pointercancel', stopResize)
   window.addEventListener('blur', stopResize)
+
+  if (typeof api.begin_native_resize === 'function') {
+    nativeResizePending = true
+    try {
+      const result = await api.begin_native_resize(dir)
+      if (result?.supported === true) {
+        stopResize()
+        return
+      }
+    } catch {
+      // Fall back to the existing resize API only while the initiating pointer is held.
+    }
+    if (!resizing) return
+    nativeResizePending = false
+    if (!event.buttons) {
+      stopResize()
+      return
+    }
+    if (lastPointerEvent) onPointerMove(lastPointerEvent)
+  }
 }
 
 const scheduleResize = (width, height) => {
@@ -67,16 +95,23 @@ const scheduleResize = (width, height) => {
     const { width: nextWidth, height: nextHeight } = pending
     pending = null
     const scale = getScale()
-    window.pywebview.api.resize_window({
-      width: Math.round(nextWidth * scale),
-      height: Math.round(nextHeight * scale),
-      fixPoint: FIX_POINT_MAP[resizeDir]
-    }).catch(() => {})
+    window.pywebview.api
+      .resize_window({
+        width: Math.round(nextWidth * scale),
+        height: Math.round(nextHeight * scale),
+        fixPoint: FIX_POINT_MAP[resizeDir]
+      })
+      .catch(() => {})
   })
 }
 
 const onPointerMove = (event) => {
   if (!resizing) return
+  if (activePointerId != null && event.pointerId !== activePointerId) return
+  if (nativeResizePending) {
+    lastPointerEvent = event
+    return
+  }
   const deltaX = event.clientX - startX
   const deltaY = event.clientY - startY
 
@@ -105,6 +140,9 @@ const onPointerMove = (event) => {
 const stopResize = () => {
   if (!resizing) return
   resizing = false
+  nativeResizePending = false
+  lastPointerEvent = null
+  activePointerId = null
   resizeDir = ''
   pending = null
   if (rafId) {
@@ -117,29 +155,39 @@ const stopResize = () => {
   window.removeEventListener('blur', stopResize)
 }
 
+const syncNativeFrame = async () => {
+  const configure = window.pywebview?.api?.configure_window_frame
+  if (typeof configure !== 'function') return
+  try {
+    const result = await configure({ theme: document.documentElement.dataset.theme || 'light' })
+    useNativeFrameResize.value = result?.code === 0 && result?.nativeResize === true
+  } catch {
+    useNativeFrameResize.value = false
+  }
+}
+
 const onPywebviewReady = () => {
   apiReady.value = true
+  syncNativeFrame()
 }
 
 onMounted(() => {
   window.addEventListener('pywebviewready', onPywebviewReady)
+  if (apiReady.value) syncNativeFrame()
+  themeObserver = new MutationObserver(syncNativeFrame)
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] })
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('pywebviewready', onPywebviewReady)
+  themeObserver?.disconnect()
   stopResize()
 })
 </script>
 
 <template>
-  <div v-if="apiReady" class="window-resize-handles">
-    <div
-      v-for="handle in handles"
-      :key="handle.dir"
-      class="resize-handle"
-      :class="handle.class"
-      @pointerdown="startResize(handle.dir, $event)"
-    ></div>
+  <div v-if="apiReady" class="window-resize-handles" :class="{ 'native-frame-resize': useNativeFrameResize }">
+    <div v-for="handle in handles" :key="handle.dir" class="resize-handle" :class="handle.class" @pointerdown="startResize(handle.dir, $event)"></div>
   </div>
 </template>
 
@@ -156,6 +204,11 @@ onBeforeUnmount(() => {
   pointer-events: auto;
   background: transparent;
   touch-action: none;
+}
+
+.native-frame-resize .resize-handle {
+  /* Let Windows hit the WinForms non-client resize frame directly. */
+  pointer-events: none;
 }
 
 .resize-n,

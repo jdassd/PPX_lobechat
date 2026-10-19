@@ -18,6 +18,8 @@ from typing import Dict, Iterable, List
 import fitz  # PyMuPDF
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 from PyPDF2 import PdfReader, PdfWriter
+from PyPDF2._encryption import PasswordType
+from PyPDF2.errors import WrongPasswordError
 
 from api.core.context import checkpoint, iter_progress, record_inputs, record_item
 from api.core.outputs import atomic_output, output_asset, write_output
@@ -77,6 +79,30 @@ class PDF():
             with temporary.open('wb') as handle:
                 writer.write(handle)
         return final
+
+    def _read_pdf(self, source: Path, password: str = '') -> PdfReader:
+        """Open a PDF, translating encryption failures into actionable messages."""
+        password = str(password or '')
+        try:
+            # Construct first without a password: PyPDF2 rejects passwords for
+            # ordinary, unencrypted documents with "Not encrypted file".
+            reader = PdfReader(str(source))
+            if reader.is_encrypted:
+                # Empty password keeps owner-password-only PDFs readable.
+                decrypted = reader.decrypt(password)
+                if decrypted == PasswordType.NOT_DECRYPTED:
+                    if password:
+                        raise ValueError('PDF 密码错误，请检查后重试')
+                    raise ValueError('PDF 已加密，请提供打开密码后重试')
+            return reader
+        except WrongPasswordError as exc:
+            if password:
+                raise ValueError('PDF 密码错误，请检查后重试') from exc
+            raise ValueError('PDF 已加密，请提供打开密码后重试') from exc
+        except Exception as exc:
+            if 'PyCryptodome is required for AES algorithm' in str(exc):
+                raise ValueError('当前运行环境缺少 PyCryptodome，无法读取 AES 加密 PDF，请重新安装应用后重试') from exc
+            raise
 
     def _pil_from_pixmap(self, pixmap: fitz.Pixmap) -> Image.Image:
         if pixmap.alpha:
@@ -423,18 +449,20 @@ class PDF():
                 if isinstance(item, dict):
                     path = item.get('path', '')
                     page_spec = str(item.get('pageSpec') or '').strip()
+                    password = str(item.get('password') or item.get('sourcePassword') or '')
                 else:
                     path = str(item)
                     page_spec = ''
+                    password = str(opts.get('password') or '')
                 pdf_path = self._ensure_pdf_file(path)
-                merge_entries.append({'path': pdf_path, 'page_spec': page_spec})
+                merge_entries.append({'path': pdf_path, 'page_spec': page_spec, 'password': password})
 
             dest = self._resolve_output_path(merge_entries[0]['path'], output_path, 'merged')
             writer = PdfWriter()
             merged_pages = 0
             for entry in merge_entries:
                 pdf = entry['path']
-                reader = PdfReader(str(pdf))
+                reader = self._read_pdf(pdf, entry['password'])
                 total = len(reader.pages)
                 if entry['page_spec']:
                     pages = self._parse_page_spec(entry['page_spec'], total)
@@ -474,7 +502,7 @@ class PDF():
             source = self._ensure_pdf_file(file_path)
             out_dir = self._ensure_output_dir(source, output_dir, 'split')
 
-            reader = PdfReader(str(source))
+            reader = self._read_pdf(source, opts.get('password'))
             total = len(reader.pages)
             exported: List[str] = []
             part = 1
@@ -511,7 +539,7 @@ class PDF():
             page_spec = str(opts.get('pageSpec') or '')
 
             source = self._ensure_pdf_file(file_path)
-            reader = PdfReader(str(source))
+            reader = self._read_pdf(source, opts.get('password'))
             total = len(reader.pages)
 
             if mode == 'range':
@@ -553,7 +581,7 @@ class PDF():
                 raise ValueError('多文件切割仅支持自定义页码模式')
 
             source = self._ensure_pdf_file(file_path)
-            reader = PdfReader(str(source))
+            reader = self._read_pdf(source, opts.get('password'))
             total = len(reader.pages)
 
             raw = page_spec.replace('\r', '\n')

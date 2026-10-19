@@ -6,7 +6,10 @@
     </header>
     <FileSelector v-model:files="form.files" incoming-route="pdf/merge" label="待合并 PDF" button-text="添加 PDF" description="按队列顺序合并；页码留空表示全部页面" @select="selectPdf">
       <template #options="{ file }">
-        <el-input v-model="file.pageSpec" size="small" placeholder="页码：1-3,5,8" :aria-label="file.filename + ' 页码'" style="width: 180px" />
+        <div class="merge-options">
+          <el-input v-model="file.pageSpec" size="small" placeholder="页码：1-3,5,8" :aria-label="file.filename + ' 页码'" />
+          <el-input v-model="file.password" size="small" type="password" show-password autocomplete="new-password" placeholder="打开密码（可选）" :aria-label="file.filename + ' 打开密码'" />
+        </div>
       </template>
     </FileSelector>
     <el-form label-width="110px" class="mt24">
@@ -39,7 +42,7 @@
 <script setup>
 import { useDraft, mergeFileQueue } from '../../../utils/workspace'
 import FileSelector from '../../shared/FileSelector.vue'
-import { inject } from 'vue'
+import { inject, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 
 const { callApi, openPath, pickPdf, pickDir } = inject('pdfApi')
@@ -51,6 +54,13 @@ const form = useDraft('pdf/parts/MergePanel/form', {
   outputName: '合并结果.pdf',
   output: ''
 })
+
+watch(
+  () => form.files.map((file) => file.path).join('\0'),
+  () => {
+    form.output = ''
+  }
+)
 
 const selectPdf = async () => {
   const result = await pickPdf('pdf/merge')
@@ -73,12 +83,14 @@ const runMerge = async () => {
     ElMessage.warning('请至少选择两个 PDF')
     return
   }
+  form.output = ''
   const res = await callApi(
     'pdf_merge',
     {
       files: form.files.map((item) => ({
         path: item.path,
-        pageSpec: item.pageSpec || ''
+        pageSpec: item.pageSpec || '',
+        password: item.password || ''
       })),
       outputDir: form.outputDir,
       outputName: form.outputName
@@ -100,5 +112,16 @@ const runMerge = async () => {
 
 .mt24 {
   margin-top: 24px;
+}
+.merge-options {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr);
+  gap: 6px;
+  width: min(220px, 100%);
+  flex: 1 1 180px;
+  min-width: 0;
+}
+:deep(.queue-row) {
+  flex-wrap: wrap;
 }
 </style>

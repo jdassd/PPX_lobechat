@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "version": "2.17.1",
+  "version": "2.17.2",
   "note": "发布决定与验收状态分开记录；未验证项目保持 pending，不因发版改为 passed。",
   "release": {
-    "tag": "v2.17.1",
+    "tag": "v2.17.2",
     "allowPendingAcceptance": true,
-    "reason": "用户于 2026-10-16 要求修正后自动发版，并于 2026-10-19 反馈未成功。v2.17.0 因 macOS 导航巡检使用固定等待而未生成 Release；v2.17.1 保留该版功能修正并改为等待实际目标视图，加入延迟加载回归。原生安装、升级、恢复及缺失可选依赖验收仍保持 pending；实际范围见 docs/releases/v2.17.1.md，不将自动构建视为原生验收。"
+    "reason": "沿用用户修正后自动发版授权，针对 2026-10-19 反馈的 AES PDF 切割失败和 Windows 默认尺寸、缩放问题发布修复。补充冻结 AES 探针、实际 Windows 冻结应用任务、200% DPI 原生窗口和物理输入拖动验证；范围见 docs/releases/v2.17.2.md。三平台安装、升级、恢复、可选依赖及其他 DPI/多屏硬件验收仍保持 pending，不将 CI 构建成功或单机检查等同于全面原生验收。"
   },
   "phases": {
     "1": { "status": "pending", "evidence": "" },

@@ -36,6 +36,14 @@ from pathlib import Path
 import webview
 
 from api.api import API
+from api.system.window_geometry import (
+    apply_windows_maximized_bounds,
+    calculate_window_geometry,
+    get_windows_scale_factor,
+    get_windows_workareas,
+    logicalize_native_window_value,
+    logicalize_saved_window_state,
+)
 from pyapp.config.config import Config
 from pyapp.db.db import DB
 
@@ -58,6 +66,8 @@ MIN_WINDOW_HEIGHT = 400
 DEV_SHUTDOWN_GRACE_SECONDS = 3.0
 _dev_shutdown_watchdog = None
 _window_state_restored = False
+_window_coordinate_scale = 1.0
+_window_constructor_adjustment = (0, 0)
 
 
 def on_shown():
@@ -70,7 +80,6 @@ def on_shown():
 
 
 def on_loaded():
-    # print('DOM加载完毕')
     pass
 
 
@@ -177,9 +186,10 @@ def _window_state_path():
     return Path(Config.appDataDir) / 'window-state.json'
 
 
-def _load_window_state():
+def _load_window_state(scale_factor=1.0):
     try:
         payload = json.loads(_window_state_path().read_text(encoding='utf-8'))
+        payload = logicalize_saved_window_state(payload, scale_factor)
         width = int(payload.get('width') or 0)
         height = int(payload.get('height') or 0)
         if not MIN_WINDOW_WIDTH <= width <= 10000 or not MIN_WINDOW_HEIGHT <= height <= 10000:
@@ -197,11 +207,11 @@ def _load_window_state():
 def _save_window_state(window):
     try:
         payload = {
-            'schemaVersion': 1,
-            'width': max(MIN_WINDOW_WIDTH, int(window.width)),
-            'height': max(MIN_WINDOW_HEIGHT, int(window.height)),
-            'x': int(window.x),
-            'y': int(window.y),
+            'schemaVersion': 3,
+            'width': max(MIN_WINDOW_WIDTH, logicalize_native_window_value(window.width, _window_coordinate_scale) + _window_constructor_adjustment[0]),
+            'height': max(MIN_WINDOW_HEIGHT, logicalize_native_window_value(window.height, _window_coordinate_scale) + _window_constructor_adjustment[1]),
+            'x': logicalize_native_window_value(window.x, _window_coordinate_scale),
+            'y': logicalize_native_window_value(window.y, _window_coordinate_scale),
             'savedAt': time.time(),
         }
         path = _window_state_path()
@@ -244,7 +254,23 @@ def _resize_window_for_primary_screen(window, restored=False):
 
 
 def _on_window_shown(window):
-    _resize_window_for_primary_screen(window, _window_state_restored)
+    global _window_constructor_adjustment
+    # Windows gets its work-area-aware geometry before create_window. Resizing
+    # it here would make the first visible frame jump and trigger a second full
+    # WebView layout pass. Keep the legacy post-show adjustment for other GUI
+    # backends whose screen APIs are initialized by pywebview.start().
+    if Config.appSystem != 'Windows':
+        _resize_window_for_primary_screen(window, _window_state_restored)
+    else:
+        # WinForms scales ClientSize before pywebview removes the caption.
+        # Calibrate that constructor trim once, so saving/reopening does not
+        # subtract the old non-client dimensions on every launch.
+        _window_constructor_adjustment = (
+            int(window.initial_width) - logicalize_native_window_value(window.width, _window_coordinate_scale),
+            int(window.initial_height) - logicalize_native_window_value(window.height, _window_coordinate_scale),
+        )
+        apply_windows_maximized_bounds(window)
+        window.events.moved += lambda *_: apply_windows_maximized_bounds(window)
     on_shown()
 
 
@@ -289,7 +315,7 @@ def _resolve_dev_server(base_port: int, timeout: float = 25.0, span: int = 16):
 
 
 def WebViewApp(ifDev=False, ifCef=False, open_files=None):
-    global _window_state_restored
+    global _window_state_restored, _window_coordinate_scale
 
     # 在任何 pywebview GUI 相关访问前确定后端，尤其不能让 --cef 被默认 GUI 抢先初始化。
     guiCEF = 'cef' if ifCef else None
@@ -327,10 +353,22 @@ def WebViewApp(ifDev=False, ifCef=False, open_files=None):
         query = urllib.parse.urlencode({'openFiles': json.dumps(launch_files, ensure_ascii=False)})
         template = f'{template}{separator}{query}'
 
-    window_state = _load_window_state()
-    _window_state_restored = bool(window_state)
-    width = window_state['width'] if window_state else INITIAL_WINDOW_WIDTH
-    height = window_state['height'] if window_state else INITIAL_WINDOW_HEIGHT
+    _window_coordinate_scale = (
+        get_windows_scale_factor()
+        if Config.appSystem == 'Windows' and not ifCef
+        else 1.0
+    )
+    window_state = _load_window_state(_window_coordinate_scale)
+    workareas = get_windows_workareas() if Config.appSystem == 'Windows' else []
+    geometry = calculate_window_geometry(
+        workareas,
+        saved_state=window_state,
+        initial_size=(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT),
+        min_size=(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT),
+    )
+    _window_state_restored = geometry['restored']
+    width = geometry['width']
+    height = geometry['height']
 
     # 创建窗口
     window = webview.create_window(
@@ -339,9 +377,9 @@ def WebViewApp(ifDev=False, ifCef=False, open_files=None):
         js_api=api,
         width=width,
         height=height,
-        x=window_state.get('x') if window_state else None,
-        y=window_state.get('y') if window_state else None,
-        min_size=(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT),
+        x=geometry['x'],
+        y=geometry['y'],
+        min_size=geometry['min_size'],
         frameless=True,  # 禁用系统默认窗口装饰，使用自定义顶栏
         resizable=True,
         easy_drag=False

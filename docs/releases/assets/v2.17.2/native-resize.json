@@ -1,0 +1,27 @@
+{
+  "platform": "Windows",
+  "dpi": 192,
+  "displayScale": 2,
+  "input": "computer-use sky.drag, real OS mouse input into isolated test windows",
+  "captureUnits": "logical pixels of the captured native window, including its visible frame; not browser CSS dimensions",
+  "sourceWindowChecks": [
+    { "edge": "left", "before": [1244, 690], "after": [1144, 690] },
+    { "edge": "top", "before": [1144, 690], "after": [1144, 610] },
+    { "edge": "bottom", "before": [1144, 610], "after": [1144, 540] },
+    { "edge": "bottom-right to minimum", "before": [1144, 540], "after": [617, 360] }
+  ],
+  "frozenProductCheck": {
+    "versionShown": "2.17.2",
+    "edge": "right",
+    "before": [1244, 690],
+    "after": [1104, 690],
+    "exitCode": 0,
+    "screenshot": "windows-frozen-resize.jpg"
+  },
+  "earlierAttempts": "Async JS initiation and Chromium-child hit tests failed real side drags despite synthetic checks. Final implementation reserves a Form-owned band and delegates its real non-client input to Windows.",
+  "limitations": [
+    "Observed on one physical 200% DPI Windows desktop; other DPI/multi-monitor hardware not tested",
+    "Drags used the outer native border; do not infer that every inner CSS pixel is a native resize target",
+    "No continuous video or frame-by-frame flicker measurement; still captures only establish resulting geometry"
+  ]
+}

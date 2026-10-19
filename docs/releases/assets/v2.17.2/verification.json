@@ -1,0 +1,75 @@
+{
+  "version": "2.17.2",
+  "sourceTag": "v2.17.2",
+  "date": "2026-10-19",
+  "localValidationBasis": "Final working tree before commit; tag CI rebuilds and checks the pushed commit. Source-window gestures preceded the version bump; the frozen executable visibly showed 2.17.2.",
+  "pythonTests": {
+    "passed": 178
+  },
+  "frontendContracts": {
+    "passed": 25
+  },
+  "lint": {
+    "errors": 0,
+    "existingWarnings": 141
+  },
+  "workspace": {
+    "passed": true,
+    "pageErrors": [],
+    "encryptedPdf": true,
+    "minimumLayout": true,
+    "fullProcessingAndWorkflows": true
+  },
+  "navigation": {
+    "modules": 14,
+    "pageErrors": [],
+    "delayedImageChunkMs": 1200
+  },
+  "windowsNative": {
+    "scale": 2,
+    "dpi": 192,
+    "probeChecks": 15,
+    "closeReopenRounds": 3,
+    "minimumBrowserCss": {
+      "dpr": 2,
+      "width": 603,
+      "height": 341
+    },
+    "realInputEvidence": "native-resize.json"
+  },
+  "frozen": {
+    "aes128And256OnefileProbe": true,
+    "actualWindowsProduct": {
+      "pdfCut": {
+        "status": "success",
+        "pages": [
+          "PDF smoke page three",
+          "PDF smoke page one"
+        ]
+      },
+      "ocr": {
+        "status": "success",
+        "text": "PPX OCR TEST 12345"
+      },
+      "imageAlphaAndDimensions": true
+    }
+  },
+  "commands": [
+    "pnpm run test",
+    "pnpm run test:gui",
+    "pnpm run lint",
+    "pnpm run test:e2e",
+    "pnpm run test:pdf:freeze",
+    "node pyapp/package/python.js pyapp/package/verifyWindowsWindow.py",
+    "node pyapp/package/python.js pyapp/package/verifyWindowsRestore.py",
+    "node pyapp/package/python.js pyapp/spec/getSpec.py --output-root build/verification-package",
+    "node pyapp/package/python.js -m PyInstaller --clean --noconfirm pyapp/spec/windows-folder.spec",
+    "build/verification-package/tools/多功能工具箱.exe --desktop-smoke build/verification/v2172-desktop-smoke.json"
+  ],
+  "limitations": [
+    "Only one physical Windows 200% DPI desktop; other DPI/multi-monitor hardware remains pending",
+    "No continuous drag video or frame-by-frame flicker measurement",
+    "Installer install/upgrade/restore not covered by these source and frozen-folder checks",
+    "OCR verified on a clean English/digit image; broad document/table OCR and LibreOffice acceptance remain pending"
+  ]
+}

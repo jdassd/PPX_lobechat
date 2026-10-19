@@ -2,6 +2,8 @@ pywebview==5.4
 pyinstaller==6.12.0
 httpx==0.27.2
 PyPDF2==3.0.1
+# PyPDF2 3.x requires PyCryptodome for AES-encrypted PDF read/write.
+pycryptodome==3.23.0
 PyMuPDF==1.24.9
 openpyxl==3.1.5
 Pillow==10.4.0

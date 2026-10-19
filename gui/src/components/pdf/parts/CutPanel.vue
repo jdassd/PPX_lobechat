@@ -4,13 +4,16 @@
       <h4>按页码摘取页面</h4>
       <p>按页码区间或列表摘取页面，生成一份新 PDF</p>
     </header>
-    <el-form :model="form" label-width="110px">
+    <el-form :model="form" label-width="110px" class="cut-form">
       <el-form-item label="源 PDF">
         <div class="field-row">
           <el-button @click="selectPdf">选择 PDF</el-button>
           <span v-if="form.file" class="file-chip">{{ form.file.filename }}</span>
           <el-tag v-else type="info" effect="plain">尚未选择</el-tag>
         </div>
+      </el-form-item>
+      <el-form-item label="打开密码">
+        <el-input v-model="form.password" type="password" show-password autocomplete="new-password" placeholder="加密 PDF 可填写；仅本次运行使用" />
       </el-form-item>
       <el-form-item label="模式">
         <el-radio-group v-model="form.mode">
@@ -75,13 +78,17 @@ const form = useDraft('pdf/parts/CutPanel/form', {
   pageSpec: '',
   multi: false,
   output: '',
-  outputs: []
+  outputs: [],
+  password: ''
 })
 
 const selectPdf = async () => {
   const result = await pickPdf()
   if (!result.length) return
   form.file = result[0]
+  form.password = ''
+  form.output = ''
+  form.outputs = []
 }
 
 const selectDir = async () => {
@@ -100,8 +107,11 @@ const runCut = async () => {
     ElMessage.warning('请输入页码集合')
     return
   }
+  form.output = ''
+  form.outputs = []
   const payload = {
     filePath: form.file.path,
+    password: form.password,
     outputDir: form.outputDir,
     outputName: form.outputName,
     mode: form.mode,
@@ -127,5 +137,40 @@ const runCut = async () => {
 <style scoped>
 .range-sep {
   color: var(--ppx-text-muted);
+}
+@media (max-width: 760px) {
+  .cut-form :deep(.el-form-item) {
+    display: block;
+  }
+  .cut-form :deep(.el-form-item__label) {
+    display: block;
+    width: auto !important;
+    height: auto;
+    justify-content: initial;
+    padding: 0 0 5px;
+    margin-bottom: 5px;
+    line-height: 1.4;
+  }
+  .cut-form :deep(.el-form-item__label:empty) {
+    display: none;
+  }
+  .cut-form :deep(.el-form-item__content) {
+    margin-left: 0 !important;
+    width: 100%;
+    min-width: 0;
+  }
+  .cut-form :deep(.field-row) {
+    min-width: 0;
+    gap: 8px;
+  }
+  .cut-form :deep(.field-row > .el-input) {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .cut-form :deep(.field-row > .el-input-number) {
+    width: min(150px, 42%);
+    min-width: 0;
+    flex: 1 1 0;
+  }
 }
 </style>

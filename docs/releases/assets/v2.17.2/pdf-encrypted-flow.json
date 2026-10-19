@@ -1,0 +1,11 @@
+{
+  "passed": true,
+  "checks": [
+    "AES-128 and AES-256 correct-password cut and reopened page-order/text verification",
+    "empty-user-password encrypted PDF cut without credentials",
+    "wrong and missing password errors with no output artifact",
+    "encrypted split and ordered per-file-password merge verified by reopening outputs",
+    "source files unchanged",
+    "password excluded from localStorage and cleared when changing source"
+  ]
+}

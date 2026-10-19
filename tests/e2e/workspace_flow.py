@@ -17,9 +17,11 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 import fitz
+from desktop_layout_flow import verify_desktop_layout
 from duplicate_review_flow import verify_duplicate_review
 from excel_processing_flow import verify_excel_processing
 from input_origins_flow import verify_input_origins
+from pdf_encrypted_flow import verify_pdf_encrypted_flow
 from PIL import Image
 from playwright.sync_api import expect, sync_playwright
 from result_handoff_flow import verify_result_handoff
@@ -52,7 +54,7 @@ def browser_evidence(context, page, report_dir, errors):
 
 def main():
     with tempfile.TemporaryDirectory(prefix="ppx-e2e-") as temp:
-        root = Path(temp)
+        root = Path(temp).resolve()
         Config.appDataDir = str(root / "app-data")
         Config.downloadDir = str(root / "outputs")
         Path(Config.appDataDir).mkdir()
@@ -195,6 +197,24 @@ def main():
                     evidence.close()
                     browser.close()
                     return
+                if '--pdf-encrypted-only' in sys.argv:
+                    original_chosen = list(chosen)
+                    try:
+                        result = verify_pdf_encrypted_flow(api, page, root, chosen, report_dir)
+                        assert not errors, errors
+                        print(json.dumps(result, ensure_ascii=False), flush=True)
+                    finally:
+                        chosen[:] = original_chosen
+                    evidence.close()
+                    browser.close()
+                    return
+                if '--desktop-layout-only' in sys.argv:
+                    result = verify_desktop_layout(page, report_dir)
+                    assert not errors, errors
+                    print(json.dumps(result, ensure_ascii=False), flush=True)
+                    evidence.close()
+                    browser.close()
+                    return
                 navigation = page.get_by_role("navigation", name="工具")
                 navigation.get_by_role("button", name="图片处理", exact=True).click()
                 page.get_by_text("目标体积", exact=True).click()
@@ -323,12 +343,19 @@ def main():
                 workflow_results = verify_workflow_results(api, page, report_dir)
                 search_archive = verify_search_archive(api, page, root, report_dir)
                 duplicate_review = verify_duplicate_review(api, page, root, report_dir)
+                original_chosen = list(chosen)
+                try:
+                    encrypted_pdf = verify_pdf_encrypted_flow(api, page, root, chosen, report_dir)
+                finally:
+                    chosen[:] = original_chosen
+                desktop_layout = verify_desktop_layout(page, report_dir)
                 assert not errors, errors
                 report_dir = ROOT / "build/verification"
                 report_dir.mkdir(parents=True, exist_ok=True)
                 page.screenshot(path=str(report_dir / 'workspace.png'), full_page=True)
                 (report_dir / 'workspace.json').write_text(json.dumps({
                     'passed': True, 'pageErrors': errors, 'resultHandoff': handoff, 'excel': excel, 'inputOrigins': origins, 'templates': templates, 'preflight': preflight, 'workflowResults': workflow_results, 'searchArchive': search_archive, 'duplicateReview': duplicate_review,
+                    'encryptedPdf': encrypted_pdf, 'desktopLayout': desktop_layout,
                     'checks': ['draft retention', 'restart configuration', 'partial failure', 'retry only failed input',
                                'output dimensions and alpha', 'handoff scoped to target module', '1000-page PDF editing/undo/reorder/export',
                                'two-step workflow via forms', 'pause only blocks new tasks', 'cancel queued task',

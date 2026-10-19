@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Vue-3.0+-4FC08D?style=flat-square&logo=vue.js&logoColor=white" alt="Vue 3" />
   <img src="https://img.shields.io/badge/Python-3.10-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.10" />
   <img src="https://img.shields.io/badge/Pywebview-5.0+-FFD43B?style=flat-square&logo=python&logoColor=blue" alt="Pywebview" />
-  <img src="https://img.shields.io/badge/version-2.17.1-2b6fff?style=flat-square" alt="Version 2.17.1" />
+  <img src="https://img.shields.io/badge/version-2.17.2-2b6fff?style=flat-square" alt="Version 2.17.2" />
   <img src="https://img.shields.io/badge/License-AGPL--3.0-green?style=flat-square" alt="License" />
 </p>
 
@@ -20,17 +20,17 @@
 
 ## 📖 简介
 
-**PPX 2.17.1** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
+**PPX 2.17.2** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
 
-2.17.1 修正异步页面导航巡检的等待条件，承接 2.17 的小图水印、收藏键盘和文本界面修正，以及 PDF、Word、图片、转换中心的真实文件回归。2.17.0 因 macOS 巡检失败未创建正式 Release。
+2.17.2 修复 AES 加密 PDF 页码处理和冻结包依赖、Windows 默认尺寸与原生缩放，并修正小窗口页码表单裁切、分类预览创建目录和撤销计数。补充真实加密文件、冻结应用任务与最小窗口可达性验证。
 
-更新内容与验收范围见 [v2.17.1 发布说明](docs/releases/v2.17.1.md)。
+更新内容与验收范围见 [v2.17.2 发布说明](docs/releases/v2.17.2.md)。
 
 定位、目标用户、14 个模块的输入输出与异常设计、协作流程、优先级和扩展边界见 [统一工具箱设计方案](docs/toolbox-design.md)。
 
 ## ✨ 主要功能
 
-PPX 2.17.1 的核心能力包括：
+PPX 2.17.2 的核心能力包括：
 
 ### 📄 文档与数据
 

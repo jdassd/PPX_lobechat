@@ -1,0 +1,143 @@
+{
+  "workareas": [
+    {
+      "x": 0,
+      "y": 0,
+      "width": 1440,
+      "height": 852,
+      "primary": true
+    }
+  ],
+  "planned": {
+    "width": 1280,
+    "height": 766,
+    "x": 80,
+    "y": 43,
+    "min_size": [
+      640,
+      400
+    ],
+    "restored": false
+  },
+  "webviewScaleFactor": 2.0,
+  "dpiBeforeWebViewInit": 96,
+  "checks": {
+    "initial_inside_physical_work_area": true,
+    "work_area_scale_conversion": true,
+    "client_size_matches_css_dpr": true,
+    "native_resize_frame_enabled": true,
+    "form_hit_tests_native_resize_corners": true,
+    "form_hit_tests_native_resize_edges": true,
+    "resize_band_is_outside_chromium": true,
+    "released_pointer_skips_native_modal_loop": true,
+    "repeated_resize_completed": true,
+    "minimum_size_enforced": true,
+    "maximize_event": true,
+    "maximized_inside_work_area": true,
+    "maximized_bounds_applied": true,
+    "restore_event": true,
+    "restored_inside_work_area": true
+  },
+  "resizeEvents": 9,
+  "native": {
+    "dpi": 192,
+    "dpiAfterWebViewInit": 192,
+    "physicalWorkareasAfterInit": [
+      {
+        "x": 0,
+        "y": 0,
+        "width": 2880,
+        "height": 1704,
+        "primary": true
+      }
+    ],
+    "browserMetrics": {
+      "dpr": 2,
+      "width": 1230,
+      "height": 671
+    },
+    "initialRect": {
+      "x": 160,
+      "y": 86,
+      "width": 2508,
+      "height": 1390
+    },
+    "pywebviewPosition": {
+      "x": 160,
+      "y": 86
+    },
+    "clientSize": {
+      "width": 2508,
+      "height": 1390
+    },
+    "formSize": {
+      "width": 2508,
+      "height": 1390
+    },
+    "formClientSize": {
+      "width": 2484,
+      "height": 1366
+    },
+    "webviewControlSize": {
+      "width": 2460,
+      "height": 1342
+    },
+    "minimumSize": {
+      "width": 1254,
+      "height": 729
+    },
+    "maximized_bounds_applied": true,
+    "resize_frame_applied": true,
+    "maximizedBounds": {
+      "x": 0,
+      "y": 0,
+      "width": 2880,
+      "height": 1704
+    },
+    "resizeHitTests": {
+      "formTopLeft": 13,
+      "formBottomRight": 17,
+      "formLeft": 10,
+      "formRight": 11,
+      "formTop": 12,
+      "formBottom": 15
+    },
+    "beginNativeResizeWithoutButton": {
+      "code": 0,
+      "msg": "鼠标已释放，已取消窗口调整大小",
+      "supported": true,
+      "started": false
+    },
+    "after_repeated_resize": {
+      "x": 160,
+      "y": 86,
+      "width": 2360,
+      "height": 1332
+    },
+    "after_minimum_resize_request": {
+      "x": 160,
+      "y": 86,
+      "width": 1254,
+      "height": 729
+    },
+    "minimumBrowserMetrics": {
+      "dpr": 2,
+      "width": 603,
+      "height": 341
+    },
+    "maximizedRect": {
+      "x": 0,
+      "y": 0,
+      "width": 2880,
+      "height": 1704
+    },
+    "restoredRect": {
+      "x": 160,
+      "y": 86,
+      "width": 1254,
+      "height": 729
+    }
+  },
+  "errors": [],
+  "ok": true
+}

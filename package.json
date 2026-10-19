@@ -1,7 +1,7 @@
 {
   "name": "tools",
   "private": true,
-  "version": "2.17.1",
+  "version": "2.17.2",
   "description": "本地优先的图片、文档、表格与文件批处理桌面工作台",
   "author": "jdassd <jdassd@163.com>",
   "scripts": {
@@ -82,6 +82,7 @@
     "format:py:windows": "node ./pyapp/package/python.js -m ruff format .",
     "test": "run-script-os",
     "test:gui": "node --test tests/frontend/resultRouting.test.mjs tests/frontend/inputOrigins.test.mjs tests/frontend/taskSanitizer.test.mjs tests/frontend/workflowResults.test.mjs",
+    "test:pdf:freeze": "node ./pyapp/package/python.js pyapp/package/verifyPdfAesFreeze.py",
     "test:e2e": "pnpm -C ./gui run build && node ./pyapp/package/python.js tests/e2e/workspace_flow.py && node ./pyapp/package/python.js tests/e2e/visual_sweep.py",
     "test:linux": "node ./pyapp/package/python.js -m unittest discover -s tests -v",
     "test:macos": "node ./pyapp/package/python.js -m unittest discover -s tests -v",
