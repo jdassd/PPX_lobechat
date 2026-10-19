@@ -37,6 +37,11 @@ const greeting = computed(() => {
   if (hour < 18) return '下午好'
   return '晚上好'
 })
+const shortcutModifier = computed(() => {
+  if (typeof navigator === 'undefined') return 'Ctrl'
+  const platform = navigator.userAgentData?.platform || navigator.platform || ''
+  return /mac|iphone|ipad|ipod/i.test(platform) ? '⌘' : 'Ctrl'
+})
 
 const openAction = (action) => emit('open', { tool: action.tool, feature: action.id || action.feature })
 const toggleActionFavorite = (action) => toggleFavorite(actionKey(action))
@@ -54,8 +59,8 @@ const toggleActionFavorite = (action) => toggleFavorite(actionKey(action))
             <h1>{{ greeting }}，<span>欢迎使用工具箱。</span></h1>
             <p>图片、PDF、Word、Excel 与文件整理，全部在本机完成。</p>
           </div>
-          <button class="search-command" type="button" @click="emit('search')">
-            <el-icon :size="19"><Search /></el-icon><span>搜索工具或功能，例如「压缩」</span><kbd>⌘ K</kbd>
+          <button class="search-command" type="button" aria-label="搜索工具或功能" @click="emit('search')">
+            <el-icon :size="19"><Search /></el-icon><span>搜索工具或功能，例如「压缩」</span><kbd>{{ shortcutModifier }} K</kbd>
           </button>
         </div>
       </section>
@@ -143,6 +148,7 @@ const toggleActionFavorite = (action) => toggleFavorite(actionKey(action))
   overflow: auto;
 }
 .home-inner {
+  container-type: inline-size;
   max-width: 1120px;
   margin: 0 auto;
   padding: clamp(24px, 4vw, 46px) clamp(20px, 4vw, 42px) 52px;
@@ -172,13 +178,14 @@ const toggleActionFavorite = (action) => toggleFavorite(actionKey(action))
 }
 h1 {
   margin: 0;
-  font-size: clamp(28px, 4vw, 40px);
+  font-size: clamp(26px, 3.4cqi, 38px);
   line-height: 1.15;
   letter-spacing: -0.035em;
   color: var(--ppx-text-primary);
 }
 h1 span {
   color: var(--accent);
+  white-space: nowrap;
 }
 .hero p {
   margin: 10px 0 0;
@@ -202,6 +209,10 @@ h1 span {
 }
 .search-command span {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 kbd {
   padding: 3px 7px;
@@ -533,7 +544,7 @@ kbd {
   cursor: pointer;
   font-size: 11.5px;
 }
-@media (max-width: 900px) {
+@container (max-width: 960px) {
   .hero-row {
     align-items: stretch;
     flex-direction: column;
@@ -547,6 +558,11 @@ kbd {
   }
   .work-grid {
     grid-template-columns: 1fr;
+  }
+}
+@container (max-width: 560px) {
+  .action-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

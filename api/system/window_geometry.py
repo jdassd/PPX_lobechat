@@ -251,6 +251,21 @@ def logicalize_saved_window_state(payload, scale_factor=1.0):
     return state
 
 
+def migrate_display_geometry(geometry, schema_version, constructor_adjustment, min_size=(640, 400)):
+    """Translate compensated schema-3 targets back to their shown dimensions.
+
+    Schema 3 saved constructor dimensions plus the WinForms trim. Earlier
+    schemas stored the dimensions users actually saw. Schema 4 stores actual
+    logical dimensions again, so only schema 3 needs this one-time adjustment.
+    """
+    migrated = dict(geometry)
+    if int(schema_version or 1) == 3:
+        trim_width, trim_height = constructor_adjustment
+        migrated['width'] = max(int(min_size[0]), int(migrated['width']) - max(0, int(trim_width)))
+        migrated['height'] = max(int(min_size[1]), int(migrated['height']) - max(0, int(trim_height)))
+    return migrated
+
+
 def logicalize_native_window_value(value, scale_factor=1.0):
     """Convert a WinForms device-pixel value to pywebview startup units."""
     scale = max(1.0, float(scale_factor or 1.0))
@@ -299,6 +314,50 @@ def apply_windows_maximized_bounds(window):
             native.Invoke(Func[Type](update_native_window))
         else:
             update_native_window()
+        return bool(applied)
+    except Exception:
+        return False
+
+
+def apply_windows_startup_geometry(window, geometry, scale_factor=1.0):
+    """Apply planned bounds after WinForms DPI initialization, before showing.
+
+    pywebview creates its Form before WinForms finishes DPI scaling and before
+    the app changes the form to borderless mode. Correcting the form in its
+    first Shown callback (while its opacity is zero) avoids the client-area
+    deductions from becoming a permanent loss in the saved bounds.
+    """
+    native = getattr(window, 'native', None)
+    if sys.platform != 'win32' or native is None:
+        return False
+
+    try:
+        from System import Func, Type
+        from System.Drawing import Point, Size
+        from System.Windows.Forms import FormWindowState
+
+        scale = max(1.0, float(scale_factor or 1.0))
+        bounds = (
+            round(int(geometry['x']) * scale),
+            round(int(geometry['y']) * scale),
+            round(int(geometry['width']) * scale),
+            round(int(geometry['height']) * scale),
+        )
+        applied = []
+
+        def set_native_bounds():
+            x, y, width, height = bounds
+            native.WindowState = FormWindowState.Normal
+            minimum_width, minimum_height = geometry['min_size']
+            native.MinimumSize = Size(round(int(minimum_width) * scale), round(int(minimum_height) * scale))
+            native.Size = Size(width, height)
+            native.Location = Point(x, y)
+            applied.append(True)
+
+        if hasattr(native, 'Invoke'):
+            native.Invoke(Func[Type](set_native_bounds))
+        else:
+            set_native_bounds()
         return bool(applied)
     except Exception:
         return False

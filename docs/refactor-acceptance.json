@@ -1,19 +1,47 @@
 {
   "schemaVersion": 1,
-  "version": "2.17.2",
+  "version": "2.17.3",
   "note": "发布决定与验收状态分开记录；未验证项目保持 pending，不因发版改为 passed。",
   "release": {
-    "tag": "v2.17.2",
+    "tag": "v2.17.3",
     "allowPendingAcceptance": true,
-    "reason": "沿用用户修正后自动发版授权，针对 2026-10-19 反馈的 AES PDF 切割失败和 Windows 默认尺寸、缩放问题发布修复。补充冻结 AES 探针、实际 Windows 冻结应用任务、200% DPI 原生窗口和物理输入拖动验证；范围见 docs/releases/v2.17.2.md。三平台安装、升级、恢复、可选依赖及其他 DPI/多屏硬件验收仍保持 pending，不将 CI 构建成功或单机检查等同于全面原生验收。"
+    "reason": "沿用用户修正后自动发版授权。已完成本轮 AES PDF、Windows 启动及旧窗口记录迁移、最小尺寸与原生缩放、首页响应布局和分类预览/撤销修复。本机180项Python、25项前端规则、完整端到端、12轮Windows200% DPI启动恢复、16项原生窗口检查及最终冻结程序的图片/AES256/OCR任务通过，证据见 docs/releases/assets/v2.17.3/verification.json。v2.17.2因补查迁移缺陷主动取消且无Release。本版正式产物必须来自已推送Tag提交的三平台成功CI；原生安装升级恢复、其他DPI/多屏、CEF、广泛OCR与LibreOffice验收仍保持pending，未采集连续视频，不宣称所有环境无闪烁。"
+  },
+  "preReleaseLocalEvidence": {
+    "windowsGeometryMigration": "docs/releases/assets/v2.17.3/verification.json",
+    "pythonTestsPassed": 180,
+    "frontendContractsPassed": 25,
+    "lintErrors": 0,
+    "lintExistingWarnings": 141,
+    "finalCommitEndToEnd": "pending",
+    "finalTagCi": "pending",
+    "finalFrozenPackageAfterHomePolish": "pending"
   },
   "phases": {
-    "1": { "status": "pending", "evidence": "" },
-    "2": { "status": "pending", "evidence": "" },
-    "3": { "status": "pending", "evidence": "" },
-    "4": { "status": "pending", "evidence": "" },
-    "5": { "status": "pending", "evidence": "" },
-    "6": { "status": "pending", "evidence": "" }
+    "1": {
+      "status": "pending",
+      "evidence": ""
+    },
+    "2": {
+      "status": "pending",
+      "evidence": ""
+    },
+    "3": {
+      "status": "pending",
+      "evidence": ""
+    },
+    "4": {
+      "status": "pending",
+      "evidence": ""
+    },
+    "5": {
+      "status": "pending",
+      "evidence": ""
+    },
+    "6": {
+      "status": "pending",
+      "evidence": ""
+    }
   },
   "platforms": {
     "windows": {},

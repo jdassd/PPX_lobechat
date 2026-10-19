@@ -38,11 +38,48 @@ def _assert_no_page_overflow(page, viewport, view_name):
     return overflow
 
 
+def _assert_home_adapts_to_content(page, viewport):
+    metrics = page.evaluate('''() => {
+      const heading = document.querySelector('.home-inner h1');
+      const accent = heading?.querySelector('span');
+      const range = document.createRange();
+      if (accent) range.selectNodeContents(accent);
+      const grid = document.querySelector('.home-inner .action-grid');
+      const clippedLabels = [...(grid?.querySelectorAll('.action-meta b') || [])]
+        .filter((label) => label.scrollWidth > label.clientWidth + 1)
+        .map((label) => label.textContent.trim());
+      const searchLabel = document.querySelector('.search-command span');
+      const searchLabelStyle = searchLabel ? getComputedStyle(searchLabel) : null;
+      const home = document.querySelector('.home-inner');
+      const homeStyle = home ? getComputedStyle(home) : null;
+      return {
+        containerWidth: home ? home.clientWidth - parseFloat(homeStyle.paddingLeft) - parseFloat(homeStyle.paddingRight) : 0,
+        headingWidth: heading?.clientWidth ?? 0,
+        headingScrollWidth: heading?.scrollWidth ?? 0,
+        accentLines: range.getClientRects().length,
+        searchLabelWhiteSpace: searchLabelStyle?.whiteSpace ?? '',
+        searchLabelHeight: searchLabel?.clientHeight ?? 0,
+        searchLabelFontSize: searchLabelStyle ? parseFloat(searchLabelStyle.fontSize) : 0,
+        columns: grid ? getComputedStyle(grid).gridTemplateColumns.split(' ').length : 0,
+        clippedLabels,
+      };
+    }''')
+    assert metrics['accentLines'] == 1, f'首页标题强调部分出现孤字换行 at {viewport}: {metrics}'
+    assert metrics['searchLabelWhiteSpace'] == 'nowrap' and metrics['searchLabelHeight'] <= metrics['searchLabelFontSize'] * 1.5, f'首页搜索提示在窄窗口内被拆行 at {viewport}: {metrics}'
+    assert metrics['headingScrollWidth'] <= metrics['headingWidth'] + 1, f'首页标题水平溢出 at {viewport}: {metrics}'
+    expected_columns = 1 if metrics['containerWidth'] <= 560 else 2 if metrics['containerWidth'] <= 960 else 4
+    assert metrics['columns'] == expected_columns, f'首页动作卡片没有按内容宽度重排 at {viewport}: {metrics}'
+    assert not metrics['clippedLabels'], f'首页动作名称被截断 at {viewport}: {metrics}'
+    return metrics
+
+
 def _verify_minimum_viewport(page, width, height, report_dir):
     viewport = f'{width}x{height}'
     page.set_viewport_size({'width': width, 'height': height})
     page.wait_for_timeout(80)
     page.locator('.sidebar .home').click()
+    expect(page.locator('.home-inner')).to_be_visible()
+    home_layout = _assert_home_adapts_to_content(page, viewport)
     nav = page.get_by_role('navigation', name='工具', exact=True)
     close = page.get_by_role('button', name='关闭', exact=True)
     reachable = [_assert_reachable(page, close, '标题栏关闭按钮', viewport)]
@@ -52,6 +89,7 @@ def _verify_minimum_viewport(page, width, height, report_dir):
     home_scroll = page.locator('.home-scroll')
     home_metrics = home_scroll.evaluate('(node) => ({clientHeight: node.clientHeight, scrollHeight: node.scrollHeight, clientWidth: node.clientWidth, scrollWidth: node.scrollWidth})')
     assert home_metrics['clientHeight'] > 0 and home_metrics['scrollHeight'] >= home_metrics['clientHeight'], (viewport, home_metrics)
+    page.screenshot(path=str(report_dir / f'desktop-layout-home-top-{width}x{height}.png'), full_page=True, animations='disabled')
     home_scroll.evaluate('(node) => { node.scrollTop = node.scrollHeight }')
     home_action = page.locator('.home-scroll .module-cta')
     reachable.append(_assert_reachable(page, home_action, '首页模块管理入口', viewport))
@@ -97,19 +135,45 @@ def _verify_minimum_viewport(page, width, height, report_dir):
     checked.append(_assert_no_page_overflow(page, viewport, '文本JSON'))
     page.screenshot(path=str(report_dir / f'desktop-layout-text-json-{width}x{height}.png'), full_page=True, animations='disabled')
 
-    return {'width': width, 'height': height, 'homeContent': home_metrics, 'pdfCutScroll': cut_scroll, 'reachableControls': reachable, 'horizontalOverflow': checked}
+    return {'width': width, 'height': height, 'homeContent': home_metrics, 'homeLayout': home_layout, 'pdfCutScroll': cut_scroll, 'reachableControls': reachable, 'horizontalOverflow': checked}
 
 
 def verify_desktop_layout(page, report_dir):
-    viewports = ((1440, 900), (1120, 780), (900, 700), (768, 620))
+    viewports = ((1440, 900), (1130, 761), (1120, 780), (900, 700), (768, 620))
     screenshots = []
+    home_layout_evidence = []
     for width, height in viewports:
         page.set_viewport_size({'width': width, 'height': height})
         page.wait_for_timeout(80)
+        page.locator('.sidebar .home').click()
+        expect(page.locator('.home-inner')).to_be_visible()
+        home_layout = _assert_home_adapts_to_content(page, f'{width}x{height}')
+        home_layout_evidence.append({'width': width, 'height': height, **home_layout})
+        if width == 1130:
+            shortcut = page.evaluate('''() => {
+              const platform = navigator.userAgentData?.platform || navigator.platform || '';
+              const modifier = /mac|iphone|ipad|ipod/i.test(platform) ? '⌘' : 'Ctrl';
+              return {
+                modifier,
+                homeHint: document.querySelector('.search-command kbd')?.textContent?.trim(),
+                toolbarTitle: document.querySelector('button[aria-label="搜索功能"]')?.getAttribute('title'),
+              };
+            }''')
+            assert shortcut['homeHint'] == f"{shortcut['modifier']} K", shortcut
+            assert shortcut['toolbarTitle'] == f"搜索 ({shortcut['modifier']} + K)", shortcut
+            for modifier in ('ctrlKey', 'metaKey'):
+                prevented = page.evaluate('''(modifier) => {
+                  const event = new KeyboardEvent('keydown', {key: 'k', [modifier]: true, bubbles: true, cancelable: true});
+                  return !window.dispatchEvent(event);
+                }''', modifier)
+                assert prevented, f'{modifier} + K did not invoke the search shortcut'
+                expect(page.get_by_role('dialog', name='搜索功能')).to_be_visible()
+                page.keyboard.press('Escape')
+                expect(page.get_by_role('dialog', name='搜索功能')).to_have_count(0)
         shell = page.locator('.app-shell').bounding_box()
         assert shell and shell['width'] <= width + 1 and shell['height'] <= height + 1, (width, height, shell)
         assert page.locator('.app-shell').evaluate('(node) => node.scrollWidth <= node.clientWidth + 1'), f'App shell overflows horizontally at {width}px'
-        if width in (1440, 900, 768):
+        if width in (1130, 1440, 900, 768):
             name = f'desktop-layout-{width}.png'
             page.screenshot(path=str(report_dir / name), full_page=True, animations='disabled')
             screenshots.append(name)
@@ -166,13 +230,16 @@ def verify_desktop_layout(page, report_dir):
     report = {
         'passed': True,
         'browserViewportBounds': [{'width': width, 'height': height} for width, height in viewports],
+        'homeLayoutAtEachViewport': 'accent heading stays on one line; action cards reflow by content width without clipped labels',
+        'homeLayoutMeasurements': home_layout_evidence,
+        'searchShortcut': 'Ctrl + K and Meta + K both open search; visible labels match the detected platform',
         'minimumViewportUsability': minimum_evidence,
         'nativeResize': 'one direction request on pointer-down; no JS resize calls',
         'fallbackResize': '24 pointer moves coalesced into one resize request',
         'screenshots': screenshots + [
             f'desktop-layout-{view}-{width}x{height}.png'
             for width, height in minimum_viewports
-            for view in ('home', 'pdf-cut', 'text-json')
+            for view in ('home-top', 'home', 'pdf-cut', 'text-json')
         ],
         'limitations': ['Browser viewport checks establish rendered control reachability at the measured CSS sizes; they do not establish native Windows compositor flicker behavior.'],
     }

@@ -64,6 +64,11 @@ const collapsed = ref(localStorage.getItem('ppx-sidebar-collapsed') === '1')
 const cmdOpen = ref(false)
 const theme = ref(localStorage.getItem('ppx-theme') || 'light')
 const density = ref(localStorage.getItem('ppx-density') || 'regular')
+const searchShortcutModifier = computed(() => {
+  if (typeof navigator === 'undefined') return 'Ctrl'
+  const platform = navigator.userAgentData?.platform || navigator.platform || ''
+  return /mac|iphone|ipad|ipod/i.test(platform) ? '⌘' : 'Ctrl'
+})
 
 const activeTool = computed(() => toolById(active.value))
 const activeView = computed(() => VIEWS[active.value] || HomeLauncher)
@@ -253,7 +258,7 @@ const toggleTheme = () => {
         <el-button text circle title="模块管理" aria-label="打开模块管理" @click="go('modules')">
           <el-icon :size="18"><SetUp /></el-icon>
         </el-button>
-        <el-button text circle title="搜索 (Ctrl/⌘ + K)" aria-label="搜索功能" @click="cmdOpen = true">
+        <el-button text circle :title="`搜索 (${searchShortcutModifier} + K)`" aria-label="搜索功能" @click="cmdOpen = true">
           <el-icon :size="18"><Search /></el-icon>
         </el-button>
         <el-button text circle title="切换主题" aria-label="切换主题" @click="toggleTheme">

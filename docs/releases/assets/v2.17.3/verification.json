@@ -1,0 +1,207 @@
+{
+  "version": "2.17.3",
+  "date": "2026-10-19",
+  "status": "local-verified-awaiting-tag-ci-and-release",
+  "predecessor": {
+    "version": "2.17.2",
+    "commit": "6ec0f59b171fd9588a72e022c3cdc4713c7b9da4",
+    "tagCi": {
+      "runId": 39203616896,
+      "status": "completed",
+      "conclusion": "cancelled",
+      "releaseExists": false,
+      "reason": "发布前补查发现旧窗口状态迁移缩水，保留标签但不发布。"
+    },
+    "workingTreeEvidence": {
+      "pythonTestsPassed": 178,
+      "frontendContractsPassed": 25,
+      "fullEndToEnd": true,
+      "note": "以上仅为 v2.17.2 前序工作树证据。"
+    }
+  },
+  "migrationRegression": {
+    "issue": "旧 schema1/2/3 状态迁移后窗口物理边界缩水或重复打开变化。",
+    "schema4Policy": "schema1 physical bounds are converted to logical units; schema2 already uses actual logical units; schema3 subtracts the measured constructor trim once. Hidden Windows startup applies the intended native physical bounds. Schema4 saves actual logical bounds.",
+    "test": "pyapp/package/verifyWindowsRestore.py (Windows native startup, isolated profile)",
+    "dpi": 192,
+    "roundsPerScenario": 3,
+    "totalRounds": 12,
+    "scenarioKeys": [
+      "freshDefault",
+      "legacySchema1",
+      "legacySchema2",
+      "legacySchema3"
+    ],
+    "allBoundsStable": true,
+    "allMigratedToSchema4": true,
+    "nativeWindowProbeCheckCount": 16,
+    "nativeWindowProbeAllPassed": true,
+    "priorFailureComparison": {
+      "version": "2.17.2",
+      "oldPhysicalBounds": {
+        "schemaVersion": 1,
+        "width": 2508,
+        "height": 1390,
+        "x": 160,
+        "y": 86
+      },
+      "observed": {
+        "width": 2456,
+        "height": 1248,
+        "x": 160,
+        "y": 86,
+        "constructorAdjustment": [
+          26,
+          71
+        ]
+      },
+      "sameBounds": false
+    },
+    "passed": true,
+    "evidence": [
+      "windows-restore.json",
+      "native-window.json",
+      "legacy-window-migration.json"
+    ]
+  },
+  "limits": {
+    "continuousVideoCaptured": false,
+    "claimNoFlicker": false,
+    "pending": [
+      "原生安装升级恢复验收",
+      "其他DPI硬件",
+      "多屏窗口迁移",
+      "CEF模式",
+      "广泛OCR文档与表格",
+      "LibreOffice可选依赖"
+    ]
+  },
+  "sourceTag": "v2.17.3",
+  "sourceScope": "Final pre-commit working tree based on 6ec0f59; all release CI checks rerun on the pushed annotated tag commit.",
+  "localChecks": {
+    "pythonTests": {
+      "passed": 180,
+      "log": "build/verification/v2173-python-tests.log"
+    },
+    "frontendContracts": {
+      "passed": 25,
+      "log": "build/verification/v2173-gui-tests.log"
+    },
+    "lint": {
+      "errors": 0,
+      "existingWarnings": 141,
+      "log": "build/verification/v2173-lint-final.log"
+    },
+    "frontendProductionBuild": {
+      "passed": true,
+      "command": "pnpm -C ./gui run build",
+      "note": "Final home polish build used by the final E2E and frozen package."
+    },
+    "encryptedPdfFlow": {
+      "passed": true,
+      "evidence": "pdf-encrypted-flow.json"
+    },
+    "frozenWindowsDesktopSmoke": {
+      "passed": true,
+      "operations": 62,
+      "aes256PdfCut": true,
+      "ocrPassed": true,
+      "imageProcessingPassed": true,
+      "evidence": "desktop-smoke.json",
+      "stage": "Final frontend after home polish"
+    },
+    "actualNativeResize": {
+      "rightEdgeAndBottomRightToMinimum": true,
+      "reopenedAtSameCapturedBounds": true,
+      "continuousVideoCaptured": false,
+      "evidence": "native-resize.json",
+      "stage": "Before final home polish; native resize implementation unchanged by home polish."
+    },
+    "frozenNormalLaunch": {
+      "passed": true,
+      "rounds": 2,
+      "exitCodes": [
+        0,
+        0
+      ],
+      "evidence": "frozen-window.json",
+      "stage": "Final frontend after home polish; default bounds preserved across two launches"
+    }
+  },
+  "finalValidation": {
+    "homePolishRegression": {
+      "passed": true,
+      "viewports": [
+        {
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "width": 1130,
+          "height": 761
+        },
+        {
+          "width": 1120,
+          "height": 780
+        },
+        {
+          "width": 900,
+          "height": 700
+        },
+        {
+          "width": 768,
+          "height": 620
+        }
+      ],
+      "minimumCssViewport": "603x341",
+      "evidence": "desktop-layout.json"
+    },
+    "fullEndToEnd": {
+      "passed": true,
+      "commands": [
+        "node ./pyapp/package/python.js tests/e2e/workspace_flow.py",
+        "node ./pyapp/package/python.js tests/e2e/visual_sweep.py"
+      ],
+      "pageErrors": [],
+      "evidence": "end-to-end.json"
+    },
+    "finalFrozenPackage": {
+      "passed": true,
+      "commands": [
+        "node ./pyapp/package/python.js -m PyInstaller --noconfirm --clean pyapp/spec/windows-folder.spec",
+        "多功能工具箱.exe --desktop-smoke <isolated-report>"
+      ],
+      "normalLaunchRounds": 2,
+      "exitCodes": [
+        0,
+        0
+      ],
+      "evidence": [
+        "desktop-smoke.json",
+        "frozen-window.json"
+      ]
+    },
+    "screenshots": {
+      "kind": "browser rendered final frontend",
+      "files": [
+        "home-1130.png",
+        "home-minimum.png"
+      ],
+      "nativeScreenshotArchived": false
+    }
+  },
+  "publication": {
+    "statusAtCommit": "not-triggered",
+    "tag": "v2.17.3",
+    "policy": "Commit and push first; only publish after all three platform tag CI builds succeed. Post-publication verification records the actual commit, run, and release assets separately."
+  },
+  "evidenceSha256": {
+    "desktop-layout.json": "7894428d8cd25f7ba287e33958b2b7089381b88eb056e91d841e900b64424da7",
+    "pdf-encrypted-flow.json": "c09a461a4ac0b78d3bfda3c1f39d708f0cc42d670fce0de8f524c484e08e2cd9",
+    "desktop-smoke.json": "b594dd308ec9f44b4edbd2b953035d2e1dc80a7fe253be0155d044e4c51c9ecd",
+    "frozen-window.json": "ee91bf6ccbdf5d29374b13372685f9d0e935bfa34900c5bb8bd29fa32c78ecb4",
+    "home-1130.png": "bba38483b25217c779d2dbb27cb83049779e012e0c354316e3c60fbc70a3f1e2",
+    "home-minimum.png": "18ee5e2be3228bca1ce1f092f1d24576bf7d47c2b33dc37f44c8075178b5262c",
+    "end-to-end.json": "cd63d2f9b817872a854365c28a386e2d81440fd0121808626a549491d13cbd36"
+  }
+}

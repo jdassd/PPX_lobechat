@@ -1,0 +1,60 @@
+{
+  "scope": "final v2.17.3 working tree before commit; CI reruns the tagged pushed commit",
+  "passed": true,
+  "pageErrors": [],
+  "workspaceChecks": [
+    "draft retention",
+    "restart configuration",
+    "partial failure",
+    "retry only failed input",
+    "output dimensions and alpha",
+    "handoff scoped to target module",
+    "1000-page PDF editing/undo/reorder/export",
+    "two-step workflow via forms",
+    "pause only blocks new tasks",
+    "cancel queued task",
+    "browser collection detail retry without duplicate rows",
+    "built-in workflow templates and history result actions"
+  ],
+  "encryptedPdf": {
+    "passed": true,
+    "checks": [
+      "AES-128 and AES-256 correct-password cut and reopened page-order/text verification",
+      "empty-user-password encrypted PDF cut without credentials",
+      "wrong and missing password errors with no output artifact",
+      "encrypted split and ordered per-file-password merge verified by reopening outputs",
+      "source files unchanged",
+      "password excluded from localStorage and cleared when changing source"
+    ]
+  },
+  "desktopLayoutPassed": true,
+  "navigationSmoke": [
+    "转换中心",
+    "图片处理",
+    "PDF 工具",
+    "Word 工具",
+    "Excel 工具",
+    "文档中心",
+    "文件批处理",
+    "自动化工作流",
+    "网页数据采集",
+    "文本工具",
+    "视频处理",
+    "印章图片生成",
+    "设置与维护",
+    "系统诊断（高级）"
+  ],
+  "navigationWait": {
+    "condition": "target component visible with nonempty text",
+    "timeoutMs": 15000,
+    "imageChunkDelayMs": 1200,
+    "delayedChunks": 1
+  },
+  "favoriteKeyboard": "toggles without navigating",
+  "textWorkflows": [
+    "JSON format and invalid JSON feedback",
+    "case transform",
+    "deduplicate and statistics",
+    "literal replacement and invalid regex feedback"
+  ]
+}

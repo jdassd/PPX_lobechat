@@ -1,0 +1,897 @@
+{
+  "passed": true,
+  "browserViewportBounds": [
+    {
+      "width": 1440,
+      "height": 900
+    },
+    {
+      "width": 1130,
+      "height": 761
+    },
+    {
+      "width": 1120,
+      "height": 780
+    },
+    {
+      "width": 900,
+      "height": 700
+    },
+    {
+      "width": 768,
+      "height": 620
+    }
+  ],
+  "homeLayoutAtEachViewport": "accent heading stays on one line; action cards reflow by content width without clipped labels",
+  "homeLayoutMeasurements": [
+    {
+      "width": 1440,
+      "height": 900,
+      "containerWidth": 1120,
+      "headingWidth": 440,
+      "headingScrollWidth": 440,
+      "accentLines": 1,
+      "searchLabelWhiteSpace": "nowrap",
+      "searchLabelHeight": 17,
+      "searchLabelFontSize": 13.3333,
+      "columns": 4,
+      "clippedLabels": []
+    },
+    {
+      "width": 1130,
+      "height": 761,
+      "containerWidth": 821,
+      "headingWidth": 755,
+      "headingScrollWidth": 755,
+      "accentLines": 1,
+      "searchLabelWhiteSpace": "nowrap",
+      "searchLabelHeight": 17,
+      "searchLabelFontSize": 13.3333,
+      "columns": 2,
+      "clippedLabels": []
+    },
+    {
+      "width": 1120,
+      "height": 780,
+      "containerWidth": 811,
+      "headingWidth": 745,
+      "headingScrollWidth": 745,
+      "accentLines": 1,
+      "searchLabelWhiteSpace": "nowrap",
+      "searchLabelHeight": 17,
+      "searchLabelFontSize": 13.3333,
+      "columns": 2,
+      "clippedLabels": []
+    },
+    {
+      "width": 900,
+      "height": 700,
+      "containerWidth": 603,
+      "headingWidth": 547,
+      "headingScrollWidth": 547,
+      "accentLines": 1,
+      "searchLabelWhiteSpace": "nowrap",
+      "searchLabelHeight": 17,
+      "searchLabelFontSize": 13.3333,
+      "columns": 2,
+      "clippedLabels": []
+    },
+    {
+      "width": 768,
+      "height": 620,
+      "containerWidth": 481.55999999999995,
+      "headingWidth": 434,
+      "headingScrollWidth": 434,
+      "accentLines": 1,
+      "searchLabelWhiteSpace": "nowrap",
+      "searchLabelHeight": 17,
+      "searchLabelFontSize": 13.3333,
+      "columns": 1,
+      "clippedLabels": []
+    }
+  ],
+  "searchShortcut": "Ctrl + K and Meta + K both open search; visible labels match the detected platform",
+  "minimumViewportUsability": [
+    {
+      "width": 640,
+      "height": 400,
+      "homeContent": {
+        "clientHeight": 365,
+        "scrollHeight": 1758,
+        "clientWidth": 415,
+        "scrollWidth": 415
+      },
+      "homeLayout": {
+        "containerWidth": 363.79999999999995,
+        "headingWidth": 318,
+        "headingScrollWidth": 318,
+        "accentLines": 1,
+        "searchLabelWhiteSpace": "nowrap",
+        "searchLabelHeight": 17,
+        "searchLabelFontSize": 13.3333,
+        "columns": 1,
+        "clippedLabels": []
+      },
+      "pdfCutScroll": {
+        "clientHeight": 253,
+        "scrollHeight": 1746,
+        "clientWidth": 415,
+        "scrollWidth": 415
+      },
+      "reachableControls": [
+        {
+          "label": "标题栏关闭按钮",
+          "bounds": {
+            "x": 600,
+            "y": 3.5,
+            "width": 28,
+            "height": 28
+          }
+        },
+        {
+          "label": "主导航：首页",
+          "bounds": {
+            "x": 12,
+            "y": 47,
+            "width": 200,
+            "height": 36
+          }
+        },
+        {
+          "label": "首页模块管理入口",
+          "bounds": {
+            "x": 267.6,
+            "y": 275.6,
+            "width": 329.8,
+            "height": 35
+          }
+        },
+        {
+          "label": "主导航：PDF工具",
+          "bounds": {
+            "x": 12,
+            "y": 201.6,
+            "width": 200,
+            "height": 36
+          }
+        },
+        {
+          "label": "PDF页码切割入口",
+          "bounds": {
+            "x": 563.8,
+            "y": 101,
+            "width": 76,
+            "height": 36
+          }
+        },
+        {
+          "label": "页码切割执行按钮",
+          "bounds": {
+            "x": 266,
+            "y": 258.0,
+            "width": 105.3,
+            "height": 32
+          }
+        },
+        {
+          "label": "主导航：文件批处理",
+          "bounds": {
+            "x": 12,
+            "y": 162.2,
+            "width": 200,
+            "height": 36
+          }
+        },
+        {
+          "label": "文件搜索执行按钮",
+          "bounds": {
+            "x": 386,
+            "y": 257.2,
+            "width": 86.8,
+            "height": 32
+          }
+        },
+        {
+          "label": "主导航：文本工具",
+          "bounds": {
+            "x": 12,
+            "y": 162.4,
+            "width": 200,
+            "height": 36
+          }
+        },
+        {
+          "label": "文本JSON工具入口",
+          "bounds": {
+            "x": 237,
+            "y": 101,
+            "width": 89.5,
+            "height": 36
+          }
+        },
+        {
+          "label": "JSON执行按钮",
+          "bounds": {
+            "x": 403.3,
+            "y": 305.4,
+            "width": 58.4,
+            "height": 32
+          }
+        }
+      ],
+      "horizontalOverflow": [
+        {
+          "document": 0,
+          "body": 0,
+          "workspace": 0,
+          "activeView": 0
+        },
+        {
+          "document": 0,
+          "body": 0,
+          "workspace": 0,
+          "activeView": 0
+        },
+        {
+          "document": 0,
+          "body": 0,
+          "workspace": 0,
+          "activeView": 0
+        },
+        {
+          "document": 0,
+          "body": 0,
+          "workspace": 0,
+          "activeView": 0
+        }
+      ]
+    },
+    {
+      "width": 627,
+      "height": 364,
+      "homeContent": {
+        "clientHeight": 329,
+        "scrollHeight": 1757,
+        "clientWidth": 402,
+        "scrollWidth": 402
+      },
+      "homeLayout": {
+        "containerWidth": 351.84000000000003,
+        "headingWidth": 306,
+        "headingScrollWidth": 306,
+        "accentLines": 1,
+        "searchLabelWhiteSpace": "nowrap",
+        "searchLabelHeight": 17,
+        "searchLabelFontSize": 13.3333,
+        "columns": 1,
+        "clippedLabels": []
+      },
+      "pdfCutScroll": {
+        "clientHeight": 217,
+        "scrollHeight": 1768,
+        "clientWidth": 402,
+        "scrollWidth": 402
+      },
+      "reachableControls": [
+        {
+          "label": "标题栏关闭按钮",
+          "bounds": {
+            "x": 587,
+            "y": 3.5,
+            "width": 28,
+            "height": 28
+          }
+        },
+        {
+          "label": "主导航：首页",
+          "bounds": {
+            "x": 12,
+            "y": 47,
+            "width": 200,
+            "height": 36
+          }
+        },
+        {
+          "label": "首页模块管理入口",
+          "bounds": {
+            "x": 267.1,
+            "y": 240.1,
+            "width": 327.4,
+            "height": 35
+          }
+        },
+        {
+          "label": "主导航：PDF工具",
+          "bounds": {
+            "x": 12,
+            "y": 144.6,
+            "width": 200,
+            "height": 36
+          }
+        },
+        {
+          "label": "PDF页码切割入口",
+          "bounds": {
+            "x": 550.8,
+            "y": 101,
+            "width": 76,
+            "height": 36
+          }
+        },
+        {
+          "label": "页码切割执行按钮",
+          "bounds": {
+            "x": 266,
+            "y": 240.0,
+            "width": 105.3,
+            "height": 32
+          }
+        },
+        {
+          "label": "主导航：文件批处理",
+          "bounds": {
+            "x": 12,
+            "y": 144.2,
+            "width": 200,
+            "height": 36
+          }
+        },
+        {
+          "label": "文件搜索执行按钮",
+          "bounds": {
+            "x": 386,
+            "y": 239.2,
+            "width": 86.8,
+            "height": 32
+          }
+        },
+        {
+          "label": "主导航：文本工具",
+          "bounds": {
+            "x": 12,
+            "y": 144.4,
+            "width": 200,
+            "height": 36
+          }
+        },
+        {
+          "label": "文本JSON工具入口",
+          "bounds": {
+            "x": 237,
+            "y": 101,
+            "width": 89.5,
+            "height": 36
+          }
+        },
+        {
+          "label": "JSON执行按钮",
+          "bounds": {
+            "x": 396.8,
+            "y": 269.4,
+            "width": 58.4,
+            "height": 32
+          }
+        }
+      ],
+      "horizontalOverflow": [
+        {
+          "document": 0,
+          "body": 0,
+          "workspace": 0,
+          "activeView": 0
+        },
+        {
+          "document": 0,
+          "body": 0,
+          "workspace": 0,
+          "activeView": 0
+        },
+        {
+          "document": 0,
+          "body": 0,
+          "workspace": 0,
+          "activeView": 0
+        },
+        {
+          "document": 0,
+          "body": 0,
+          "workspace": 0,
+          "activeView": 0
+        }
+      ]
+    },
+    {
+      "width": 617,
+      "height": 360,
+      "homeContent": {
+        "clientHeight": 325,
+        "scrollHeight": 1787,
+        "clientWidth": 392,
+        "scrollWidth": 392
+      },
+      "homeLayout": {
+        "containerWidth": 342.64,
+        "headingWidth": 297,
+        "headingScrollWidth": 297,
+        "accentLines": 1,
+        "searchLabelWhiteSpace": "nowrap",
+        "searchLabelHeight": 17,
+        "searchLabelFontSize": 13.3333,
+        "columns": 1,
+        "clippedLabels": []
+      },
+      "pdfCutScroll": {
+        "clientHeight": 213,
+        "scrollHeight": 1768,
+        "clientWidth": 392,
+        "scrollWidth": 392
+      },
+      "reachableControls": [
+        {
+          "label": "标题栏关闭按钮",
+          "bounds": {
+            "x": 577,
+            "y": 3.5,
+            "width": 28,
+            "height": 28
+          }
+        },
+        {
+          "label": "主导航：首页",
+          "bounds": {
+            "x": 12,
+            "y": 47,
+            "width": 200,
+            "height": 36
+          }
+        },
+        {
+          "label": "首页模块管理入口",
+          "bounds": {
+            "x": 266.7,
+            "y": 235.6,
+            "width": 327.4,
+            "height": 35
+          }
+        },
+        {
+          "label": "主导航：PDF工具",
+          "bounds": {
+            "x": 12,
+            "y": 142.6,
+            "width": 200,
+            "height": 36
+          }
+        },
+        {
+          "label": "PDF页码切割入口",
+          "bounds": {
+            "x": 540.8,
+            "y": 101,
+            "width": 76,
+            "height": 36
+          }
+        },
+        {
+          "label": "页码切割执行按钮",
+          "bounds": {
+            "x": 266,
+            "y": 238.0,
+            "width": 105.3,
+            "height": 32
+          }
+        },
+        {
+          "label": "主导航：文件批处理",
+          "bounds": {
+            "x": 12,
+            "y": 142.2,
+            "width": 200,
+            "height": 36
+          }
+        },
+        {
+          "label": "文件搜索执行按钮",
+          "bounds": {
+            "x": 386,
+            "y": 237.2,
+            "width": 86.8,
+            "height": 32
+          }
+        },
+        {
+          "label": "主导航：文本工具",
+          "bounds": {
+            "x": 12,
+            "y": 142.4,
+            "width": 200,
+            "height": 36
+          }
+        },
+        {
+          "label": "文本JSON工具入口",
+          "bounds": {
+            "x": 237,
+            "y": 101,
+            "width": 89.5,
+            "height": 36
+          }
+        },
+        {
+          "label": "JSON执行按钮",
+          "bounds": {
+            "x": 391.8,
+            "y": 265.4,
+            "width": 58.4,
+            "height": 32
+          }
+        }
+      ],
+      "horizontalOverflow": [
+        {
+          "document": 0,
+          "body": 0,
+          "workspace": 0,
+          "activeView": 0
+        },
+        {
+          "document": 0,
+          "body": 0,
+          "workspace": 0,
+          "activeView": 0
+        },
+        {
+          "document": 0,
+          "body": 0,
+          "workspace": 0,
+          "activeView": 0
+        },
+        {
+          "document": 0,
+          "body": 0,
+          "workspace": 0,
+          "activeView": 0
+        }
+      ]
+    },
+    {
+      "width": 605,
+      "height": 348,
+      "homeContent": {
+        "clientHeight": 313,
+        "scrollHeight": 1786,
+        "clientWidth": 380,
+        "scrollWidth": 386
+      },
+      "homeLayout": {
+        "containerWidth": 331.6,
+        "headingWidth": 286,
+        "headingScrollWidth": 286,
+        "accentLines": 1,
+        "searchLabelWhiteSpace": "nowrap",
+        "searchLabelHeight": 17,
+        "searchLabelFontSize": 13.3333,
+        "columns": 1,
+        "clippedLabels": []
+      },
+      "pdfCutScroll": {
+        "clientHeight": 201,
+        "scrollHeight": 1768,
+        "clientWidth": 380,
+        "scrollWidth": 380
+      },
+      "reachableControls": [
+        {
+          "label": "标题栏关闭按钮",
+          "bounds": {
+            "x": 565,
+            "y": 3.5,
+            "width": 28,
+            "height": 28
+          }
+        },
+        {
+          "label": "主导航：首页",
+          "bounds": {
+            "x": 12,
+            "y": 47,
+            "width": 200,
+            "height": 36
+          }
+        },
+        {
+          "label": "首页模块管理入口",
+          "bounds": {
+            "x": 266.2,
+            "y": 224.1,
+            "width": 327.4,
+            "height": 35
+          }
+        },
+        {
+          "label": "主导航：PDF工具",
+          "bounds": {
+            "x": 12,
+            "y": 136.6,
+            "width": 200,
+            "height": 36
+          }
+        },
+        {
+          "label": "PDF页码切割入口",
+          "bounds": {
+            "x": 528.8,
+            "y": 101,
+            "width": 76,
+            "height": 36
+          }
+        },
+        {
+          "label": "页码切割执行按钮",
+          "bounds": {
+            "x": 266,
+            "y": 232.0,
+            "width": 105.3,
+            "height": 32
+          }
+        },
+        {
+          "label": "主导航：文件批处理",
+          "bounds": {
+            "x": 12,
+            "y": 136.2,
+            "width": 200,
+            "height": 36
+          }
+        },
+        {
+          "label": "文件搜索执行按钮",
+          "bounds": {
+            "x": 386,
+            "y": 231.2,
+            "width": 86.8,
+            "height": 32
+          }
+        },
+        {
+          "label": "主导航：文本工具",
+          "bounds": {
+            "x": 12,
+            "y": 136.4,
+            "width": 200,
+            "height": 36
+          }
+        },
+        {
+          "label": "文本JSON工具入口",
+          "bounds": {
+            "x": 237,
+            "y": 101,
+            "width": 89.5,
+            "height": 36
+          }
+        },
+        {
+          "label": "JSON执行按钮",
+          "bounds": {
+            "x": 385.8,
+            "y": 253.4,
+            "width": 58.4,
+            "height": 32
+          }
+        }
+      ],
+      "horizontalOverflow": [
+        {
+          "document": 0,
+          "body": 0,
+          "workspace": 0,
+          "activeView": 0
+        },
+        {
+          "document": 0,
+          "body": 0,
+          "workspace": 0,
+          "activeView": 0
+        },
+        {
+          "document": 0,
+          "body": 0,
+          "workspace": 0,
+          "activeView": 0
+        },
+        {
+          "document": 0,
+          "body": 0,
+          "workspace": 0,
+          "activeView": 0
+        }
+      ]
+    },
+    {
+      "width": 603,
+      "height": 341,
+      "homeContent": {
+        "clientHeight": 306,
+        "scrollHeight": 1786,
+        "clientWidth": 378,
+        "scrollWidth": 386
+      },
+      "homeLayout": {
+        "containerWidth": 329.76,
+        "headingWidth": 284,
+        "headingScrollWidth": 284,
+        "accentLines": 1,
+        "searchLabelWhiteSpace": "nowrap",
+        "searchLabelHeight": 17,
+        "searchLabelFontSize": 13.3333,
+        "columns": 1,
+        "clippedLabels": []
+      },
+      "pdfCutScroll": {
+        "clientHeight": 194,
+        "scrollHeight": 1768,
+        "clientWidth": 378,
+        "scrollWidth": 378
+      },
+      "reachableControls": [
+        {
+          "label": "标题栏关闭按钮",
+          "bounds": {
+            "x": 563,
+            "y": 3.5,
+            "width": 28,
+            "height": 28
+          }
+        },
+        {
+          "label": "主导航：首页",
+          "bounds": {
+            "x": 12,
+            "y": 47,
+            "width": 200,
+            "height": 36
+          }
+        },
+        {
+          "label": "首页模块管理入口",
+          "bounds": {
+            "x": 266.1,
+            "y": 217,
+            "width": 327.4,
+            "height": 35
+          }
+        },
+        {
+          "label": "主导航：PDF工具",
+          "bounds": {
+            "x": 12,
+            "y": 132.6,
+            "width": 200,
+            "height": 36
+          }
+        },
+        {
+          "label": "PDF页码切割入口",
+          "bounds": {
+            "x": 526.8,
+            "y": 101,
+            "width": 76,
+            "height": 36
+          }
+        },
+        {
+          "label": "页码切割执行按钮",
+          "bounds": {
+            "x": 266,
+            "y": 228.0,
+            "width": 105.3,
+            "height": 32
+          }
+        },
+        {
+          "label": "主导航：文件批处理",
+          "bounds": {
+            "x": 12,
+            "y": 133.2,
+            "width": 200,
+            "height": 36
+          }
+        },
+        {
+          "label": "文件搜索执行按钮",
+          "bounds": {
+            "x": 386,
+            "y": 228.2,
+            "width": 86.8,
+            "height": 32
+          }
+        },
+        {
+          "label": "主导航：文本工具",
+          "bounds": {
+            "x": 12,
+            "y": 133.4,
+            "width": 200,
+            "height": 36
+          }
+        },
+        {
+          "label": "文本JSON工具入口",
+          "bounds": {
+            "x": 237,
+            "y": 101,
+            "width": 89.5,
+            "height": 36
+          }
+        },
+        {
+          "label": "JSON执行按钮",
+          "bounds": {
+            "x": 384.8,
+            "y": 246.4,
+            "width": 58.4,
+            "height": 32
+          }
+        }
+      ],
+      "horizontalOverflow": [
+        {
+          "document": 0,
+          "body": 0,
+          "workspace": 0,
+          "activeView": 0
+        },
+        {
+          "document": 0,
+          "body": 0,
+          "workspace": 0,
+          "activeView": 0
+        },
+        {
+          "document": 0,
+          "body": 0,
+          "workspace": 0,
+          "activeView": 0
+        },
+        {
+          "document": 0,
+          "body": 0,
+          "workspace": 0,
+          "activeView": 0
+        }
+      ]
+    }
+  ],
+  "nativeResize": "one direction request on pointer-down; no JS resize calls",
+  "fallbackResize": "24 pointer moves coalesced into one resize request",
+  "screenshots": [
+    "desktop-layout-1440.png",
+    "desktop-layout-1130.png",
+    "desktop-layout-900.png",
+    "desktop-layout-768.png",
+    "desktop-layout-home-top-640x400.png",
+    "desktop-layout-home-640x400.png",
+    "desktop-layout-pdf-cut-640x400.png",
+    "desktop-layout-text-json-640x400.png",
+    "desktop-layout-home-top-627x364.png",
+    "desktop-layout-home-627x364.png",
+    "desktop-layout-pdf-cut-627x364.png",
+    "desktop-layout-text-json-627x364.png",
+    "desktop-layout-home-top-617x360.png",
+    "desktop-layout-home-617x360.png",
+    "desktop-layout-pdf-cut-617x360.png",
+    "desktop-layout-text-json-617x360.png",
+    "desktop-layout-home-top-605x348.png",
+    "desktop-layout-home-605x348.png",
+    "desktop-layout-pdf-cut-605x348.png",
+    "desktop-layout-text-json-605x348.png",
+    "desktop-layout-home-top-603x341.png",
+    "desktop-layout-home-603x341.png",
+    "desktop-layout-pdf-cut-603x341.png",
+    "desktop-layout-text-json-603x341.png"
+  ],
+  "limitations": [
+    "Browser viewport checks establish rendered control reachability at the measured CSS sizes; they do not establish native Windows compositor flicker behavior."
+  ]
+}

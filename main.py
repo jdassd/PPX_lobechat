@@ -38,11 +38,13 @@ import webview
 from api.api import API
 from api.system.window_geometry import (
     apply_windows_maximized_bounds,
+    apply_windows_startup_geometry,
     calculate_window_geometry,
     get_windows_scale_factor,
     get_windows_workareas,
     logicalize_native_window_value,
     logicalize_saved_window_state,
+    migrate_display_geometry,
 )
 from pyapp.config.config import Config
 from pyapp.db.db import DB
@@ -86,6 +88,9 @@ def on_loaded():
 def on_closing(window=None):
     # print('程序关闭')
     if window is not None:
+        startup_show_timer = getattr(window, '_ppx_startup_show_timer', None)
+        if startup_show_timer is not None:
+            startup_show_timer.cancel()
         _save_window_state(window)
     try:
         api.workflow_stop()
@@ -195,6 +200,7 @@ def _load_window_state(scale_factor=1.0):
         if not MIN_WINDOW_WIDTH <= width <= 10000 or not MIN_WINDOW_HEIGHT <= height <= 10000:
             return None
         return {
+            'schemaVersion': int(payload.get('schemaVersion') or 1),
             'width': width,
             'height': height,
             'x': int(payload['x']) if payload.get('x') is not None else None,
@@ -207,9 +213,9 @@ def _load_window_state(scale_factor=1.0):
 def _save_window_state(window):
     try:
         payload = {
-            'schemaVersion': 3,
-            'width': max(MIN_WINDOW_WIDTH, logicalize_native_window_value(window.width, _window_coordinate_scale) + _window_constructor_adjustment[0]),
-            'height': max(MIN_WINDOW_HEIGHT, logicalize_native_window_value(window.height, _window_coordinate_scale) + _window_constructor_adjustment[1]),
+            'schemaVersion': 4,
+            'width': max(MIN_WINDOW_WIDTH, logicalize_native_window_value(window.width, _window_coordinate_scale)),
+            'height': max(MIN_WINDOW_HEIGHT, logicalize_native_window_value(window.height, _window_coordinate_scale)),
             'x': logicalize_native_window_value(window.x, _window_coordinate_scale),
             'y': logicalize_native_window_value(window.y, _window_coordinate_scale),
             'savedAt': time.time(),
@@ -262,13 +268,31 @@ def _on_window_shown(window):
     if Config.appSystem != 'Windows':
         _resize_window_for_primary_screen(window, _window_state_restored)
     else:
-        # WinForms scales ClientSize before pywebview removes the caption.
-        # Calibrate that constructor trim once, so saving/reopening does not
-        # subtract the old non-client dimensions on every launch.
-        _window_constructor_adjustment = (
-            int(window.initial_width) - logicalize_native_window_value(window.width, _window_coordinate_scale),
-            int(window.initial_height) - logicalize_native_window_value(window.height, _window_coordinate_scale),
-        )
+        # The WinForms Form has finished DPI setup at this event. Apply the
+        # intended bounds while the startup window is still hidden so its first
+        # visible frame and subsequent saves use the same dimensions.
+        startup_geometry = getattr(window, '_ppx_startup_geometry', None)
+        if startup_geometry:
+            trim = (
+                int(window.initial_width) - logicalize_native_window_value(window.width, _window_coordinate_scale),
+                int(window.initial_height) - logicalize_native_window_value(window.height, _window_coordinate_scale),
+            )
+            startup_geometry = migrate_display_geometry(
+                startup_geometry,
+                getattr(window, '_ppx_startup_schema', 0),
+                trim,
+                min_size=window.min_size,
+            )
+            window._ppx_startup_geometry = startup_geometry
+            applied = apply_windows_startup_geometry(window, startup_geometry, _window_coordinate_scale)
+            window._ppx_startup_geometry_applied = applied
+        if not startup_geometry or not getattr(window, '_ppx_startup_geometry_applied', False):
+            _window_constructor_adjustment = (
+                int(window.initial_width) - logicalize_native_window_value(window.width, _window_coordinate_scale),
+                int(window.initial_height) - logicalize_native_window_value(window.height, _window_coordinate_scale),
+            )
+        else:
+            _window_constructor_adjustment = (0, 0)
         apply_windows_maximized_bounds(window)
         window.events.moved += lambda *_: apply_windows_maximized_bounds(window)
     on_shown()
@@ -382,16 +406,62 @@ def WebViewApp(ifDev=False, ifCef=False, open_files=None):
         min_size=geometry['min_size'],
         frameless=True,  # 禁用系统默认窗口装饰，使用自定义顶栏
         resizable=True,
-        easy_drag=False
+        easy_drag=False,
+        hidden=Config.appSystem == 'Windows' and not ifCef,
     )
+    if Config.appSystem == 'Windows' and not ifCef:
+        window._ppx_startup_geometry = geometry
+        window._ppx_startup_schema = (window_state or {}).get('schemaVersion', 0)
 
     # 获取窗口实例
     api.setWindow(window)
 
+    # pywebview dispatches shown and loaded handlers on independent threads.
+    # Prepare once, and do not reveal a fast-loading page before its bounds are ready.
+    startup_geometry_ready = threading.Event()
+    startup_prepare_lock = threading.Lock()
+    startup_prepared = False
+
+    def prepare_startup_window():
+        nonlocal startup_prepared
+        with startup_prepare_lock:
+            if startup_prepared:
+                return
+            startup_prepared = True
+        try:
+            _on_window_shown(window)
+        finally:
+            startup_geometry_ready.set()
+
     # 绑定事件
-    window.events.shown += lambda: _on_window_shown(window)
+    window.events.shown += prepare_startup_window
     window.events.loaded += on_loaded
     window.events.closing += lambda: on_closing(window)
+
+    startup_show_lock = threading.Lock()
+    startup_shown = False
+    startup_show_timer = None
+
+    def show_startup_window(wait_for_geometry=True):
+        nonlocal startup_shown
+        if wait_for_geometry:
+            startup_geometry_ready.wait(timeout=15)
+        with startup_show_lock:
+            if startup_shown:
+                return
+            startup_shown = True
+        if startup_show_timer is not None:
+            startup_show_timer.cancel()
+        window.show()
+
+    if Config.appSystem == 'Windows' and not ifCef:
+        # The Form is dimensioned on its first hidden Shown event. Reveal it
+        # after page load, with a timeout fallback if WebView2 fails to load.
+        window.events.loaded += show_startup_window
+        startup_show_timer = threading.Timer(15, lambda: show_startup_window(False))
+        startup_show_timer.daemon = True
+        window._ppx_startup_show_timer = startup_show_timer
+        startup_show_timer.start()
 
     # 启动窗口
     try:

@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from api.system.window import WindowMixin
 from api.system.window_geometry import (
     apply_windows_maximized_bounds,
+    apply_windows_startup_geometry,
     calculate_window_geometry,
     ensure_windows_resize_frame,
     get_windows_scale_factor,
@@ -62,6 +63,7 @@ def main():
         'resizeEvents': 0,
     }
     finished = threading.Event()
+    geometry_ready = threading.Event()
     errors = []
     holder = {}
 
@@ -101,13 +103,22 @@ def main():
             results['native']['maximized_bounds_applied'] = applied
             results['native']['resize_frame_applied'] = resize_frame
 
-    window.events.shown += set_maximized_bounds
+    def prepare_window(*_):
+        try:
+            holder['startup_geometry_applied'] = apply_windows_startup_geometry(window, geometry, scale_factor)
+            set_maximized_bounds()
+        finally:
+            geometry_ready.set()
+
+    window.events.shown += prepare_window
     window.events.moved += set_maximized_bounds
 
     def run_probe():
         try:
             if not window.events.shown.wait(20):
                 raise RuntimeError('native pywebview test window did not become visible')
+            if not geometry_ready.wait(20):
+                raise RuntimeError('native window geometry was not initialized')
 
             native = window.native
             hwnd = native.Handle.ToInt64()
@@ -154,6 +165,10 @@ def main():
                 and initial['x'] + initial['width'] <= physical_workarea['x'] + physical_workarea['width']
                 and initial['y'] + initial['height'] <= physical_workarea['y'] + physical_workarea['height']
             )
+            results['checks']['initial_matches_planned_physical_size'] = (
+                abs(initial['width'] - round(geometry['width'] * scale_factor)) <= 2
+                and abs(initial['height'] - round(geometry['height'] * scale_factor)) <= 2
+            )
             results['checks']['work_area_scale_conversion'] = bool(
                 physical_workarea
                 and abs(physical_workarea['x'] - workarea['x'] * scale_factor) <= 2
@@ -167,8 +182,8 @@ def main():
             )
             results['checks']['native_resize_frame_enabled'] = bool(
                 holder.get('resize_frame_applied')
-                and int(native.MinimumSize.Width) >= geometry['min_size'][0]
-                and int(native.MinimumSize.Height) >= geometry['min_size'][1]
+                and int(native.MinimumSize.Width) >= round(geometry['min_size'][0] * scale_factor)
+                and int(native.MinimumSize.Height) >= round(geometry['min_size'][1] * scale_factor)
             )
 
             user32 = ctypes.windll.user32
@@ -255,8 +270,8 @@ def main():
                 '({dpr: window.devicePixelRatio, width: window.innerWidth, height: window.innerHeight})'
             )
             results['checks']['minimum_size_enforced'] = (
-                int(native.Width) >= geometry['min_size'][0]
-                and int(native.Height) >= geometry['min_size'][1]
+                int(native.Width) >= round(geometry['min_size'][0] * scale_factor)
+                and int(native.Height) >= round(geometry['min_size'][1] * scale_factor)
             )
 
             window.maximize()

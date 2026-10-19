@@ -1,0 +1,28 @@
+{
+  "version": "2.17.3",
+  "rounds": [
+    {
+      "exitCode": 0,
+      "savedState": {
+        "schemaVersion": 4,
+        "width": 1280,
+        "height": 766,
+        "x": 80,
+        "y": 43,
+        "savedAt": 1792389675.9085739
+      }
+    },
+    {
+      "exitCode": 0,
+      "savedState": {
+        "schemaVersion": 4,
+        "width": 1280,
+        "height": 766,
+        "x": 80,
+        "y": 43,
+        "savedAt": 1792389729.8966794
+      }
+    }
+  ],
+  "passed": true
+}

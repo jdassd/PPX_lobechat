@@ -1,0 +1,262 @@
+{
+  "platform": "Windows",
+  "dpi": 192,
+  "scaleFactor": 2.0,
+  "roundsPerScenario": 3,
+  "totalRounds": 12,
+  "scenarios": {
+    "freshDefault": {
+      "rounds": [
+        {
+          "physicalBounds": {
+            "width": 2560,
+            "height": 1532,
+            "x": 160,
+            "y": 86
+          },
+          "visible": true,
+          "geometryApplied": true,
+          "minimumSizePhysical": {
+            "width": 1280,
+            "height": 800
+          }
+        },
+        {
+          "physicalBounds": {
+            "width": 2560,
+            "height": 1532,
+            "x": 160,
+            "y": 86
+          },
+          "visible": true,
+          "geometryApplied": true,
+          "minimumSizePhysical": {
+            "width": 1280,
+            "height": 800
+          }
+        },
+        {
+          "physicalBounds": {
+            "width": 2560,
+            "height": 1532,
+            "x": 160,
+            "y": 86
+          },
+          "visible": true,
+          "geometryApplied": true,
+          "minimumSizePhysical": {
+            "width": 1280,
+            "height": 800
+          }
+        }
+      ],
+      "finalSchemaVersion": 4,
+      "finalLogicalBounds": {
+        "width": 1280,
+        "height": 766,
+        "x": 80,
+        "y": 43
+      },
+      "checks": {
+        "freshDefault_startup_geometry": true,
+        "freshDefault_close_reopen_stable": true,
+        "freshDefault_saved_schema_is_current": true
+      }
+    },
+    "legacySchema1": {
+      "rounds": [
+        {
+          "physicalBounds": {
+            "width": 2508,
+            "height": 1390,
+            "x": 160,
+            "y": 86
+          },
+          "visible": true,
+          "geometryApplied": true,
+          "minimumSizePhysical": {
+            "width": 1280,
+            "height": 800
+          }
+        },
+        {
+          "physicalBounds": {
+            "width": 2508,
+            "height": 1390,
+            "x": 160,
+            "y": 86
+          },
+          "visible": true,
+          "geometryApplied": true,
+          "minimumSizePhysical": {
+            "width": 1280,
+            "height": 800
+          }
+        },
+        {
+          "physicalBounds": {
+            "width": 2508,
+            "height": 1390,
+            "x": 160,
+            "y": 86
+          },
+          "visible": true,
+          "geometryApplied": true,
+          "minimumSizePhysical": {
+            "width": 1280,
+            "height": 800
+          }
+        }
+      ],
+      "finalSchemaVersion": 4,
+      "finalLogicalBounds": {
+        "width": 1254,
+        "height": 695,
+        "x": 80,
+        "y": 43
+      },
+      "checks": {
+        "legacySchema1_startup_geometry": true,
+        "legacySchema1_close_reopen_stable": true,
+        "legacySchema1_saved_schema_is_current": true,
+        "legacySchema1_preserves_previous_displayed_bounds": true
+      }
+    },
+    "legacySchema2": {
+      "rounds": [
+        {
+          "physicalBounds": {
+            "width": 2508,
+            "height": 1390,
+            "x": 160,
+            "y": 86
+          },
+          "visible": true,
+          "geometryApplied": true,
+          "minimumSizePhysical": {
+            "width": 1280,
+            "height": 800
+          }
+        },
+        {
+          "physicalBounds": {
+            "width": 2508,
+            "height": 1390,
+            "x": 160,
+            "y": 86
+          },
+          "visible": true,
+          "geometryApplied": true,
+          "minimumSizePhysical": {
+            "width": 1280,
+            "height": 800
+          }
+        },
+        {
+          "physicalBounds": {
+            "width": 2508,
+            "height": 1390,
+            "x": 160,
+            "y": 86
+          },
+          "visible": true,
+          "geometryApplied": true,
+          "minimumSizePhysical": {
+            "width": 1280,
+            "height": 800
+          }
+        }
+      ],
+      "finalSchemaVersion": 4,
+      "finalLogicalBounds": {
+        "width": 1254,
+        "height": 695,
+        "x": 80,
+        "y": 43
+      },
+      "checks": {
+        "legacySchema2_startup_geometry": true,
+        "legacySchema2_close_reopen_stable": true,
+        "legacySchema2_saved_schema_is_current": true,
+        "legacySchema2_preserves_previous_displayed_bounds": true
+      }
+    },
+    "legacySchema3": {
+      "rounds": [
+        {
+          "physicalBounds": {
+            "width": 2508,
+            "height": 1390,
+            "x": 160,
+            "y": 86
+          },
+          "visible": true,
+          "geometryApplied": true,
+          "minimumSizePhysical": {
+            "width": 1280,
+            "height": 800
+          }
+        },
+        {
+          "physicalBounds": {
+            "width": 2508,
+            "height": 1390,
+            "x": 160,
+            "y": 86
+          },
+          "visible": true,
+          "geometryApplied": true,
+          "minimumSizePhysical": {
+            "width": 1280,
+            "height": 800
+          }
+        },
+        {
+          "physicalBounds": {
+            "width": 2508,
+            "height": 1390,
+            "x": 160,
+            "y": 86
+          },
+          "visible": true,
+          "geometryApplied": true,
+          "minimumSizePhysical": {
+            "width": 1280,
+            "height": 800
+          }
+        }
+      ],
+      "finalSchemaVersion": 4,
+      "finalLogicalBounds": {
+        "width": 1254,
+        "height": 695,
+        "x": 80,
+        "y": 43
+      },
+      "checks": {
+        "legacySchema3_startup_geometry": true,
+        "legacySchema3_close_reopen_stable": true,
+        "legacySchema3_saved_schema_is_current": true,
+        "legacySchema3_preserves_previous_displayed_bounds": true
+      }
+    }
+  },
+  "checks": {
+    "freshDefault_startup_geometry": true,
+    "freshDefault_close_reopen_stable": true,
+    "freshDefault_saved_schema_is_current": true,
+    "legacySchema1_startup_geometry": true,
+    "legacySchema1_close_reopen_stable": true,
+    "legacySchema1_saved_schema_is_current": true,
+    "legacySchema1_preserves_previous_displayed_bounds": true,
+    "legacySchema2_startup_geometry": true,
+    "legacySchema2_close_reopen_stable": true,
+    "legacySchema2_saved_schema_is_current": true,
+    "legacySchema2_preserves_previous_displayed_bounds": true,
+    "legacySchema3_startup_geometry": true,
+    "legacySchema3_close_reopen_stable": true,
+    "legacySchema3_saved_schema_is_current": true,
+    "legacySchema3_preserves_previous_displayed_bounds": true
+  },
+  "passed": true
+}

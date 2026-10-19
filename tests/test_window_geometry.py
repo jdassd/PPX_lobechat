@@ -4,6 +4,7 @@ from api.system.window_geometry import (
     calculate_window_geometry,
     logicalize_native_window_value,
     logicalize_saved_window_state,
+    migrate_display_geometry,
 )
 
 
@@ -97,6 +98,24 @@ class WindowGeometryTests(unittest.TestCase):
         self.assertEqual(state['height'], 610)
         self.assertEqual(state['x'], 240)
         self.assertEqual(state['y'], 85)
+
+    def test_schema_three_compensation_migrates_once_to_actual_displayed_size(self):
+        geometry = {'width': 1280, 'height': 766, 'x': 80, 'y': 43}
+
+        migrated = migrate_display_geometry(geometry, 3, (26, 71))
+        self.assertEqual(migrated, {'width': 1254, 'height': 695, 'x': 80, 'y': 43})
+        self.assertEqual(migrate_display_geometry(migrated, 4, (26, 71)), migrated)
+
+    def test_schema_three_migration_respects_minimum_size(self):
+        migrated = migrate_display_geometry(
+            {'width': 650, 'height': 410, 'x': 0, 'y': 0},
+            3,
+            (100, 100),
+            min_size=(640, 400),
+        )
+
+        self.assertEqual(migrated['width'], 640)
+        self.assertEqual(migrated['height'], 400)
 
 
 if __name__ == '__main__':
