@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Vue-3.0+-4FC08D?style=flat-square&logo=vue.js&logoColor=white" alt="Vue 3" />
   <img src="https://img.shields.io/badge/Python-3.10-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.10" />
   <img src="https://img.shields.io/badge/Pywebview-5.0+-FFD43B?style=flat-square&logo=python&logoColor=blue" alt="Pywebview" />
-  <img src="https://img.shields.io/badge/version-2.17.0-2b6fff?style=flat-square" alt="Version 2.17.0" />
+  <img src="https://img.shields.io/badge/version-2.17.1-2b6fff?style=flat-square" alt="Version 2.17.1" />
   <img src="https://img.shields.io/badge/License-AGPL--3.0-green?style=flat-square" alt="License" />
 </p>
 
@@ -20,17 +20,17 @@
 
 ## 📖 简介
 
-**PPX 2.17.0** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
+**PPX 2.17.1** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
 
-2.17 修正小图水印定位和首页收藏键盘误导航，改善文本工具窄窗口布局与结果区主题，补齐 PDF、Word、图片和转换中心的真实文件回归，并将模块导航与文本交互检查接入自动发版流程。
+2.17.1 修正异步页面导航巡检的等待条件，承接 2.17 的小图水印、收藏键盘和文本界面修正，以及 PDF、Word、图片、转换中心的真实文件回归。2.17.0 因 macOS 巡检失败未创建正式 Release。
 
-更新内容与验收范围见 [v2.17.0 发布说明](docs/releases/v2.17.0.md)。
+更新内容与验收范围见 [v2.17.1 发布说明](docs/releases/v2.17.1.md)。
 
 定位、目标用户、14 个模块的输入输出与异常设计、协作流程、优先级和扩展边界见 [统一工具箱设计方案](docs/toolbox-design.md)。
 
 ## ✨ 主要功能
 
-PPX 2.17.0 的核心能力包括：
+PPX 2.17.1 的核心能力包括：
 
 ### 📄 文档与数据
 

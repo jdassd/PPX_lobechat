@@ -291,7 +291,7 @@ const toggleTheme = () => {
           <div class="active-tool-view">
             <transition name="view" mode="out-in">
               <KeepAlive>
-                <component :is="activeView" :key="active" :initial-tab="activeFeature" @open="go" @search="cmdOpen = true" @modules="go('modules')" @tasks="go('tasks')" />
+                <component :is="activeView" :key="active" :data-tool-view="active" :initial-tab="activeFeature" @open="go" @search="cmdOpen = true" @modules="go('modules')" @tasks="go('tasks')" />
               </KeepAlive>
             </transition>
           </div>

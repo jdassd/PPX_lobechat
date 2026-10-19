@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import socket
 import subprocess
 import tempfile
@@ -55,6 +56,16 @@ def main():
                 page.set_default_timeout(15000)
                 errors = []
                 page.on("pageerror", lambda error: errors.append(str(error)))
+                delayed_chunks = []
+
+                def delay_image_view(route):
+                    response = route.fetch()
+                    time.sleep(1.2)
+                    delayed_chunks.append(route.request.url)
+                    route.fulfill(response=response)
+
+                # Exercise navigation with a chunk arriving after the old 450 ms wait.
+                context.route(re.compile(r"/ImageTool\.[^/]+\.js(?:\?.*)?$"), delay_image_view)
                 context.add_init_script(
                     "localStorage.setItem('ppx-v2-modules', JSON.stringify({video: true, seal: true, system: true}))"
                 )
@@ -156,19 +167,27 @@ def main():
                 expect(page.locator(".el-message--error").last).to_contain_text("批量替换失败")
 
                 page.set_viewport_size({"width": 1440, "height": 1000})
-                modules = ["转换中心", "图片处理", "PDF 工具", "Word 工具", "Excel 工具", "文档中心", "文件批处理", "自动化工作流", "网页数据采集", "文本工具", "视频处理", "印章图片生成", "设置与维护", "系统诊断（高级）"]
+                modules = [
+                    ("conversion", "转换中心"), ("image", "图片处理"), ("pdf", "PDF 工具"),
+                    ("word", "Word 工具"), ("excel", "Excel 工具"), ("document", "文档中心"),
+                    ("file", "文件批处理"), ("workflow", "自动化工作流"), ("webauto", "网页数据采集"),
+                    ("text", "文本工具"), ("video", "视频处理"), ("seal", "印章图片生成"),
+                    ("maintenance", "设置与维护"), ("system", "系统诊断（高级）"),
+                ]
                 navigated = []
-                for name in modules:
+                for tool_id, name in modules:
                     button = navigation.get_by_role("button", name=name, exact=True)
                     if not button.count() and name != "系统诊断（高级）":
                         raise AssertionError(f"Missing module: {name}")
                     if button.count():
                         button.click()
-                        page.wait_for_timeout(450)
-                        assert page.locator(".active-tool-view").inner_text().strip(), f"Empty view: {name}"
+                        view = page.locator(f'.active-tool-view [data-tool-view="{tool_id}"]')
+                        expect(view).to_be_visible(timeout=15000)
+                        expect(view).to_have_text(re.compile(r"\S"), timeout=15000)
                         navigated.append(name)
+                assert delayed_chunks, "Slow image-view loading was not exercised"
                 assert not errors, errors
-                result = {"passed": True, "revision": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(), "visuals": visual, "favoriteKeyboard": "toggles without navigating", "textWorkflows": ["JSON format and invalid JSON feedback", "case transform", "deduplicate and statistics", "literal replacement and invalid regex feedback"], "navigationSmoke": navigated, "pageErrors": errors}
+                result = {"passed": True, "revision": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(), "visuals": visual, "favoriteKeyboard": "toggles without navigating", "textWorkflows": ["JSON format and invalid JSON feedback", "case transform", "deduplicate and statistics", "literal replacement and invalid regex feedback"], "navigationSmoke": navigated, "navigationWait": {"condition": "target component visible with nonempty text", "timeoutMs": 15000, "imageChunkDelayMs": 1200, "delayedChunks": len(delayed_chunks)}, "pageErrors": errors}
                 (report_dir / "visual-sweep.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
                 browser.close()
         finally:
