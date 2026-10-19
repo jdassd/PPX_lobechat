@@ -1,0 +1,72 @@
+{
+  "version": "2.17.3",
+  "verifiedAt": "2026-10-19T06:26:21.465024+00:00",
+  "releaseCommit": "ab21f69904857db6141e5bb50ccc8b70e8cb349b",
+  "commitPushVerified": true,
+  "tag": "v2.17.3",
+  "tagObject": "9e0d7a59e79e1c26cacd99abf3e4e9074eef8a34",
+  "tagCi": {
+    "runId": 39207926926,
+    "runAttempt": 1,
+    "conclusion": "success",
+    "url": "https://github.com/jdassd/PPX_lobechat/actions/runs/39207926926",
+    "jobs": [
+      {
+        "name": "build (macos-latest)",
+        "conclusion": "success"
+      },
+      {
+        "name": "build (ubuntu-latest)",
+        "conclusion": "success"
+      },
+      {
+        "name": "build (windows-latest)",
+        "conclusion": "success"
+      },
+      {
+        "name": "release",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "release": {
+    "id": 416970194,
+    "url": "https://github.com/jdassd/PPX_lobechat/releases/tag/v2.17.3",
+    "publishedAt": "2026-10-19T06:24:28Z",
+    "draft": false,
+    "prerelease": false,
+    "isLatest": true,
+    "notesMatch": true,
+    "assets": [
+      {
+        "name": "-V2.17.3_Linux.deb",
+        "bytes": 423857606,
+        "digest": "sha256:045f0bdd0aea30b3b3c9e3a4b32bffa29e3fc089cea93aee3cfb3f8f6d4aa830",
+        "url": "https://github.com/jdassd/PPX_lobechat/releases/download/v2.17.3/-V2.17.3_Linux.deb"
+      },
+      {
+        "name": "-v2.17.3_macOS.dmg",
+        "bytes": 325584062,
+        "digest": "sha256:24b642ca4e4bafb228a98d30ffaf544ad611828131d863cba0d19131285ac033",
+        "url": "https://github.com/jdassd/PPX_lobechat/releases/download/v2.17.3/-v2.17.3_macOS.dmg"
+      },
+      {
+        "name": "-V2.17.3_Windows.exe",
+        "bytes": 243355968,
+        "digest": "sha256:2b18068b26f59d3348c40a65e9c627b343d537cfd9eec4f46e7a481823b43ddd",
+        "url": "https://github.com/jdassd/PPX_lobechat/releases/download/v2.17.3/-V2.17.3_Windows.exe"
+      }
+    ]
+  },
+  "windowsInstallerDownload": {
+    "file": "-V2.17.3_Windows.exe",
+    "bytes": 243355968,
+    "sha256": "2b18068b26f59d3348c40a65e9c627b343d537cfd9eec4f46e7a481823b43ddd",
+    "digestMatchesRelease": true,
+    "fixedFileVersion": "2.17.3.0"
+  },
+  "limits": [
+    "Only the Windows installer was downloaded and hashed; macOS/Linux assets were checked through Release metadata.",
+    "Download, metadata, and version checks do not constitute native installation/upgrade/restore acceptance."
+  ]
+}

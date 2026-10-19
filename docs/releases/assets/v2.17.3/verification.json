@@ -1,7 +1,7 @@
 {
   "version": "2.17.3",
   "date": "2026-10-19",
-  "status": "local-verified-awaiting-tag-ci-and-release",
+  "status": "published-and-verified",
   "predecessor": {
     "version": "2.17.2",
     "commit": "6ec0f59b171fd9588a72e022c3cdc4713c7b9da4",
@@ -191,9 +191,16 @@
     }
   },
   "publication": {
-    "statusAtCommit": "not-triggered",
-    "tag": "v2.17.3",
-    "policy": "Commit and push first; only publish after all three platform tag CI builds succeed. Post-publication verification records the actual commit, run, and release assets separately."
+    "statusAtSourceCommit": "not-triggered",
+    "status": "published",
+    "releaseCommit": "ab21f69904857db6141e5bb50ccc8b70e8cb349b",
+    "commitPushed": true,
+    "tagCiRunId": 39207926926,
+    "tagCiConclusion": "success",
+    "releaseUrl": "https://github.com/jdassd/PPX_lobechat/releases/tag/v2.17.3",
+    "publishedAt": "2026-10-19T06:24:28Z",
+    "windowsInstallerDownloadedAndVerified": true,
+    "evidence": "publication.json"
   },
   "evidenceSha256": {
     "desktop-layout.json": "7894428d8cd25f7ba287e33958b2b7089381b88eb056e91d841e900b64424da7",

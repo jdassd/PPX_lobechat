@@ -103,13 +103,14 @@
 - 详细验证范围、未验证场景和发版门槛见 [v2.17.2 发布说明](releases/v2.17.2.md)；三平台 CI 必须全部成功才生成对应 Release。
 - 提交 `6ec0f59b171fd9588a72e022c3cdc4713c7b9da4` 已推送。补充检查发现旧 schema1 窗口记录在恢复时尺寸缩水后，CI `39203616896` 已取消（结论 `cancelled`）；GitHub 上没有 v2.17.2 Release。保留已推送提交与标签记录，不将 v2.17.2 标记为正式发布。
 
-## 准备发布：v2.17.3 加密 PDF 与 Windows 窗口修复
+## 已发布：v2.17.3 加密 PDF 与 Windows 窗口修复
 
 - 承接 v2.17.2 工作树已验证的 AES 密码处理与 PyCryptodome 冻结打包、Windows 默认窗口和原生缩放、窄窗 PDF 页码表单、分类预览副作用及复制撤销计数修正。
 - 补充修正旧 schema1/2/3 窗口状态迁移和最小窗口物理尺寸。Windows 200% DPI 上 fresh 与 schema1/2/3 状态各经 3 轮实际启动/关闭重开，共 12 轮；窗口物理边界均保持一致并统一保存为 schema4。16 项原生窗口探针、右边缘及右下角实际拖动到最小窗口后重开、两轮冻结包 normal 启动与 schema4 保存均通过。
 - 首页按实际内容宽度重排标题、搜索和动作卡片，Windows/Linux 快捷键提示改为 Ctrl。最终布局回归覆盖 1440×900 到 603×341，标题无孤字、卡片名称完整、控件可达且无横向溢出，浏览器截图已存档。
 - 最终工作树本机验证：Python 180 项、前端契约 25 项、lint 0 错误和 141 条既有 warning、生产构建、完整工作区与模块巡检均通过，页面错误为零。最终冻结 Windows 包内 AES-256 PDF 切割、RapidOCR 和图片任务通过，主界面两次正常启动/关闭均退出 0，窗口状态稳定。真实边缘拖动及最小尺寸重开证据在首页收尾前完成；后续首页调整未改变原生缩放实现。未采集连续窗口视频，不声称已证明零闪烁。
-- v2.17.2 Tag CI `39203616896` 已取消且没有 GitHub Release；保留标签历史。v2.17.3 本机最终验证通过，三平台 Tag CI 与正式发布待推送提交后执行。记录见 [发布说明](releases/v2.17.3.md) 与 [验证清单](releases/assets/v2.17.3/verification.json)。原生安装升级恢复、CEF、其他 DPI、多屏、广泛 OCR 与 LibreOffice 验收继续保持 pending。
+- 发布提交 `ab21f69904857db6141e5bb50ccc8b70e8cb349b` 与附注 Tag `v2.17.3` 已成功推送。Tag CI `39207926926` 的三平台检查、构建及 release 任务全部成功，2026-10-19 06:24:28 UTC 正式发布；重复的分支 CI `39207910480` 主动取消。三份 Release 附件、发布说明、最新正式版与 Tag 提交已核对；Windows 安装包实际下载的字节数及 SHA-256 匹配，固定文件版本为 `2.17.3.0`。[Release](https://github.com/jdassd/PPX_lobechat/releases/tag/v2.17.3)，[发布后校验](releases/assets/v2.17.3/publication.json)。
+- v2.17.2 Tag CI `39203616896` 已取消且没有 GitHub Release；保留标签历史。记录见 [发布说明](releases/v2.17.3.md) 与 [验证清单](releases/assets/v2.17.3/verification.json)。原生安装升级恢复、CEF、其他 DPI、多屏、广泛 OCR 与 LibreOffice 验收继续保持 pending。
 
 ## 后续候选方向
 
