@@ -82,12 +82,14 @@ def main() -> int:
         report['buildLogTail'] = _tail(build_log_path)
         report['runLogTail'] = _tail(run_log_path)
         report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
-        print(json.dumps(report, ensure_ascii=False, indent=2))
+        # Reports can contain Chinese API messages; keep console output safe
+        # for Windows CI consoles using legacy encodings such as cp1252.
+        print(json.dumps(report, ensure_ascii=True, indent=2))
         return 1
 
     report['finishedAt'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
-    print(json.dumps(report, ensure_ascii=False, indent=2))
+    print(json.dumps(report, ensure_ascii=True, indent=2))
     return 0
 
 

@@ -156,8 +156,16 @@
 
 - 用户截图显示网页采集状态已就绪，但启动仍在 `internal/playwright/driver/package/.local-browsers/chromium-1140` 查找不存在的程序。问题是冻结版 Playwright 1.48 的子进程默认缓存与应用状态检测/安装路径分叉。
 - 修复统一状态检测、安装环境和启动可执行文件的默认缓存解析，并增加重新检测入口。此前一次空缓存测试设置了 `PLAYWRIGHT_BROWSERS_PATH`，没有覆盖默认环境；这次新增独立冻结程序默认路径 CI 检查，避免相同测试缺口。
-- 本地验证通过并复核：206 项 Python、26 项前端合约、lint/build、完整工作流程及六种视口/主题扫描、AES 冻结探针与默认浏览器冻结探针。完整 Windows 冻结包在空隔离默认缓存中实际下载并通过采集接口打开工具条，父进程没有 `PLAYWRIGHT_BROWSERS_PATH`。错误恢复界面两种尺寸可操作并保留网址/配置。测试浏览器使用专用 headless 覆盖；不据此宣称原生人工点选或合成器闪烁验收通过。证据见 `docs/releases/assets/v2.18.2/verification.json`。Tag CI 与发版结果仍待完成。
-- 保留原生安装升级恢复、其他 DPI/多屏、CEF、广泛 OCR 与 LibreOffice 的既有 pending 验收；自动发布需等待 v2.18.2 标签的三平台 CI 成功。
+- 本地验证通过并复核：206 项 Python、26 项前端合约、lint/build、完整工作流程及六种视口/主题扫描、AES 冻结探针与默认浏览器冻结探针。完整 Windows 冻结包在空隔离默认缓存中实际下载并通过采集接口打开工具条，父进程没有 `PLAYWRIGHT_BROWSERS_PATH`。错误恢复界面两种尺寸可操作并保留网址/配置。测试浏览器使用专用 headless 覆盖；不据此宣称原生人工点选或合成器闪烁验收通过。证据见 `docs/releases/assets/v2.18.2/verification.json`。
+- v2.18.2 未正式发布：Tag CI Windows job `118556793544` 已完成浏览器启动及工具条检查，但探针输出中文 JSON 时遭遇 cp1252 编码异常；workflow run `39401420777` 随后取消，未创建 Release。此前指定缓存的测试未覆盖默认环境这一缺口仍如实记录；修复及新探针后续由 v2.18.3 承接。保留 v2.18.2 标签，不移动或覆盖。
+- 保留原生安装升级恢复、其他 DPI/多屏、CEF、广泛 OCR 与 LibreOffice 的既有 pending 验收。
+
+## 未发布：v2.18.3 网页采集默认缓存发布探针修正
+
+- 承接 v2.18.2 的默认 Playwright 缓存路径修正和重新检测入口；兼容冻结探针的中文报告输出，避免 Windows 控制台 cp1252 编码阻断 CI。
+- v2.18.2 的默认缓存本机回归证据可用于产品 API/UI（这部分未改动），但不能替代本版最终 GUI 构建、完整冻结包、空缓存实际安装与点选启动验证。旧 Windows Tag CI 已到达真实浏览器和工具条检查，失败发生在报告序列化输出，不应记作产品采集失败。
+- 本地 2.18.3 GUI 构建、完整 Windows 冻结包与空默认缓存实际下载/采集启动均通过，嵌入版本和正常退出已核对。CP1252 冻结验证器修复前复现退出 1，修复后退出 0；磁盘中文报告保留 UTF-8。未改动的产品 API/UI 使用前版 206 Python、26 GUI 合约与完整 E2E 证据；新标签 CI 会从本版提交完整回归。三平台 Tag CI 和正式发布待完成。验证记录见 [v2.18.3 发布说明](releases/v2.18.3.md) 和 [验证清单](releases/assets/v2.18.3/verification.json)。
+- 原生安装、升级、恢复、其他 DPI/多屏、CEF、广泛 OCR 和 LibreOffice 验收继续保持 pending。
 
 ## 后续候选方向
 

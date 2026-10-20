@@ -1,0 +1,51 @@
+{
+  "version": "2.18.3",
+  "baseRevision": "122bca4",
+  "scope": "final local 2.18.3 GUI and frozen package verified; unchanged API/UI regression inherited; new Tag CI/publication pending",
+  "productChanges": {
+    "browserDefaultCacheFix": "inherited from v2.18.2: status detection, installation environment and launch executable share the default Playwright cache",
+    "errorRecoveryUi": "inherited from v2.18.2: re-detect browser kernel action",
+    "productApiUiChangedForThisVersion": false,
+    "probeCompatibility": "v2.18.2 Windows probe completed browser startup and toolbar readiness, then failed when writing Chinese JSON to a cp1252 console; v2.18.3 adds report-output compatibility"
+  },
+  "previousCacheTestGap": {
+    "status": "confirmed",
+    "details": "The earlier cold-cache test explicitly set PLAYWRIGHT_BROWSERS_PATH and did not prove default-environment behavior. The v2.18.2 local follow-up did exercise an isolated default cache, but v2.18.3 still requires its own final frozen package and Tag CI evidence."
+  },
+  "inheritedV2182LocalRegression": {
+    "status": "passed_for_unchanged_product_api_ui_only",
+    "python": "206 passed; full unittest suite",
+    "guiContracts": "26 passed",
+    "lint": "exit 0; ESLint 0 errors and 141 warnings",
+    "frontendBuild": "v2.18.2 production build passed; does not establish the v2.18.3 build",
+    "fullEndToEnd": "workspace and visual sweep passed; page errors empty",
+    "frozenDefaultCache": "isolated default-cache cold download and public picker API reached toolbar-ready event; test-only headless override",
+    "evidence": "docs/releases/assets/v2.18.2/verification.json",
+    "boundary": "These results are inherited evidence for unchanged product API/UI only; they are not evidence for v2.18.3 probe output compatibility, final build/package or release."
+  },
+  "v2182ReleaseOutcome": {
+    "status": "not_published",
+    "run": "39401420777",
+    "failedWindowsJob": "118556793544",
+    "details": "Browser launch and toolbar readiness completed; the probe then failed printing Chinese JSON under cp1252. The workflow was canceled and no GitHub Release was created. The v2.18.2 tag was preserved."
+  },
+  "v2183Validation": {
+    "finalGuiBuild": "passed: pnpm -C ./gui run build completed successfully for package version 2.18.3",
+    "fullFrozenPackage": "passed: PyInstaller exit 0; full desktop smoke exit 0; embedded Config v2.18.3 and GUI 2.18.3 verified",
+    "freshDefaultCacheDownloadAndPickerLaunch": "passed: desktop-default-cache-smoke.json; official default host; new isolated cache; no PLAYWRIGHT_BROWSERS_PATH; real public API toolbar ready; cancel/join completed",
+    "tagCi": "pending",
+    "publication": "pending",
+    "cp1252FrozenVerifier": "passed: console-encoding-regression.json and webauto-default-freeze.json",
+    "ruff": "passed for both changed probe scripts"
+  },
+  "pendingAcceptance": [
+    "native install, upgrade and restore",
+    "other DPI and multiple monitors",
+    "CEF",
+    "broad OCR coverage",
+    "LibreOffice",
+    "native human picker and Windows compositor flicker"
+  ],
+  "evidenceBoundary": "Do not copy the v2.18.2 source SHA manifest as evidence for v2.18.3. Browser automation uses a test-only headless override; production picker remains visible.",
+  "catalogBoundary": "63 is the operation catalog count, not 63 executed functional checks. Executed desktop checks are enumerated in desktop-default-cache-smoke.json."
+}

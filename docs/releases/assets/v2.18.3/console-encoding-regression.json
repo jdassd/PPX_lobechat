@@ -1,0 +1,27 @@
+{
+  "originalCi": {
+    "runId": "39401420777",
+    "windowsJobId": "118556793544",
+    "step": "验证冻结程序的默认浏览器路径",
+    "exit": 1,
+    "failure": "UnicodeEncodeError: 'charmap' codec can't encode characters in position 768-771",
+    "browserToolbarMountedBeforeFailure": true,
+    "releaseCreated": false
+  },
+  "localBeforeFix": {
+    "PYTHONIOENCODING": "cp1252",
+    "verifierExit": 1,
+    "childFrozenAndBrowserToolbarPassed": true,
+    "log": "build/verification/webauto-default-freeze-cp1252-repro-parent.log"
+  },
+  "localAfterFix": {
+    "command": "PYTHONIOENCODING=cp1252 pnpm run test:browser:freeze",
+    "exit": 0,
+    "passed": true,
+    "frozen": true,
+    "browserCacheOverrideAbsent": true,
+    "consoleJson": "ASCII escaped",
+    "diskJson": "UTF-8 with original Chinese",
+    "log": "build/verification/webauto-default-freeze-cp1252-pnpm.log"
+  }
+}

@@ -42,7 +42,9 @@ def main() -> int:
                 thread.join(timeout=8)
         finally:
             report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
-    print(json.dumps(report, ensure_ascii=False))
+    # Frozen Windows stdout may use a legacy code page such as cp1252.
+    # Keep console JSON ASCII-only while preserving UTF-8 JSON on disk.
+    print(json.dumps(report, ensure_ascii=True))
     return 0 if report['passed'] else 1
 
 

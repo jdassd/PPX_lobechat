@@ -1,7 +1,7 @@
 {
   "version": "2.18.2",
   "baseRevision": "76b4176",
-  "scope": "final v2.18.2 working tree tested locally; release CI/publication recorded separately after completion",
+  "scope": "local v2.18.2 working-tree regression evidence; v2.18.2 was not released",
   "browserDefaultCacheFix": {
     "status": "implemented",
     "details": "status detection, installation environment and launch executable use the same default Playwright browser cache; GUI offers re-detection"
@@ -42,8 +42,13 @@
     "firstAttempt": "workspace foreground command reached tool 240s limit; not counted as passed; complete background rerun exit 0"
   },
   "nativeInstallUpgradeRestore": "pending",
-  "finalTagCi": "pending",
-  "publication": "pending",
+  "finalTagCi": {
+    "status": "failed_then_canceled",
+    "run": "39401420777",
+    "failedWindowsJob": "118556793544",
+    "details": "The default-cache browser and toolbar probe completed, then printing its Chinese JSON report to a cp1252 console raised an encoding error. The workflow was canceled; no GitHub Release was created."
+  },
+  "publication": "not_published",
   "pendingAcceptance": [
     "native install, upgrade and restore",
     "other DPI and multiple monitors",
@@ -51,7 +56,7 @@
     "broad OCR coverage",
     "LibreOffice"
   ],
-  "evidenceBoundary": "Frozen and workflow browser checks use test-only headless=True; production launch remains headless=False. No native human picker, installation/upgrade/restore or compositor flicker acceptance inferred. Baseline revision in visual report predates this uncommitted fix; tested-source-sha256.json identifies exact tested content.",
+  "evidenceBoundary": "Frozen and workflow browser checks use test-only headless=True; production launch remains headless=False. No native human picker, installation/upgrade/restore or compositor flicker acceptance inferred. Baseline revision in visual report predates this uncommitted fix; tested-source-sha256.json identifies exact tested content. Windows CI failure occurred after browser/toolbar checks during Chinese report output encoding, not during product browser startup.",
   "errorRecoveryUi": {
     "status": "passed",
     "evidence": "recovery-ui.json",

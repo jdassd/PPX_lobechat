@@ -1,0 +1,16 @@
+{
+  "baseRevision": "122bca47d5a1ae327458209b6dd8bea209dcadc3",
+  "scope": "final 2.18.3 working tree; full frozen package/default-cache smoke and CP1252 freeze verifier; CRLF-to-LF normalized SHA-256",
+  "sources": {
+    "api/webauto.py": "0627e9063e865c0dc7b5e513256a998fe51bdacaaada1a5c84abfee05ee5031c",
+    "gui/src/components/webauto/WebAutoTool.vue": "36206061210a3e5dae47abbb3f22bd84d94acb0b76384ab172d4a33d2d92e3bd",
+    "pyapp/package/desktopSmoke.py": "624409967d299f32f409a5a7b85a8b59d5bbecd2130f337c5addd37617aa74f3",
+    "pyapp/package/webautoDefaultSmoke.py": "fd1dc55b0017ceee146436146c047faf9fd5ecc68418cea12af665692e34de14",
+    "pyapp/package/webautoDefaultFreezeProbe.py": "b6610dc4cd357cff37d6059e58fbc11a5bf2fa14e9b87292f05aad6070b816cf",
+    "pyapp/package/verifyWebAutoFreeze.py": "5a8a4e5a07f85dcb72f97b2070374c0ad18729921d89618480e2663030f36289",
+    "tests/test_webauto_install.py": "07a6cdabbef7d2c7ae4352e9394cdfde28e3e04abee2f204fd1c83e6dd0c701d",
+    "pyapp/config/config.py": "8079ddddef6084084fb762121bb4fbc16a081a76d4338134ca6bafafd2798727",
+    "gui/package.json": "549825f9febe5063e5308a35610bf7da4eb0ef79c21e7241da8b1e7d88052435",
+    "package.json": "6dfa216f3fc5475977f71ea741ca541c1bba185a34134f03ff79170ffb59898a"
+  }
+}
