@@ -1,7 +1,7 @@
 {
   "version": "2.18.3",
   "baseRevision": "122bca4",
-  "scope": "final local 2.18.3 GUI and frozen package verified; unchanged API/UI regression inherited; new Tag CI/publication pending",
+  "scope": "final local 2.18.3 package verified; full three-platform tag CI and formal publication completed from the pushed source commit",
   "productChanges": {
     "browserDefaultCacheFix": "inherited from v2.18.2: status detection, installation environment and launch executable share the default Playwright cache",
     "errorRecoveryUi": "inherited from v2.18.2: re-detect browser kernel action",
@@ -33,8 +33,8 @@
     "finalGuiBuild": "passed: pnpm -C ./gui run build completed successfully for package version 2.18.3",
     "fullFrozenPackage": "passed: PyInstaller exit 0; full desktop smoke exit 0; embedded Config v2.18.3 and GUI 2.18.3 verified",
     "freshDefaultCacheDownloadAndPickerLaunch": "passed: desktop-default-cache-smoke.json; official default host; new isolated cache; no PLAYWRIGHT_BROWSERS_PATH; real public API toolbar ready; cancel/join completed",
-    "tagCi": "pending",
-    "publication": "pending",
+    "tagCi": "passed: https://github.com/jdassd/PPX_lobechat/actions/runs/39403926423; all three platform jobs and release",
+    "publication": "published and verified: publication.json",
     "cp1252FrozenVerifier": "passed: console-encoding-regression.json and webauto-default-freeze.json",
     "ruff": "passed for both changed probe scripts"
   },
@@ -47,5 +47,15 @@
     "native human picker and Windows compositor flicker"
   ],
   "evidenceBoundary": "Do not copy the v2.18.2 source SHA manifest as evidence for v2.18.3. Browser automation uses a test-only headless override; production picker remains visible.",
-  "catalogBoundary": "63 is the operation catalog count, not 63 executed functional checks. Executed desktop checks are enumerated in desktop-default-cache-smoke.json."
+  "catalogBoundary": "63 is the operation catalog count, not 63 executed functional checks. Executed desktop checks are enumerated in desktop-default-cache-smoke.json.",
+  "finalTagCi": {
+    "status": "passed",
+    "runId": "39403926423",
+    "commit": "bc595e7913044ea881ee503a560301ec60e8de38",
+    "evidence": "publication.json"
+  },
+  "publication": {
+    "status": "published and verified",
+    "evidence": "publication.json"
+  }
 }

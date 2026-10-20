@@ -1,0 +1,153 @@
+{
+  "tag": "v2.18.3",
+  "sourceCommit": "bc595e7913044ea881ee503a560301ec60e8de38",
+  "codePush": "success; remote branch/tag commit verified before release",
+  "remoteTagPeeledCommit": "bc595e7913044ea881ee503a560301ec60e8de38",
+  "tagCiRunId": "39403926423",
+  "tagCiUrl": "https://github.com/jdassd/PPX_lobechat/actions/runs/39403926423",
+  "tagCiConclusion": "success",
+  "jobs": [
+    {
+      "name": "build (ubuntu-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "build (macos-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "build (windows-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "release",
+      "conclusion": "success"
+    }
+  ],
+  "ciEvidence": [
+    {
+      "platform": "Windows",
+      "artifactId": 12257035860,
+      "reports": {
+        "webauto-default-freeze.json": {
+          "passed": true,
+          "reportSha256": "42c3ce2ad13ff81faf6d291e5e1c4e416fcfeacff1021d26cc774ea30090fb31"
+        },
+        "webauto-default-freeze-probe.json": {
+          "passed": true,
+          "reportSha256": "c59e2f0839fd70ddd90b91508345677cf63018833a8a962fa67101f76346a3ff",
+          "archivedEvidence": "ci-default-cache-Windows.json"
+        },
+        "pdf-aes-freeze.json": {
+          "passed": true,
+          "reportSha256": "187ffa1bace95c814a48344f89e8c243b4068095752dc96f6091b0d0422c3c4b"
+        },
+        "workspace.json": {
+          "passed": true,
+          "reportSha256": "d4f1874234d8055c6b2a82dbfb2c8d4c6b0f5f8c34a32df4b3a6f2cd1e276726",
+          "archivedEvidence": "ci-workflow-Windows.json"
+        },
+        "visual-sweep.json": {
+          "passed": true,
+          "reportSha256": "cae3cdf9b563181dca920a05462b8a11977efbe4ffac4fcd39d5aafc35b3a325"
+        }
+      }
+    },
+    {
+      "platform": "Linux",
+      "artifactId": 12256199165,
+      "reports": {
+        "webauto-default-freeze.json": {
+          "passed": true,
+          "reportSha256": "c6574533dcf7410ceb84d8fc7ff242c996474d2a18accf3dd90f1ede4e7a6f91"
+        },
+        "webauto-default-freeze-probe.json": {
+          "passed": true,
+          "reportSha256": "eb2960d57ddc4cfeebe1297e3c6171f8776e5fccabaabdd3ccecc186123cc3dc",
+          "archivedEvidence": "ci-default-cache-Linux.json"
+        },
+        "pdf-aes-freeze.json": {
+          "passed": true,
+          "reportSha256": "7a3d857b9c6b05c59b910c50d959faaa91ef9dda7f5ffae00cf60ad846e44d74"
+        },
+        "workspace.json": {
+          "passed": true,
+          "reportSha256": "db3d9d69d4d2c0b1c41778b210afbcefe807604b8cc0bc568b091ceafcfa62bf",
+          "archivedEvidence": "ci-workflow-Linux.json"
+        },
+        "visual-sweep.json": {
+          "passed": true,
+          "reportSha256": "75232c732495ac49ba2da244383f7d058a8d461b5b75115a90cddb5a3b2f7150"
+        }
+      }
+    },
+    {
+      "platform": "macOS",
+      "artifactId": 12256299770,
+      "reports": {
+        "webauto-default-freeze.json": {
+          "passed": true,
+          "reportSha256": "1781d3025f8f71b506fc64da8f160c0989d815626ce616a08f22d405e721f83a"
+        },
+        "webauto-default-freeze-probe.json": {
+          "passed": true,
+          "reportSha256": "278dd749785f199d2c61dc039256a1118835eea06c673dd7f6d3c51b51f2bf2b",
+          "archivedEvidence": "ci-default-cache-macOS.json"
+        },
+        "pdf-aes-freeze.json": {
+          "passed": true,
+          "reportSha256": "796b8fd4e92a8a8f83e3725f5bf93295a32eefede3d02ffb406f635b55bdc658"
+        },
+        "workspace.json": {
+          "passed": true,
+          "reportSha256": "984e538229b2782f0fb3e8a2e16ec3310e3d99b3b4590eca705a1546848fd89b",
+          "archivedEvidence": "ci-workflow-macOS.json"
+        },
+        "visual-sweep.json": {
+          "passed": true,
+          "reportSha256": "75232c732495ac49ba2da244383f7d058a8d461b5b75115a90cddb5a3b2f7150"
+        }
+      }
+    }
+  ],
+  "releaseUrl": "https://github.com/jdassd/PPX_lobechat/releases/tag/v2.18.3",
+  "publishedAt": "2026-10-20T10:13:35Z",
+  "latest": true,
+  "draft": false,
+  "prerelease": false,
+  "notesMatchTagAndSource": true,
+  "assets": [
+    {
+      "name": "-V2.18.3_Linux.deb",
+      "size": 423879542,
+      "digest": "sha256:3b4ea3ade9b9fd652c16ddf5eca678e0e707778e033a35d11326d490265056b6",
+      "browser_download_url": "https://github.com/jdassd/PPX_lobechat/releases/download/v2.18.3/-V2.18.3_Linux.deb"
+    },
+    {
+      "name": "-v2.18.3_macOS.dmg",
+      "size": 325605729,
+      "digest": "sha256:7a61ab9a526193c9b16d587aedb9df325e0f6c412300ba1bf2da74d96e5c6c46",
+      "browser_download_url": "https://github.com/jdassd/PPX_lobechat/releases/download/v2.18.3/-v2.18.3_macOS.dmg"
+    },
+    {
+      "name": "-V2.18.3_Windows.exe",
+      "size": 243354524,
+      "digest": "sha256:9977c5415e57a0dfe8786351e0e986777fb5b4e464457ff4e41a5befe5d8eff7",
+      "browser_download_url": "https://github.com/jdassd/PPX_lobechat/releases/download/v2.18.3/-V2.18.3_Windows.exe"
+    }
+  ],
+  "windowsDownloadedInstaller": {
+    "name": "-V2.18.3_Windows.exe",
+    "size": 243354524,
+    "sha256": "9977c5415e57a0dfe8786351e0e986777fb5b4e464457ff4e41a5befe5d8eff7",
+    "peFileVersion": [
+      2,
+      18,
+      3,
+      0
+    ],
+    "localPath": "build/release-verification/v2.18.3/-V2.18.3_Windows.exe"
+  },
+  "checkedAt": "2026-10-20T10:15:30.769201+00:00",
+  "boundary": "Downloaded bytes and PE version verified; no native install/upgrade/restore or manual compositor acceptance inferred."
+}

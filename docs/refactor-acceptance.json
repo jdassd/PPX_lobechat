@@ -5,7 +5,7 @@
   "release": {
     "tag": "v2.18.3",
     "allowPendingAcceptance": true,
-    "reason": "承接冻结版默认浏览器缓存路径修复与重新检测入口，修正 Windows 冻结探针中文报告输出的控制台编码兼容。v2.18.2 Tag CI 的 Windows job 118556793544 在报告输出阶段因 cp1252 无法编码中文而失败；该探针此前已完成浏览器启动和工具条检查。随后 workflow run 39401420777 被取消，未创建 GitHub Release。保留 v2.18.2 标签，不移动或覆盖。2.18.3 GUI 构建已本地通过；完整冻结包冷缓存安装和启动已通过，CP1252 下冻结验证器正常退出；v2.18.3 Tag CI 与 Release 待完成。继承的本地全回归证据仅用于未改变的产品 API/UI；不作为本版冻结包或发布验证。浏览器自动验证使用测试专用 headless 覆盖，不视为原生人工验收。原生安装升级恢复、其他 DPI/多屏、CEF、广泛 OCR、LibreOffice保持 pending。正式包须由已推送 v2.18.3 标签提交的三平台成功 CI 生成。"
+    "reason": "承接冻结版默认浏览器缓存路径修复与重新检测入口，修正 Windows 冻结探针中文报告输出的控制台编码兼容。v2.18.2 Tag CI 的 Windows job 118556793544 在报告输出阶段因 cp1252 无法编码中文而失败；该探针此前已完成浏览器启动和工具条检查。随后 workflow run 39401420777 被取消，未创建 GitHub Release。保留 v2.18.2 标签，不移动或覆盖。2.18.3 GUI 构建已本地通过；完整冻结包冷缓存安装和启动已通过，CP1252 下冻结验证器正常退出；v2.18.3 三平台 Tag CI 与正式发布已完成，证据见 publication.json。继承的本地全回归证据仅用于未改变的产品 API/UI；不作为本版冻结包或发布验证。浏览器自动验证使用测试专用 headless 覆盖，不视为原生人工验收。原生安装升级恢复、其他 DPI/多屏、CEF、广泛 OCR、LibreOffice保持 pending。正式包须由已推送 v2.18.3 标签提交的三平台成功 CI 生成。"
   },
   "preReleaseLocalEvidence": {
     "inheritedBaseline": "docs/releases/assets/v2.18.1/publication.json",
@@ -15,8 +15,8 @@
     "frontendChecks": "passed: 26 GUI contracts, lint exit 0 (141 warnings), 2.18.2 production build",
     "finalFrozenDefaultCacheProbe": "passed: docs/releases/assets/v2.18.3/webauto-default-freeze.json; CP1252 verifier exit 0",
     "fullLocalRegression": "passed: full workspace/visual E2E and full Windows frozen default-cache cold install/launch; see versionEvidence",
-    "finalTagCi": "pending: v2.18.3; previous v2.18.2 was canceled after Windows report encoding failure",
-    "publicationEvidence": "pending",
+    "finalTagCi": "passed: https://github.com/jdassd/PPX_lobechat/actions/runs/39403926423; three platforms and release job",
+    "publicationEvidence": "docs/releases/assets/v2.18.3/publication.json",
     "frontendBuild": "passed: pnpm -C ./gui run build for package version 2.18.3; generated production bundle",
     "versionEvidence": "docs/releases/assets/v2.18.3/verification.json",
     "note": "v2.18.2 was not released. Its local regression results can be referenced only for unchanged product API/UI; they do not establish the v2.18.3 GUI build, frozen package, cold-cache flow, Tag CI or publication. Native install/upgrade/restore, other DPI/multi-monitor, CEF, broad OCR and LibreOffice acceptance remain pending.",

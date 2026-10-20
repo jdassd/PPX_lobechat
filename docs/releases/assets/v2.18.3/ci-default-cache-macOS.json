@@ -1,0 +1,39 @@
+{
+  "passed": true,
+  "frozen": true,
+  "playwrightBrowsersPathAbsent": true,
+  "initialStatus": {
+    "ready": true,
+    "installed": true
+  },
+  "browser": {
+    "parentPlaywrightBrowsersPathAbsent": true,
+    "defaultCachePath": "/Users/runner/Library/Caches/ms-playwright",
+    "launchExecutablePath": "/Users/runner/Library/Caches/ms-playwright/chromium-1140/chrome-mac/Chromium.app/Contents/MacOS/Chromium",
+    "launchExecutableMatchesDefaultCache": true,
+    "productHeadlessWas": false,
+    "testOnlyHeadlessOverride": true,
+    "toolbarReady": true,
+    "readyEvent": {
+      "title": "PPX default-cache browser smoke",
+      "marker": "default browser cache smoke",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+    },
+    "apiState": {
+      "code": 0,
+      "msg": "操作成功",
+      "active": true,
+      "url": "http://127.0.0.1:49279/",
+      "mode": "container",
+      "container": "",
+      "containerSample": "",
+      "containerCount": 0,
+      "fields": [],
+      "pagination": "",
+      "detailActive": false,
+      "detailFields": [],
+      "done": false,
+      "error": ""
+    }
+  }
+}

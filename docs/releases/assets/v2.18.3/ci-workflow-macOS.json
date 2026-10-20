@@ -1,0 +1,70 @@
+{
+  "passed": true,
+  "pageErrors": [],
+  "checks": [
+    "draft retention",
+    "restart configuration",
+    "partial failure",
+    "retry only failed input",
+    "output dimensions and alpha",
+    "handoff scoped to target module",
+    "1000-page PDF editing/undo/reorder/export",
+    "two-step workflow via forms",
+    "pause only blocks new tasks",
+    "cancel queued task",
+    "browser collection detail retry without duplicate rows",
+    "web picker UI selection, preview, collection and XLSX reopen",
+    "built-in workflow templates and history result actions"
+  ],
+  "webautoPicker": {
+    "passed": true,
+    "environment": {
+      "ready": true,
+      "installed": true
+    },
+    "url": "http://127.0.0.1:49337/list",
+    "picker": {
+      "containerRows": 2,
+      "fields": [
+        "标题",
+        "链接"
+      ],
+      "selectedViaToolbar": true
+    },
+    "previewRows": 2,
+    "collectedRows": 2,
+    "xlsxRows": [
+      [
+        "标题",
+        "链接"
+      ],
+      [
+        "Alpha result",
+        "/alpha"
+      ],
+      [
+        "Beta result",
+        "/beta"
+      ]
+    ],
+    "output": "/private/var/folders/n6/hn37q6pj7sj_9dmqqc2113800000gn/T/ppx-e2e-cxsrap5o/outputs/采集结果.xlsx",
+    "testOnlyBrowserOptions": [
+      "headless=True",
+      "--remote-debugging-port=0",
+      "isolated appDataDir profile"
+    ]
+  },
+  "encryptedPdf": {
+    "passed": true,
+    "checks": [
+      "AES-128 and AES-256 correct-password cut and reopened page-order/text verification",
+      "empty-user-password encrypted PDF cut without credentials",
+      "wrong and missing password errors with no output artifact",
+      "encrypted split and ordered per-file-password merge verified by reopening outputs",
+      "source files unchanged",
+      "password excluded from localStorage and cleared when changing source"
+    ]
+  },
+  "sourceCommit": "bc595e7913044ea881ee503a560301ec60e8de38",
+  "runId": "39403926423"
+}
