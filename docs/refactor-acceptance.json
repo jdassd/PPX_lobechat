@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "version": "2.17.5",
+  "version": "2.17.6",
   "note": "发布决定与验收状态分开记录；未验证项目保持 pending，不因发版改为 passed。",
   "release": {
-    "tag": "v2.17.5",
+    "tag": "v2.17.6",
     "allowPendingAcceptance": true,
-    "reason": "沿用用户修正完成后自动发版授权，承接浏览器采集修复并修正慢速重复项扫描测试过早超时的问题。v2.17.4 已记录 190 项 Python 测试、25 项前端检查、完整 E2E、界面巡检、真实点选导出、指定 Google 搜索页有头采集及 Windows 冻结程序空缓存安装；这些是前一版本的实现验证，不冒充 v2.17.5 最终构建证据。v2.17.4 Tag CI 的 Windows 工作因旧重复项测试等待超时失败，v2.17.5 重复扫描专项两轮及最终 Windows 冻结冒烟已通过，正式 Tag CI 待完成。原生界面首次下载操作未完成验收；安装器安装升级恢复、其他 DPI/多屏、CEF、广泛 OCR 与 LibreOffice 继续保持 pending。本版正式产物必须来自已推送 Tag 提交的三平台成功 CI。"
+    "reason": "沿用用户修正完成后自动发版授权，承接浏览器采集修复并提升采集流程在页面跳转期间的等待稳定性。v2.17.4 已记录真实工具条点选导出、指定 Google 搜索页有头采集及 Windows 冻结程序空缓存下载 Chromium 的实现验证；v2.17.5 最终 Windows 冻结冒烟通过。v2.17.5 Tag CI（39363831140）macOS 构建通过，Ubuntu 与 Windows 在新浏览器点选 E2E 的导航等待断言失败，release 被跳过；两项均已越过重复项扫描等待断言，不能据此推断产品功能失败。v2.17.6 点选专项三轮与最终 Windows 冻结构建冒烟通过，三平台完整 Tag CI 待完成。原生界面首次下载操作未完成验收；安装器安装升级恢复、其他 DPI/多屏、CEF、广泛 OCR 与 LibreOffice 继续保持 pending。本版正式产物必须来自已推送 Tag 提交的三平台成功 CI。"
   },
   "preReleaseLocalEvidence": {
     "browserCollectionInherited": "docs/releases/assets/v2.17.4/verification.json",
@@ -14,9 +14,10 @@
     "previousVersionLintErrors": 0,
     "previousVersionLintExistingWarnings": 141,
     "duplicateScanTargetedReruns": "2 passed, exit 0; all existing result assertions retained",
-    "finalCommitEndToEnd": "v2.17.5 exact Tag CI pending; browser implementation full local E2E passed in v2.17.4",
+    "finalCommitEndToEnd": "v2.17.6 pending; browser implementation full local E2E passed in v2.17.4",
     "finalTagCi": "pending",
-    "finalFrozenPackageAfterHomePolish": "v2.17.5 passed; browser CLI, bridge, AES PDF cut, images and actual OCR"
+    "finalFrozenPackageAfterHomePolish": "v2.17.6 passed; browser CLI, bridge, AES PDF cut, images and actual OCR",
+    "pickerTargetedReruns": "v2.17.6 navigation-ready test passed three runs with real selection, collection and XLSX reopen"
   },
   "phases": {
     "1": {

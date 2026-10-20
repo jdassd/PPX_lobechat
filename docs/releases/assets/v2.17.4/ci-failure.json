@@ -8,6 +8,7 @@
   "failedStep": "complete workspace E2E",
   "failedAssertion": "duplicate_review_flow.py:148 expected incomplete scan summary within 5000ms",
   "failureEvidence": "CI screenshot and trace show the scan button still loading, no summary, and no page errors",
+  "failureScreenshot": "ci-scan-loading.png",
   "backendFinalResult": "not captured in the failed attempt",
   "releaseCreated": false,
   "tagPreserved": true,

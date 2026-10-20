@@ -1,0 +1,14 @@
+{
+  "tag": "v2.17.5",
+  "commit": "fe0f9dfc3a12d1a7694c89040aaf40f075a736ef",
+  "runId": 39363831140,
+  "runUrl": "https://github.com/jdassd/PPX_lobechat/actions/runs/39363831140",
+  "jobs": { "ubuntu": "failure", "windows": "failure", "macos": "success", "release": "skipped" },
+  "failedTest": "webauto_picker_flow.py:108",
+  "error": "Locator.count: Execution context was destroyed, most likely because of a navigation",
+  "previousDuplicateScanRegression": "passed on both affected platforms before the picker failure",
+  "followup": "v2.17.6 waits for the fixture URL and uses the navigation-aware locator.wait_for for toolbar readiness; all real collection and workbook assertions retained",
+  "targetedReruns": { "passed": 3, "exitCodes": [0, 0, 0] },
+  "releaseCreated": false,
+  "tagPreserved": true
+}

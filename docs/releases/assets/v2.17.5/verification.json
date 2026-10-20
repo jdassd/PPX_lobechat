@@ -1,7 +1,7 @@
 {
   "version": "2.17.5",
   "date": "2026-10-20",
-  "status": "validation-in-progress-publication-pending",
+  "status": "ci-failed-no-release-tag-preserved",
   "scope": {
     "productChanges": "inherits browser collection fixes from v2.17.4",
     "ciRegressionFix": "condition the duplicate-review scan wait so slow scans are not treated as missing results",
@@ -36,10 +36,18 @@
     "frontendContracts": "25 inherited; exact Tag CI pending",
     "lint": "local Ruff passed; GUI unchanged apart from version; exact Tag CI pending",
     "productionBuild": "passed; v2.17.5 GUI and Windows frozen build",
-    "fullWorkspaceEndToEnd": "pending",
-    "visualSweep": "pending",
+    "fullWorkspaceEndToEnd": {
+      "passed": false,
+      "runId": "39363831140",
+      "ubuntu": "failed in tests/e2e/webauto_picker_flow.py:108: Locator.count raised Execution context was destroyed during navigation",
+      "windows": "failed in tests/e2e/webauto_picker_flow.py:108: Locator.count raised Execution context was destroyed during navigation",
+      "bothReachedDuplicateScanAssertion": true,
+      "productFailureInferred": false,
+      "evidence": ["../../../../build/verification/v2.17.5-ubuntu-ci.log", "../../../../build/verification/v2.17.5-windows-ci.log"]
+    },
+    "visualSweep": "not reached after workspace E2E failure",
     "finalFrozenPackage": { "passed": true, "exitCode": 0, "frozen": true, "evidence": "frozen-smoke.json", "actualDownloadRepeated": false, "actualDownloadEvidence": "../v2.17.4/frozen-install-smoke.json" },
-    "tagCi": "pending"
+    "tagCi": { "conclusion": "failure", "runId": "39363831140", "macos": "passed", "ubuntu": "failed", "windows": "failed", "release": "skipped" }
   },
   "pendingValidation": [
     "native UI first browser download",
@@ -54,8 +62,8 @@
     "commitPushed": false,
     "tag": "v2.17.5",
     "tagPushed": false,
-    "tagCiRunId": null,
-    "tagCiConclusion": "pending",
+    "tagCiRunId": 39363831140,
+    "tagCiConclusion": "failure; Ubuntu and Windows browser-picker E2E navigation readiness locator failed with Execution context was destroyed; macOS passed; release skipped",
     "releaseUrl": null
   }
 }

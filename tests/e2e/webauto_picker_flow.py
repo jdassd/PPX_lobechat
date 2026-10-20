@@ -100,17 +100,18 @@ def verify_webauto_picker(api, page, root: Path, report_dir: Path):
                     browser = cdp_driver.chromium.connect_over_cdp(endpoint)
                     try:
                         context = browser.contexts[0]
-                        deadline = time.monotonic() + 15
-                        picker_page = None
-                        while time.monotonic() < deadline:
-                            pages = context.pages
-                            picker_page = next((candidate for candidate in pages if candidate.url.startswith(fixture_url)), None)
-                            if picker_page and picker_page.locator('#__ppx_bar').count():
-                                break
-                            time.sleep(0.1)
-                        assert picker_page is not None, f'Picker page not found: {[p.url for p in context.pages]}'
+                        deadline = time.monotonic() + 30
+                        pages = context.pages
+                        picker_page = next((candidate for candidate in pages if candidate.url.startswith(fixture_url)), None)
+                        if picker_page is None:
+                            picker_page = next((candidate for candidate in pages if candidate.url == 'about:blank'), None)
+                        assert picker_page is not None, f'Picker page not found: {[p.url for p in pages]}'
+                        if not picker_page.url.startswith(fixture_url):
+                            remaining_ms = max(1, int((deadline - time.monotonic()) * 1000))
+                            picker_page.wait_for_url(lambda url: url.startswith(fixture_url), timeout=remaining_ms)
                         toolbar = picker_page.locator('#__ppx_bar')
-                        expect(toolbar).to_be_visible(timeout=15000)
+                        remaining_ms = max(1, int((deadline - time.monotonic()) * 1000))
+                        toolbar.wait_for(state='visible', timeout=remaining_ms)
                         picker_results.put(('ready', None))
                         while True:
                             command = picker_commands.get()

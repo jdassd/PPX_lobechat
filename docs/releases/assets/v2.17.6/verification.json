@@ -1,0 +1,59 @@
+{
+  "version": "2.17.6",
+  "date": "2026-10-20",
+  "status": "validation-in-progress-publication-pending",
+  "scope": {
+    "productChanges": "inherits browser installation, picker event delivery, match count, error handling, and Google verification recovery fixes",
+    "e2eStabilityChange": "wait for picker toolbar readiness across navigation instead of querying locator count during a transient navigation",
+    "previousVersion": "2.17.5",
+    "previousTagCiRunId": 39363831140,
+    "previousTagCi": {
+      "macos": "passed",
+      "ubuntu": "failed: webauto_picker_flow.py:108 Locator.count raised Execution context was destroyed during navigation",
+      "windows": "failed: webauto_picker_flow.py:108 Locator.count raised Execution context was destroyed during navigation",
+      "bothFailuresReachedDuplicateScanAssertion": true,
+      "productFailureInferred": false,
+      "releaseCreated": false,
+      "tagPreserved": true
+    }
+  },
+  "inheritedEvidence": {
+    "sourceVersion": "2.17.4",
+    "evidenceFile": "../v2.17.4/verification.json",
+    "realPickerToExcel": "passed: real toolbar selection, two-row preview and collection, reopened workbook values checked",
+    "headedGoogleProductFlow": "passed: user-provided search URL, two-row preview and collection",
+    "googleChallengeRecovery": "passed: challenge page reports manual verification, retains session, and collection succeeds after navigating to a normal page",
+    "frozenEmptyCacheInstall": "passed: final frozen Windows app downloaded and launched Chromium 130.0.6723.31",
+    "previousVersionWindowsFrozenSmoke": "passed: v2.17.5 final frozen browser CLI, bridge, AES PDF cut, image and OCR smoke",
+    "appliesTo": "inherited implementation evidence only; does not establish v2.17.6 final build or Tag CI status"
+  },
+  "v2176Checks": {
+    "versionAlignment": "passed; package, GUI, Config, README and acceptance aligned",
+    "pythonTests": "pending",
+    "frontendContracts": "pending",
+    "lint": "Ruff passed; final Tag CI pending",
+    "productionBuild": "passed; v2.17.6 GUI and Windows frozen build",
+    "fullWorkspaceEndToEnd": "pending",
+    "webautoPickerNavigationWait": { "passed": true, "targetedRuns": 3, "exitCodes": [0, 0, 0], "checks": ["real toolbar selection", "API state", "two-row preview", "two-row collection", "XLSX export and reopen"] },
+    "visualSweep": "pending",
+    "finalWindowsFrozenPackage": { "passed": true, "exitCode": 0, "frozen": true, "evidence": "frozen-smoke.json", "checks": ["browser Node CLI", "bridge", "AES PDF page cut", "image", "actual OCR"], "actualFirstBrowserDownloadEvidence": "../v2.17.4/frozen-install-smoke.json" },
+    "tagCi": "pending"
+  },
+  "pendingValidation": [
+    "native UI first browser download",
+    "native installer installation, upgrade and restore",
+    "other Windows DPI hardware and multi-monitor migration",
+    "CEF mode",
+    "broad OCR documents and tables",
+    "LibreOffice optional dependency"
+  ],
+  "publication": {
+    "commit": "pending",
+    "commitPushed": false,
+    "tag": "v2.17.6",
+    "tagPushed": false,
+    "tagCiRunId": null,
+    "tagCiConclusion": "pending",
+    "releaseUrl": null
+  }
+}

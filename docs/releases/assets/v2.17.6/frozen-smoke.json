@@ -1,0 +1,42 @@
+{
+  "passed": true,
+  "platform": "Windows",
+  "python": "3.10.11",
+  "frozen": true,
+  "playwrightInstallDryRun": {
+    "passed": true,
+    "command": [
+      "node.exe",
+      "D:\\bc\\PPX_lobechat\\build\\verification-package\\tools\\_internal\\playwright\\driver\\package\\cli.js",
+      "install",
+      "--dry-run",
+      "chromium"
+    ],
+    "downloadedBrowser": false
+  },
+  "operations": 62,
+  "checks": [
+    "bundled frontend loads",
+    "native Pywebview bridge",
+    "operation catalog resource",
+    "bundled PyPDF2 AES provider",
+    "bundled Playwright Node CLI install dry-run (no browser download)",
+    "isolated image processing child",
+    "SQLite task persistence",
+    "AES-256 pdf_cut task through isolated worker",
+    "output page order and text",
+    "bundled RapidOCR/ONNX models through isolated worker",
+    "image output dimensions and alpha"
+  ],
+  "pdfCut": {
+    "status": "success",
+    "pages": [
+      "PDF smoke page three",
+      "PDF smoke page one"
+    ]
+  },
+  "ocr": {
+    "status": "success",
+    "text": "PPX OCR TEST 12345"
+  }
+}
