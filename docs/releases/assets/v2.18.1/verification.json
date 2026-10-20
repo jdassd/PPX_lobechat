@@ -1,0 +1,39 @@
+{
+  "version": "2.18.1",
+  "baseRevision": "d6e00698f65bb4a04271a3f75ef545d897b5dd37",
+  "scope": "local validation of release code; official package publication is recorded separately after tag CI",
+  "pythonTests": {
+    "passed": 202,
+    "failed": 0
+  },
+  "cajTargetedTests": {
+    "passed": 12,
+    "failed": 0
+  },
+  "frontendContracts": {
+    "passed": 26,
+    "failed": 0
+  },
+  "lint": {
+    "errors": 0,
+    "existingFrontendWarnings": 141
+  },
+  "frontendProductionBuild": "passed",
+  "cajBrowserFlow": "caj-pdf-flow.json",
+  "windowsFrozenSmoke": "caj-frozen-smoke.json",
+  "fullLocalRegression": "previous candidate full Windows flow passed; current search-refresh fix and final tag CI must be validated",
+  "fixtureScope": "synthetic CAJ containers matching pinned upstream layout; no real-world CAJ corpus; HN/C8/encrypted formats unsupported",
+  "nativeInstallUpgradeRestore": "pending",
+  "previousReleaseCandidate": {
+    "tag": "v2.18.0",
+    "commit": "1bca44c03ded442b80d199831c34b4ec6b50d9d8",
+    "ci": "39391578926",
+    "outcome": "macOS CAJ task-center refresh assertion failed; no release"
+  },
+  "windowsFrozenSmokeScope": "inherited v2.18.0 CAJ engine and packaging verification; UI search scheduling change is verified by current browser flow",
+  "cajSearchRaceReruns": {
+    "passed": 3,
+    "failed": 0,
+    "scenario": "activation request delayed 1200 ms, latest search immediately refreshed, failed input retried"
+  }
+}

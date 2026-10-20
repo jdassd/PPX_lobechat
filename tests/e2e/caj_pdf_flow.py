@@ -58,10 +58,22 @@ def verify_caj_pdf_flow(api, page, root, chosen, report_dir):
 
     # Recover the unsupported input, then retry through the actual task UI.
     bad.write_bytes(make_embedded_pdf_caj('recovered CAJ'))
+    # Change the search while activation's old request is still in flight.
+    # The latest criteria must run immediately after it, without waiting for
+    # the five-second polling timer or letting the old response replace them.
+    page.evaluate('''() => {
+      const api = window.pywebview.api;
+      window.__cajOriginalTaskList = api.task_list;
+      let first = true;
+      api.task_list = async (...args) => {
+        if (first) { first = false; await new Promise(resolve => setTimeout(resolve, 1200)); }
+        return window.__cajOriginalTaskList(...args);
+      };
+    }''')
     page.get_by_role('button', name='打开任务中心', exact=True).click()
     page.get_by_placeholder('搜索任务、输出路径或错误信息', exact=True).fill('CAJ 转 PDF')
     card = page.locator('.task-card').filter(has_text='CAJ 转 PDF').filter(has_text='部分成功')
-    expect(card).to_have_count(1)
+    expect(card).to_have_count(1, timeout=15000)
     card.get_by_role('button', name='重试', exact=True).click()
     completed = page.locator('.task-card').filter(has_text='CAJ 转 PDF').filter(
         has=page.locator('.task-title-row .el-tag').filter(has_text=re.compile('^已完成$')))
@@ -72,6 +84,10 @@ def verify_caj_pdf_flow(api, page, root, chosen, report_dir):
     with fitz.open(fixture_dir / 'unsupported.pdf') as document:
         assert 'recovered CAJ' in document[0].get_text()
 
+    page.evaluate('''() => {
+      window.pywebview.api.task_list = window.__cajOriginalTaskList;
+      delete window.__cajOriginalTaskList;
+    }''')
     page.get_by_placeholder('搜索任务、输出路径或错误信息', exact=True).fill('')
     navigation.get_by_role('button', name='PDF 工具', exact=True).click()
     page.get_by_role('navigation', name='子功能', exact=True).get_by_role('button', name='CAJ 转 PDF', exact=True).click()
@@ -93,7 +109,8 @@ def verify_caj_pdf_flow(api, page, root, chosen, report_dir):
         'passed': True,
         'fixtures': 'synthetic containers following the pinned upstream CAJ layout; no real-world CAJ corpus',
         'checks': ['missing page tree and page order', 'source directory default', 'partial result and HN error',
-                   'task-center retry only failed input', 'repeated conversion avoids overwrites',
+                   'task-center retry only failed input', 'latest search wins over delayed activation refresh',
+                   'repeated conversion avoids overwrites',
                    'custom output directory and reset', 'source bytes unchanged', 'light and dark panel render'],
         'screenshots': screenshots,
     }

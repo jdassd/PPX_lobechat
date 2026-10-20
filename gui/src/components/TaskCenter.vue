@@ -25,6 +25,8 @@ const cleanupVisible = ref(false)
 const cleanupLoading = ref(false)
 const cleanupForm = reactive({ scope: 'filtered', statuses: ['success', 'failed', 'interrupted', 'canceled'], olderThanDays: 0 })
 let refreshTimer = null
+let refreshAgain = false
+let queuedNotification = false
 
 const taskStats = computed(() => {
   if (backendStats.value) return backendStats.value
@@ -109,11 +111,17 @@ const methodLabel = (method) => tasks.value.find((task) => task.method === metho
 const shortDate = (value) => String(value || '').slice(5)
 
 const refreshTasks = async (notify = false) => {
-  if (refreshing.value) return
+  if (refreshing.value) {
+    refreshAgain = true
+    queuedNotification ||= notify
+    return
+  }
   refreshing.value = true
+  const filters = () => ({ page: page.value, pageSize: pageSize.value, query: query.value, status: statusFilter.value === 'all' ? '' : statusFilter.value, tool: toolFilter.value === 'all' ? '' : toolFilter.value })
+  const requested = filters()
   try {
-    const result = await callApi('task_list', { page: page.value, pageSize: pageSize.value, query: query.value, status: statusFilter.value === 'all' ? '' : statusFilter.value, tool: toolFilter.value === 'all' ? '' : toolFilter.value })
-    if (result.ok) {
+    const result = await callApi('task_list', requested)
+    if (result.ok && JSON.stringify(requested) === JSON.stringify(filters())) {
       serverRecords.value = hydrateBackendTasks(result.data.tasks || [], result.data.paused)
       serverTotal.value = result.data.total || 0
       backendStats.value = result.data.stats || null
@@ -125,6 +133,12 @@ const refreshTasks = async (notify = false) => {
     // 旧版后端仍可使用前端本地任务记录。
   } finally {
     refreshing.value = false
+    if (refreshAgain) {
+      const notifyNext = queuedNotification
+      refreshAgain = false
+      queuedNotification = false
+      refreshTasks(notifyNext)
+    }
   }
 }
 

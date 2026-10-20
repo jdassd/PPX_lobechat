@@ -1,7 +1,7 @@
 {
   "version": "2.18.0",
   "baseRevision": "d6e00698f65bb4a04271a3f75ef545d897b5dd37",
-  "scope": "local working tree before release commit; official packages require all three tag CI builds",
+  "scope": "local validation of release code; official package publication is recorded separately after tag CI",
   "pythonTests": {
     "passed": 202,
     "failed": 0
@@ -21,7 +21,13 @@
   "frontendProductionBuild": "passed",
   "cajBrowserFlow": "caj-pdf-flow.json",
   "windowsFrozenSmoke": "caj-frozen-smoke.json",
-  "fullLocalRegression": "rerun in progress after resetting inherited task search in the CAJ test",
+  "fullLocalRegression": {
+    "passed": true,
+    "workspace": "workspace.json",
+    "visual": "visual-sweep.json",
+    "pageErrors": 0
+  },
   "fixtureScope": "synthetic CAJ containers matching pinned upstream layout; no real-world CAJ corpus; HN/C8/encrypted formats unsupported",
-  "nativeInstallUpgradeRestore": "pending"
+  "nativeInstallUpgradeRestore": "pending",
+  "testedCodeCommit": "1bca44c03ded442b80d199831c34b4ec6b50d9d8"
 }

@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "version": "2.18.0",
+  "version": "2.18.1",
   "note": "发布决定与验收状态分开记录；未验证项目保持 pending，不因发版改为 passed。",
   "release": {
-    "tag": "v2.18.0",
+    "tag": "v2.18.1",
     "allowPendingAcceptance": true,
-    "reason": "用户于 2026-10-20 明确要求新增 PDF 工具中的 CAJ 转 PDF 并完成发布。本版验证内嵌 PDF 的 CAJ 容器、页树修复、批量结果和任务重试，不声称支持 HN/C8 或加密格式，也不声称已覆盖真实 CAJ 样本集。沿用已有原生安装升级恢复、其他 DPI/多屏、CEF、广泛 OCR 和 LibreOffice pending 验收状态，不因发版改为 passed。正式产物必须来自已推送 v2.18.0 标签提交的三平台成功 CI。"
+    "reason": "用户于 2026-10-20 明确要求新增 PDF 工具中的 CAJ 转 PDF 并完成发布。本版验证内嵌 PDF 的 CAJ 容器、页树修复、批量结果和任务重试，不声称支持 HN/C8 或加密格式，也不声称已覆盖真实 CAJ 样本集。沿用已有原生安装升级恢复、其他 DPI/多屏、CEF、广泛 OCR 和 LibreOffice pending 验收状态，不因发版改为 passed。正式产物必须来自已推送 v2.18.1 标签提交的三平台成功 CI。 v2.18.0 macOS CI 暴露任务中心刷新期间切换搜索条件被忽略、需等待定时刷新的问题，已修正为立即处理最新条件并丢弃旧响应，v2.18.1 专项连续三轮通过。"
   },
   "preReleaseLocalEvidence": {
     "inheritedBaseline": "docs/releases/assets/v2.17.6/publication.json",
@@ -17,7 +17,10 @@
     "cajBrowserFlow": "passed: real API worker, two-page content/order, partial failure, failed-only retry, output conflict protection, directory reset, light/dark render",
     "windowsFrozenSmoke": "passed: bundled CAJ through native Pywebview bridge and isolated worker, reopened PDF text; AES PDF, images and actual OCR also passed",
     "cajFixtureScope": "synthetic containers following pinned upstream layout; real-world CAJ corpus, HN/C8 and encrypted CAJ are not covered",
-    "versionEvidence": "docs/releases/assets/v2.18.0/verification.json"
+    "versionEvidence": "docs/releases/assets/v2.18.1/verification.json",
+    "pythonTestsPassed": 202,
+    "fullLocalEndToEnd": "inherited v2.18.0 complete Windows workspace and visual flow passed; v2.18.1 current CAJ delayed-search flow passed three rounds; final tag CI validates all flows",
+    "cajDelayedSearchReruns": 3
   },
   "phases": {
     "1": {
