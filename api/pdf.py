@@ -23,6 +23,7 @@ from PyPDF2.errors import WrongPasswordError
 
 from api.core.context import checkpoint, iter_progress, record_inputs, record_item
 from api.core.outputs import atomic_output, output_asset, write_output
+from api.utils.caj import caj_to_pdf_bytes
 from api.utils.validators import ensure_output_directory
 
 
@@ -980,6 +981,71 @@ class PDF():
             }
         except Exception as exc:
             return {'code': -1, 'msg': f'页面处理失败：{exc}'}
+
+    def pdf_caj_to_pdf(self, options: Dict = None):
+        """Convert CAJ files whose payload embeds a recoverable PDF object stream."""
+        try:
+            opts = self._validate_payload(options)
+            files = opts.get('_retryInputs') or opts.get('files') or []
+            if not isinstance(files, list) or not files:
+                raise ValueError('请选择 CAJ 文件')
+            output_dir = str(opts.get('outputDir') or '').strip()
+            if output_dir:
+                out_dir = Path(output_dir).expanduser()
+                out_dir.mkdir(parents=True, exist_ok=True)
+            else:
+                out_dir = None
+
+            inputs = [str(item.get('path') if isinstance(item, dict) else item) for item in files]
+            record_inputs(inputs)
+            converted, failures, items = [], [], []
+            for source_name in iter_progress(inputs, '正在转换 CAJ 文件'):
+                checkpoint()
+                source = Path(source_name).expanduser()
+                dest = (out_dir or source.parent) / f'{source.stem}.pdf'
+                try:
+                    if not source.is_file():
+                        raise FileNotFoundError(f'文件不存在：{source}')
+                    payload = caj_to_pdf_bytes(source.read_bytes())
+                    with atomic_output(dest) as (temporary, final):
+                        temporary.write_bytes(payload)
+                    asset = output_asset(final)
+                    converted.append(str(final))
+                    item = {'source': source_name, 'output': str(final), 'status': 'success'}
+                    record_item(source_name, 'success', outputs=[asset])
+                    items.append(item)
+                except Exception as exc:
+                    checkpoint()
+                    error = str(exc)
+                    item = {'source': source_name, 'output': '', 'status': 'error', 'error': error}
+                    failures.append({'input': source_name, 'error': error})
+                    record_item(source_name, 'failed', error)
+                    items.append(item)
+            success_count = len(converted)
+            failed_count = len(failures)
+            result_directories = {str(Path(path).parent) for path in converted}
+            output_location = str(out_dir) if out_dir else next(iter(result_directories), '') if len(result_directories) == 1 else ''
+            return {
+                'code': 0 if success_count else -1,
+                'msg': f'CAJ 转 PDF 完成：{success_count} 个成功，{failed_count} 个失败',
+                'files': converted,
+                'output': output_location,
+                'items': items,
+                'successCount': success_count,
+                'failedCount': failed_count,
+                'failures': failures,
+                'partial': bool(success_count and failed_count),
+                'inputItems': inputs,
+                'itemResults': [
+                    {'input': item['source'], 'status': 'success' if item['status'] == 'success' else 'failed',
+                     'message': item.get('error', ''),
+                     'outputs': [output_asset(item['output'])] if item['output'] else []}
+                    for item in items
+                ],
+            }
+        except Exception as exc:
+            return {'code': -1, 'msg': f'CAJ 转 PDF 失败：{exc}', 'files': [], 'output': '',
+                    'items': [], 'successCount': 0, 'failedCount': 0}
 
     def pdf_secure(self, options: Dict = None):
         '''添加可见水印、永久遮盖敏感文字、清理元数据并可设置密码。'''

@@ -164,7 +164,7 @@ class TaskOriginTests(unittest.TestCase):
                     'format_center_images_to_pdf', 'format_center_merge_pdfs', 'pdf_compress',
                     'ocr_pdf', 'pdf_merge', 'word_merge', 'excel_merge_tables', 'excel_column_profile',
                     'excel_process', 'excel_split_by_column', 'document_index_build', 'format_center_convert',
-                    'video_compress', 'video_cut', 'file_compress', 'excel_quality_report'}
+                    'video_compress', 'video_cut', 'file_compress', 'excel_quality_report', 'pdf_caj_to_pdf'}
         self.assertEqual({name for name, value in OPERATIONS.items() if value.primaryInputFields}, expected)
 
 

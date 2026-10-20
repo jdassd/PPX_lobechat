@@ -29,7 +29,7 @@ TRACKED_METHODS = {
     'image_rotate_flip', 'image_concat', 'image_batch_rename', 'image_to_pdf', 'ocr_image',
     'pdf_convert_to_images', 'pdf_convert_to_scan', 'pdf_compress', 'pdf_merge', 'pdf_split',
     'pdf_cut', 'pdf_multi_cut', 'pdf_extract_text', 'ocr_pdf', 'pdf_to_word', 'pdf_extract_images',
-    'pdf_page_workbench', 'pdf_secure', 'word_split', 'word_cut', 'word_merge',
+    'pdf_page_workbench', 'pdf_secure', 'pdf_caj_to_pdf', 'word_split', 'word_cut', 'word_merge',
     'excel_process', 'excel_merge_tables', 'excel_column_profile', 'excel_split_by_column',
     'excel_quality_report',
     'text_format_json', 'text_case_transform', 'text_deduplicate_sort', 'text_batch_replace',
@@ -711,6 +711,15 @@ class TaskMixin:
                 args[0]['_retryPageNumbers'] = [int(path.rsplit('#page=', 1)[1]) for path in task['inputItems'] if path not in completed]
                 if not args[0]['_retryPageNumbers']:
                     return api_error('所有页面均已完成，无需重新执行')
+            if method == 'pdf_caj_to_pdf' and task.get('inputItems') and args and isinstance(args[0], dict):
+                completed = {item.get('input') for item in task.get('itemResults', []) if item.get('status') == 'success'}
+                remaining = [path for path in task['inputItems'] if path not in completed]
+                if task.get('status') == 'partial':
+                    failed = {item.get('input') for item in task.get('itemResults', []) if item.get('status') == 'failed'}
+                    remaining = [path for path in task['inputItems'] if path in failed]
+                if not remaining:
+                    return api_error('所有文件均已完成，无需重新执行')
+                args[0]['files'] = remaining
             if batch_key and args and isinstance(args[0], dict):
                 successes = {item.get('input') for item in [*result.get('itemResults', []), *task.get('itemResults', [])] if item.get('status') == 'success'}
                 failures = {item.get('input') for item in result.get('failures', [])}

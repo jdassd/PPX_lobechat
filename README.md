@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Vue-3.0+-4FC08D?style=flat-square&logo=vue.js&logoColor=white" alt="Vue 3" />
   <img src="https://img.shields.io/badge/Python-3.10-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.10" />
   <img src="https://img.shields.io/badge/Pywebview-5.0+-FFD43B?style=flat-square&logo=python&logoColor=blue" alt="Pywebview" />
-  <img src="https://img.shields.io/badge/version-2.17.6-2b6fff?style=flat-square" alt="Version 2.17.6" />
+  <img src="https://img.shields.io/badge/version-2.18.0-2b6fff?style=flat-square" alt="Version 2.18.0" />
   <img src="https://img.shields.io/badge/License-AGPL--3.0-green?style=flat-square" alt="License" />
 </p>
 
@@ -20,22 +20,22 @@
 
 ## 📖 简介
 
-**PPX 2.17.6** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
+**PPX 2.18.0** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
 
-2.17.6 延续浏览器采集安装、点选回调、匹配数量和验证页恢复修复，并提升采集流程在页面跳转期间的等待稳定性。真实浏览器流程及冻结程序空缓存安装的验证记录见发布说明；本版冻结构建和自动发版仍以 Tag CI 成功为准。
+2.18.0 在 PDF 工具中新增 CAJ 转 PDF：本地批量转换、逐项结果、失败项重试和同名输出保护。支持内嵌 PDF 的 CAJ，HN、C8 和加密格式暂不支持；本版冻结构建和自动发版以 Tag CI 成功为准。
 
-更新内容与验收范围见 [v2.17.6 发布说明](docs/releases/v2.17.6.md)。
+更新内容与验收范围见 [v2.18.0 发布说明](docs/releases/v2.18.0.md)。
 
 定位、目标用户、14 个模块的输入输出与异常设计、协作流程、优先级和扩展边界见 [统一工具箱设计方案](docs/toolbox-design.md)。
 
 ## ✨ 主要功能
 
-PPX 2.17.6 的核心能力包括：
+PPX 2.18.0 的核心能力包括：
 
 ### 📄 文档与数据
 
 - **转换中心**：通过本机 FlyingMouse Format 引擎统一处理图片、文本、Office / WPS、PDF、音频、视频、电子书与 ZIP，支持混合批量、目标格式记忆、图片合成 PDF 和 PDF 合并。
-- **PDF 工具**：合并、拆分、压缩、切割、页面缩略图重排、页码、水印、永久脱敏及 AES-256 安全副本；PDF / Word / 图片互转集中在转换中心。
+- **PDF 工具**：CAJ 转 PDF、合并、拆分、压缩、切割、页面缩略图重排、页码、水印、永久脱敏及 AES-256 安全副本；PDF / Word / 图片互转集中在转换中心。
 - **离线 OCR**：识别图片或扫描 PDF，可生成纯文本、可搜索 PDF，并将规则表格导出为 Excel / CSV / JSON。
 - **Word 工具**：按结构或真实页码拆分、切割及多文档合并。
 - **Excel 工具**：结构预览、数据清洗、列画像、质量报告、按列拆分及多表合并。
@@ -59,7 +59,7 @@ PPX 2.17.6 的核心能力包括：
 - **任务中心**：持久保存队列与历史，支持筛选分页、批量取消/重试、7 天趋势、方法可靠性、失败诊断、多输出资产、输入来源逐层查看，以及带来源的 JSON/CSV 导出和可预览清理。
 - **模块中心**：按需开启可选能力，并检查 OCR、FFmpeg、LibreOffice 与 Playwright 依赖。
 - **全局搜索**：按 `Ctrl/⌘ + K` 搜索工具或具体动作。
-- **结果接力**：在“检查结果 / 继续处理”中选择兼容操作，预先查看可发送数量和跳过原因；覆盖图片、转换、PDF、Word、Excel、索引、归档和视频的 18 个目标操作。
+- **结果接力**：在“检查结果 / 继续处理”中选择兼容操作，预先查看可发送数量和跳过原因；覆盖图片、转换、PDF、Word、Excel、索引、归档和视频，CAJ 文件可接力到 PDF 工具。
 - **设置与维护**：跨平台健康检查、SHA-256 完整备份、延迟安全恢复、隐私诊断报告及窗口状态记忆；旧版备份继续兼容并明确标注校验等级。
 
 ## 🏗️ 技术栈

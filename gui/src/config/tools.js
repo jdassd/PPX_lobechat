@@ -51,7 +51,8 @@ export const TOOLS = [
       feature('ocr', '扫描 PDF OCR', ['可搜索 PDF', '扫描件文字识别'], { featured: true }),
       feature('images', '提取 PDF 图片', ['内嵌图片']),
       feature('pages', 'PDF 页面工作台', ['缩略图', '重排', '旋转', '页码'], { featured: true }),
-      feature('security', 'PDF 安全副本', ['水印', '脱敏', '密码', '元数据'])
+      feature('security', 'PDF 安全副本', ['水印', '脱敏', '密码', '元数据']),
+      feature('caj', 'CAJ 转 PDF', ['CAJ', 'HN', '知网', '文献'])
     ]
   },
   {

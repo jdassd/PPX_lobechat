@@ -33,6 +33,14 @@ test('unknown formats only suggest the universal archive receiver', () => {
   assert.deepEqual(routes.map((plan) => plan.route.id), ['file/archive'])
 })
 
+test('CAJ inputs go to their PDF panel and converted PDFs keep PDF routes', () => {
+  const routes = getResultRoutes([asset('/tmp/paper.CAJ')]).map((plan) => plan.route.id)
+  assert.deepEqual(routes, ['pdf/caj', 'file/archive'])
+  assert.equal(planResultHandoff([asset('/tmp/a.caj'), asset('/tmp/b.caj')], 'pdf/caj').acceptedCount, 2)
+  assert.equal(planResultHandoff([asset('/tmp/result.pdf')], 'pdf/caj').acceptedCount, 0)
+  assert.ok(getResultRoutes([asset('/tmp/result.pdf')]).some((plan) => plan.route.id === 'pdf/compress'))
+})
+
 test('path extension wins over same-name metadata and supports doc/docx contracts', () => {
   const planned = planResultHandoff([asset('/tmp/a.doc', { name: 'pretend.docx' }), asset('/tmp/b.docx')], 'word/merge')
   assert.equal(planned.acceptedCount, 1)

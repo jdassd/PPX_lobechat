@@ -10,6 +10,7 @@
     <ExtractImagesPanel v-show="activeTab === 'images'" />
     <PageWorkbenchPanel v-show="activeTab === 'pages'" />
     <SecurityPanel v-show="activeTab === 'security'" />
+    <CajPanel v-show="activeTab === 'caj'" />
 
     <section class="log-panel">
       <header>
@@ -45,6 +46,7 @@ import ExtractTextPanel from './parts/ExtractTextPanel.vue'
 import ExtractImagesPanel from './parts/ExtractImagesPanel.vue'
 import PageWorkbenchPanel from './parts/PageWorkbenchPanel.vue'
 import SecurityPanel from './parts/SecurityPanel.vue'
+import CajPanel from './parts/CajPanel.vue'
 
 const TABS = [
   { name: 'scan', label: 'PDF → 扫描件' },
@@ -56,7 +58,8 @@ const TABS = [
   { name: 'ocr', label: '扫描件 OCR' },
   { name: 'images', label: '提取图片' },
   { name: 'pages', label: '页面工作台' },
-  { name: 'security', label: '安全副本' }
+  { name: 'security', label: '安全副本' },
+  { name: 'caj', label: 'CAJ 转 PDF' }
 ]
 
 const props = defineProps({ initialTab: { type: String, default: '' } })

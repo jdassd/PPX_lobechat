@@ -18,6 +18,15 @@ PPX 经授权将 FlyingMouse Format 的 CLI 运行时嵌入安装包。界面和
 
 PPX 安装包包含当前目标平台的 Node.js 运行时，用于启动内置 FlyingMouse Format CLI。构建脚本会随包复制 Node.js 上游许可证；若本机构建环境未提供许可证文件，则写入对应版本的官方许可证地址。
 
+## caj2pdf CAJ 格式参考
+
+- 项目：caj2pdf/caj2pdf（不包含其 Qt 图形界面）
+- 上游地址：https://github.com/caj2pdf/caj2pdf
+- 参考源码版本：`6c4bc32b15ce748d211f45d536f5d5511ef9f368`
+- 许可证：GLWTPL，见 [上游许可证](https://github.com/caj2pdf/caj2pdf/blob/6c4bc32b15ce748d211f45d536f5d5511ef9f368/LICENSE)
+
+PPX 的 `api/utils/caj.py` 独立实现内嵌 PDF CAJ 容器偏移读取、缺失页面树重建和 PyMuPDF xref 修复；该文件未复制上游实现代码。当前不支持需要 JBIG/JBIG2 原生解码器的 HN/C8 图像容器。
+
 ## 可选转换引擎
 
 FFmpeg、LibreOffice、Poppler、Tesseract、qpdf 等大型引擎不作为 FlyingMouse 源码的一部分重新授权。PPX 仅在用户系统或独立合规运行时提供这些组件时启用相应格式，实际可用能力以“转换中心 → 引擎与说明”页面为准。

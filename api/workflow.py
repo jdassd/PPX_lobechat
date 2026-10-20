@@ -29,7 +29,7 @@ WORKFLOW_METHODS = {
     'image_rotate_flip', 'image_concat', 'image_batch_rename', 'image_to_pdf', 'ocr_image',
     'pdf_convert_to_images', 'pdf_convert_to_scan', 'pdf_compress', 'pdf_merge', 'pdf_split',
     'pdf_cut', 'pdf_multi_cut', 'pdf_extract_text', 'ocr_pdf', 'pdf_to_word', 'pdf_extract_images',
-    'pdf_page_workbench', 'pdf_secure', 'word_split', 'word_cut', 'word_merge',
+    'pdf_page_workbench', 'pdf_secure', 'pdf_caj_to_pdf', 'word_split', 'word_cut', 'word_merge',
     'excel_process', 'excel_merge_tables', 'excel_column_profile', 'excel_split_by_column',
     'excel_quality_report',
     'text_format_json', 'text_case_transform', 'text_deduplicate_sort', 'text_batch_replace',
@@ -658,6 +658,9 @@ class WorkflowMixin:
                 elif step['method'] in {'file_batch_copy', 'file_batch_delete', 'file_batch_rename', 'file_auto_classify'} and previous.get('inputItems'):
                     args['_retryInputs'] = [path for path in previous['inputItems'] if path not in completed]
                     args['_inputOrder'] = {path: index for index, path in enumerate(previous['inputItems'])}
+                    resume_info['retainedInputCount'] = len(set(previous['inputItems']) & completed)
+                elif step['method'] == 'pdf_caj_to_pdf' and previous.get('inputItems'):
+                    args['_retryInputs'] = [path for path in previous['inputItems'] if path not in completed]
                     resume_info['retainedInputCount'] = len(set(previous['inputItems']) & completed)
             handler = getattr(self, step['method'], None)
             if step['method'] not in WORKFLOW_METHODS or not callable(handler):

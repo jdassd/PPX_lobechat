@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 import fitz
+from caj_pdf_flow import verify_caj_pdf_flow
 from desktop_layout_flow import verify_desktop_layout
 from duplicate_review_flow import verify_duplicate_review
 from excel_processing_flow import verify_excel_processing
@@ -142,6 +143,13 @@ def main():
                     + ".map(method => [method, (...args) => window.ppxCall(method, args)]))};"
                 )
                 page.goto(f"http://127.0.0.1:{port}")
+                if '--caj-only' in sys.argv:
+                    result = verify_caj_pdf_flow(api, page, root, chosen, report_dir)
+                    assert not errors, errors
+                    print(json.dumps(result, ensure_ascii=False), flush=True)
+                    evidence.close()
+                    browser.close()
+                    return
                 if '--webauto-picker-only' in sys.argv:
                     webauto_picker = verify_webauto_picker(api, page, root, report_dir)
                     assert not errors, errors
@@ -354,6 +362,7 @@ def main():
                 original_chosen = list(chosen)
                 try:
                     encrypted_pdf = verify_pdf_encrypted_flow(api, page, root, chosen, report_dir)
+                    caj_pdf = verify_caj_pdf_flow(api, page, root, chosen, report_dir)
                 finally:
                     chosen[:] = original_chosen
                 desktop_layout = verify_desktop_layout(page, report_dir)
@@ -364,7 +373,7 @@ def main():
                 page.screenshot(path=str(report_dir / 'workspace.png'), full_page=True)
                 (report_dir / 'workspace.json').write_text(json.dumps({
                     'passed': True, 'pageErrors': errors, 'resultHandoff': handoff, 'excel': excel, 'inputOrigins': origins, 'templates': templates, 'preflight': preflight, 'workflowResults': workflow_results, 'searchArchive': search_archive, 'duplicateReview': duplicate_review,
-                    'encryptedPdf': encrypted_pdf, 'desktopLayout': desktop_layout, 'webautoPicker': webauto_picker,
+                    'encryptedPdf': encrypted_pdf, 'cajPdf': caj_pdf, 'desktopLayout': desktop_layout, 'webautoPicker': webauto_picker,
                     'checks': ['draft retention', 'restart configuration', 'partial failure', 'retry only failed input',
                                'output dimensions and alpha', 'handoff scoped to target module', '1000-page PDF editing/undo/reorder/export',
                                'two-step workflow via forms', 'pause only blocks new tasks', 'cancel queued task',

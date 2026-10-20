@@ -56,7 +56,7 @@ nodeRuntimeName = 'node.exe' if not ifMac and not ifLinux else 'node'
 flyingMouseNode = f"('../../build/flyingmouse-runtime/{nodeRuntimeName}', 'vendor/flyingmouse-runtime'),"
 addDll = flyingMouseNode
 addModules = (
-    "('../../gui/dist', 'web'), ('../../static', 'static'), "
+    "('../../gui/dist', 'web'), ('../../static', 'static'), ('../../licenses/GLWTPL-caj2pdf.txt', 'licenses'), "
     "('../../api/operation_catalog.json', 'api'), "
     "('../../build/flyingmouse-source', 'vendor/flyingmouse-format'), "
     "('../../LICENSE', 'licenses'), ('../../THIRD_PARTY_NOTICES.md', 'licenses')"

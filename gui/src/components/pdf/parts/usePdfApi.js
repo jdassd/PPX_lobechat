@@ -55,6 +55,12 @@ export function usePdfApi(shared) {
   }
 
   const callApi = async (method, payload, inputAssets = null) => {
+    const result = await callApiDetailed(method, payload, inputAssets)
+    return result?.ok ? result.data : null
+  }
+
+  // 面板需要显示部分成功或逐项失败时，保留标准化结果中的完整 data。
+  const callApiDetailed = async (method, payload, inputAssets = null) => {
     if (!ensurePyReady()) return null
     if (!window.pywebview.api[method]) {
       ElMessage.error('当前客户端版本缺少 PDF 能力')
@@ -67,12 +73,12 @@ export function usePdfApi(shared) {
       if (result.ok) {
         ElMessage.success(result.message || '操作成功')
         pushLog('success', result.message || '操作成功', method, result.data)
-        return result.data
+        return result
       } else {
         const msg = result.message || '操作失败'
         ElMessage.error(msg)
         pushLog('warning', msg, method, result.data)
-        return null
+        return result
       }
     } catch (error) {
       ElMessage.error(error.message || '执行失败')
@@ -95,6 +101,13 @@ export function usePdfApi(shared) {
   const pickPdf = async (routeId = '') => {
     if (!ensurePyReady()) return []
     const result = await selectInputFiles(routeId, ['PDF 文件 (*.pdf)'])
+    return result && result.length ? result : []
+  }
+
+  /** Select one or more CAJ files, consuming only the declared incoming route. */
+  const pickCaj = async (routeId = 'pdf/caj') => {
+    if (!ensurePyReady()) return []
+    const result = await selectInputFiles(routeId, ['CAJ 文件 (*.caj)'])
     return result && result.length ? result : []
   }
 
@@ -123,8 +136,10 @@ export function usePdfApi(shared) {
     ensurePyReady,
     pushLog,
     callApi,
+    callApiDetailed,
     openPath,
     pickPdf,
+    pickCaj,
     pickImages,
     pickDir
   }

@@ -64,6 +64,7 @@ _OUTPUT_FIELDS = {
     'pdf_compress': ['output'], 'pdf_merge': ['output'], 'pdf_split': ['files'],
     'pdf_cut': ['output'], 'pdf_multi_cut': ['files'], 'pdf_extract_text': ['output'],
     'pdf_to_word': ['output'], 'pdf_extract_images': ['files'],
+    'pdf_caj_to_pdf': ['files'],
     'pdf_page_workbench': ['output'], 'pdf_secure': ['output'],
     'word_split': ['files'], 'word_cut': ['output'], 'word_merge': ['output'],
     'ocr_image': ['output'], 'ocr_pdf': ['outputs'], 'ocr_table': ['outputs'],

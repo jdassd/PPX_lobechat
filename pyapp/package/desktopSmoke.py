@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import platform
+import struct
 import subprocess
 import sys
 import tempfile
@@ -111,6 +112,16 @@ def main():
         DB().init()
         source = root / 'source.png'
         Image.new('RGBA', (64, 48), (40, 80, 120, 90)).save(source)
+        caj_source = root / 'embedded-pdf.caj'
+        with fitz.open() as caj_document:
+            caj_document.new_page().insert_text((72, 72), 'CAJ frozen smoke page')
+            caj_payload = caj_document.tobytes()
+        caj_header = bytearray(0x100)
+        caj_header[:4] = b'CAJ\0'
+        struct.pack_into('<i', caj_header, 0x10, 1)
+        struct.pack_into('<i', caj_header, 0x14, 0x80)
+        struct.pack_into('<i', caj_header, 0x80, 0x100)
+        caj_source.write_bytes(bytes(caj_header) + caj_payload)
         ocr_source = root / 'ocr-source.png'
         ocr_image = Image.new('RGB', (1600, 360), 'white')
         ImageDraw.Draw(ocr_image).text((70, 90), 'PPX OCR TEST 12345', font=ImageFont.load_default(size=80), fill='black')
@@ -240,6 +251,10 @@ def main():
                     'method': 'ocr_image',
                     'args': [{'filePath': str(ocr_source), 'outputDir': Config.downloadDir}],
                 })
+                caj_options = json.dumps({
+                    'method': 'pdf_caj_to_pdf',
+                    'args': [{'files': [str(caj_source)], 'outputDir': Config.downloadDir}],
+                })
                 window.evaluate_js('''
                     window.__ppxSmoke = {done: false};
                     (async () => {
@@ -258,8 +273,9 @@ def main():
                         }
                         const imageTask = await submitAndWait(''' + image_options + ''');
                         const pdfTask = await submitAndWait(''' + pdf_options + ''');
+                        const cajTask = await submitAndWait(''' + caj_options + ''');
                         const ocrTask = await submitAndWait(''' + ocr_options + ''');
-                        window.__ppxSmoke = {done: true, imageTask, pdfTask, ocrTask,
+                        window.__ppxSmoke = {done: true, imageTask, pdfTask, cajTask, ocrTask,
                           operations: catalog.operations.length, text: document.body.innerText.slice(0, 2000)};
                       } catch (error) { window.__ppxSmoke = {done: true, error: String(error)}; }
                     })();
@@ -287,6 +303,13 @@ def main():
                     page_texts = [page.get_text().strip() for page in result]
                 if page_texts != ['PDF smoke page three', 'PDF smoke page one']:
                     raise ValueError(f'Native pdf_cut output page order/content mismatch: {page_texts!r}')
+                caj_task = state['cajTask']
+                if caj_task['status'] != 'success':
+                    raise RuntimeError(json.dumps(caj_task, ensure_ascii=False))
+                with fitz.open(caj_task['outputs'][0]['path']) as result:
+                    caj_text = result[0].get_text().strip()
+                if caj_text != 'CAJ frozen smoke page':
+                    raise ValueError(f'Bundled CAJ conversion content mismatch: {caj_text!r}')
                 ocr_task = state['ocrTask']
                 if ocr_task['status'] != 'success':
                     raise RuntimeError(json.dumps(ocr_task, ensure_ascii=False))
@@ -298,11 +321,13 @@ def main():
                     'bundled PyPDF2 AES provider', 'bundled Playwright Node CLI install dry-run (no browser download)',
                     'isolated image processing child', 'SQLite task persistence',
                     'AES-256 pdf_cut task through isolated worker', 'output page order and text',
+                    'CAJ container conversion through isolated worker and reopened PDF text',
                     'bundled RapidOCR/ONNX models through isolated worker',
                     'image output dimensions and alpha'])
                 if install_browser:
                     report['checks'].append('isolated actual first Chromium download and local-page launch')
                 report['pdfCut'] = {'status': pdf_task['status'], 'pages': page_texts}
+                report['cajPdf'] = {'status': caj_task['status'], 'text': caj_text}
                 report['ocr'] = {'status': ocr_task['status'], 'text': ocr_text}
             except Exception as exc:
                 report['error'] = str(exc)

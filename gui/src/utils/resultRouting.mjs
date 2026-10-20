@@ -81,6 +81,7 @@ export const RESULT_ROUTES = [
   { id: 'pdf/compress', tool: 'pdf', feature: 'compress', label: '压缩 PDF', description: '压缩单份 PDF 文件体积。', extensions: ['pdf'], capability: { maximumAssets: 1 } },
   { id: 'pdf/ocr', tool: 'pdf', feature: 'ocr', label: 'PDF OCR', description: '识别单份扫描件中的文字。', extensions: ['pdf'], capability: { maximumAssets: 1 }, dependency: 'ocr' },
   { id: 'pdf/merge', tool: 'pdf', feature: 'merge', label: '合并 PDF', description: '按当前顺序合并多份 PDF。', extensions: ['pdf'], capability: { minimumAssets: 2 } },
+  { id: 'pdf/caj', tool: 'pdf', feature: 'caj', label: '转换 CAJ 为 PDF', description: '在本机批量转换 CAJ 文档。', extensions: ['caj'] },
   { id: 'word/merge', tool: 'word', feature: 'merge', label: '合并 Word', description: '按当前顺序合并 DOCX 文档。', extensions: ['docx'], capability: { minimumAssets: 2 } },
   { id: 'excel/merge', tool: 'excel', feature: 'merge', label: '合并 Excel', description: '将多个 Excel 数据表合并为主表。', extensions: ['xlsx', 'xlsm', 'xltx', 'xltm'], capability: { minimumAssets: 2 } },
   { id: 'excel/profile', tool: 'excel', feature: 'profile', label: 'Excel 数据质检', description: '检查单份工作簿的缺失值、字段分布并导出质量报告。', extensions: ['xlsx', 'xlsm', 'xltx', 'xltm'], capability: { maximumAssets: 1 } },

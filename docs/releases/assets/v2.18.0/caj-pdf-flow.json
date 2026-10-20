@@ -1,0 +1,18 @@
+{
+  "passed": true,
+  "fixtures": "synthetic containers following the pinned upstream CAJ layout; no real-world CAJ corpus",
+  "checks": [
+    "missing page tree and page order",
+    "source directory default",
+    "partial result and HN error",
+    "task-center retry only failed input",
+    "repeated conversion avoids overwrites",
+    "custom output directory and reset",
+    "source bytes unchanged",
+    "light and dark panel render"
+  ],
+  "screenshots": [
+    "caj-pdf-light.png",
+    "caj-pdf-dark.png"
+  ]
+}

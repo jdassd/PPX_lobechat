@@ -1,26 +1,23 @@
 {
   "schemaVersion": 1,
-  "version": "2.17.6",
+  "version": "2.18.0",
   "note": "发布决定与验收状态分开记录；未验证项目保持 pending，不因发版改为 passed。",
   "release": {
-    "tag": "v2.17.6",
+    "tag": "v2.18.0",
     "allowPendingAcceptance": true,
-    "reason": "沿用用户修正完成后自动发版授权，承接浏览器采集修复并提升采集流程在页面跳转期间的等待稳定性。v2.17.4 已记录真实工具条点选导出、指定 Google 搜索页有头采集及 Windows 冻结程序空缓存下载 Chromium 的实现验证；v2.17.5 最终 Windows 冻结冒烟通过。v2.17.5 Tag CI（39363831140）macOS 构建通过，Ubuntu 与 Windows 在新浏览器点选 E2E 的导航等待断言失败，release 被跳过；两项均已越过重复项扫描等待断言，不能据此推断产品功能失败。v2.17.6 点选专项三轮与最终 Windows 冻结构建冒烟通过，三平台完整 Tag CI 39365337729 与自动发布均成功，Windows 安装包实际下载后大小、SHA-256 和版本已核对。原生界面首次下载操作未完成验收；安装器安装升级恢复、其他 DPI/多屏、CEF、广泛 OCR 与 LibreOffice 继续保持 pending。本版正式产物必须来自已推送 Tag 提交的三平台成功 CI。"
+    "reason": "用户于 2026-10-20 明确要求新增 PDF 工具中的 CAJ 转 PDF 并完成发布。本版验证内嵌 PDF 的 CAJ 容器、页树修复、批量结果和任务重试，不声称支持 HN/C8 或加密格式，也不声称已覆盖真实 CAJ 样本集。沿用已有原生安装升级恢复、其他 DPI/多屏、CEF、广泛 OCR 和 LibreOffice pending 验收状态，不因发版改为 passed。正式产物必须来自已推送 v2.18.0 标签提交的三平台成功 CI。"
   },
   "preReleaseLocalEvidence": {
-    "browserCollectionInherited": "docs/releases/assets/v2.17.4/verification.json",
-    "previousVersionPythonTestsPassed": 190,
-    "previousVersionFrontendContractsPassed": 25,
-    "previousVersionLintErrors": 0,
-    "previousVersionLintExistingWarnings": 141,
-    "duplicateScanTargetedReruns": "2 passed, exit 0; all existing result assertions retained",
-    "finalCommitEndToEnd": "v2.17.6 exact release commit 0c93bd9522f63c916f23f16d063e25d1d8ce88e9 passed full E2E and visual checks on all three CI platforms",
-    "finalTagCi": "39365337729: three builds and release succeeded",
-    "finalCiPythonTestsPassed": 190,
-    "finalCiFrontendContractsPassed": 25,
-    "publicationEvidence": "docs/releases/assets/v2.17.6/publication.json",
-    "finalFrozenPackageAfterHomePolish": "v2.17.6 passed; browser CLI, bridge, AES PDF cut, images and actual OCR",
-    "pickerTargetedReruns": "v2.17.6 navigation-ready test passed three runs with real selection, collection and XLSX reopen"
+    "inheritedBaseline": "docs/releases/assets/v2.17.6/publication.json",
+    "cajTargetedTestsPassed": 12,
+    "taskOriginsTargetedTestsPassed": 6,
+    "frontendContractsPassed": 26,
+    "lintErrors": 0,
+    "existingFrontendLintWarnings": 141,
+    "cajBrowserFlow": "passed: real API worker, two-page content/order, partial failure, failed-only retry, output conflict protection, directory reset, light/dark render",
+    "windowsFrozenSmoke": "passed: bundled CAJ through native Pywebview bridge and isolated worker, reopened PDF text; AES PDF, images and actual OCR also passed",
+    "cajFixtureScope": "synthetic containers following pinned upstream layout; real-world CAJ corpus, HN/C8 and encrypted CAJ are not covered",
+    "versionEvidence": "docs/releases/assets/v2.18.0/verification.json"
   },
   "phases": {
     "1": {
