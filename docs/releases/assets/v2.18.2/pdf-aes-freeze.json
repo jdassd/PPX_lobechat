@@ -1,0 +1,29 @@
+{
+  "passed": true,
+  "platform": "win32",
+  "python": "3.10.11",
+  "startedAt": "2026-10-20T09:18:31Z",
+  "fixtureAlgorithms": [
+    "AES-128",
+    "AES-256"
+  ],
+  "buildLog": "build/verification/pdf-aes-freeze-build.log",
+  "runLog": "build/verification/pdf-aes-freeze-run.log",
+  "buildCommand": [
+    "python.exe",
+    "-m",
+    "PyInstaller",
+    "--onefile",
+    "--hidden-import",
+    "Crypto.Cipher.AES",
+    "--hidden-import",
+    "Crypto.Cipher.ARC4",
+    "--hidden-import",
+    "Crypto.Util.Padding"
+  ],
+  "completedChecks": [
+    "AES-128 decrypt and page text",
+    "AES-256 decrypt and page text"
+  ],
+  "finishedAt": "2026-10-20T09:18:48Z"
+}

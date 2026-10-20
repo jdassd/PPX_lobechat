@@ -1,0 +1,60 @@
+{
+  "version": "2.18.2",
+  "baseRevision": "76b4176",
+  "scope": "final v2.18.2 working tree tested locally; release CI/publication recorded separately after completion",
+  "browserDefaultCacheFix": {
+    "status": "implemented",
+    "details": "status detection, installation environment and launch executable use the same default Playwright browser cache; GUI offers re-detection"
+  },
+  "previousCacheTestGap": {
+    "status": "confirmed",
+    "details": "the previous cold-cache test explicitly set PLAYWRIGHT_BROWSERS_PATH and did not validate the default environment"
+  },
+  "targetedImplementationEvidence": {
+    "python": "206 passed; full unittest suite, exit 0",
+    "guiContracts": "26 passed, 0 failed; exit 0",
+    "lint": "exit 0; Ruff clean; ESLint 0 errors and 141 warnings",
+    "frontendBuild": "2.18.2 production build passed"
+  },
+  "frozenDefaultCacheProbe": {
+    "status": "passed",
+    "command": "pnpm run test:browser:freeze",
+    "evidence": "webauto-default-freeze.json"
+  },
+  "fullPythonGuiRegression": "passed: 206 Python tests, 26 GUI contract tests; lint/build exit 0",
+  "finalFrozenDefaultEnvironmentColdInstallAndLaunch": {
+    "status": "passed",
+    "evidence": "desktop-default-cache-smoke.json",
+    "downloadHost": "official default; no custom host",
+    "environment": "PLAYWRIGHT_BROWSERS_PATH absent; fresh isolated LOCALAPPDATA and APPDATA",
+    "browser": "initially absent, downloaded, launched by public API, matching executable, toolbar ready, cancel/join completed",
+    "otherChecks": "native bridge, image alpha/dimensions, SQLite, AES-256 pdf_cut page order, CAJ, OCR"
+  },
+  "fullEndToEnd": {
+    "status": "passed",
+    "workspace": "workspace.json",
+    "visual": "visual-sweep.json",
+    "pageErrors": [],
+    "exitCodes": [
+      0,
+      0
+    ],
+    "firstAttempt": "workspace foreground command reached tool 240s limit; not counted as passed; complete background rerun exit 0"
+  },
+  "nativeInstallUpgradeRestore": "pending",
+  "finalTagCi": "pending",
+  "publication": "pending",
+  "pendingAcceptance": [
+    "native install, upgrade and restore",
+    "other DPI and multiple monitors",
+    "CEF",
+    "broad OCR coverage",
+    "LibreOffice"
+  ],
+  "evidenceBoundary": "Frozen and workflow browser checks use test-only headless=True; production launch remains headless=False. No native human picker, installation/upgrade/restore or compositor flicker acceptance inferred. Baseline revision in visual report predates this uncommitted fix; tested-source-sha256.json identifies exact tested content.",
+  "errorRecoveryUi": {
+    "status": "passed",
+    "evidence": "recovery-ui.json",
+    "boundary": "rendered frontend with injected API error, not a backend launch test"
+  }
+}

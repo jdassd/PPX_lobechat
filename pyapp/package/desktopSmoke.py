@@ -25,6 +25,7 @@ def main():
     )
     from pyapp.config.config import Config
     from pyapp.db.db import DB
+    from pyapp.package.webautoDefaultSmoke import run_default_browser_smoke
 
     index = sys.argv.index('--desktop-smoke')
     target = Path(sys.argv[index + 1]).resolve()
@@ -32,7 +33,38 @@ def main():
     report = {'passed': False, 'platform': platform.system(), 'python': platform.python_version(),
               'frozen': bool(getattr(sys, 'frozen', False))}
     install_browser = os.environ.get('PPX_DESKTOP_SMOKE_INSTALL_BROWSER') == '1'
+    default_browser = os.environ.get('PPX_DESKTOP_SMOKE_DEFAULT_BROWSER') == '1'
+    if install_browser and default_browser:
+        report['error'] = 'The custom-cache and default-cache browser smoke modes are mutually exclusive.'
+        target.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+        return 1
     browser_cache = None
+    default_root = None
+    if default_browser:
+        root_value = os.environ.get('PPX_SMOKE_DEFAULT_ROOT', '').strip()
+        if not root_value or not Path(root_value).is_absolute():
+            report['error'] = 'Default-cache browser smoke requires an absolute PPX_SMOKE_DEFAULT_ROOT.'
+            target.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+            return 1
+        if 'PLAYWRIGHT_BROWSERS_PATH' in os.environ:
+            report['error'] = 'PLAYWRIGHT_BROWSERS_PATH must be completely absent for default-cache browser smoke.'
+            target.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+            return 1
+        default_root = Path(root_value).resolve()
+        local_app_data = (default_root / 'LocalAppData').resolve()
+        roaming_app_data = (default_root / 'AppData').resolve()
+        local_app_data.mkdir(parents=True, exist_ok=True)
+        roaming_app_data.mkdir(parents=True, exist_ok=True)
+        os.environ['LOCALAPPDATA'] = str(local_app_data)
+        os.environ['APPDATA'] = str(roaming_app_data)
+        os.environ['PPX_SMOKE_DEFAULT_ROOT'] = str(default_root)
+        report['defaultBrowserEnvironment'] = {
+            'root': str(default_root),
+            'localAppData': str(local_app_data),
+            'appData': str(roaming_app_data),
+            'playwrightBrowsersPathAbsent': 'PLAYWRIGHT_BROWSERS_PATH' not in os.environ,
+            'defaultCache': str(local_app_data / 'ms-playwright'),
+        }
     if install_browser:
         cache_value = os.environ.get('PLAYWRIGHT_BROWSERS_PATH', '').strip()
         if not cache_value:
@@ -145,7 +177,7 @@ def main():
                 start_result = api.webauto_install_browser()
                 if start_result.get('code') != 0:
                     raise RuntimeError(f'Browser install could not start: {start_result.get("msg", "unknown error")}')
-                installer_thread = getattr(api, '_wa_install_thread', None)
+                installer_thread = getattr(api._services[WebAutoTool], '_wa_install_thread', None)
                 install_deadline = time.monotonic() + 900
                 while time.monotonic() < install_deadline:
                     install_status = api.webauto_install_status()
@@ -213,6 +245,66 @@ def main():
                 if installer_thread is not None and installer_thread.is_alive():
                     installer_thread.join(timeout=5)
                 os.environ.pop('PLAYWRIGHT_BROWSERS_PATH', None)
+        if default_browser:
+            installer_thread = None
+            install_status = None
+            initial_installed = None
+            webauto_service = None
+            try:
+                if 'PLAYWRIGHT_BROWSERS_PATH' in os.environ:
+                    raise RuntimeError('PLAYWRIGHT_BROWSERS_PATH appeared before default-cache install.')
+                initial_status = api.webauto_status()
+                if initial_status.get('code') != 0:
+                    raise RuntimeError(f'Initial browser status failed: {initial_status.get("msg", "unknown error")}')
+                initial_installed = bool(initial_status.get('installed'))
+                if initial_installed:
+                    raise RuntimeError('Isolated default Chromium cache was unexpectedly reported as installed.')
+                start_result = api.webauto_install_browser()
+                if start_result.get('code') != 0:
+                    raise RuntimeError(f'Browser install could not start: {start_result.get("msg", "unknown error")}')
+                installer_thread = getattr(api._services[WebAutoTool], '_wa_install_thread', None)
+                install_deadline = time.monotonic() + 900
+                while time.monotonic() < install_deadline:
+                    install_status = api.webauto_install_status()
+                    if install_status.get('code') != 0:
+                        raise RuntimeError(f'Browser install status failed: {install_status.get("msg", "unknown error")}')
+                    if install_status.get('done'):
+                        break
+                    time.sleep(0.5)
+                else:
+                    raise TimeoutError('Default-cache first browser install exceeded 15 minutes.')
+                if not install_status.get('success'):
+                    raise RuntimeError(f'Browser install failed: {install_status.get("error") or "unknown error"}')
+                final_status = api.webauto_status()
+                if final_status.get('code') != 0 or not final_status.get('installed'):
+                    raise RuntimeError(f'Installed browser was not reported ready: {final_status.get("msg", "unknown error")}')
+                webauto_service = api._services[WebAutoTool]
+                if webauto_service._wa_browsers_dir().resolve() != (local_app_data / 'ms-playwright').resolve():
+                    raise AssertionError('WebAutoTool did not resolve Chromium to LOCALAPPDATA/ms-playwright.')
+                browser_result = run_default_browser_smoke(webauto_service)
+                report['defaultCacheBrowser'] = {
+                    'initialInstalled': initial_installed,
+                    'downloaded': True,
+                    'installed': bool(final_status.get('installed')),
+                    'cachePath': str(webauto_service._wa_browsers_dir().resolve()),
+                    'publicApiStart': True,
+                    **browser_result,
+                }
+            except Exception as exc:
+                report['defaultCacheBrowser'] = {
+                    'initialInstalled': initial_installed,
+                    'downloaded': bool(install_status and install_status.get('success')),
+                    'publicApiStart': False,
+                    'playwrightBrowsersPathAbsent': 'PLAYWRIGHT_BROWSERS_PATH' not in os.environ,
+                    'apiState': webauto_service.webauto_pick_state() if webauto_service is not None else None,
+                    'installState': install_status,
+                }
+                report['error'] = f'Frozen default-cache browser smoke failed: {type(exc).__name__}: {exc}'
+                target.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+                return 1
+            finally:
+                if installer_thread is not None and installer_thread.is_alive():
+                    installer_thread.join(timeout=5)
         resource = Path(Config.codeDir) / ('web/index.html' if getattr(sys, 'frozen', False) else 'gui/dist/index.html')
         if not resource.is_file():
             raise FileNotFoundError(f'Build the frontend before desktop verification: {resource}')
@@ -326,6 +418,8 @@ def main():
                     'image output dimensions and alpha'])
                 if install_browser:
                     report['checks'].append('isolated actual first Chromium download and local-page launch')
+                if default_browser:
+                    report['checks'].append('isolated default-cache Chromium download and real WebAutoTool picker toolbar')
                 report['pdfCut'] = {'status': pdf_task['status'], 'pages': page_texts}
                 report['cajPdf'] = {'status': caj_task['status'], 'text': caj_text}
                 report['ocr'] = {'status': ocr_task['status'], 'text': ocr_text}

@@ -52,6 +52,63 @@ class WebAutoInstallTests(unittest.TestCase):
                 executable.write_bytes(b'')
                 self.assertTrue(webauto.WebAutoTool._wa_chromium_installed())
 
+    def test_pyinstaller_zero_browser_path_uses_user_cache_for_detection_and_installer(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            user_cache = Path(temporary) / 'Local' / 'ms-playwright'
+            with patch.dict(webauto.os.environ, {
+                'PLAYWRIGHT_BROWSERS_PATH': '0',
+                'LOCALAPPDATA': str(Path(temporary) / 'Local'),
+            }, clear=False), patch.object(webauto.sys, 'platform', 'win32'):
+                browser_dir = webauto.WebAutoTool._wa_browsers_dir()
+                installer_env = webauto._wa_install_environment()
+                self.assertEqual(webauto.os.environ['PLAYWRIGHT_BROWSERS_PATH'], '0')
+
+            self.assertEqual(browser_dir, user_cache.resolve())
+            self.assertEqual(Path(installer_env['PLAYWRIGHT_BROWSERS_PATH']), browser_dir)
+
+    def test_empty_browser_path_uses_user_cache_and_absolute_custom_path_is_preserved(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            local_app_data = Path(temporary) / 'Local'
+            custom_cache = Path(temporary) / 'custom-cache'
+            for configured, expected in (
+                ('', local_app_data / 'ms-playwright'),
+                ('relative-cache', local_app_data / 'ms-playwright'),
+                (str(custom_cache), custom_cache),
+            ):
+                with self.subTest(configured=configured), patch.dict(webauto.os.environ, {
+                    'PLAYWRIGHT_BROWSERS_PATH': configured,
+                    'LOCALAPPDATA': str(local_app_data),
+                }, clear=False), patch.object(webauto.sys, 'platform', 'win32'):
+                    browser_dir = webauto.WebAutoTool._wa_browsers_dir()
+                    self.assertEqual(browser_dir, expected.resolve())
+                    self.assertEqual(
+                        Path(webauto._wa_install_environment()['PLAYWRIGHT_BROWSERS_PATH']),
+                        browser_dir,
+                    )
+
+    def test_launch_kwargs_use_the_detected_current_revision_executable(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            executable = root / 'chromium-1208' / 'chrome-win' / 'chrome.exe'
+            executable.parent.mkdir(parents=True)
+            executable.write_bytes(b'')
+            with patch.object(webauto.WebAutoTool, '_wa_browsers_dir', return_value=root), \
+                    patch.object(webauto.WebAutoTool, '_wa_expected_chromium_dirs', return_value=['chromium-1208']), \
+                    patch.object(webauto.sys, 'platform', 'win32'):
+                tool = webauto.WebAutoTool()
+                options = tool._wa_pick_launch_options()
+
+            self.assertEqual(options['executable_path'], str(executable.resolve()))
+            self.assertFalse(options['headless'])
+
+    def test_missing_browser_executable_error_is_actionable_and_other_errors_keep_details(self):
+        missing = webauto._wa_format_pick_error(Exception("Executable doesn't exist at C:/app/chrome.exe"))
+        self.assertIn('重新检测并下载', missing)
+        self.assertNotIn('C:/app', missing)
+
+        other = webauto._wa_format_pick_error(Exception('navigation timed out'))
+        self.assertIn('navigation timed out', other)
+
     def test_install_failure_keeps_safe_diagnostic_and_allows_retry(self):
         tool = webauto.WebAutoTool()
         tool._wa_ensure()

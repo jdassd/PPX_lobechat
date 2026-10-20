@@ -1,0 +1,72 @@
+{
+  "passed": true,
+  "revision": "76b41766c4e17e573d985a8c9dc02a268f12a3cf",
+  "visuals": [
+    {
+      "file": "home-desktop-light.png",
+      "width": 1440,
+      "height": 1000,
+      "theme": "light"
+    },
+    {
+      "file": "home-desktop-dark.png",
+      "width": 1440,
+      "height": 1000,
+      "theme": "dark"
+    },
+    {
+      "file": "home-narrow-light.png",
+      "width": 900,
+      "height": 760,
+      "theme": "light"
+    },
+    {
+      "file": "home-narrow-dark.png",
+      "width": 900,
+      "height": 760,
+      "theme": "dark"
+    },
+    {
+      "file": "text-tools-narrow-light.png",
+      "width": 900,
+      "height": 760,
+      "theme": "light"
+    },
+    {
+      "file": "text-tools-narrow-dark.png",
+      "width": 900,
+      "height": 760,
+      "theme": "dark"
+    }
+  ],
+  "favoriteKeyboard": "toggles without navigating",
+  "textWorkflows": [
+    "JSON format and invalid JSON feedback",
+    "case transform",
+    "deduplicate and statistics",
+    "literal replacement and invalid regex feedback"
+  ],
+  "navigationSmoke": [
+    "转换中心",
+    "图片处理",
+    "PDF 工具",
+    "Word 工具",
+    "Excel 工具",
+    "文档中心",
+    "文件批处理",
+    "自动化工作流",
+    "网页数据采集",
+    "文本工具",
+    "视频处理",
+    "印章图片生成",
+    "设置与维护",
+    "系统诊断（高级）"
+  ],
+  "navigationWait": {
+    "condition": "target component visible with nonempty text",
+    "timeoutMs": 15000,
+    "imageChunkDelayMs": 1200,
+    "delayedChunks": 1
+  },
+  "pageErrors": []
+}

@@ -45,10 +45,15 @@ def _wa_install_command() -> List[str]:
 
 
 def _wa_install_environment(host: str = '') -> Dict[str, str]:
-    """Build the same driver environment used by Playwright's Python API."""
+    """Build the installer environment with the browser cache used by this app."""
     from playwright._impl._driver import get_driver_env
 
     env = get_driver_env()
+    # Playwright's frozen transport defaults its driver environment to "0", which
+    # looks beside the bundled driver under _internal. That directory is
+    # read-only after installation. Keep installs and runtime detection in the
+    # same per-user cache without mutating process-global environment variables.
+    env['PLAYWRIGHT_BROWSERS_PATH'] = str(WebAutoTool._wa_browsers_dir())
     if host:
         env['PLAYWRIGHT_DOWNLOAD_HOST'] = host
     env.setdefault('PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT', '120000')
@@ -77,6 +82,14 @@ def _wa_sanitize_install_diagnostic(value: str, limit: int = 2000) -> str:
     text = re.sub(r'(?i)(Bearer\s+)\S+', r'\1<redacted>', text)
     text = re.sub(r'(?i)(password|passwd|token|authorization|proxy-auth)\s*[:=]\s*[^\s,;]+', r'\1=<redacted>', text)
     return text[-max(0, limit):].strip()
+
+
+def _wa_format_pick_error(error: Exception) -> str:
+    """Keep actionable Chromium cache failures readable in the UI."""
+    message = str(error)
+    if "executable doesn't exist" in message.lower():
+        return '浏览器内核文件缺失或已损坏，请重新检测并下载 Chromium 内核'
+    return f'点选会话异常：{message}'
 
 # ============================================================================
 # 注入到页面的点选脚本（纯 JS）。
@@ -666,16 +679,25 @@ class WebAutoTool:
 
     @staticmethod
     def _wa_browsers_dir() -> Path:
-        """playwright 浏览器缓存目录。"""
-        env = os.environ.get('PLAYWRIGHT_BROWSERS_PATH')
-        if env:
-            return Path(env)
+        """Return one writable, absolute cache path for detection, install and launch."""
+        env = os.path.expandvars(os.path.expanduser(
+            os.environ.get('PLAYWRIGHT_BROWSERS_PATH', '').strip()
+        ))
+        # "0" is Playwright's special package-local mode. In a frozen app that
+        # resolves inside _internal/playwright and may be unwritable; empty and
+        # relative values are also not stable across launch working directories.
+        if env and env != '0':
+            custom = Path(env)
+            if custom.is_absolute():
+                return custom.resolve()
         if sys.platform.startswith('win'):
             base = os.environ.get('LOCALAPPDATA') or str(Path.home() / 'AppData' / 'Local')
-            return Path(base) / 'ms-playwright'
-        if sys.platform == 'darwin':
-            return Path.home() / 'Library' / 'Caches' / 'ms-playwright'
-        return Path.home() / '.cache' / 'ms-playwright'
+            default = Path(base) / 'ms-playwright'
+        elif sys.platform == 'darwin':
+            default = Path.home() / 'Library' / 'Caches' / 'ms-playwright'
+        else:
+            default = Path.home() / '.cache' / 'ms-playwright'
+        return default.resolve()
 
     @staticmethod
     def _wa_expected_chromium_dirs() -> List[str]:
@@ -730,20 +752,36 @@ class WebAutoTool:
         return any(candidate.is_file() for candidate in cls._wa_chromium_executable_candidates(directory))
 
     @classmethod
+    def _wa_chromium_executable_path(cls) -> Optional[Path]:
+        """Resolve the executable matching the installed Playwright revision."""
+        base = cls._wa_browsers_dir()
+        expected = cls._wa_expected_chromium_dirs()
+        directories = [base / dirname for dirname in expected]
+        if not expected:
+            directories = [Path(value) for value in glob.glob(str(base / 'chromium-*'))]
+        for directory in directories:
+            for candidate in cls._wa_chromium_executable_candidates(directory):
+                if candidate.is_file():
+                    return candidate.resolve()
+        return None
+
+    @classmethod
     def _wa_chromium_installed(cls) -> bool:
         """检测与当前 playwright 版本匹配的 chromium 内核是否已下载。"""
-        base = cls._wa_browsers_dir()
-        if not base.exists():
-            return False
-        expected = cls._wa_expected_chromium_dirs()
-        if expected:
-            # 只按当前包的修订号检查主 Chromium 可执行文件，空目录/半下载目录不得算就绪。
-            return any(cls._wa_chromium_directory_ready(base / dirname) for dirname in expected)
-        # 回退时同样要求找到真实可执行文件，不能只按目录名判断。
-        for dirname in glob.glob(str(base / 'chromium-*')):
-            if cls._wa_chromium_directory_ready(Path(dirname)):
-                return True
-        return False
+        return cls._wa_chromium_executable_path() is not None
+
+    def _wa_pick_launch_options(self) -> Dict[str, Any]:
+        """Build launch kwargs from the same executable checked by status/install."""
+        executable_path = self._wa_chromium_executable_path()
+        if executable_path is None:
+            raise RuntimeError('未找到与当前 Playwright 版本匹配的 Chromium 可执行文件')
+        return {
+            'headless': False,
+            'executable_path': str(executable_path),
+            'args': _WA_LAUNCH_ARGS,
+            'locale': 'zh-CN',
+            'user_agent': _WA_USER_AGENT,
+        }
 
     # ------------------------------------------------------------------ #
     # 1. 状态查询
@@ -962,8 +1000,9 @@ class WebAutoTool:
             self._wa_driver = playwright._impl_obj._connection._transport._proc
             profile = Path(Config.appDataDir) / 'webauto' / 'browser-profile'
             profile.mkdir(parents=True, exist_ok=True)
-            browser = context = playwright.chromium.launch_persistent_context(str(profile), headless=False,
-                              args=_WA_LAUNCH_ARGS, locale='zh-CN', user_agent=_WA_USER_AGENT)
+            browser = context = playwright.chromium.launch_persistent_context(
+                str(profile), **self._wa_pick_launch_options(),
+            )
             context.set_default_timeout(5000)
             context.set_default_navigation_timeout(15000)
             context.add_init_script(_STEALTH_INIT)
@@ -1028,7 +1067,7 @@ class WebAutoTool:
                     break
         except Exception as exc:
             with self._wa_lock:
-                self._wa_pick['error'] = f'点选会话异常：{exc}'
+                self._wa_pick['error'] = _wa_format_pick_error(exc)
                 self._wa_pick['done'] = True
         finally:
             # 在本线程内关闭，保证线程亲和

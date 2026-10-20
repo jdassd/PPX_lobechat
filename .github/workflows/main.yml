@@ -93,6 +93,9 @@ jobs:
       - name: 安装浏览器测试运行时
         run: node pyapp/package/python.js -m playwright install --with-deps chromium
 
+      - name: 验证冻结程序的默认浏览器路径
+        run: pnpm run test:browser:freeze
+
       - name: 验证完整工作区流程
         run: pnpm run test:e2e
 

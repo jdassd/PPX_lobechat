@@ -255,6 +255,13 @@ const pickFields = computed(() => pick.state?.fields || [])
 const hasPagination = computed(() => !!pick.state?.pagination)
 const pickDetailActive = computed(() => !!pick.state?.detailActive)
 const pickDetailFields = computed(() => pick.state?.detailFields || [])
+const pickErrorSummary = computed(() => {
+  const message = String(pick.startError || '')
+  if (/executable doesn't exist|browser.*(missing|not found)|chromium.*(missing|not found)/i.test(message)) {
+    return '浏览器内核文件缺失或不可用，请重新检测环境并按提示下载。'
+  }
+  return '浏览器点选启动失败，请重新检测浏览器内核后重试。'
+})
 
 // 打开浏览器开始点选
 const startPick = async () => {
@@ -368,6 +375,13 @@ const cancelPick = async () => {
 const retryPick = async () => {
   await cancelPick()
   await startPick()
+}
+
+// 清理失效点选会话后重新检测环境；不改网址或已保存的采集配置。
+const recoverPickEnvironment = async () => {
+  await cancelPick()
+  activeStep.value = STEP.ENV
+  await checkEnv()
 }
 
 /* ============================================================
@@ -746,8 +760,15 @@ checkEnv()
 
         <div v-if="pick.startError" class="mt">
           <el-alert type="error" :closable="false" show-icon title="浏览器点选未能继续" />
-          <p class="wa-error-detail">{{ pick.startError }}</p>
-          <el-button class="mt8" size="small" type="primary" :loading="pick.starting" @click="retryPick">重试打开浏览器</el-button>
+          <p class="wa-error-summary">{{ pickErrorSummary }}</p>
+          <details class="wa-error-diagnostics">
+            <summary>查看详细错误</summary>
+            <pre class="wa-error-detail">{{ pick.startError }}</pre>
+          </details>
+          <div class="wa-actions">
+            <el-button type="primary" :loading="env.loading" @click="recoverPickEnvironment">重新检测浏览器内核</el-button>
+            <el-button :loading="pick.starting" @click="retryPick">重试打开浏览器</el-button>
+          </div>
         </div>
 
         <!-- 操作说明 -->
@@ -1113,6 +1134,20 @@ checkEnv()
   color: var(--el-color-danger);
   font-size: 13px;
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.wa-error-summary {
+  margin: 8px 0 0;
+  color: var(--el-color-danger);
+  font-size: 13px;
+}
+.wa-error-diagnostics {
+  margin-top: 8px;
+  color: var(--ppx-text-muted);
+  font-size: 12px;
+}
+.wa-error-diagnostics summary {
+  cursor: pointer;
 }
 .hint {
   font-size: 12.5px;

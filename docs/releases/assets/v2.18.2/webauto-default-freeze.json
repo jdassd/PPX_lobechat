@@ -1,0 +1,59 @@
+{
+  "passed": true,
+  "platform": "win32",
+  "python": "3.10.11",
+  "startedAt": "2026-10-20T09:18:08Z",
+  "parentPlaywrightBrowsersPathAbsent": true,
+  "buildLog": "build/verification/webauto-default-freeze-build.log",
+  "runLog": "build/verification/webauto-default-freeze-run.log",
+  "buildCommand": [
+    "python.exe",
+    "-m",
+    "PyInstaller",
+    "--onedir",
+    "webautoDefaultFreezeProbe.py"
+  ],
+  "childReport": "build/verification/webauto-default-freeze-probe.json",
+  "browser": {
+    "parentPlaywrightBrowsersPathAbsent": true,
+    "defaultCachePath": "<LOCALAPPDATA>\\ms-playwright",
+    "launchExecutablePath": "<LOCALAPPDATA>\\ms-playwright\\chromium-1140\\chrome-win\\chrome.exe",
+    "launchExecutableMatchesDefaultCache": true,
+    "productHeadlessWas": false,
+    "testOnlyHeadlessOverride": true,
+    "toolbarReady": true,
+    "readyEvent": {
+      "title": "PPX default-cache browser smoke",
+      "marker": "default browser cache smoke",
+      "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+    },
+    "apiState": {
+      "code": 0,
+      "msg": "操作成功",
+      "active": true,
+      "url": "http://127.0.0.1:58998/",
+      "mode": "container",
+      "container": "",
+      "containerSample": "",
+      "containerCount": 0,
+      "fields": [],
+      "pagination": "",
+      "detailActive": false,
+      "detailFields": [],
+      "done": false,
+      "error": ""
+    }
+  },
+  "initialStatus": {
+    "ready": true,
+    "installed": true
+  },
+  "checks": [
+    "one-dir frozen Playwright driver starts under no cache override",
+    "real WebAutoTool.webauto_pick_start opens local fixture",
+    "injected picker toolbar and fixture DOM report readiness",
+    "product launch executable matches the default Chromium cache",
+    "picker session cancels and joins cleanly"
+  ],
+  "finishedAt": "2026-10-20T09:18:23Z"
+}

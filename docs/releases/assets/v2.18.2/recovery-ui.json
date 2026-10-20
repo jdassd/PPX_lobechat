@@ -1,0 +1,64 @@
+{
+  "passed": true,
+  "validationType": "frontend UI interaction with injected API response; not a real backend launch test",
+  "injectedError": "BrowserType.launch_persistent_context: Executable doesn't exist at D:\\多功能工具箱\\_internal\\playwright\\driver\\package\\.local-browsers\\chromium-1140\\chrome-win\\chrome.exe\n\nLooks like Playwright was just installed or updated. Please run playwright install.",
+  "summary": "浏览器内核文件缺失或不可用，请重新检测环境并按提示下载。",
+  "detailsCollapsedByDefault": true,
+  "detailsExpandedReadable": true,
+  "dimensions": [
+    {
+      "width": 1280,
+      "height": 800,
+      "innerWidth": 1280,
+      "documentScrollWidth": 1280,
+      "bodyScrollWidth": 1280,
+      "horizontalOverflow": false,
+      "recoveryButtonVisible": true,
+      "retryButtonVisible": true
+    },
+    {
+      "width": 960,
+      "height": 640,
+      "innerWidth": 960,
+      "documentScrollWidth": 960,
+      "bodyScrollWidth": 960,
+      "horizontalOverflow": false,
+      "recoveryButtonVisible": true,
+      "retryButtonVisible": true
+    }
+  ],
+  "recovery": {
+    "environmentStepVisible": true,
+    "urlPreserved": true,
+    "configPreserved": true,
+    "geometry": {
+      "width": 960,
+      "height": 640,
+      "innerWidth": 960,
+      "documentScrollWidth": 960,
+      "bodyScrollWidth": 960,
+      "horizontalOverflow": false,
+      "recheckButtonVisible": true
+    }
+  },
+  "apiCalls": [
+    "configure_window_frame",
+    "operations_list",
+    "task_list",
+    "webauto_download_sources",
+    "webauto_status",
+    "webauto_pick_start",
+    "webauto_pick_cancel",
+    "webauto_download_sources",
+    "webauto_status"
+  ],
+  "statusCalls": 2,
+  "browserErrors": [],
+  "screenshots": [
+    "error-1280x800.png",
+    "error-960x640.png",
+    "error-details-1280x800.png",
+    "recovered-1280x800.png",
+    "recovered-960x640.png"
+  ]
+}

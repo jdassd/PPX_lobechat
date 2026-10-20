@@ -152,6 +152,13 @@
 - 2026-10-20 16:48:20（北京时间）正式发布 [v2.18.1](https://github.com/jdassd/PPX_lobechat/releases/tag/v2.18.1)，已核对三份资产、发布说明和 latest 状态。原生安装、升级、恢复仍保持 pending；发布核验见 [publication.json](releases/assets/v2.18.1/publication.json)。
 - Windows 安装包实际下载后为 243358877 字节，SHA-256 与 GitHub 相符，固定文件版本为 `2.18.1.0`；Linux/macOS 资产核对范围为 GitHub 提供的大小和 SHA-256 元数据。
 
+## 未发布：v2.18.2 网页采集默认浏览器缓存修正
+
+- 用户截图显示网页采集状态已就绪，但启动仍在 `internal/playwright/driver/package/.local-browsers/chromium-1140` 查找不存在的程序。问题是冻结版 Playwright 1.48 的子进程默认缓存与应用状态检测/安装路径分叉。
+- 修复统一状态检测、安装环境和启动可执行文件的默认缓存解析，并增加重新检测入口。此前一次空缓存测试设置了 `PLAYWRIGHT_BROWSERS_PATH`，没有覆盖默认环境；这次新增独立冻结程序默认路径 CI 检查，避免相同测试缺口。
+- 本地验证通过并复核：206 项 Python、26 项前端合约、lint/build、完整工作流程及六种视口/主题扫描、AES 冻结探针与默认浏览器冻结探针。完整 Windows 冻结包在空隔离默认缓存中实际下载并通过采集接口打开工具条，父进程没有 `PLAYWRIGHT_BROWSERS_PATH`。错误恢复界面两种尺寸可操作并保留网址/配置。测试浏览器使用专用 headless 覆盖；不据此宣称原生人工点选或合成器闪烁验收通过。证据见 `docs/releases/assets/v2.18.2/verification.json`。Tag CI 与发版结果仍待完成。
+- 保留原生安装升级恢复、其他 DPI/多屏、CEF、广泛 OCR 与 LibreOffice 的既有 pending 验收；自动发布需等待 v2.18.2 标签的三平台 CI 成功。
+
 ## 后续候选方向
 
 1. 操作目录与真实输入输出契约对齐，特别是工作流结果字段选择，减少可提前避免的链路配置错误。

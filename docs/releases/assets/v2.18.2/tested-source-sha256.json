@@ -1,0 +1,16 @@
+{
+  "baseRevision": "76b41766c4e17e573d985a8c9dc02a268f12a3cf",
+  "scope": "final uncommitted v2.18.2 source; SHA-256 after CRLF-to-LF normalization",
+  "sources": {
+    "api/webauto.py": "0627e9063e865c0dc7b5e513256a998fe51bdacaaada1a5c84abfee05ee5031c",
+    "gui/src/components/webauto/WebAutoTool.vue": "36206061210a3e5dae47abbb3f22bd84d94acb0b76384ab172d4a33d2d92e3bd",
+    "pyapp/package/desktopSmoke.py": "624409967d299f32f409a5a7b85a8b59d5bbecd2130f337c5addd37617aa74f3",
+    "pyapp/package/webautoDefaultSmoke.py": "fd1dc55b0017ceee146436146c047faf9fd5ecc68418cea12af665692e34de14",
+    "pyapp/package/webautoDefaultFreezeProbe.py": "2d2286c09d6ed92fd4e6585fe412d9826da1b81cd3924aa5bfaf2a904d2988bc",
+    "pyapp/package/verifyWebAutoFreeze.py": "6762b1ddda15ed704b214a90616a042ede1a53d865249289a30d3847a0e87e7c",
+    "tests/test_webauto_install.py": "07a6cdabbef7d2c7ae4352e9394cdfde28e3e04abee2f204fd1c83e6dd0c701d",
+    "pyapp/config/config.py": "550a327fc517f4afa0a462ab0aac2dbe46b69c43465d748640c846490db7dd3d",
+    "gui/package.json": "62593ba2170723c6027feb3c5f957145b3b30d7619a6eac5d1afca1b2a0b99d6",
+    "package.json": "a1103bc38d93dfd55673d5c7a227e2aa0c36d92cb03156107596a86bc022c7f9"
+  }
+}

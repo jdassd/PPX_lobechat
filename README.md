@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Vue-3.0+-4FC08D?style=flat-square&logo=vue.js&logoColor=white" alt="Vue 3" />
   <img src="https://img.shields.io/badge/Python-3.10-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.10" />
   <img src="https://img.shields.io/badge/Pywebview-5.0+-FFD43B?style=flat-square&logo=python&logoColor=blue" alt="Pywebview" />
-  <img src="https://img.shields.io/badge/version-2.18.1-2b6fff?style=flat-square" alt="Version 2.18.1" />
+  <img src="https://img.shields.io/badge/version-2.18.2-2b6fff?style=flat-square" alt="Version 2.18.2" />
   <img src="https://img.shields.io/badge/License-AGPL--3.0-green?style=flat-square" alt="License" />
 </p>
 
@@ -20,17 +20,17 @@
 
 ## 📖 简介
 
-**PPX 2.18.1** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
+**PPX 2.18.2** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
 
 2.18.1 在 PDF 工具中新增 CAJ 转 PDF：本地批量转换、逐项结果、失败项重试和同名输出保护，并修复任务中心搜索条件切换期间的刷新等待。支持内嵌 PDF 的 CAJ，HN、C8 和加密格式暂不支持；本版冻结构建和自动发版以 Tag CI 成功为准。
 
-更新内容与验收范围见 [v2.18.1 发布说明](docs/releases/v2.18.1.md)。
+2.18.2 修复 Windows 冻结版网页采集已显示浏览器就绪、启动时却找不到 Chromium 的默认缓存路径分叉，并增加重新检测入口。更新内容与验收范围见 [v2.18.2 发布说明](docs/releases/v2.18.2.md)。
 
 定位、目标用户、14 个模块的输入输出与异常设计、协作流程、优先级和扩展边界见 [统一工具箱设计方案](docs/toolbox-design.md)。
 
 ## ✨ 主要功能
 
-PPX 2.18.1 的核心能力包括：
+PPX 2.18.2 的核心能力包括：
 
 ### 📄 文档与数据
 
