@@ -1,0 +1,62 @@
+{
+  "version": "2.17.6",
+  "verifiedAtUtc": "2026-10-20T03:59:20.815169+00:00",
+  "commit": "0c93bd9522f63c916f23f16d063e25d1d8ce88e9",
+  "commitPushed": true,
+  "remoteAnnotatedTagVerified": true,
+  "tagCiRunId": 39365337729,
+  "tagCiConclusion": "success",
+  "runUrl": "https://github.com/jdassd/PPX_lobechat/actions/runs/39365337729",
+  "jobs": [
+    {
+      "name": "build (windows-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "build (macos-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "build (ubuntu-latest)",
+      "conclusion": "success"
+    },
+    {
+      "name": "release",
+      "conclusion": "success"
+    }
+  ],
+  "releaseUrl": "https://github.com/jdassd/PPX_lobechat/releases/tag/v2.17.6",
+  "publishedAt": "2026-10-20T03:57:19Z",
+  "draft": false,
+  "prerelease": false,
+  "latestVerified": true,
+  "releaseNotesMatch": true,
+  "assets": [
+    {
+      "name": "-V2.17.6_Linux.deb",
+      "size": 423864340,
+      "digest": "sha256:7fc5caa5a014aac6946a3caf98cc9fee6801ba838e30247417cb01b61b3d0a10",
+      "browser_download_url": "https://github.com/jdassd/PPX_lobechat/releases/download/v2.17.6/-V2.17.6_Linux.deb"
+    },
+    {
+      "name": "-v2.17.6_macOS.dmg",
+      "size": 325595451,
+      "digest": "sha256:336a33f84d5ddc96781c8729b78806e1d2f3abe83bc58894fd5478ea7869998a",
+      "browser_download_url": "https://github.com/jdassd/PPX_lobechat/releases/download/v2.17.6/-v2.17.6_macOS.dmg"
+    },
+    {
+      "name": "-V2.17.6_Windows.exe",
+      "size": 243351227,
+      "digest": "sha256:3e78a17fd9c6572abaa4c605bee9e61b4ec2a51d1cb237806ee31497ebe43e9d",
+      "browser_download_url": "https://github.com/jdassd/PPX_lobechat/releases/download/v2.17.6/-V2.17.6_Windows.exe"
+    }
+  ],
+  "downloadedWindowsInstaller": {
+    "name": "-V2.17.6_Windows.exe",
+    "size": 243351227,
+    "sha256": "3e78a17fd9c6572abaa4c605bee9e61b4ec2a51d1cb237806ee31497ebe43e9d",
+    "githubDigestMatched": true,
+    "fixedFileVersion": "2.17.6.0",
+    "nativeInstallUpgradeRestoreVerified": false
+  }
+}

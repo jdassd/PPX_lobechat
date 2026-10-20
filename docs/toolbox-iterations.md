@@ -128,11 +128,12 @@
 - v2.17.4 的实际浏览器验证证据继续适用于相同实现：真实工具条点选、两行预览/采集并核对 Excel；Google 搜索网址有头流程成功；冻结程序空缓存下载并启动 Chromium。此处引用前版证据，不表示 v2.17.5 最终冻结包已完成验收。
 - v2.17.5 重复扫描专项连续两轮退出 0，所有原有结果断言保留；最终前端及 Windows 冻结构建、包内浏览器 CLI/桥接/AES 切页/图像/实际 OCR 冒烟通过。Tag CI `39363831140` 的 macOS 构建成功；Ubuntu 与 Windows 均在新 `webauto_picker_flow.py:108` 的 `locator.count()` 探测期间遇到页面导航，Playwright 报 `Execution context was destroyed`，未完成工作区 E2E，Release 被跳过。两项失败都已越过重复项扫描断言，不能据此推断产品功能失败。详情见 [验证清单](releases/assets/v2.17.5/verification.json) 和本机保存的两平台 CI 日志。保留 Tag，不改写发布说明或标签；原生界面首次下载、安装升级恢复、其他 DPI/多屏、CEF、广泛 OCR 与 LibreOffice 继续保持 pending。
 
-## 待发布：v2.17.6 浏览器采集导航等待修正
+## 已发布：v2.17.6 浏览器采集导航等待修正
 
 - 延续浏览器首次安装、工具条点选回调、匹配数量、错误提示及 Google 验证后恢复采集修复；在真实点选 E2E 中用可等待的定位器处理页面导航期间的执行上下文销毁。
 - 同一产品浏览器实现已在 v2.17.4 完成用户指定 Google 搜索网址有头采集两行、点选预览与导出，以及冻结程序空缓存实际下载并启动 Chromium 130.0.6723.31；v2.17.5 最终 Windows 冻结冒烟亦通过。这些继承证据不代表 v2.17.6 最终冻结包或 Tag CI 结果。
-- v2.17.6 最终全流程、冻结包冒烟和三平台 Tag CI 待根任务补录。原生界面首次下载、安装升级恢复、其他 DPI/多屏、CEF、广泛 OCR 与 LibreOffice 继续保持 pending。
+- v2.17.6 点选专项三轮及最终 Windows 冻结冒烟通过。发布提交 `0c93bd9522f63c916f23f16d063e25d1d8ce88e9` 已推送；附注 Tag CI `39365337729` 三平台检查、190 项 Python、25 项前端合同、完整 E2E、界面巡检、打包和自动发布均通过。已下载 Windows/Linux 本轮验证产物核对提交号、真实点选两行与 XLSX 复读，未沿用旧报告。
+- 2026-10-20 03:57:19 UTC 正式发布 [v2.17.6](https://github.com/jdassd/PPX_lobechat/releases/tag/v2.17.6)，三平台资产、发布说明、latest 及远端 Tag 指向均已核对。实际下载 Windows 安装包 243351227 字节，SHA-256 与 GitHub 匹配，固定文件版本 2.17.6.0；证据见 [publication.json](releases/assets/v2.17.6/publication.json)。原生界面首次下载、安装升级恢复、其他 DPI/多屏、CEF、广泛 OCR 与 LibreOffice 继续保持 pending。
 
 ## 后续候选方向
 

@@ -1,7 +1,7 @@
 {
   "version": "2.17.6",
   "date": "2026-10-20",
-  "status": "validation-in-progress-publication-pending",
+  "status": "published-and-windows-installer-verified",
   "scope": {
     "productChanges": "inherits browser installation, picker event delivery, match count, error handling, and Google verification recovery fixes",
     "e2eStabilityChange": "wait for picker toolbar readiness across navigation instead of querying locator count during a transient navigation",
@@ -29,15 +29,15 @@
   },
   "v2176Checks": {
     "versionAlignment": "passed; package, GUI, Config, README and acceptance aligned",
-    "pythonTests": "pending",
-    "frontendContracts": "pending",
-    "lint": "Ruff passed; final Tag CI pending",
-    "productionBuild": "passed; v2.17.6 GUI and Windows frozen build",
-    "fullWorkspaceEndToEnd": "pending",
+    "pythonTests": { "passed": 190, "threePlatformCi": "success" },
+    "frontendContracts": { "passed": 25, "threePlatformCi": "success" },
+    "lint": { "errors": 0, "windowsCiWarnings": 64, "threePlatformCi": "success" },
+    "productionBuild": "passed on Windows, macOS and Ubuntu",
+    "fullWorkspaceEndToEnd": { "passed": true, "platforms": ["Windows", "macOS", "Ubuntu"], "commit": "0c93bd9522f63c916f23f16d063e25d1d8ce88e9", "pageErrors": [] },
     "webautoPickerNavigationWait": { "passed": true, "targetedRuns": 3, "exitCodes": [0, 0, 0], "checks": ["real toolbar selection", "API state", "two-row preview", "two-row collection", "XLSX export and reopen"] },
-    "visualSweep": "pending",
+    "visualSweep": "passed on all three CI platforms; fresh Windows and Linux artifact revisions verified",
     "finalWindowsFrozenPackage": { "passed": true, "exitCode": 0, "frozen": true, "evidence": "frozen-smoke.json", "checks": ["browser Node CLI", "bridge", "AES PDF page cut", "image", "actual OCR"], "actualFirstBrowserDownloadEvidence": "../v2.17.4/frozen-install-smoke.json" },
-    "tagCi": "pending"
+    "tagCi": { "runId": 39365337729, "conclusion": "success", "threeBuildsAndReleasePassed": true }
   },
   "pendingValidation": [
     "native UI first browser download",
@@ -48,12 +48,26 @@
     "LibreOffice optional dependency"
   ],
   "publication": {
-    "commit": "pending",
-    "commitPushed": false,
+    "commit": "0c93bd9522f63c916f23f16d063e25d1d8ce88e9",
+    "commitPushed": true,
     "tag": "v2.17.6",
-    "tagPushed": false,
-    "tagCiRunId": null,
-    "tagCiConclusion": "pending",
-    "releaseUrl": null
+    "tagPushed": true,
+    "tagCiRunId": 39365337729,
+    "tagCiConclusion": "success",
+    "releaseUrl": "https://github.com/jdassd/PPX_lobechat/releases/tag/v2.17.6",
+    "publishedAtUtc": "2026-10-20T03:57:19Z",
+    "windowsInstallerDownloadedAndSha256Matched": true,
+    "windowsInstallerVersion": "2.17.6.0",
+    "details": "publication.json"
+  },
+  "evidenceFiles": {
+    "finalFrozenSmoke": "frozen-smoke.json",
+    "windowsCiPicker": "ci-windows-picker-flow.json",
+    "windowsCiScreenshot": "ci-windows-picker-flow.png",
+    "windowsCiVisuals": "ci-windows-visual.json",
+    "linuxCiPicker": "ci-linux-picker-flow.json",
+    "headedGoogleProductFlow": "../v2.17.4/google-product-flow.json",
+    "actualFrozenFirstBrowserDownload": "../v2.17.4/frozen-install-smoke.json",
+    "publicationAndInstallerIntegrity": "publication.json"
   }
 }
