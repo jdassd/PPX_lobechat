@@ -1,21 +1,21 @@
 {
   "schemaVersion": 1,
-  "version": "2.17.3",
+  "version": "2.17.4",
   "note": "发布决定与验收状态分开记录；未验证项目保持 pending，不因发版改为 passed。",
   "release": {
-    "tag": "v2.17.3",
+    "tag": "v2.17.4",
     "allowPendingAcceptance": true,
-    "reason": "沿用用户修正后自动发版授权。已完成本轮 AES PDF、Windows 启动及旧窗口记录迁移、最小尺寸与原生缩放、首页响应布局和分类预览/撤销修复。本机180项Python、25项前端规则、完整端到端、12轮Windows200% DPI启动恢复、16项原生窗口检查及最终冻结程序的图片/AES256/OCR任务通过，证据见 docs/releases/assets/v2.17.3/verification.json。v2.17.2因补查迁移缺陷主动取消且无Release。本版正式产物必须来自已推送Tag提交的三平台成功CI；原生安装升级恢复、其他DPI/多屏、CEF、广泛OCR与LibreOffice验收仍保持pending，未采集连续视频，不宣称所有环境无闪烁。"
+    "reason": "沿用用户修正完成后自动发版授权，修复冻结包浏览器安装命令、同步点选事件回调、容器数量契约及错误反馈。190 项 Python 测试、25 项前端检查、完整 E2E、界面巡检通过；真实点选预览采集并重开 Excel 通过。指定 Google 搜索网址在产品 API 的有头浏览器中预览和正式采集各成功两行；另验证挑战页提示及恢复。最终 Windows 冻结程序从空缓存实际下载安装并启动 Chromium，桥接、AES 切页、图像和 OCR 冒烟通过。证据见 docs/releases/assets/v2.17.4/verification.json。原生界面首次下载操作未完成验收；安装器安装升级恢复、其他 DPI/多屏、CEF、广泛 OCR 与 LibreOffice 继续保持 pending。本版正式产物必须来自已推送 Tag 提交的三平台成功 CI。"
   },
   "preReleaseLocalEvidence": {
-    "windowsGeometryMigration": "docs/releases/assets/v2.17.3/verification.json",
-    "pythonTestsPassed": 180,
+    "browserCollection": "docs/releases/assets/v2.17.4/verification.json",
+    "pythonTestsPassed": 190,
     "frontendContractsPassed": 25,
     "lintErrors": 0,
     "lintExistingWarnings": 141,
-    "finalCommitEndToEnd": "pending",
+    "finalCommitEndToEnd": "passed on release working tree; final Tag CI pending",
     "finalTagCi": "pending",
-    "finalFrozenPackageAfterHomePolish": "pending"
+    "finalFrozenPackageAfterHomePolish": "passed; frozen actual first Chromium download and launch, AES, image, OCR, bridge"
   },
   "phases": {
     "1": {

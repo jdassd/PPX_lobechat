@@ -63,9 +63,24 @@ def verify_web_collection(api, browser_context):
     page.goto('http://ppx.test/login')
     expired = service_task(api.task_submit({'method': 'webauto_collect', 'args': [{}]})['taskId'])
     assert expired['status'] == 'failed' and '登录' in expired['message'], expired
+
+    def google_challenge(route):
+        route.fulfill(status=200, content_type='text/html', body='''
+            <title>Sorry...</title><h1>Our systems have detected unusual traffic</h1>
+        ''')
+
+    browser_context.route('https://www.google.com/sorry/**', google_challenge)
+    page.goto('https://www.google.com/sorry/index?continue=%2Fsearch%3Fq%3D123')
+    challenged = service_task(api.task_submit({'method': 'webauto_collect', 'args': [{}]})['taskId'])
+    assert challenged['status'] == 'failed' and '请在已打开浏览器完成验证后重试' in challenged['message'], challenged
+    assert not page.is_closed() and '/sorry/' in page.url, 'The Google verification page and browser session must remain open'
+    page.goto('http://ppx.test/list')
+    recovered = service_task(api.task_submit({'method': 'webauto_collect', 'args': [{}]})['taskId'])
+    assert recovered['status'] == 'success' and recovered['result']['total'] == 2, recovered
+    browser_context.unroute('https://www.google.com/sorry/**', google_challenge)
     web._wa_pick['active'] = False
     closed = service_task(api.task_submit({'method': 'webauto_collect', 'args': [{}]})['taskId'])
     assert closed['status'] == 'failed' and '浏览器会话未打开' in closed['message'], closed
     page.close()
     browser_context.unroute('http://ppx.test/**', serve)
-    print('PASS: browser collection, partial details, retry only failed requests, no duplicate rows, expired login and closed session feedback')
+    print('PASS: browser collection, partial detail retry, no duplicate rows, expired login, Google challenge preservation and recovery, and closed-session feedback')

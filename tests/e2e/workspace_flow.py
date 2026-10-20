@@ -27,6 +27,7 @@ from playwright.sync_api import expect, sync_playwright
 from result_handoff_flow import verify_result_handoff
 from search_archive_flow import verify_search_archive
 from web_collection_flow import verify_web_collection
+from webauto_picker_flow import verify_webauto_picker
 from workflow_preflight_flow import verify_workflow_preflight
 from workflow_results_flow import verify_workflow_results
 from workflow_templates_flow import verify_workflow_templates
@@ -141,6 +142,13 @@ def main():
                     + ".map(method => [method, (...args) => window.ppxCall(method, args)]))};"
                 )
                 page.goto(f"http://127.0.0.1:{port}")
+                if '--webauto-picker-only' in sys.argv:
+                    webauto_picker = verify_webauto_picker(api, page, root, report_dir)
+                    assert not errors, errors
+                    print(json.dumps(webauto_picker, ensure_ascii=False), flush=True)
+                    evidence.close()
+                    browser.close()
+                    return
                 if '--duplicates-only' in sys.argv:
                     result = verify_duplicate_review(api, page, root, report_dir)
                     assert not errors, errors
@@ -349,17 +357,18 @@ def main():
                 finally:
                     chosen[:] = original_chosen
                 desktop_layout = verify_desktop_layout(page, report_dir)
+                webauto_picker = verify_webauto_picker(api, page, root, report_dir)
                 assert not errors, errors
                 report_dir = ROOT / "build/verification"
                 report_dir.mkdir(parents=True, exist_ok=True)
                 page.screenshot(path=str(report_dir / 'workspace.png'), full_page=True)
                 (report_dir / 'workspace.json').write_text(json.dumps({
                     'passed': True, 'pageErrors': errors, 'resultHandoff': handoff, 'excel': excel, 'inputOrigins': origins, 'templates': templates, 'preflight': preflight, 'workflowResults': workflow_results, 'searchArchive': search_archive, 'duplicateReview': duplicate_review,
-                    'encryptedPdf': encrypted_pdf, 'desktopLayout': desktop_layout,
+                    'encryptedPdf': encrypted_pdf, 'desktopLayout': desktop_layout, 'webautoPicker': webauto_picker,
                     'checks': ['draft retention', 'restart configuration', 'partial failure', 'retry only failed input',
                                'output dimensions and alpha', 'handoff scoped to target module', '1000-page PDF editing/undo/reorder/export',
                                'two-step workflow via forms', 'pause only blocks new tasks', 'cancel queued task',
-                               'browser collection detail retry without duplicate rows', 'built-in workflow templates and history result actions']
+                               'browser collection detail retry without duplicate rows', 'web picker UI selection, preview, collection and XLSX reopen', 'built-in workflow templates and history result actions']
                 }, indent=2), encoding='utf-8')
                 evidence.close()
                 browser.close()

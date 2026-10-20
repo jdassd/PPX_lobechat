@@ -1,0 +1,13 @@
+{
+  "command": [
+    "D:\\bc\\PPX_lobechat\\pyapp\\pyenv\\pyenv\\Scripts\\python.exe",
+    "-u",
+    "tests/e2e/visual_sweep.py"
+  ],
+  "pid": 48904,
+  "exit_code": 0,
+  "timed_out": false,
+  "duration_seconds": 24.11,
+  "log": "D:\\bc\\PPX_lobechat\\build\\verification\\v2.17.4-visual-sweep-controlled.log",
+  "finished": "2026-10-20T10:40:01+0800"
+}

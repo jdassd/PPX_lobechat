@@ -1,0 +1,85 @@
+{
+  "version": "2.17.4",
+  "date": "2026-10-20",
+  "status": "local-validation-passed-publication-pending",
+  "reportedFailure": {
+    "feature": "browser collection",
+    "userProvidedUrl": "https://www.google.com.hk/search?q=123",
+    "frozenInstallRootCause": "frozen application executable was incorrectly invoked with -m playwright",
+    "pickerRootCause": "time.sleep on synchronous Playwright owner thread prevented exposed binding delivery",
+    "containerCountRootCause": "frontend read sample text as match count"
+  },
+  "checks": {
+    "pythonTests": { "passed": 190 },
+    "frontendContracts": { "passed": 25 },
+    "lint": { "errors": 0, "existingWarnings": 141 },
+    "productionBuild": "passed",
+    "fullWorkspaceEndToEnd": {
+      "passed": true,
+      "exitCode": 0,
+      "durationSeconds": 387.44,
+      "pageErrors": [],
+      "note": "Initial new test assertion matched a hidden menu item; scoped to the visible collection status and reran the complete workflow. Old reports were excluded."
+    },
+    "visualSweep": { "passed": true, "exitCode": 0, "durationSeconds": 24.11, "navigationModules": 14, "pageErrors": [] },
+    "realPickerToExcel": {
+      "passed": true,
+      "selectedViaToolbar": true,
+      "containerRows": 2,
+      "previewRows": 2,
+      "collectedRows": 2,
+      "xlsxReopenedAndValuesChecked": true,
+      "testOnlyOptions": ["headless browser", "CDP observation", "isolated profile"]
+    },
+    "userGoogleUrl": {
+      "headed": true,
+      "productApi": true,
+      "title": "123 - Google 搜索",
+      "toolbarVisible": true,
+      "toolbarSelectionReachedApi": true,
+      "previewRows": 2,
+      "collectedRows": 2,
+      "jsonOutputCreated": true,
+      "browserStillActive": true,
+      "challengePath": false,
+      "headlessPreflight": "encountered Google abnormal-traffic verification; not counted as collection success"
+    },
+    "googleChallengeFixture": "passed: HTTP 200 challenge rejected with manual verification prompt; session preserved; normal-page recovery succeeds",
+    "finalWindowsFrozenRuntime": {
+      "passed": true,
+      "exitCode": 0,
+      "frozen": true,
+      "actualFirstBrowserInstall": true,
+      "initialInstalled": false,
+      "done": true,
+      "success": true,
+      "installed": true,
+      "downloadedBrowser": true,
+      "browserVersion": "130.0.6723.31",
+      "localPageRead": true,
+      "otherChecks": ["bundled frontend", "Pywebview bridge", "AES-256 PDF cut and page order", "image alpha and dimensions", "SQLite task persistence", "actual RapidOCR output"]
+    }
+  },
+  "pendingValidation": [
+    "native UI first browser download: test could not obtain an actionable window and computer-use tool stopped; not passed",
+    "native installer installation, upgrade and restore",
+    "other Windows DPI hardware and multi-monitor migration",
+    "CEF mode",
+    "broad OCR documents and tables",
+    "LibreOffice optional dependency"
+  ],
+  "evidenceFiles": {
+    "frozenRuntime": "frozen-install-smoke.json",
+    "pickerToExcel": "webauto-picker-flow.json",
+    "userGoogleUrl": "google-product-flow.json",
+    "localWorkspaceExit": "workspace-exit.json",
+    "localVisualExit": "visual-exit.json"
+  },
+  "publication": {
+    "commit": "pending",
+    "commitPushed": false,
+    "tagCiRunId": null,
+    "tagCiConclusion": "pending",
+    "releaseUrl": null
+  }
+}

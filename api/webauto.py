@@ -28,12 +28,55 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlsplit
 
 from api.core.context import current_context, publish_output
 from api.core.outputs import write_output
 from api.core.store import StateStore
 from api.utils import api_error, api_success
 from pyapp.config.config import Config
+
+
+def _wa_install_command() -> List[str]:
+    """Return Playwright's own Node driver command (works in source and frozen builds)."""
+    from playwright._impl._driver import compute_driver_executable
+
+    return list(compute_driver_executable()) + ['install', 'chromium']
+
+
+def _wa_install_environment(host: str = '') -> Dict[str, str]:
+    """Build the same driver environment used by Playwright's Python API."""
+    from playwright._impl._driver import get_driver_env
+
+    env = get_driver_env()
+    if host:
+        env['PLAYWRIGHT_DOWNLOAD_HOST'] = host
+    env.setdefault('PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT', '120000')
+    return env
+
+
+def _wa_install_creation_options() -> Dict[str, Any]:
+    """Hide the helper console on Windows so installing Chromium is unobtrusive."""
+    if sys.platform == 'win32':
+        return {'creationflags': getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000)}
+    return {}
+
+
+def _wa_sanitize_install_diagnostic(value: str, limit: int = 2000) -> str:
+    """Bound installer diagnostics and remove URLs that may carry credentials or tokens."""
+    from urllib.parse import urlsplit
+
+    def safe_url(match):
+        try:
+            parsed = urlsplit(match.group(0).rstrip('.,);'))
+            return f'{parsed.scheme}://{parsed.hostname or "redacted-host"}'
+        except Exception:
+            return '<redacted-url>'
+
+    text = re.sub(r'https?://[^\s\"\'<>]+', safe_url, str(value), flags=re.IGNORECASE)
+    text = re.sub(r'(?i)(Bearer\s+)\S+', r'\1<redacted>', text)
+    text = re.sub(r'(?i)(password|passwd|token|authorization|proxy-auth)\s*[:=]\s*[^\s,;]+', r'\1=<redacted>', text)
+    return text[-max(0, limit):].strip()
 
 # ============================================================================
 # 注入到页面的点选脚本（纯 JS）。
@@ -66,6 +109,7 @@ _PICK_SCRIPT = r"""
   var state = {
     mode: 'container',     // container | field | pagination | detailField
     container: '',         // 列表块选择器
+    containerCount: 0,     // 当前选择器的实际匹配数量
     fields: [],            // [{id,name,selector,attr,sample}]
     pagination: '',        // 翻页按钮选择器
     detailFields: [],      // 详情字段
@@ -406,6 +450,7 @@ _PICK_SCRIPT = r"""
   function snapshot() {
     return {
       container: state.container,
+      containerCount: state.containerCount,
       fields: state.fields,
       pagination: state.pagination,
       detailFields: state.detailFields,
@@ -441,6 +486,7 @@ _PICK_SCRIPT = r"""
       var built = buildContainerSelector(block);
       state.container = built.selector;
       var n = highlightMatches(built.selector);
+      state.containerCount = n;
       emit({ type: 'container', selector: built.selector, sample: sampleOf(block, ''), count: n });
       render();
     } else if (state.mode === 'field') {
@@ -592,7 +638,7 @@ class WebAutoTool:
     def _wa_blank_pick() -> Dict[str, Any]:
         return {
             'active': False, 'url': '', 'mode': 'container',
-            'container': '', 'containerSample': '',
+            'container': '', 'containerSample': '', 'containerCount': 0,
             'fields': [], 'pagination': '',
             'detailActive': False, 'detailFields': [], 'detailLinkField': '',
             'done': False, 'error': '',
@@ -653,13 +699,35 @@ class WebAutoTool:
         for browser in data.get('browsers', []):
             name = browser.get('name', '')
             revision = browser.get('revision')
-            # 仅关注默认安装的 chromium 主内核（排除 tip-of-tree 等非默认项）
+            # 仅关注启动所需的 chromium 主内核（排除 headless/tip-of-tree 项）
             if (not revision or not name.startswith('chromium')
-                    or name == 'chromium-tip-of-tree'
+                    or name != 'chromium'
                     or not browser.get('installByDefault', False)):
                 continue
             dirs.append(f"{name.replace('-', '_')}-{revision}")
         return dirs
+
+    @staticmethod
+    def _wa_chromium_executable_candidates(directory: Path) -> List[Path]:
+        """Known Chromium executable layouts used by supported Playwright revisions."""
+        if sys.platform.startswith('win'):
+            return [directory / relative for relative in (
+                'chrome-win/chrome.exe', 'chrome-win64/chrome.exe', 'chrome.exe',
+            )]
+        if sys.platform == 'darwin':
+            return [directory / relative for relative in (
+                'chrome-mac/Chromium.app/Contents/MacOS/Chromium',
+                'chrome-mac-x64/Chromium.app/Contents/MacOS/Chromium',
+                'chrome-mac-arm64/Chromium.app/Contents/MacOS/Chromium',
+                'Chromium.app/Contents/MacOS/Chromium',
+            )]
+        return [directory / relative for relative in (
+            'chrome-linux/chrome', 'chrome-linux64/chrome', 'chrome',
+        )]
+
+    @classmethod
+    def _wa_chromium_directory_ready(cls, directory: Path) -> bool:
+        return any(candidate.is_file() for candidate in cls._wa_chromium_executable_candidates(directory))
 
     @classmethod
     def _wa_chromium_installed(cls) -> bool:
@@ -669,12 +737,13 @@ class WebAutoTool:
             return False
         expected = cls._wa_expected_chromium_dirs()
         if expected:
-            # 严格校验：必须存在与当前 playwright 版本匹配的内核目录，
-            # 避免残留的不匹配修订号被误判为已就绪。
-            return all((base / dirname).exists() for dirname in expected)
-        # 回退：无法读取期望修订号时，宽松匹配任意 chromium 目录
-        patterns = [str(base / 'chromium-*'), str(base / 'chromium_headless_shell-*')]
-        return any(glob.glob(pattern) for pattern in patterns)
+            # 只按当前包的修订号检查主 Chromium 可执行文件，空目录/半下载目录不得算就绪。
+            return any(cls._wa_chromium_directory_ready(base / dirname) for dirname in expected)
+        # 回退时同样要求找到真实可执行文件，不能只按目录名判断。
+        for dirname in glob.glob(str(base / 'chromium-*')):
+            if cls._wa_chromium_directory_ready(Path(dirname)):
+                return True
+        return False
 
     # ------------------------------------------------------------------ #
     # 1. 状态查询
@@ -769,21 +838,22 @@ class WebAutoTool:
         host 非空时通过 PLAYWRIGHT_DOWNLOAD_HOST 指定下载源（国内 / 海外镜像）。
         """
         try:
-            env = {**os.environ}
-            if host:
-                env['PLAYWRIGHT_DOWNLOAD_HOST'] = host
-            # 放宽下载连接超时，弱网环境下减少因超时导致的失败
-            env.setdefault('PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT', '120000')
+            command = _wa_install_command()
+            env = _wa_install_environment(host)
+            output_tail = ''
+            # Use Node + Playwright's bundled CLI in both source and frozen applications.
+            # sys.executable points at the app EXE after freezing and cannot handle `-m`.
             proc = subprocess.Popen(
-                [sys.executable, '-m', 'playwright', 'install', 'chromium'],
+                command,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 text=True, encoding='utf-8', errors='replace',
-                env=env,
+                env=env, **_wa_install_creation_options(),
             )
             pct_re = re.compile(r'(\d{1,3})\s*%')
             for line in iter(proc.stdout.readline, ''):
                 if not line:
                     break
+                output_tail = (output_tail + line)[-8000:]
                 low = line.lower()
                 progress = -1
                 match = pct_re.search(line)
@@ -800,20 +870,25 @@ class WebAutoTool:
                     if progress >= 0:
                         self._wa_install['progress'] = progress
             proc.wait()
-            success = proc.returncode == 0 and self._wa_chromium_installed()
+            installed = self._wa_chromium_installed()
+            success = proc.returncode == 0 and installed
             with self._wa_lock:
                 self._wa_install['installing'] = False
                 self._wa_install['done'] = True
                 self._wa_install['success'] = success
                 self._wa_install['progress'] = 100 if success else self._wa_install['progress']
                 if not success:
-                    self._wa_install['error'] = '内核下载失败，可切换其他下载来源后重试'
+                    details = _wa_sanitize_install_diagnostic(output_tail)
+                    reason = f'Playwright 安装命令退出码 {proc.returncode}'
+                    if proc.returncode == 0 and not installed:
+                        reason = '安装命令已结束，但未找到完整的 Chromium 可执行文件'
+                    self._wa_install['error'] = f'{reason}。可切换下载来源后重试。{details}'
         except Exception as exc:
             with self._wa_lock:
                 self._wa_install['installing'] = False
                 self._wa_install['done'] = True
                 self._wa_install['success'] = False
-                self._wa_install['error'] = f'下载异常：{exc}'
+                self._wa_install['error'] = f'下载异常：{_wa_sanitize_install_diagnostic(str(exc))}'
 
     # ------------------------------------------------------------------ #
     # 3. 安装进度
@@ -939,17 +1014,18 @@ class WebAutoTool:
                 if req is not None:
                     self._wa_collect_in_session(page, context, req)
                     continue
-                # 2) 检测窗口是否被用户手动关闭
+                # 2) 同步 Playwright 必须由 owner 线程 pump 消息；等待时也处理
+                # expose_binding 回调，否则 JS 状态变化但服务端点选状态一直为空。
                 try:
-                    if page.is_closed():
-                        with self._wa_lock:
-                            self._wa_pick['done'] = True
-                        break
+                    page.wait_for_timeout(200)
                 except Exception:
-                    with self._wa_lock:
-                        self._wa_pick['done'] = True
+                    # 用户正常关闭窗口，或明确取消时，Playwright 会在 wait 处抛异常。
+                    # 这些属于正常结束；其他 driver/page 故障继续交给外层记录。
+                    if self._wa_pick_stop.is_set() or page.is_closed():
+                        break
+                    raise
+                if page.is_closed():
                     break
-                time.sleep(0.2)
         except Exception as exc:
             with self._wa_lock:
                 self._wa_pick['error'] = f'点选会话异常：{exc}'
@@ -980,6 +1056,7 @@ class WebAutoTool:
             if etype == 'container':
                 self._wa_pick['container'] = payload.get('selector', '')
                 self._wa_pick['containerSample'] = payload.get('sample', '')
+                self._wa_pick['containerCount'] = max(0, int(payload.get('count') or 0))
                 self._wa_pick['mode'] = 'container'
             elif etype == 'field':
                 self._wa_pick['fields'].append({
@@ -1013,6 +1090,8 @@ class WebAutoTool:
                 st = payload.get('state') or {}
                 if 'container' in st:
                     self._wa_pick['container'] = st.get('container', '')
+                if 'containerCount' in st:
+                    self._wa_pick['containerCount'] = max(0, int(st.get('containerCount') or 0))
                 if 'pagination' in st:
                     self._wa_pick['pagination'] = st.get('pagination', '')
                 if 'detailLinkField' in st:
@@ -1049,6 +1128,7 @@ class WebAutoTool:
                     mode=st['mode'],
                     container=st['container'],
                     containerSample=st['containerSample'],
+                    containerCount=st['containerCount'],
                     fields=[dict(f) for f in st['fields']],
                     pagination=st['pagination'],
                     detailActive=bool(st['detailActive']),
@@ -1284,6 +1364,20 @@ class WebAutoTool:
             'sampleOnly': bool(options.get('sampleOnly')),
         }
 
+    @staticmethod
+    def _wa_google_verification_error(url: str) -> str:
+        """Recognize Google's explicit /sorry challenge route without matching body copy."""
+        try:
+            parsed = urlsplit(str(url or ''))
+            host = (parsed.hostname or '').lower().rstrip('.')
+            google_host = bool(re.fullmatch(r'(?:[a-z0-9-]+\.)*google\.[a-z]{2,3}(?:\.[a-z]{2})?', host))
+            sorry_path = parsed.path.lower() == '/sorry' or parsed.path.lower().startswith('/sorry/')
+            if google_host and sorry_path:
+                return 'Google 搜索暂时要求完成验证，请在已打开浏览器完成验证后重试'
+        except (TypeError, ValueError):
+            pass
+        return ''
+
     def _wa_collect_in_session(self, page, context, config: Dict[str, Any]) -> None:
         """在当前会话页面上执行采集（不开浏览器、不导航、不关闭）。结果写入 self._wa_run。
 
@@ -1335,6 +1429,10 @@ class WebAutoTool:
                     page.wait_for_timeout(300)
                 except Exception:
                     pass
+
+                verification_error = self._wa_google_verification_error(page.url)
+                if verification_error:
+                    raise ValueError(verification_error)
 
                 # 抓取当前页的所有列表块
                 blocks = []

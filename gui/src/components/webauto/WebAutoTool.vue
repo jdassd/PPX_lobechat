@@ -21,16 +21,25 @@ const STEP = {
 }
 const activeStep = ref(STEP.ENV)
 const sample = ref(null)
+const sampleError = ref('')
 const sampling = ref(false)
 const validateSample = async () => {
   sampling.value = true
+  sampleError.value = ''
   try {
     const response = await pyCall('webauto_collect_preview', buildCollectOptions())
-    if (!response.ok) return ElMessage.error(response.message)
+    if (!response.ok) {
+      sampleError.value = response.message || '读取样本失败，请检查网页和采集配置后重试'
+      return
+    }
     sample.value = response.data
+    if (!response.data?.rows?.length) {
+      sampleError.value = '当前页面没有采集到数据。请确认目标列表已加载，且登录或安全验证未阻止访问，再检查点选字段。'
+      return
+    }
     ElMessage.success('已读取当前页的前 10 条样本，请核对字段')
   } catch (error) {
-    ElMessage.error(error.message)
+    sampleError.value = error?.message || '读取样本失败，请检查网页和采集配置后重试'
   } finally {
     sampling.value = false
   }
@@ -88,6 +97,7 @@ onUnmounted(() => {
 const env = reactive({
   loading: false, // 首次检测中
   checked: false, // 是否已完成首次检测
+  checkError: '', // 环境接口不可用时保留诊断信息
   installed: false, // 浏览器内核是否已就绪
   ready: false, // playwright 依赖是否已安装
   installing: false, // 是否正在下载
@@ -142,22 +152,26 @@ const loadSources = async () => {
 const checkEnv = async () => {
   if (!ensurePyReady()) return
   env.loading = true
+  env.checkError = ''
+  env.checked = false
   try {
     await loadSources()
     const { ok, data, message } = await pyCall('webauto_status')
     if (ok && data) {
       env.installed = !!data.installed
       env.ready = !!data.ready
+      env.checked = true
     } else if (!ok) {
-      ElMessage.error(message || '环境检测失败')
+      env.checkError = message || '环境检测失败，请稍后重试'
+    } else {
+      env.checkError = '环境检测没有返回有效状态，请稍后重试'
     }
   } catch (e) {
-    ElMessage.error(e?.message || '环境检测失败，请确认桌面客户端')
+    env.checkError = e?.message || '环境检测失败，请确认桌面客户端后重试'
   } finally {
-    env.checked = true
     env.loading = false
     // 已就绪则直接进入下一步
-    if (env.installed) activeStep.value = STEP.PICK
+    if (env.checked && env.installed) activeStep.value = STEP.PICK
   }
 }
 
@@ -230,11 +244,13 @@ const pick = reactive({
   starting: false, // 点击“打开浏览器”后的过渡态
   active: false, // 点选会话是否进行中
   state: null, // webauto_pick_state 的原始 data
-  finishing: false // 完成选取 loading
+  finishing: false, // 完成选取 loading
+  startError: '',
+  pollFailures: 0
 })
 
 // 命中数量（容器/重复块）
-const containerCount = computed(() => pick.state?.containerSample || 0)
+const containerCount = computed(() => Number(pick.state?.containerCount) || 0)
 const pickFields = computed(() => pick.state?.fields || [])
 const hasPagination = computed(() => !!pick.state?.pagination)
 const pickDetailActive = computed(() => !!pick.state?.detailActive)
@@ -248,18 +264,19 @@ const startPick = async () => {
     return
   }
   pick.starting = true
+  pick.startError = ''
+  pick.pollFailures = 0
   try {
     const { ok, message } = await pyCall('webauto_pick_start', { url: pick.url.trim() })
     if (!ok) {
-      ElMessage.error(message || '打开浏览器失败')
+      pick.startError = message || '浏览器启动失败，请检查环境后重试'
       return
     }
     pick.active = true
     pick.state = null
     pollPick()
-    ElMessage.success('浏览器已打开，请按提示在页面上点选')
   } catch (e) {
-    ElMessage.error(e?.message || '打开浏览器失败')
+    pick.startError = e?.message || '浏览器启动请求失败，请检查连接后重试'
   } finally {
     pick.starting = false
   }
@@ -271,10 +288,22 @@ const pollPick = () => {
   timers.pick = setInterval(async () => {
     try {
       const { ok, data } = await pyCall('webauto_pick_state')
-      if (!ok || !data) return
+      if (!ok || !data) {
+        pick.pollFailures += 1
+        if (pick.pollFailures >= 3) {
+          clearTimer('pick')
+          pick.startError = '无法读取浏览器点选状态，请检查桌面客户端连接后重试。'
+          pick.active = false
+        }
+        return
+      }
+      pick.pollFailures = 0
       pick.state = data
       if (data.error) {
-        ElMessage.error(data.error)
+        pick.startError = data.error
+        clearTimer('pick')
+        pick.active = false
+        return
       }
       // 用户在浏览器里点了“完成” → 自动收尾
       if (data.done) {
@@ -285,9 +314,15 @@ const pollPick = () => {
       if (data.active === false && !data.done) {
         clearTimer('pick')
         pick.active = false
+        pick.startError = '点选浏览器已关闭，请重新打开后再试。'
       }
     } catch (e) {
-      // 轮询期间的偶发异常不打断用户，仅在严重时停止
+      pick.pollFailures += 1
+      if (pick.pollFailures >= 3) {
+        clearTimer('pick')
+        pick.active = false
+        pick.startError = e?.message || '无法读取浏览器点选状态，请检查桌面客户端连接后重试。'
+      }
     }
   }, 800)
 }
@@ -321,12 +356,18 @@ const cancelPick = async () => {
   clearTimer('pick')
   pick.active = false
   pick.state = null
+  pick.startError = ''
   if (!hasPyApi()) return
   try {
     await pyCall('webauto_pick_cancel')
   } catch (e) {
     /* 忽略：取消失败不影响用户 */
   }
+}
+
+const retryPick = async () => {
+  await cancelPick()
+  await startPick()
 }
 
 /* ============================================================
@@ -346,6 +387,7 @@ watch(
   config,
   () => {
     sample.value = null
+    sampleError.value = ''
   },
   { deep: true }
 )
@@ -501,7 +543,7 @@ const startRun = async () => {
   try {
     const { ok, message, data } = await pyCall('webauto_collect', buildCollectOptions())
     if (!ok) {
-      ElMessage.error(message || '启动采集失败')
+      run.error = message || '采集失败，请检查网页会话和采集配置后重试'
       return
     }
     if (data) Object.assign(run, { resultId: data.resultId || '', total: data.total || 0, rows: data.rows || [], columns: data.columns || [], done: true, success: !data.partial && ok, outputPath: data.outputPath || '' })
@@ -509,7 +551,7 @@ const startRun = async () => {
     run.stopping = false
     clearTimer('run')
   } catch (e) {
-    ElMessage.error(e?.message || '启动采集失败')
+    run.error = e?.message || '采集失败，请检查网页会话和采集配置后重试'
   } finally {
     run.starting = false
     run.running = false
@@ -641,15 +683,23 @@ checkEnv()
         </div>
 
         <template v-else>
-          <!-- 依赖没装好 -->
-          <el-alert v-if="env.checked && !env.ready" type="warning" :closable="false" show-icon title="还缺少必要的程序组件" description="请先在命令行运行 pnpm run init 安装依赖后再使用本功能。" />
+          <template v-if="env.checkError">
+            <el-alert type="error" :closable="false" show-icon title="无法检测网页采集环境" :description="env.checkError" />
+            <div class="wa-actions"><el-button type="primary" :icon="Loading" @click="checkEnv">重新检测</el-button></div>
+          </template>
+
+          <!-- Playwright 运行组件缺失 -->
+          <template v-else-if="env.checked && !env.ready">
+            <el-alert type="error" :closable="false" show-icon title="当前客户端缺少网页采集运行组件" description="桌面版请先重启客户端；如果仍无法使用，请安装最新版。若你正在本地开发，再运行 pnpm run init 安装依赖。" />
+            <div class="wa-actions"><el-button type="primary" :icon="Loading" @click="checkEnv">重新检测</el-button></div>
+          </template>
 
           <!-- 需要下载浏览器内核 -->
           <div v-else class="wa-card">
             <div class="wa-card-head">
               <el-icon :size="22"><Download /></el-icon>
               <div>
-                <h4>首次使用需要下载浏览器内核</h4>
+                <h4>{{ env.installed ? '浏览器内核已就绪' : '首次使用需要下载浏览器内核' }}</h4>
                 <p class="muted">大约 150MB，只需下载这一次，以后就不用再下了。</p>
               </div>
             </div>
@@ -694,6 +744,12 @@ checkEnv()
           </div>
         </div>
 
+        <div v-if="pick.startError" class="mt">
+          <el-alert type="error" :closable="false" show-icon title="浏览器点选未能继续" />
+          <p class="wa-error-detail">{{ pick.startError }}</p>
+          <el-button class="mt8" size="small" type="primary" :loading="pick.starting" @click="retryPick">重试打开浏览器</el-button>
+        </div>
+
         <!-- 操作说明 -->
         <el-alert type="info" :closable="false" show-icon class="mt" title="操作很简单，跟着做就行：">
           <ol class="guide">
@@ -716,6 +772,8 @@ checkEnv()
               <el-button type="success" :icon="CircleCheck" :loading="pick.finishing" @click="finishPick">完成选取</el-button>
             </div>
           </div>
+
+          <el-alert v-if="!pick.state && !pick.startError" type="info" :closable="false" show-icon class="mt" title="正在启动浏览器并等待网页就绪" description="启动完成后会显示页面点选状态；若浏览器关闭或连接中断，这里会保留错误并提供重试。" />
 
           <!-- 列表块 -->
           <div class="pick-block">
@@ -879,6 +937,7 @@ checkEnv()
           <el-button :loading="sampling" @click="validateSample">读取样本并检查</el-button>
           <el-button type="primary" :icon="Setting" @click="goExport">下一步：正式采集</el-button>
         </div>
+        <el-alert v-if="sampleError" type="error" :closable="false" show-icon class="mt" title="样本验证未通过" :description="sampleError" />
         <el-table v-if="sample" :data="sample.rows" max-height="300"><el-table-column v-for="column in sample.columns" :key="column" :prop="column" :label="column" min-width="160" /></el-table>
       </section>
 
@@ -1048,6 +1107,12 @@ checkEnv()
 .muted {
   color: var(--ppx-text-muted);
   font-size: 13px;
+}
+.wa-error-detail {
+  margin: 8px 0 0;
+  color: var(--el-color-danger);
+  font-size: 13px;
+  overflow-wrap: anywhere;
 }
 .hint {
   font-size: 12.5px;

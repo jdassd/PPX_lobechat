@@ -1,0 +1,15 @@
+{
+  "command": [
+    "D:\\bc\\PPX_lobechat\\pyapp\\pyenv\\pyenv\\Scripts\\python.exe",
+    "-u",
+    "-c",
+    "import faulthandler,runpy,sys,threading,time; sys.path.insert(0,\"tests/e2e\"); faulthandler.dump_traceback_later(120,repeat=True); tracefile=\"build/verification/v2.17.4-workspace-e2e-retry-trace.log\"; last=[0.0]; deftrace=None; exec(\"def tracer(frame,event,arg):\\n now=time.monotonic()\\n fn=frame.f_code.co_filename.replace(\\\"/\\\",\\\"\\\\\\\\\\\")\\n if \\\"\\\\\\\\tests\\\\\\\\e2e\\\\\\\\\\\" in fn and (event==\\\"call\\\" or now-last[0]>=1):\\n  with open(tracefile,\\\"a\\\",encoding=\\\"utf-8\\\") as f: f.write(f\\\"{now:.1f} {event} {frame.f_code.co_name} {fn}:{frame.f_lineno}\\\\n\\\")\\n  last[0]=now\\n return tracer\"); sys.settrace(tracer); threading.settrace(tracer); sys.argv=[\"workspace_flow.py\"]; runpy.run_path(\"tests/e2e/workspace_flow.py\",run_name=\"__main__\")"
+  ],
+  "pid": 46948,
+  "exit_code": 0,
+  "timed_out": false,
+  "duration_seconds": 387.44,
+  "log": "D:\\bc\\PPX_lobechat\\build\\verification\\v2.17.4-workspace-e2e-retry.log",
+  "trace": "D:\\bc\\PPX_lobechat\\build\\verification\\v2.17.4-workspace-e2e-retry-trace.log",
+  "finished": "2026-10-20T10:47:05+0800"
+}

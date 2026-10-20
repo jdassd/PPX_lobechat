@@ -112,6 +112,14 @@
 - 发布提交 `ab21f69904857db6141e5bb50ccc8b70e8cb349b` 与附注 Tag `v2.17.3` 已成功推送。Tag CI `39207926926` 的三平台检查、构建及 release 任务全部成功，2026-10-19 06:24:28 UTC 正式发布；重复的分支 CI `39207910480` 主动取消。三份 Release 附件、发布说明、最新正式版与 Tag 提交已核对；Windows 安装包实际下载的字节数及 SHA-256 匹配，固定文件版本为 `2.17.3.0`。[Release](https://github.com/jdassd/PPX_lobechat/releases/tag/v2.17.3)，[发布后校验](releases/assets/v2.17.3/publication.json)。
 - v2.17.2 Tag CI `39203616896` 已取消且没有 GitHub Release；保留标签历史。记录见 [发布说明](releases/v2.17.3.md) 与 [验证清单](releases/assets/v2.17.3/verification.json)。原生安装升级恢复、CEF、其他 DPI、多屏、广泛 OCR 与 LibreOffice 验收继续保持 pending。
 
+## 待发布：v2.17.4 浏览器采集修复
+
+- 用户指定 Google 搜索页 `https://www.google.com.hk/search?q=123` 在产品 API 的有头浏览器中实际点选后，预览与正式采集各成功两行，JSON 导出存在。独立无头预检曾遇到验证页；另验证挑战页提示、保留会话及恢复，未把验证页当作采集成功。
+- 修正冻结安装包将 `sys.executable -m playwright` 错当作 Playwright CLI、同步 Playwright 桥接回调等待、浏览器可执行文件就绪检查及有限脱敏失败诊断；验证页在采集前提示人工验证并保留浏览器会话。增加驱动安装 `--dry-run` 检查，该检查不代表实际安装完成。
+- 修复检测、启动等待、重试反馈和容器数量契约。190 项 Python、25 项前端检查、静态检查（141 条既有警告，0 错误）、构建、完整 E2E 与界面巡检通过。新回归实际点击浏览器工具条，预览/采集两行并重开 Excel 核对。曾因隐藏菜单同名定位器失败，限定可见采集状态后完整重跑通过，未沿用旧报告。
+- 最终 Windows 冻结程序从空隔离缓存通过真实 API 下载安装并启动 Chromium 130.0.6723.31，桥接、AES 切页、图像及 OCR 冒烟通过。原生界面首次下载因自动化未取得可操作窗口且工具停止，未完成验收。证据见 [发布说明](releases/v2.17.4.md) 与 [验证清单](releases/assets/v2.17.4/verification.json)。
+- 正式发版须等待已推送 Tag 的三平台 CI 成功；此前原生安装升级恢复、其他 DPI/多屏、CEF、广泛 OCR 与 LibreOffice 验收仍为 pending。
+
 ## 后续候选方向
 
 1. 操作目录与真实输入输出契约对齐，特别是工作流结果字段选择，减少可提前避免的链路配置错误。

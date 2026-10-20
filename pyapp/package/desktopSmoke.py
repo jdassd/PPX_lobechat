@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import json
+import os
 import platform
+import subprocess
 import sys
 import tempfile
 import time
@@ -14,6 +16,12 @@ def main():
     from PIL import Image, ImageDraw, ImageFont
 
     from api.api import API
+    from api.webauto import (
+        WebAutoTool,
+        _wa_install_command,
+        _wa_install_creation_options,
+        _wa_install_environment,
+    )
     from pyapp.config.config import Config
     from pyapp.db.db import DB
 
@@ -22,6 +30,24 @@ def main():
     target.parent.mkdir(parents=True, exist_ok=True)
     report = {'passed': False, 'platform': platform.system(), 'python': platform.python_version(),
               'frozen': bool(getattr(sys, 'frozen', False))}
+    install_browser = os.environ.get('PPX_DESKTOP_SMOKE_INSTALL_BROWSER') == '1'
+    browser_cache = None
+    if install_browser:
+        cache_value = os.environ.get('PLAYWRIGHT_BROWSERS_PATH', '').strip()
+        if not cache_value:
+            report['error'] = 'Opt-in browser install requires an isolated PLAYWRIGHT_BROWSERS_PATH.'
+            target.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+            return 1
+        browser_cache = Path(cache_value)
+        if not browser_cache.is_absolute():
+            report['error'] = 'PLAYWRIGHT_BROWSERS_PATH must be an absolute path.'
+            target.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+            return 1
+        browser_cache = browser_cache.resolve()
+        if not browser_cache.is_dir() or any(browser_cache.iterdir()):
+            report['error'] = 'PLAYWRIGHT_BROWSERS_PATH must already exist and be empty.'
+            target.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+            return 1
     with tempfile.TemporaryDirectory(prefix='ppx-desktop-check-', ignore_cleanup_errors=True) as temporary:
         root = Path(temporary)
         import fitz
@@ -49,6 +75,35 @@ def main():
             target.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
             return 1
 
+        # Confirm the same bundled Node driver used by the install worker can resolve
+        # the matching Chromium packages without downloading the browser archives.
+        try:
+            install_command = _wa_install_command()
+            dry_run_command = install_command[:-1] + ['--dry-run', 'chromium']
+            dry_run = subprocess.run(
+                dry_run_command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                timeout=45,
+                env=_wa_install_environment(),
+                **_wa_install_creation_options(),
+            )
+            dry_run_output = dry_run.stdout or ''
+            if dry_run.returncode != 0 or 'chromium' not in dry_run_output.lower() or 'install location' not in dry_run_output.lower():
+                raise RuntimeError(f'Playwright CLI dry-run exit={dry_run.returncode}: {dry_run_output[-2000:]}')
+            report['playwrightInstallDryRun'] = {
+                'passed': True,
+                'command': [Path(dry_run_command[0]).name, *dry_run_command[1:]],
+                'downloadedBrowser': False,
+            }
+        except Exception as exc:
+            report['error'] = f'Bundled Playwright Node CLI install dry-run failed: {exc}'
+            target.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+            return 1
+
         Config.appDataDir = str(root / 'data')
         Config.downloadDir = str(root / 'outputs')
         Path(Config.appDataDir).mkdir()
@@ -61,6 +116,92 @@ def main():
         ImageDraw.Draw(ocr_image).text((70, 90), 'PPX OCR TEST 12345', font=ImageFont.load_default(size=80), fill='black')
         ocr_image.save(ocr_source)
         api = API()
+        if install_browser:
+            installer_thread = None
+            browser = None
+            install_status = None
+            initial_installed = False
+            try:
+                # The cache path is supplied by the caller and checked empty above. Keep
+                # the process environment and Playwright's installer on that same cache.
+                os.environ['PLAYWRIGHT_BROWSERS_PATH'] = str(browser_cache)
+                initial_status = api.webauto_status()
+                if initial_status.get('code') != 0:
+                    raise RuntimeError(f'Initial browser status failed: {initial_status.get("msg", "unknown error")}')
+                initial_installed = bool(initial_status.get('installed'))
+                if initial_installed:
+                    raise RuntimeError('Isolated browser cache was unexpectedly reported as installed.')
+                start_result = api.webauto_install_browser()
+                if start_result.get('code') != 0:
+                    raise RuntimeError(f'Browser install could not start: {start_result.get("msg", "unknown error")}')
+                installer_thread = getattr(api, '_wa_install_thread', None)
+                install_deadline = time.monotonic() + 900
+                while time.monotonic() < install_deadline:
+                    install_status = api.webauto_install_status()
+                    if install_status.get('code') != 0:
+                        raise RuntimeError(f'Browser install status failed: {install_status.get("msg", "unknown error")}')
+                    if install_status.get('done'):
+                        break
+                    time.sleep(0.5)
+                else:
+                    raise TimeoutError('Isolated first browser install exceeded 15 minutes.')
+                if not install_status.get('success'):
+                    raise RuntimeError(f'Browser install failed: {install_status.get("error") or "unknown error"}')
+                final_status = api.webauto_status()
+                if final_status.get('code') != 0 or not final_status.get('installed'):
+                    raise RuntimeError(f'Installed browser was not reported ready: {final_status.get("msg", "unknown error")}')
+
+                webauto_service = api._services[WebAutoTool]
+                executables = [
+                    candidate
+                    for directory_name in webauto_service._wa_expected_chromium_dirs()
+                    for candidate in webauto_service._wa_chromium_executable_candidates(browser_cache / directory_name)
+                    if candidate.is_file()
+                ]
+                if not executables:
+                    raise FileNotFoundError('The installed Chromium executable was not found in the isolated cache.')
+                executable = executables[0].resolve()
+                page_file = browser_cache.parent / 'ppx-frozen-browser-smoke.html'
+                page_file.write_text('<!doctype html><title>PPX Chromium smoke</title><main id="result">local browser ready</main>', encoding='utf-8')
+                from playwright.sync_api import sync_playwright
+
+                with sync_playwright() as playwright:
+                    browser = playwright.chromium.launch(headless=True)
+                    page = browser.new_page()
+                    page.goto(page_file.as_uri(), wait_until='load', timeout=30000)
+                    local_text = page.locator('#result').inner_text()
+                    browser_version = browser.version
+                    if local_text != 'local browser ready':
+                        raise ValueError(f'Installed Chromium could not read the local smoke page: {local_text!r}')
+                browser = None
+                report['firstBrowserInstall'] = {
+                    'initialInstalled': initial_installed,
+                    'done': bool(install_status.get('done')),
+                    'success': bool(install_status.get('success')),
+                    'installed': bool(final_status.get('installed')),
+                    'currentExecutable': str(executable),
+                    'browserVersion': browser_version,
+                    'downloadedBrowser': True,
+                    'localPageText': local_text,
+                    'cachePathIsolated': True,
+                }
+            except Exception as exc:
+                report['firstBrowserInstall'] = {
+                    'initialInstalled': initial_installed,
+                    'done': bool(install_status.get('done')) if install_status else False,
+                    'success': bool(install_status.get('success')) if install_status else False,
+                    'installed': False,
+                    'downloadedBrowser': False,
+                }
+                report['error'] = f'Frozen first browser install smoke failed: {exc}'
+                target.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+                return 1
+            finally:
+                if browser is not None:
+                    browser.close()
+                if installer_thread is not None and installer_thread.is_alive():
+                    installer_thread.join(timeout=5)
+                os.environ.pop('PLAYWRIGHT_BROWSERS_PATH', None)
         resource = Path(Config.codeDir) / ('web/index.html' if getattr(sys, 'frozen', False) else 'gui/dist/index.html')
         if not resource.is_file():
             raise FileNotFoundError(f'Build the frontend before desktop verification: {resource}')
@@ -154,10 +295,13 @@ def main():
                     raise ValueError(f'Bundled OCR result mismatch: {ocr_text!r}')
                 report.update(passed=True, operations=state['operations'], checks=[
                     'bundled frontend loads', 'native Pywebview bridge', 'operation catalog resource',
-                    'bundled PyPDF2 AES provider', 'isolated image processing child', 'SQLite task persistence',
+                    'bundled PyPDF2 AES provider', 'bundled Playwright Node CLI install dry-run (no browser download)',
+                    'isolated image processing child', 'SQLite task persistence',
                     'AES-256 pdf_cut task through isolated worker', 'output page order and text',
                     'bundled RapidOCR/ONNX models through isolated worker',
                     'image output dimensions and alpha'])
+                if install_browser:
+                    report['checks'].append('isolated actual first Chromium download and local-page launch')
                 report['pdfCut'] = {'status': pdf_task['status'], 'pages': page_texts}
                 report['ocr'] = {'status': ocr_task['status'], 'text': ocr_text}
             except Exception as exc:
