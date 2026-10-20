@@ -1,0 +1,15 @@
+{
+  "tag": "v2.17.4",
+  "commit": "dbd70ad75ebf4664d1de7296911e133dc073595e",
+  "runId": 39361638442,
+  "runUrl": "https://github.com/jdassd/PPX_lobechat/actions/runs/39361638442",
+  "jobs": { "linux": "success", "macos": "success", "windows": "failure", "release": "skipped" },
+  "windowsFailedJobId": 118428935668,
+  "failedStep": "complete workspace E2E",
+  "failedAssertion": "duplicate_review_flow.py:148 expected incomplete scan summary within 5000ms",
+  "failureEvidence": "CI screenshot and trace show the scan button still loading, no summary, and no page errors",
+  "backendFinalResult": "not captured in the failed attempt",
+  "releaseCreated": false,
+  "tagPreserved": true,
+  "followup": "v2.17.5 increases the asynchronous scan-result expectation to 60s while retaining every existing result assertion; two local targeted reruns passed"
+}

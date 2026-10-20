@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/Vue-3.0+-4FC08D?style=flat-square&logo=vue.js&logoColor=white" alt="Vue 3" />
   <img src="https://img.shields.io/badge/Python-3.10-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.10" />
   <img src="https://img.shields.io/badge/Pywebview-5.0+-FFD43B?style=flat-square&logo=python&logoColor=blue" alt="Pywebview" />
-  <img src="https://img.shields.io/badge/version-2.17.4-2b6fff?style=flat-square" alt="Version 2.17.4" />
+  <img src="https://img.shields.io/badge/version-2.17.5-2b6fff?style=flat-square" alt="Version 2.17.5" />
   <img src="https://img.shields.io/badge/License-AGPL--3.0-green?style=flat-square" alt="License" />
 </p>
 
@@ -20,17 +20,17 @@
 
 ## 📖 简介
 
-**PPX 2.17.4** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
+**PPX 2.17.5** 是一款面向日常办公的本地桌面工作台。它通过 Vue 3 提供统一界面，由 Python 在本机完成图片、PDF、Word、Excel、全文检索和文件批处理；文件默认不上传到第三方服务。
 
-2.17.4 修复冻结版浏览器安装命令、点选事件回调和匹配数量显示，并保留可重试的错误提示。已验证冻结程序从空缓存下载并启动浏览器、真实点选后导出 Excel，以及指定 Google 搜索页的有头预览和采集。
+2.17.5 延续浏览器安装、点选事件回调和匹配数量修复，并修正重复项检查在慢速扫描时过早超时的回归等待。浏览器流程及冻结程序空缓存安装的验证记录见发布说明；本版冻结构建和自动发版仍以 Tag CI 成功为准。
 
-更新内容与验收范围见 [v2.17.4 发布说明](docs/releases/v2.17.4.md)。
+更新内容与验收范围见 [v2.17.5 发布说明](docs/releases/v2.17.5.md)。
 
 定位、目标用户、14 个模块的输入输出与异常设计、协作流程、优先级和扩展边界见 [统一工具箱设计方案](docs/toolbox-design.md)。
 
 ## ✨ 主要功能
 
-PPX 2.17.4 的核心能力包括：
+PPX 2.17.5 的核心能力包括：
 
 ### 📄 文档与数据
 

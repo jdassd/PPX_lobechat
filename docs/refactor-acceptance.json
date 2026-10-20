@@ -1,21 +1,22 @@
 {
   "schemaVersion": 1,
-  "version": "2.17.4",
+  "version": "2.17.5",
   "note": "发布决定与验收状态分开记录；未验证项目保持 pending，不因发版改为 passed。",
   "release": {
-    "tag": "v2.17.4",
+    "tag": "v2.17.5",
     "allowPendingAcceptance": true,
-    "reason": "沿用用户修正完成后自动发版授权，修复冻结包浏览器安装命令、同步点选事件回调、容器数量契约及错误反馈。190 项 Python 测试、25 项前端检查、完整 E2E、界面巡检通过；真实点选预览采集并重开 Excel 通过。指定 Google 搜索网址在产品 API 的有头浏览器中预览和正式采集各成功两行；另验证挑战页提示及恢复。最终 Windows 冻结程序从空缓存实际下载安装并启动 Chromium，桥接、AES 切页、图像和 OCR 冒烟通过。证据见 docs/releases/assets/v2.17.4/verification.json。原生界面首次下载操作未完成验收；安装器安装升级恢复、其他 DPI/多屏、CEF、广泛 OCR 与 LibreOffice 继续保持 pending。本版正式产物必须来自已推送 Tag 提交的三平台成功 CI。"
+    "reason": "沿用用户修正完成后自动发版授权，承接浏览器采集修复并修正慢速重复项扫描测试过早超时的问题。v2.17.4 已记录 190 项 Python 测试、25 项前端检查、完整 E2E、界面巡检、真实点选导出、指定 Google 搜索页有头采集及 Windows 冻结程序空缓存安装；这些是前一版本的实现验证，不冒充 v2.17.5 最终构建证据。v2.17.4 Tag CI 的 Windows 工作因旧重复项测试等待超时失败，v2.17.5 重复扫描专项两轮及最终 Windows 冻结冒烟已通过，正式 Tag CI 待完成。原生界面首次下载操作未完成验收；安装器安装升级恢复、其他 DPI/多屏、CEF、广泛 OCR 与 LibreOffice 继续保持 pending。本版正式产物必须来自已推送 Tag 提交的三平台成功 CI。"
   },
   "preReleaseLocalEvidence": {
-    "browserCollection": "docs/releases/assets/v2.17.4/verification.json",
-    "pythonTestsPassed": 190,
-    "frontendContractsPassed": 25,
-    "lintErrors": 0,
-    "lintExistingWarnings": 141,
-    "finalCommitEndToEnd": "passed on release working tree; final Tag CI pending",
+    "browserCollectionInherited": "docs/releases/assets/v2.17.4/verification.json",
+    "previousVersionPythonTestsPassed": 190,
+    "previousVersionFrontendContractsPassed": 25,
+    "previousVersionLintErrors": 0,
+    "previousVersionLintExistingWarnings": 141,
+    "duplicateScanTargetedReruns": "2 passed, exit 0; all existing result assertions retained",
+    "finalCommitEndToEnd": "v2.17.5 exact Tag CI pending; browser implementation full local E2E passed in v2.17.4",
     "finalTagCi": "pending",
-    "finalFrozenPackageAfterHomePolish": "passed; frozen actual first Chromium download and launch, AES, image, OCR, bridge"
+    "finalFrozenPackageAfterHomePolish": "v2.17.5 passed; browser CLI, bridge, AES PDF cut, images and actual OCR"
   },
   "phases": {
     "1": {

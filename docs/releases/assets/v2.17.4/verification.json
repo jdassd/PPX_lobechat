@@ -1,7 +1,7 @@
 {
   "version": "2.17.4",
   "date": "2026-10-20",
-  "status": "local-validation-passed-publication-pending",
+  "status": "ci-failed-no-release-tag-preserved",
   "reportedFailure": {
     "feature": "browser collection",
     "userProvidedUrl": "https://www.google.com.hk/search?q=123",
@@ -76,10 +76,10 @@
     "localVisualExit": "visual-exit.json"
   },
   "publication": {
-    "commit": "pending",
-    "commitPushed": false,
-    "tagCiRunId": null,
-    "tagCiConclusion": "pending",
+    "commit": "dbd70ad75ebf4664d1de7296911e133dc073595e",
+    "commitPushed": true,
+    "tagCiRunId": 39361638442,
+    "tagCiConclusion": "failure; Windows scan-result assertion timed out; Linux/macOS passed; see ci-failure.json",
     "releaseUrl": null
   }
 }

@@ -1,0 +1,61 @@
+{
+  "version": "2.17.5",
+  "date": "2026-10-20",
+  "status": "validation-in-progress-publication-pending",
+  "scope": {
+    "productChanges": "inherits browser collection fixes from v2.17.4",
+    "ciRegressionFix": "condition the duplicate-review scan wait so slow scans are not treated as missing results",
+    "previousTag": "v2.17.4",
+    "previousTagCiRunId": "39361638442",
+    "previousTagCi": {
+      "linux": "passed",
+      "macos": "passed",
+      "windows": "failed: duplicate_review_flow.py timed out waiting for scan results after 5 seconds",
+      "windowsScanResultConclusion": "unknown; failure screenshot was captured while scan was still running",
+      "releaseCreated": false,
+      "tagPreserved": true
+    }
+  },
+  "inheritedEvidence": {
+    "sourceVersion": "2.17.4",
+    "evidenceFile": "../v2.17.4/verification.json",
+    "pythonTestsPassed": 190,
+    "frontendContractsPassed": 25,
+    "lintErrors": 0,
+    "lintExistingWarnings": 141,
+    "fullWorkspaceEndToEnd": "passed",
+    "visualSweep": "passed",
+    "realPickerToExcel": "passed: toolbar selection, two-row preview and collection, reopened workbook values checked",
+    "headedGoogleProductFlow": "passed: user-provided search URL, two-row preview and collection",
+    "frozenEmptyCacheInstall": "passed: actual Chromium 130.0.6723.31 download and launch; bridge, AES page cut, image and OCR smoke passed",
+    "appliesTo": "same browser implementation; not a v2.17.5 final-build or Tag-CI result"
+  },
+  "v2175Checks": {
+    "duplicateReviewWaitRegression": { "passed": true, "localRuns": 2, "exitCodes": [0, 0], "testOnlyChange": "5s result expectation increased to 60s; all existing assertions retained" },
+    "pythonTests": "190 inherited; exact Tag CI pending",
+    "frontendContracts": "25 inherited; exact Tag CI pending",
+    "lint": "local Ruff passed; GUI unchanged apart from version; exact Tag CI pending",
+    "productionBuild": "passed; v2.17.5 GUI and Windows frozen build",
+    "fullWorkspaceEndToEnd": "pending",
+    "visualSweep": "pending",
+    "finalFrozenPackage": { "passed": true, "exitCode": 0, "frozen": true, "evidence": "frozen-smoke.json", "actualDownloadRepeated": false, "actualDownloadEvidence": "../v2.17.4/frozen-install-smoke.json" },
+    "tagCi": "pending"
+  },
+  "pendingValidation": [
+    "native UI first browser download",
+    "native installer installation, upgrade and restore",
+    "other Windows DPI hardware and multi-monitor migration",
+    "CEF mode",
+    "broad OCR documents and tables",
+    "LibreOffice optional dependency"
+  ],
+  "publication": {
+    "commit": "pending",
+    "commitPushed": false,
+    "tag": "v2.17.5",
+    "tagPushed": false,
+    "tagCiRunId": null,
+    "tagCiConclusion": "pending",
+    "releaseUrl": null
+  }
+}

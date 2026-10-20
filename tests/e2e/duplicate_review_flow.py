@@ -145,7 +145,7 @@ def verify_duplicate_review(api, page, root, report_dir):
         limit.fill('100')
         limit.press('Tab')
         start.click()
-        expect(panel.locator('.dedup-summary')).to_contain_text('扫描不完整')
+        expect(panel.locator('.dedup-summary')).to_contain_text('扫描不完整', timeout=60000)
         expect(panel.locator('.el-alert')).to_contain_text('达到文件数量上限')
         expect(panel.locator('.duplicate-files li')).to_have_count(20)
         panel.get_by_label('组内文件分页').locator('.btn-next').click()
