@@ -20,7 +20,11 @@
     "versionEvidence": "docs/releases/assets/v2.18.1/verification.json",
     "pythonTestsPassed": 202,
     "fullLocalEndToEnd": "inherited v2.18.0 complete Windows workspace and visual flow passed; v2.18.1 current CAJ delayed-search flow passed three rounds; final tag CI validates all flows",
-    "cajDelayedSearchReruns": 3
+    "cajDelayedSearchReruns": 3,
+    "finalTagCi": "39393669404: all three builds and release succeeded for 36b9586b8ca0a18701fa5238c22d878365dea91d",
+    "finalEndToEnd": "all three actual CI reports match the release commit; CAJ delayed-search flow and workspace/visual checks passed, zero page errors",
+    "publicationEvidence": "docs/releases/assets/v2.18.1/publication.json",
+    "windowsInstallerIntegrity": "actual download: 243358877 bytes, SHA-256 matches GitHub, file version 2.18.1.0"
   },
   "phases": {
     "1": {

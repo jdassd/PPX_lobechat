@@ -1,0 +1,72 @@
+{
+  "tag": "v2.18.1",
+  "releaseCommit": "36b9586b8ca0a18701fa5238c22d878365dea91d",
+  "commitPushed": true,
+  "tagPushed": true,
+  "annotatedTag": "09ef27926b2d6ddd1bbe79dcea33549d46129cd1",
+  "url": "https://github.com/jdassd/PPX_lobechat/releases/tag/v2.18.1",
+  "publishedAt": "2026-10-20T08:48:20Z",
+  "latest": true,
+  "draft": false,
+  "prerelease": false,
+  "ci": {
+    "runId": 39393669404,
+    "url": "https://github.com/jdassd/PPX_lobechat/actions/runs/39393669404",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "name": "build (ubuntu-latest)",
+        "conclusion": "success"
+      },
+      {
+        "name": "build (macos-latest)",
+        "conclusion": "success"
+      },
+      {
+        "name": "build (windows-latest)",
+        "conclusion": "success"
+      },
+      {
+        "name": "release",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "releaseNotesMatch": true,
+  "assets": [
+    {
+      "name": "-V2.18.1_Linux.deb",
+      "label": "多功能工具箱-V2.18.1_Linux.deb",
+      "size": 423874394,
+      "digest": "sha256:df19d898e375b0b2ce4300a3a64321bf5f72048a0f152ddf5c4b9f2f2e3bbfde",
+      "url": "https://github.com/jdassd/PPX_lobechat/releases/download/v2.18.1/-V2.18.1_Linux.deb",
+      "verification": "GitHub metadata verified"
+    },
+    {
+      "name": "-v2.18.1_macOS.dmg",
+      "label": "多功能工具箱-v2.18.1_macOS.dmg",
+      "size": 325599147,
+      "digest": "sha256:e4d230fa952e7daedc65f81ef0ad39a18f0d5aa9a2aa3b799fea6ef47956f95c",
+      "url": "https://github.com/jdassd/PPX_lobechat/releases/download/v2.18.1/-v2.18.1_macOS.dmg",
+      "verification": "GitHub metadata verified"
+    },
+    {
+      "name": "-V2.18.1_Windows.exe",
+      "label": "多功能工具箱-V2.18.1_Windows.exe",
+      "size": 243358877,
+      "digest": "sha256:3bf2da46b1dd72ef19b3c64eb7cbba1d08ef1f0bf5187eaf76c6952e26d18efd",
+      "url": "https://github.com/jdassd/PPX_lobechat/releases/download/v2.18.1/-V2.18.1_Windows.exe",
+      "verification": "downloaded bytes and file version verified"
+    }
+  ],
+  "windowsInstaller": {
+    "name": "-V2.18.1_Windows.exe",
+    "bytes": 243358877,
+    "sha256": "3bf2da46b1dd72ef19b3c64eb7cbba1d08ef1f0bf5187eaf76c6952e26d18efd",
+    "fileVersion": "2.18.1.0",
+    "sizeMatches": true,
+    "sha256Matches": true,
+    "versionMatches": true
+  },
+  "nativeInstallUpgradeRestore": "pending; installer was read, not installed"
+}

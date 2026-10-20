@@ -21,7 +21,7 @@
   "frontendProductionBuild": "passed",
   "cajBrowserFlow": "caj-pdf-flow.json",
   "windowsFrozenSmoke": "caj-frozen-smoke.json",
-  "fullLocalRegression": "previous candidate full Windows flow passed; current search-refresh fix and final tag CI must be validated",
+  "fullLocalRegression": "inherited v2.18.0 complete Windows workspace passed; v2.18.1 delayed-search targeted flow passed three rounds; final tag CI complete flows passed on all three platforms",
   "fixtureScope": "synthetic CAJ containers matching pinned upstream layout; no real-world CAJ corpus; HN/C8/encrypted formats unsupported",
   "nativeInstallUpgradeRestore": "pending",
   "previousReleaseCandidate": {
@@ -35,5 +35,37 @@
     "passed": 3,
     "failed": 0,
     "scenario": "activation request delayed 1200 ms, latest search immediately refreshed, failed input retried"
-  }
+  },
+  "finalTagCi": {
+    "runId": 39393669404,
+    "codeCommit": "36b9586b8ca0a18701fa5238c22d878365dea91d",
+    "platforms": {
+      "Linux": {
+        "cajPassed": true,
+        "workspacePassed": true,
+        "visualPassed": true,
+        "revision": "36b9586b8ca0a18701fa5238c22d878365dea91d",
+        "pageErrors": 0,
+        "searchRaceVerified": true
+      },
+      "Windows": {
+        "cajPassed": true,
+        "workspacePassed": true,
+        "visualPassed": true,
+        "revision": "36b9586b8ca0a18701fa5238c22d878365dea91d",
+        "pageErrors": 0,
+        "searchRaceVerified": true
+      },
+      "macOS": {
+        "cajPassed": true,
+        "workspacePassed": true,
+        "visualPassed": true,
+        "revision": "36b9586b8ca0a18701fa5238c22d878365dea91d",
+        "pageErrors": 0,
+        "searchRaceVerified": true
+      }
+    },
+    "conclusion": "success"
+  },
+  "publication": "publication.json"
 }
